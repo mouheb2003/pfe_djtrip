@@ -5,51 +5,43 @@ class Organisator extends User {
   final String? numeroLicence;
   final String? adresseEntreprise;
   final String? siteWeb;
-  final List<String> specialites;
+  final List<String> typesActivites;
+  final int nombreActivites;
   final double noteMoyenne;
   final int nombreAvis;
   final List<String> certifications;
+  final List<String> languesProposees;
+  final int? capaciteMoyenne;
+  final String? description;
 
   Organisator({
-    required String id,
-    required String fullname,
-    required String email,
-    int? age,
-    String? numTel,
-    String? avatar,
-    String? bio,
-    String? paysOrigine,
-    required String status,
-    required DateTime dateInscription,
-    DateTime? derniereConnexion,
-    required bool notificationsEmail,
-    required bool notificationsSms,
-    required bool consentementDonnees,
+    required super.id,
+    required super.fullname,
+    required super.email,
+    super.age,
+    super.numTel,
+    super.avatar,
+    super.bio,
+    super.paysOrigine,
+    required super.status,
+    required super.dateInscription,
+    super.derniereConnexion,
+    required super.notificationsEmail,
+    required super.notificationsSms,
+    required super.consentementDonnees,
     required this.nomEntreprise,
     this.numeroLicence,
     this.adresseEntreprise,
     this.siteWeb,
-    required this.specialites,
+    required this.typesActivites,
+    required this.nombreActivites,
     required this.noteMoyenne,
     required this.nombreAvis,
     required this.certifications,
-  }) : super(
-         id: id,
-         fullname: fullname,
-         email: email,
-         userType: 'Organisator',
-         age: age,
-         numTel: numTel,
-         avatar: avatar,
-         bio: bio,
-         paysOrigine: paysOrigine,
-         status: status,
-         dateInscription: dateInscription,
-         derniereConnexion: derniereConnexion,
-         notificationsEmail: notificationsEmail,
-         notificationsSms: notificationsSms,
-         consentementDonnees: consentementDonnees,
-       );
+    required this.languesProposees,
+    this.capaciteMoyenne,
+    this.description,
+  }) : super(userType: 'Organisator');
 
   factory Organisator.fromJson(Map<String, dynamic> json) {
     return Organisator(
@@ -75,10 +67,14 @@ class Organisator extends User {
       numeroLicence: json['numero_licence'],
       adresseEntreprise: json['adresse_entreprise'],
       siteWeb: json['site_web'],
-      specialites: List<String>.from(json['specialites'] ?? []),
+      typesActivites: List<String>.from(json['types_activites'] ?? []),
+      nombreActivites: json['nombre_activites'] ?? 0,
       noteMoyenne: (json['note_moyenne'] ?? 0).toDouble(),
       nombreAvis: json['nombre_avis'] ?? 0,
       certifications: List<String>.from(json['certifications'] ?? []),
+      languesProposees: List<String>.from(json['langues_proposees'] ?? []),
+      capaciteMoyenne: json['capacite_moyenne'],
+      description: json['description'],
     );
   }
 
@@ -89,10 +85,14 @@ class Organisator extends User {
     data['numero_licence'] = numeroLicence;
     data['adresse_entreprise'] = adresseEntreprise;
     data['site_web'] = siteWeb;
-    data['specialites'] = specialites;
+    data['types_activites'] = typesActivites;
+    data['nombre_activites'] = nombreActivites;
     data['note_moyenne'] = noteMoyenne;
     data['nombre_avis'] = nombreAvis;
     data['certifications'] = certifications;
+    data['langues_proposees'] = languesProposees;
+    data['capacite_moyenne'] = capaciteMoyenne;
+    data['description'] = description;
     return data;
   }
 }

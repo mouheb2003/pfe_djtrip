@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../welcome_screen.dart';
+import '../onboarding/profile_completion_screen.dart';
 import 'new_login_screen.dart';
 
 class NewSignupScreen extends StatefulWidget {
-  const NewSignupScreen({Key? key}) : super(key: key);
+  const NewSignupScreen({super.key});
 
   @override
   State<NewSignupScreen> createState() => _NewSignupScreenState();
@@ -80,11 +80,11 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
     });
 
     if (result['success']) {
-      // Succès - Naviguer vers l'écran de bienvenue
+      // Succès - Naviguer vers l'écran de complétion du profil
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => WelcomeScreen(user: result['user']),
+          builder: (context) => ProfileCompletionScreen(user: result['user']),
         ),
       );
     } else {
@@ -134,9 +134,9 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                   ),
                   SizedBox(height: 40),
 
-                  // Titre
+                  // Title
                   Text(
-                    'Créer un compte',
+                    'Create an account',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -145,14 +145,14 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Rejoignez Travelo et commencez votre aventure',
+                    'Join Travelo and start your adventure',
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   SizedBox(height: 30),
 
-                  // Type d'utilisateur
+                  // User type
                   Text(
-                    'Je suis un...',
+                    'I am a...',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -166,7 +166,7 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                         child: _buildUserTypeCard(
                           type: 'Touriste',
                           icon: Icons.luggage,
-                          description: 'Explorer',
+                          description: 'Explore',
                         ),
                       ),
                       SizedBox(width: 12),
@@ -174,22 +174,22 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                         child: _buildUserTypeCard(
                           type: 'Organisator',
                           icon: Icons.business,
-                          description: 'Organiser',
+                          description: 'Organize',
                         ),
                       ),
                     ],
                   ),
                   SizedBox(height: 20),
 
-                  // Nom complet
+                  // Full name
                   _buildTextField(
                     controller: _fullNameController,
-                    label: 'Nom complet',
-                    hint: 'Votre nom complet',
+                    label: 'Full name',
+                    hint: 'Your full name',
                     icon: Icons.person_outline,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre nom';
+                        return 'Please enter your name';
                       }
                       return null;
                     },
@@ -200,31 +200,31 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                   _buildTextField(
                     controller: _emailController,
                     label: 'Email',
-                    hint: 'votre@email.com',
+                    hint: 'your@email.com',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre email';
+                        return 'Please enter your email';
                       }
                       if (!value.contains('@')) {
-                        return 'Email invalide';
+                        return 'Invalid email';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 16),
 
-                  // Nom d'entreprise (si Organisator)
+                  // Company name (if Organisator)
                   if (_selectedUserType == 'Organisator') ...[
                     _buildTextField(
                       controller: _nomEntrepriseController,
-                      label: 'Nom de l\'entreprise',
-                      hint: 'Nom de votre entreprise',
+                      label: 'Company name',
+                      hint: 'Your company name',
                       icon: Icons.business_outlined,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer le nom de l\'entreprise';
+                          return 'Please enter company name';
                         }
                         return null;
                       },
@@ -232,10 +232,10 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                     SizedBox(height: 16),
                   ],
 
-                  // Mot de passe
+                  // Password
                   _buildTextField(
                     controller: _passwordController,
-                    label: 'Mot de passe',
+                    label: 'Password',
                     hint: '••••••••',
                     icon: Icons.lock_outline,
                     obscureText: !_isPasswordVisible,
@@ -254,20 +254,20 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un mot de passe';
+                        return 'Please enter a password';
                       }
                       if (value.length < 6) {
-                        return 'Le mot de passe doit contenir au moins 6 caractères';
+                        return 'Password must be at least 6 characters';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 16),
 
-                  // Confirmer mot de passe
+                  // Confirm password
                   _buildTextField(
                     controller: _confirmPasswordController,
-                    label: 'Confirmer le mot de passe',
+                    label: 'Confirm password',
                     hint: '••••••••',
                     icon: Icons.lock_outline,
                     obscureText: !_isConfirmPasswordVisible,
@@ -287,14 +287,14 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez confirmer le mot de passe';
+                        return 'Please confirm password';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 20),
 
-                  // Accepter les conditions
+                  // Accept terms
                   Row(
                     children: [
                       Checkbox(
@@ -308,7 +308,7 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                       ),
                       Expanded(
                         child: Text(
-                          'J\'accepte les conditions d\'utilisation et la politique de confidentialité',
+                          'I accept the terms of use and privacy policy',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],
@@ -319,7 +319,7 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                   ),
                   SizedBox(height: 24),
 
-                  // Bouton S'inscrire
+                  // Sign Up Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -336,7 +336,7 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                       child: _isLoading
                           ? CircularProgressIndicator(color: Colors.white)
                           : Text(
-                              'S\'inscrire',
+                              'Sign Up',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -346,7 +346,7 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                   ),
                   SizedBox(height: 16),
 
-                  // Lien vers connexion
+                  // Link to login
                   Center(
                     child: TextButton(
                       onPressed: () {
@@ -362,11 +362,11 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                           style: TextStyle(fontSize: 15),
                           children: [
                             TextSpan(
-                              text: 'Vous avez déjà un compte? ',
+                              text: 'Already have an account? ',
                               style: TextStyle(color: Colors.grey[700]),
                             ),
                             TextSpan(
-                              text: 'Se connecter',
+                              text: 'Log In',
                               style: TextStyle(
                                 color: Color(0xFFFF6B1A),
                                 fontWeight: FontWeight.bold,
@@ -377,7 +377,56 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
                       ),
                     ),
                   ),
+                  // Separator "OR"
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey[400])),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OU',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey[400])),
+                    ],
+                  ),
+                  SizedBox(height: 24),
+
                   SizedBox(height: 20),
+                  // Social signup buttons
+                  _buildSocialButton(
+                    label: 'Continue with Google',
+                    icon: Icons.g_mobiledata,
+                    color: Colors.white,
+                    textColor: Colors.black87,
+                    borderColor: Colors.grey[300]!,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Connexion Google en développement'),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildSocialButton(
+                    label: 'Continue with Facebook',
+                    icon: Icons.facebook,
+                    color: Color(0xFF1877F2),
+                    textColor: Colors.white,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Connexion Facebook en développement'),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 24),
                 ],
               ),
             ),
@@ -431,6 +480,42 @@ class _NewSignupScreenState extends State<NewSignupScreen> {
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required Color textColor,
+    Color? borderColor,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, color: textColor, size: 28),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: borderColor != null
+                ? BorderSide(color: borderColor, width: 1)
+                : BorderSide.none,
+          ),
+          elevation: borderColor != null ? 0 : 2,
         ),
       ),
     );

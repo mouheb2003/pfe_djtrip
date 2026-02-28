@@ -5,16 +5,16 @@ import '../models/user.dart';
 import 'storage_service.dart';
 
 class AuthService {
-  // Inscription (Sign Up)
+  // Sign Up
   static Future<Map<String, dynamic>> signUp({
     required String fullname,
     required String email,
     required String password,
-    required String userType, // "Touriste" ou "Organisator"
-    String? nomEntreprise, // Requis si userType == "Organisator"
+    required String userType, // "Touriste" or "Organisator"
+    String? nomEntreprise, // Required if userType == "Organisator"
   }) async {
     try {
-      // Préparer le body
+      // Prepare the body
       final body = {
         'fullname': fullname,
         'email': email,
@@ -22,7 +22,7 @@ class AuthService {
         'userType': userType,
       };
 
-      // Si c'est un organisateur, ajouter le nom de l'entreprise
+      // If it's an organizer, add the company name
       if (userType == 'Organisator' && nomEntreprise != null) {
         body['nom_entreprise'] = nomEntreprise;
       }
@@ -44,7 +44,7 @@ class AuthService {
           refreshToken: data['refreshToken'],
         );
 
-        // Sauvegarder les informations utilisateur
+        // Save user information
         final user = User.fromJson(data['user']);
         await StorageService.saveUserInfo(
           userId: user.id,
@@ -56,7 +56,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de l\'inscription',
+          'message': data['message'] ?? 'Error during registration',
         };
       }
     } catch (e) {
@@ -67,7 +67,7 @@ class AuthService {
     }
   }
 
-  // Connexion (Sign In)
+  // Sign In
   static Future<Map<String, dynamic>> signIn({
     required String email,
     required String password,
@@ -94,7 +94,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Erreur lors de la connexion',
+          'message': data['message'] ?? 'Error during login',
         };
       }
     } catch (e) {
@@ -105,13 +105,13 @@ class AuthService {
     }
   }
 
-  // Récupérer les informations de l'utilisateur connecté
+  // Get logged-in user information
   static Future<Map<String, dynamic>> getMyInfo() async {
     try {
       final accessToken = await StorageService.getAccessToken();
 
       if (accessToken == null) {
-        return {'success': false, 'message': 'Non connecté'};
+        return {'success': false, 'message': 'Not logged in'};
       }
 
       final response = await http
@@ -132,9 +132,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message':
-              data['message'] ??
-              'Erreur lors de la récupération des informations',
+          'message': data['message'] ?? 'Error retrieving information',
         };
       }
     } catch (e) {
@@ -145,7 +143,7 @@ class AuthService {
     }
   }
 
-  // Rafraîchir le token
+  // Refresh token
   static Future<bool> refreshAccessToken() async {
     try {
       final refreshToken = await StorageService.getRefreshToken();
@@ -176,8 +174,29 @@ class AuthService {
     }
   }
 
-  // Déconnexion
+  // Logout
   static Future<void> logout() async {
-    await StorageService.clearAll();
+    try {
+      final accessToken = await StorageService.getAccessToken();
+
+      // Call backend to set status to inactive
+      if (accessToken != null) {
+        await http
+            .post(
+              Uri.parse(ApiConfig.logout),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $accessToken',
+              },
+            )
+            .timeout(ApiConfig.connectionTimeout);
+      }
+    } catch (e) {
+      // Even if the call fails, continue with local logout
+      print('Error during backend logout: $e');
+    } finally {
+      // Always clear local storage
+      await StorageService.clearAll();
+    }
   }
 }

@@ -23,8 +23,11 @@ class ApiConfig {
   // Endpoints
   static const String signUp = '$baseUrl/users/signup';
   static const String signIn = '$baseUrl/users/signin';
+  static const String logout = '$baseUrl/users/logout';
   static const String refreshToken = '$baseUrl/users/refresh-token';
   static const String myInfo = '$baseUrl/users/me';
+  static const String updateProfile = '$baseUrl/users/me';
+  static const String updateAvatar = '$baseUrl/users/me/avatar';
   static const String users = '$baseUrl/users';
   static const String touristes = '$baseUrl/touristes';
   static const String organisators = '$baseUrl/organisators';

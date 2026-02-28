@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class TraveloLogo extends StatelessWidget {
   final double size;
 
-  const TraveloLogo({Key? key, this.size = 80}) : super(key: key);
+  const TraveloLogo({super.key, this.size = 80});
 
   @override
   Widget build(BuildContext context) {

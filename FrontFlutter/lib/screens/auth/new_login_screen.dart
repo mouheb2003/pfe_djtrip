@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../welcome_screen.dart';
+import '../main_screen.dart';
 import 'new_signup_screen.dart';
 
 class NewLoginScreen extends StatefulWidget {
-  const NewLoginScreen({Key? key}) : super(key: key);
+  const NewLoginScreen({super.key});
 
   @override
   State<NewLoginScreen> createState() => _NewLoginScreenState();
@@ -49,17 +49,17 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
       });
 
       if (userInfo['success']) {
-        // Succès - Naviguer vers l'écran de bienvenue
+        // Succès - Naviguer vers l'écran principal
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => WelcomeScreen(user: userInfo['user']),
+            builder: (context) => MainScreen(user: userInfo['user']),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la récupération des informations'),
+            content: Text('Error retrieving information'),
             backgroundColor: Colors.red,
           ),
         );
@@ -119,7 +119,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
 
                   // Titre
                   Text(
-                    'Bon retour!',
+                    'Welcome Back!',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -128,7 +128,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Connectez-vous pour continuer votre aventure',
+                    'Log in to continue your adventure',
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                   SizedBox(height: 40),
@@ -137,25 +137,25 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                   _buildTextField(
                     controller: _emailController,
                     label: 'Email',
-                    hint: 'votre@email.com',
+                    hint: 'your@email.com',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre email';
+                        return 'Please enter your email';
                       }
                       if (!value.contains('@')) {
-                        return 'Email invalide';
+                        return 'Invalid email';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 16),
 
-                  // Mot de passe
+                  // Password
                   _buildTextField(
                     controller: _passwordController,
-                    label: 'Mot de passe',
+                    label: 'Password',
                     hint: '••••••••',
                     icon: Icons.lock_outline,
                     obscureText: !_isPasswordVisible,
@@ -174,7 +174,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre mot de passe';
+                        return 'Please enter your password';
                       }
                       return null;
                     },
@@ -197,7 +197,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                             activeColor: Color(0xFFFF6B1A),
                           ),
                           Text(
-                            'Se souvenir de moi',
+                            'Remember me',
                             style: TextStyle(color: Colors.grey[700]),
                           ),
                         ],
@@ -207,7 +207,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                           // TODO: Implémenter mot de passe oublié
                         },
                         child: Text(
-                          'Mot de passe oublié?',
+                          'Forgot password?',
                           style: TextStyle(
                             color: Color(0xFFFF6B1A),
                             fontWeight: FontWeight.w600,
@@ -218,7 +218,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                   ),
                   SizedBox(height: 24),
 
-                  // Bouton Se connecter
+                  // Login Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -235,7 +235,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                       child: _isLoading
                           ? CircularProgressIndicator(color: Colors.white)
                           : Text(
-                              'Se connecter',
+                              'Log In',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -245,7 +245,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                   ),
                   SizedBox(height: 16),
 
-                  // Lien vers inscription
+                  // Link to signup
                   Center(
                     child: TextButton(
                       onPressed: () {
@@ -261,11 +261,11 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                           style: TextStyle(fontSize: 15),
                           children: [
                             TextSpan(
-                              text: 'Pas encore de compte? ',
+                              text: 'Don\'t have an account? ',
                               style: TextStyle(color: Colors.grey[700]),
                             ),
                             TextSpan(
-                              text: 'S\'inscrire',
+                              text: 'Sign Up',
                               style: TextStyle(
                                 color: Color(0xFFFF6B1A),
                                 fontWeight: FontWeight.bold,
@@ -276,47 +276,51 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 40),
+                  SizedBox(height: 24),
 
-                  // Divider
+                  // Séparateur "OU"
                   Row(
                     children: [
-                      Expanded(child: Divider()),
+                      Expanded(child: Divider(color: Colors.grey[400])),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'OU',
-                          style: TextStyle(color: Colors.grey[600]),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      Expanded(child: Divider()),
+                      Expanded(child: Divider(color: Colors.grey[400])),
                     ],
                   ),
                   SizedBox(height: 24),
 
-                  // Boutons réseaux sociaux (optionnel)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSocialButton(
-                          icon: Icons.g_mobiledata,
-                          label: 'Google',
-                          onPressed: () {
-                            // TODO: Implémenter connexion Google
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSocialButton(
-                          icon: Icons.facebook,
-                          label: 'Facebook',
-                          onPressed: () {
-                            // TODO: Implémenter connexion Facebook
-                          },
-                        ),
-                      ),
-                    ],
+                  // Social login buttons
+                  _buildLargeSocialButton(
+                    label: 'Continue with Google',
+                    icon: Icons.g_mobiledata,
+                    color: Colors.white,
+                    textColor: Colors.black87,
+                    borderColor: Colors.grey[300]!,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Google login coming soon')),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildLargeSocialButton(
+                    label: 'Continue with Facebook',
+                    icon: Icons.facebook,
+                    color: Color(0xFF1877F2),
+                    textColor: Colors.white,
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Facebook login coming soon')),
+                      );
+                    },
                   ),
                   SizedBox(height: 20),
                 ],
@@ -385,20 +389,38 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
     );
   }
 
-  Widget _buildSocialButton({
-    required IconData icon,
+  Widget _buildLargeSocialButton({
     required String label,
+    required IconData icon,
+    required Color color,
+    required Color textColor,
+    Color? borderColor,
     required VoidCallback onPressed,
   }) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 24),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[700],
-        side: BorderSide(color: Colors.grey[300]!),
-        padding: EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, color: textColor, size: 28),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: borderColor != null
+                ? BorderSide(color: borderColor, width: 1)
+                : BorderSide.none,
+          ),
+          elevation: borderColor != null ? 0 : 2,
+        ),
       ),
     );
   }
