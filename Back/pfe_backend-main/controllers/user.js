@@ -94,8 +94,14 @@ exports.signIn = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Check and update account status based on activity
+    await exports.updateAccountStatusBasedOnActivity(user._id);
+
+    // Re-fetch user after potential status update
+    const updatedUser = await User.findById(user._id);
+
     // Check if user is active
-    if (user.status === "inactif") {
+    if (updatedUser.status === "inactif") {
       return res
         .status(403)
         .json({ message: "Account is inactive. Please contact support." });
@@ -104,25 +110,26 @@ exports.signIn = async (req, res) => {
     // Verify password
     const isPasswordValid = await bcrypt.compare(
       mot_de_passe,
-      user.mot_de_passe,
+      updatedUser.mot_de_passe,
     );
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Update last connection
-    user.derniere_connexion = new Date();
-    await user.save();
+    // Update last connection and set status to actif
+    updatedUser.derniere_connexion = new Date();
+    updatedUser.status = "actif";
+    await updatedUser.save();
 
     // Generate access and refresh tokens
     const { accessToken, refreshToken } = generateTokens(
-      user._id,
-      user.email,
-      user.userType,
+      updatedUser._id,
+      updatedUser.email,
+      updatedUser.userType,
     );
 
     // Return user without password
-    const userResponse = user.toObject();
+    const userResponse = updatedUser.toObject();
     delete userResponse.mot_de_passe;
 
     res.status(200).json({
@@ -194,5 +201,174 @@ exports.getUserById = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error retrieving user", error: err.message });
+  }
+};
+
+// Update profile (PUT /users/me)
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const updateData = req.body;
+
+    // Fields that cannot be updated via this endpoint
+    const restrictedFields = [
+      "mot_de_passe",
+      "_id",
+      "email",
+      "userType",
+      "date_inscription",
+    ];
+
+    // Remove restricted fields from update data
+    restrictedFields.forEach((field) => delete updateData[field]);
+
+    // Find and update user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: user,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error updating profile", error: err.message });
+  }
+};
+
+// Update avatar (PUT /users/me/avatar)
+exports.updateAvatar = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No avatar file provided" });
+    }
+
+    // Upload to Cloudinary (if configured)
+    const cloudinary = require("cloudinary").v2;
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "travelo/avatars",
+      transformation: [
+        { width: 400, height: 400, crop: "fill" },
+        { quality: "auto" },
+      ],
+    });
+
+    // Update user avatar
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { avatar: result.secure_url },
+      { new: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "Avatar updated successfully",
+      avatar: result.secure_url,
+      user: user,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error updating avatar", error: err.message });
+  }
+};
+
+// Update account status based on activity
+exports.updateAccountStatusBasedOnActivity = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    const now = new Date();
+    const lastConnection = user.derniere_connexion || user.date_inscription;
+    const daysSinceLastConnection = Math.floor(
+      (now - lastConnection) / (1000 * 60 * 60 * 24),
+    );
+
+    // Auto-suspend account after 180 days of inactivity
+    if (daysSinceLastConnection > 180 && user.status === "actif") {
+      user.status = "inactif";
+      await user.save();
+    }
+
+    // Reactivate account if user logs back in
+    if (user.status === "inactif" && daysSinceLastConnection < 180) {
+      user.status = "actif";
+      await user.save();
+    }
+  } catch (err) {
+    console.error("Error updating account status:", err.message);
+  }
+};
+
+// Update account status manually (PUT /users/:id/status)
+exports.updateAccountStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    if (!["actif", "inactif"].includes(status)) {
+      return res.status(400).json({
+        message: 'Status must be either "actif" or "inactif"',
+      });
+    }
+
+    // Update user status
+    const user = await User.findByIdAndUpdate(
+      id,
+      { status: status },
+      { new: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "Account status updated successfully",
+      user: user,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error updating account status", error: err.message });
+  }
+};
+
+// Logout - Set status to inactif (POST /users/logout)
+exports.logout = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Find user and update status to inactif
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Set status to inactif and update derniere_connexion
+    user.status = "inactif";
+    user.derniere_connexion = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: "Logout successful, account status set to inactive",
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error logging out", error: err.message });
   }
 };
