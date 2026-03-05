@@ -6,7 +6,7 @@ import 'auth/new_login_screen.dart';
 class WelcomeScreen extends StatefulWidget {
   final User user;
 
-  const WelcomeScreen({Key? key, required this.user}) : super(key: key);
+  const WelcomeScreen({super.key, required this.user});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -74,7 +74,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'TRAVELO',
+                      'DJTrip',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,

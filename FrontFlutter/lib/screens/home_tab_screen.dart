@@ -16,7 +16,7 @@ class HomeTabScreen extends StatelessWidget {
         title: Row(
           children: [
             Text(
-              'TRAVELO',
+              'DJTrip',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,

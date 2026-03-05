@@ -4,8 +4,7 @@ import '../utils/countries.dart';
 class CountrySelectionScreen extends StatefulWidget {
   final String? selectedCountry;
 
-  const CountrySelectionScreen({Key? key, this.selectedCountry})
-    : super(key: key);
+  const CountrySelectionScreen({super.key, this.selectedCountry});
 
   @override
   State<CountrySelectionScreen> createState() => _CountrySelectionScreenState();

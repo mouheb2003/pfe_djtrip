@@ -24,7 +24,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   String? _selectedCountry;
   String? _selectedLanguage;
   int _currentStep = 0;
-  bool _canSkip = true;
+  final bool _canSkip = true;
 
   @override
   void dispose() {

@@ -1,7 +1,9 @@
 import 'user.dart';
 
 class Touriste extends User {
+  @override
   final List<String> centresInteret;
+  @override
   final String languePreferee;
 
   Touriste({

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "travelo" "\0"
+            VALUE "CompanyName", "com.djtrip" "\0"
+            VALUE "FileDescription", "DJTrip" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "travelo" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "travelo.exe" "\0"
-            VALUE "ProductName", "travelo" "\0"
+            VALUE "InternalName", "djtrip" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 DJTrip. All rights reserved." "\0"
+            VALUE "OriginalFilename", "djtrip.exe" "\0"
+            VALUE "ProductName", "DJTrip" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

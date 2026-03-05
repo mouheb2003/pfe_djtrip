@@ -117,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ],
                     ),
                     child: Text(
-                      "TRAVELO",
+                      "DJTrip",
                       style: TextStyle(
                         fontSize: 48,
                         fontWeight: FontWeight.w900,
@@ -129,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen>
                   SizedBox(height: 24),
                   // Text with animation
                   Text(
-                    "Your Journey Begins Here",
+                    "Découvrez Djerba avec nous",
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.white,

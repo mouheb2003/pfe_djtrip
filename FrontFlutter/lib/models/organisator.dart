@@ -1,17 +1,29 @@
 import 'user.dart';
 
 class Organisator extends User {
+  @override
   final String nomEntreprise;
+  @override
   final String? numeroLicence;
+  @override
   final String? adresseEntreprise;
+  @override
   final String? siteWeb;
+  @override
   final List<String> typesActivites;
+  @override
   final int nombreActivites;
+  @override
   final double noteMoyenne;
+  @override
   final int nombreAvis;
+  @override
   final List<String> certifications;
+  @override
   final List<String> languesProposees;
+  @override
   final int? capaciteMoyenne;
+  @override
   final String? description;
 
   Organisator({

@@ -4,8 +4,7 @@ import '../utils/languages.dart';
 class LanguageSelectionScreen extends StatefulWidget {
   final String? selectedLanguage;
 
-  const LanguageSelectionScreen({Key? key, this.selectedLanguage})
-    : super(key: key);
+  const LanguageSelectionScreen({super.key, this.selectedLanguage});
 
   @override
   State<LanguageSelectionScreen> createState() =>

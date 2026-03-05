@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-class TraveloLogo extends StatelessWidget {
+class DJTripLogo extends StatelessWidget {
   final double size;
 
-  const TraveloLogo({super.key, this.size = 80});
+  const DJTripLogo({super.key, this.size = 80});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class TraveloLogo extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        'TRAVELO',
+        'DJTrip',
         style: TextStyle(
           fontSize: size * 0.25,
           fontWeight: FontWeight.w900,

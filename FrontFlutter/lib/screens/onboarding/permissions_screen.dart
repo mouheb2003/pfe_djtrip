@@ -360,7 +360,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Color(0xFFFF6B1A),
+            activeThumbColor: Color(0xFFFF6B1A),
           ),
         ],
       ),

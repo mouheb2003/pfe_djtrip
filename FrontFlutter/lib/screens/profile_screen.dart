@@ -14,7 +14,7 @@ class ProfileScreen extends StatelessWidget {
   void _shareProfile(BuildContext context) async {
     final profileText =
         '''
-🌍 Travelo Profile
+🌍 DJTrip Profile
 
 👤 ${user.fullname}
 📧 ${user.email}
@@ -23,7 +23,7 @@ ${user.paysOrigine != null ? '🌎 ${user.paysOrigine}\n' : ''}
 ${user.userType == 'Touriste' && user.languePreferee != null ? '🗣️ ${user.languePreferee}\n' : ''}
 ${user.bio != null && user.bio!.isNotEmpty ? '📝 ${user.bio}\n' : ''}
 
-✈️ ${user.userType} on Travelo
+✈️ ${user.userType} on DJTrip
 ''';
 
     try {

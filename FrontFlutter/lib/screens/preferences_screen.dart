@@ -4,8 +4,7 @@ import '../services/user_service.dart';
 class PreferencesScreen extends StatefulWidget {
   final List<String>? initialPreferences;
 
-  const PreferencesScreen({Key? key, this.initialPreferences})
-    : super(key: key);
+  const PreferencesScreen({super.key, this.initialPreferences});
 
   @override
   State<PreferencesScreen> createState() => _PreferencesScreenState();

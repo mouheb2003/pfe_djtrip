@@ -24,7 +24,7 @@ ${user.siteWeb != null ? '🌐 ${user.siteWeb}\n' : ''}
 🎯 ${user.nombreActivites ?? 0} activities created
 ⭐ ${user.noteMoyenne?.toStringAsFixed(1) ?? '0.0'} / 5.0 (${user.nombreAvis ?? 0} reviews)
 
-✈️ Activity Organizer on Travelo
+✈️ Activity Organizer on DJTrip
 ''';
 
     try {
@@ -176,7 +176,7 @@ ${user.siteWeb != null ? '🌐 ${user.siteWeb}\n' : ''}
                             Icon(Icons.star, color: Colors.amber, size: 16),
                             SizedBox(width: 4),
                             Text(
-                              '${user.noteMoyenne?.toStringAsFixed(1) ?? '0.0'}',
+                              user.noteMoyenne?.toStringAsFixed(1) ?? '0.0',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -652,7 +652,7 @@ ${user.siteWeb != null ? '🌐 ${user.siteWeb}\n' : ''}
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

@@ -1,6 +1,6 @@
-# travelo
+# DJTrip - Djerba Trip
 
-A new Flutter project.
+Application de voyage pour découvrir Djerba.
 
 ## Getting Started
 

@@ -52,7 +52,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TraveloLogo(size: 60),
+                    DJTripLogo(size: 60),
                     TextButton.icon(
                       onPressed: () {
                         // TODO: Implement language selection
