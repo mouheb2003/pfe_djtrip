@@ -4,13 +4,16 @@ Bienvenue dans la documentation du projet **Travelo** - une application mobile d
 
 ## 📁 Structure de la Documentation
 
-| Document                                             | Description                                                                                            |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [SETUP.md](./SETUP.md)                               | 🚀 **Guide d'Installation Complet** - Configuration du projet, prérequis, installation étape par étape |
-| [ARCHITECTURE.md](./ARCHITECTURE.md)                 | 🏗️ **Architecture Technique** - Structure du projet, flux de données, design patterns                  |
-| [API_REFERENCE.md](./API_REFERENCE.md)               | 📡 **Référence API** - Documentation complète de toutes les routes backend                             |
-| [FEATURES.md](./FEATURES.md)                         | 🎯 **Liste des Fonctionnalités** - Catalogue détaillé de toutes les features disponibles               |
-| [CHANGELOG_28-02-2026.md](./CHANGELOG_28-02-2026.md) | 📝 **Changelog du 28/02/2026** - Toutes les modifications effectuées aujourd'hui                       |
+| Document                                                             | Description                                                                                             |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [README_INDEX.md](./README_INDEX.md)                                 | 📚 **Index de tous les README** - Liste complète de tous les fichiers README avec dates et descriptions |
+| [SETUP.md](./SETUP.md)                                               | 🚀 **Guide d'Installation Complet** - Configuration du projet, prérequis, installation étape par étape  |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)                                 | 🏗️ **Architecture Technique** - Structure du projet, flux de données, design patterns                   |
+| [API_REFERENCE.md](./API_REFERENCE.md)                               | 📡 **Référence API** - Documentation complète de toutes les routes backend                              |
+| [FEATURES.md](./FEATURES.md)                                         | 🎯 **Liste des Fonctionnalités** - Catalogue détaillé de toutes les features disponibles                |
+| [GOOGLE_SIGNIN_FIX_2026-03-08.md](./GOOGLE_SIGNIN_FIX_2026-03-08.md) | 🔧 **Fix Google Sign-In** - Guide complet pour résoudre ApiException: 10                                |
+| [CHANGELOG_2026-03-08.md](./CHANGELOG_2026-03-08.md)                 | 📝 **Changelog du 08/03/2026** - Modifications du 8 mars 2026                                           |
+| [CHANGELOG_28-02-2026.md](./CHANGELOG_28-02-2026.md)                 | 📝 **Changelog du 28/02/2026** - Modifications du 28 février 2026                                       |
 
 ## 🚀 Quick Start
 
