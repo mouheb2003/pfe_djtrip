@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/activite.dart';
@@ -75,7 +75,7 @@ class ActiviteService {
         return jsonDecode(response.body);
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors de la création');
+        throw Exception(error['message'] ?? 'Error creating activity');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -119,7 +119,7 @@ class ActiviteService {
         final List<dynamic> activitesJson = data['activites'];
         return activitesJson.map((json) => Activite.fromJson(json)).toList();
       } else {
-        throw Exception('Erreur lors de la récupération des activités');
+        throw Exception('Error fetching activities');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -135,7 +135,7 @@ class ActiviteService {
         final data = jsonDecode(response.body);
         return Activite.fromJson(data['activite']);
       } else {
-        throw Exception('Activité non trouvée');
+        throw Exception('Activity not found');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -157,7 +157,7 @@ class ActiviteService {
         return activitesJson.map((json) => Activite.fromJson(json)).toList();
       } else {
         throw Exception(
-          'Erreur lors de la récupération des activités de l\'organisateur',
+          'Error fetching organizer activities',
         );
       }
     } catch (e) {
@@ -227,7 +227,7 @@ class ActiviteService {
         return jsonDecode(response.body);
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors de la mise à jour');
+        throw Exception(error['message'] ?? 'Error updating activity');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');

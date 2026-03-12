@@ -3,8 +3,11 @@ import '../models/activite.dart';
 import '../models/user.dart';
 import '../models/inscription.dart';
 import '../services/activity_service.dart';
+import '../services/favorites_service.dart';
 import '../services/inscription_service.dart';
 import '../widgets/activity_card_tourist.dart';
+import '../widgets/review_widgets.dart';
+import '../widgets/shimmer_box.dart';
 import 'package:intl/intl.dart';
 
 class ActivitiesTabScreen extends StatefulWidget {
@@ -85,6 +88,7 @@ class AllActivitiesTab extends StatefulWidget {
 class _AllActivitiesTabState extends State<AllActivitiesTab>
     with AutomaticKeepAliveClientMixin {
   List<Activite> _activities = [];
+  Set<String> _favoriteIds = {};
   bool _isLoading = true;
   String? _errorMessage;
   String _sortBy =
@@ -115,10 +119,15 @@ class _AllActivitiesTabState extends State<AllActivitiesTab>
     });
 
     final result = await ActivityService.getAllActivities();
+    Set<String> favIds = {};
+    try {
+      favIds = (await FavoritesService.getFavoriteIds()).toSet();
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _favoriteIds = favIds;
         if (result['success']) {
           _activities = result['activities'] as List<Activite>;
           _sortActivities();
@@ -154,8 +163,10 @@ class _AllActivitiesTabState extends State<AllActivitiesTab>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFFFF6B1A)),
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 6,
+        itemBuilder: (_, __) => const ActivityCardSkeleton(),
       );
     }
 
@@ -347,10 +358,15 @@ class _AllActivitiesTabState extends State<AllActivitiesTab>
               padding: const EdgeInsets.all(16),
               itemCount: _activities.length,
               itemBuilder: (context, index) {
+                final activity = _activities[index];
                 return ActivityCardTourist(
-                  activity: _activities[index],
+                  activity: activity,
                   user: widget.user,
                   onRefresh: _loadActivities,
+                  isFavorite: _favoriteIds.contains(activity.id),
+                  onFavoriteToggle: (activityId, currentFavorite) async {
+                    await FavoritesService.toggleFavorite(activityId, currentFavorite);
+                  },
                 );
               },
             ),
@@ -441,11 +457,11 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
+      builder: (sheetCtx) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
+        builder: (scrollCtx, scrollController) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -540,24 +556,104 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
               const SizedBox(height: 16),
 
               // Location
-              _buildDetailSection(Icons.location_on, 'Lieu', activity.lieu),
+              _buildDetailSection(Icons.location_on, 'Location', activity.lieu),
               const SizedBox(height: 16),
 
               // Duration
               _buildDetailSection(
                 Icons.access_time,
-                'Durée',
-                '${activity.duree.toStringAsFixed(1)} heures',
+                'Duration',
+                '${activity.duree.toStringAsFixed(1)} hours',
               ),
               const SizedBox(height: 16),
 
               // Price
               _buildDetailSection(
                 Icons.attach_money,
-                'Prix payé',
+                'Price paid',
                 '${inscription.prixTotal.toStringAsFixed(0)} DT (${activity.prix.toStringAsFixed(0)} DT x ${inscription.nombreParticipants})',
               ),
               const SizedBox(height: 20),
+
+              // Review / Rate Organizer buttons (approved past activities)
+              if (inscription.statut == 'approuvee') ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final submitted =
+                              await showSubmitActivityReviewDialog(
+                                context,
+                                activiteId: activity.id,
+                                activiteTitle: activity.titre,
+                              );
+                          if (submitted && context.mounted) {
+                            final messenger = ScaffoldMessenger.of(context);
+                            Navigator.pop(context);
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Review submitted – thank you!'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.rate_review, size: 18),
+                        label: const Text('Review'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFF6B1A),
+                          side: const BorderSide(color: Color(0xFFFF6B1A)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (inscription.organisateurId.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final submitted =
+                                await showSubmitOrganisateurRatingDialog(
+                                  context,
+                                  organisateurId: inscription.organisateurId,
+                                  organisateurName:
+                                      inscription.organisateurNom ??
+                                      'Organizer',
+                                );
+                            if (submitted && context.mounted) {
+                              final messenger = ScaffoldMessenger.of(context);
+                              Navigator.pop(context);
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Organizer rated – thank you!'),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.person_pin, size: 18),
+                          label: const Text('Rate Organizer'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF2D5016),
+                            side: const BorderSide(color: Color(0xFF2D5016)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Close button
               ElevatedButton(
@@ -571,7 +667,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   ),
                 ),
                 child: const Text(
-                  'Fermer',
+                  'Close',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -662,106 +758,196 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Image thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: activity.photos.isNotEmpty
-                  ? Image.network(
-                      activity.photos.first,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 80,
-                        height: 80,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image, size: 30),
-                      ),
-                    )
-                  : Container(
-                      width: 80,
-                      height: 80,
-                      color: Colors.grey[300],
-                      child: Icon(
-                        _getActivityIcon(activity.typeActivite),
-                        size: 30,
-                        color: const Color(0xFFFF6B1A),
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Image thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: activity.photos.isNotEmpty
+                      ? Image.network(
+                          activity.photos.first,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                width: 80,
+                                height: 80,
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 30),
+                              ),
+                        )
+                      : Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[300],
+                          child: Icon(
+                            _getActivityIcon(activity.typeActivite),
+                            size: 30,
+                            color: const Color(0xFFFF6B1A),
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 16),
 
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.titre,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 14,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        _formatDate(activity.dateFin),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        activity.titre,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 14,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          activity.lieu,
-                          style: TextStyle(
-                            fontSize: 12,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 14,
                             color: Colors.grey[600],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(activity.dateFin),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              activity.lieu,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                ),
+
+                // Eye icon button
+                IconButton(
+                  onPressed: () => _showActivityDetails(context, inscription),
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    color: Color(0xFFFF6B1A),
+                    size: 28,
+                  ),
+                  tooltip: 'View details',
+                ),
+              ],
+            ),
+          ),
+
+          // ── Review / Rate buttons (only for approved past inscriptions) ──────
+          if (inscription.statut == 'approuvee')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final submitted = await showSubmitActivityReviewDialog(
+                          context,
+                          activiteId: activity.id,
+                          activiteTitle: activity.titre,
+                        );
+                        if (submitted && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Review submitted – thank you!'),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.rate_review, size: 16),
+                      label: const Text(
+                        'Review',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF6B1A),
+                        side: const BorderSide(color: Color(0xFFFF6B1A)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                  if (inscription.organisateurId.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final submitted =
+                              await showSubmitOrganisateurRatingDialog(
+                                context,
+                                organisateurId: inscription.organisateurId,
+                                organisateurName:
+                                    inscription.organisateurNom ?? 'Organizer',
+                              );
+                          if (submitted && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Organizer rated – thank you!'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.person_pin, size: 16),
+                        label: const Text(
+                          'Rate Organizer',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2D5016),
+                          side: const BorderSide(color: Color(0xFF2D5016)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-
-            // Eye icon button
-            IconButton(
-              onPressed: () => _showActivityDetails(context, inscription),
-              icon: const Icon(
-                Icons.visibility_outlined,
-                color: Color(0xFFFF6B1A),
-                size: 28,
-              ),
-              tooltip: 'Voir les détails',
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -791,7 +977,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
                   const SizedBox(height: 16),
                   Text(
-                    'Erreur',
+                    'Error',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -811,7 +997,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   ElevatedButton.icon(
                     onPressed: _loadPastActivities,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Réessayer'),
+                    label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFF6B1A),
                       foregroundColor: Colors.white,
@@ -840,7 +1026,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   Icon(Icons.history, size: 80, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'Aucune activité passée',
+                    'No past activities',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -849,7 +1035,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Les activités auxquelles vous avez participé\naparaîtront ici',
+                    'Activities you have participated in\nwill appear here',
                     style: TextStyle(color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
@@ -857,7 +1043,7 @@ class _MyPastActivitiesTabState extends State<MyPastActivitiesTab>
                   ElevatedButton.icon(
                     onPressed: _loadPastActivities,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Actualiser'),
+                    label: const Text('Refresh'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFF6B1A),
                       foregroundColor: Colors.white,

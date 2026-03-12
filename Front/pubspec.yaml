@@ -61,6 +61,12 @@ dependencies:
   # Facebook Auth
   flutter_facebook_auth: ^7.1.5
 
+  # Real-time messaging
+  socket_io_client: ^2.0.3+1
+
+  # Share (activity link, profile)
+  share_plus: ^10.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

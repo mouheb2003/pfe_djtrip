@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import '../config/api_config.dart';
 import '../models/inscription.dart';
 import 'http_client.dart';
@@ -67,7 +67,7 @@ class InscriptionService {
             .map((json) => Inscription.fromJson(json))
             .toList();
       } else {
-        throw Exception('Erreur lors de la récupération des inscriptions');
+        throw Exception('Error fetching inscriptions');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -136,7 +136,7 @@ class InscriptionService {
             .map((json) => Inscription.fromJson(json))
             .toList();
       } else {
-        throw Exception('Erreur lors de la récupération des demandes');
+        throw Exception('Error fetching requests');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -158,7 +158,7 @@ class InscriptionService {
             .map((json) => Inscription.fromJson(json))
             .toList();
       } else {
-        throw Exception('Erreur lors de la récupération des demandes');
+        throw Exception('Error fetching requests');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');
@@ -237,7 +237,7 @@ class InscriptionService {
         final data = jsonDecode(response.body);
         return Inscription.fromJson(data['inscription']);
       } else {
-        throw Exception('Inscription non trouvée');
+        throw Exception('Booking not found');
       }
     } catch (e) {
       throw Exception('Erreur: ${e.toString()}');

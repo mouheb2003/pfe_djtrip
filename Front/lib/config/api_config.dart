@@ -6,12 +6,12 @@ class ApiConfig {
   // ========================================
 
   // 1. Pour ÉMULATEUR ANDROID (Android Studio AVD)
-  static const String baseUrl = 'http://192.168.121.99:3000/api';
+  static const String baseUrl = 'http://192.168.173.99:3000/api';
 
   // 2. Pour APPAREIL PHYSIQUE (Android/iOS)
   // Trouvez votre IP avec : ipconfig (Windows) ou ifconfig (Mac/Linux)
   // Remplacez 192.168.1.X par VOTRE IP
-  // static const String baseUrl = 'http://192.168.121.99:3000/api';
+  // static const String baseUrl = 'http://192.168.173.99:3000/api';
 
   // 3. Pour iOS SIMULATOR
   // static const String baseUrl = 'http://localhost:3000/api';
@@ -30,6 +30,7 @@ class ApiConfig {
   static const String myInfo = '$baseUrl/users/me';
   static const String updateProfile = '$baseUrl/users/me';
   static const String updateAvatar = '$baseUrl/users/me/avatar';
+  static const String deleteAvatar = '$baseUrl/users/me/avatar';
   static const String users = '$baseUrl/users';
   static const String touristes = '$baseUrl/touristes';
   static const String organisators = '$baseUrl/organisators';

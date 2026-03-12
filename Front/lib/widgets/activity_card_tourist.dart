@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/activite.dart';
 import '../models/user.dart';
 import '../models/inscription.dart';
+import '../screens/chat_screen.dart';
 import '../screens/image_gallery_screen.dart';
+import '../screens/organizer_public_profile_screen.dart';
 import '../services/inscription_service.dart';
+import '../services/message_service.dart';
+import 'review_widgets.dart';
 import 'package:intl/intl.dart';
 
 class ActivityCardTourist extends StatefulWidget {
@@ -12,6 +17,8 @@ class ActivityCardTourist extends StatefulWidget {
   final User user;
   final VoidCallback onRefresh;
   final bool isPast;
+  final bool isFavorite;
+  final Future<void> Function(String activityId, bool currentFavorite)? onFavoriteToggle;
 
   const ActivityCardTourist({
     super.key,
@@ -19,6 +26,8 @@ class ActivityCardTourist extends StatefulWidget {
     required this.user,
     required this.onRefresh,
     this.isPast = false,
+    this.isFavorite = false,
+    this.onFavoriteToggle,
   });
 
   @override
@@ -78,21 +87,21 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'Annuler la réservation',
+          'Cancel Booking',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         content: const Text(
-          'Êtes-vous sûr de vouloir annuler votre demande de réservation?',
+          'Are you sure you want to cancel your booking request?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Non'),
+            child: const Text('No'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Oui, annuler'),
+            child: const Text('Yes, cancel'),
           ),
         ],
       ),
@@ -106,7 +115,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Réservation annulée'),
+              content: Text('Booking cancelled'),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
             ),
@@ -117,7 +126,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
         if (mounted) {
           String msg = e.toString();
           if (msg.startsWith('Exception: ')) msg = msg.substring(11);
-          if (msg.startsWith('Erreur: ')) msg = msg.substring(8);
+          if (msg.startsWith('Error: ')) msg = msg.substring(7);
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -128,7 +137,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                 children: [
                   Icon(Icons.error_outline, color: Colors.red, size: 22),
                   SizedBox(width: 8),
-                  Text('Erreur', style: TextStyle(fontSize: 17)),
+                  Text('Error', style: TextStyle(fontSize: 17)),
                 ],
               ),
               content: Text(msg),
@@ -183,7 +192,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
     if (widget.activity.organisateur == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Informations de l\'organisateur non disponibles'),
+          content: Text('Organizer information not available'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -261,7 +270,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
-                'Organisateur',
+                'Organizer',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -308,7 +317,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'avis',
+                    'reviews',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                 ],
@@ -321,16 +330,21 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Fonctionnalité de messagerie bientôt disponible',
+                      await MessageService.connect();
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              partnerId: org.id,
+                              partnerName: org.fullname,
+                              partnerAvatar: org.avatar,
+                            ),
                           ),
-                          backgroundColor: Colors.blue,
-                        ),
-                      );
+                        );
+                      }
                     },
                     icon: const Icon(Icons.message, size: 18),
                     label: const Text('Message'),
@@ -352,15 +366,16 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Profil complet bientôt disponible'),
-                          backgroundColor: Colors.blue,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              OrganizerPublicProfileScreen.fromInfo(org),
                         ),
                       );
                     },
                     icon: const Icon(Icons.person, size: 18),
-                    label: const Text('Profil'),
+                    label: const Text('Profile'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2D5016),
                       foregroundColor: Colors.white,
@@ -381,7 +396,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
-                  'Fermer',
+                  'Close',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ),
@@ -405,7 +420,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
             children: [
               Icon(Icons.error_outline, color: Colors.white),
               SizedBox(width: 12),
-              Expanded(child: Text('Désolé, cette activité est complète')),
+              Expanded(child: Text('Sorry, this activity is full')),
             ],
           ),
           backgroundColor: Colors.red[600],
@@ -427,7 +442,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
               borderRadius: BorderRadius.circular(16),
             ),
             title: const Text(
-              'Réserver cette activité',
+              'Book this activity',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF2D5016),
@@ -480,9 +495,9 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                     ),
                   const SizedBox(height: 8),
 
-                  // Nombre de participants
+                  // Number of participants
                   const Text(
-                    'Nombre de participants',
+                    'Number of participants',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
@@ -531,7 +546,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Prix total:',
+                          'Total price:',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -550,9 +565,9 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Message optionnel
+                  // Optional message
                   const Text(
-                    'Message (optionnel)',
+                    'Message (optional)',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
@@ -561,7 +576,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                     maxLines: 3,
                     maxLength: 500,
                     decoration: InputDecoration(
-                      hintText: 'Ajoutez une note pour l\'organisateur...',
+                      hintText: 'Add a note for the organizer...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -573,14 +588,14 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler'),
+                child: const Text('Cancel'),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D5016),
                 ),
-                child: const Text('Confirmer'),
+                child: const Text('Confirm'),
               ),
             ],
           );
@@ -597,8 +612,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
       );
 
       try {
-        // Créer l'inscription
-        final response = await InscriptionService.createInscription(
+        await InscriptionService.createInscription(
           activiteId: widget.activity.id,
           nombreParticipants: participants,
           messageTouriste: messageController.text.isNotEmpty
@@ -612,7 +626,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                '✓ Demande envoyée! L\'organisateur va examiner votre réservation.',
+                '✓ Request sent! The organizer will review your booking.',
               ),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 4),
@@ -631,8 +645,8 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
           if (errorMessage.startsWith('Exception: ')) {
             errorMessage = errorMessage.substring('Exception: '.length);
           }
-          if (errorMessage.startsWith('Erreur: ')) {
-            errorMessage = errorMessage.substring('Erreur: '.length);
+          if (errorMessage.startsWith('Error: ')) {
+            errorMessage = errorMessage.substring('Error: '.length);
           }
 
           showDialog(
@@ -645,7 +659,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                 children: [
                   Icon(Icons.error_outline, color: Colors.red, size: 22),
                   SizedBox(width: 8),
-                  Text('Erreur', style: TextStyle(fontSize: 17)),
+                  Text('Error', style: TextStyle(fontSize: 17)),
                 ],
               ),
               content: Text(errorMessage),
@@ -817,6 +831,51 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                   ),
                 ),
 
+                // Favorite & Share (top right)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.onFavoriteToggle != null)
+                        IconButton(
+                          icon: Icon(
+                            widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: widget.isFavorite ? Colors.red : Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: () async {
+                            await widget.onFavoriteToggle!(
+                              widget.activity.id,
+                              widget.isFavorite,
+                            );
+                            widget.onRefresh();
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black26,
+                            padding: const EdgeInsets.all(8),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.share, color: Colors.white, size: 22),
+                        onPressed: () {
+                          final desc = widget.activity.description ?? '';
+                          final descShort = desc.length > 100 ? '${desc.substring(0, 100)}...' : desc;
+                          Share.share(
+                            '${widget.activity.titre}\n$descShort\nPrix: ${widget.activity.prix} DH',
+                            subject: widget.activity.titre,
+                          );
+                        },
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black26,
+                          padding: const EdgeInsets.all(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // Type Badge
                 Positioned(
                   top: 12,
@@ -1217,11 +1276,20 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _buildStatCard(
-                          Icons.rate_review_outlined,
-                          '${widget.activity.nombreAvis}',
-                          'Reviews',
-                          Colors.purple,
+                        child: GestureDetector(
+                          onTap: () => showActivityReviewsSheet(
+                            context,
+                            activiteId: widget.activity.id,
+                            activiteTitle: widget.activity.titre,
+                            noteMoyenne: widget.activity.noteMoyenne,
+                            nombreAvis: widget.activity.nombreAvis,
+                          ),
+                          child: _buildStatCard(
+                            Icons.rate_review_outlined,
+                            '${widget.activity.nombreAvis}',
+                            'Reviews',
+                            Colors.purple,
+                          ),
                         ),
                       ),
                     ],
@@ -1304,7 +1372,7 @@ class _ActivityCardTouristState extends State<ActivityCardTourist> {
                                     isFull ? Icons.block : Icons.bookmark_add,
                                     size: 18,
                                   ),
-                                  label: Text(isFull ? 'Complet' : 'Book Now'),
+                                  label: Text(isFull ? 'Full' : 'Book Now'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: isFull
                                         ? Colors.grey[400]

@@ -70,21 +70,21 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'Annuler la réservation',
+          'Cancel Booking',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
         ),
         content: Text(
-          'Voulez-vous vraiment annuler votre réservation pour "${booking.activite?.titre ?? 'cette activité'}" ?',
+          'Do you really want to cancel your booking for "${booking.activite?.titre ?? "this activity"}" ?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Non'),
+            child: const Text('No'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Oui, annuler'),
+            child: const Text('Yes, cancel'),
           ),
         ],
       ),
@@ -96,7 +96,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Réservation annulée'),
+              content: Text('Booking cancelled'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -106,7 +106,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur: ${e.toString()}'),
+              content: Text('Error: ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -165,7 +165,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        booking.activite?.titre ?? 'Activité',
+                        booking.activite?.titre ?? 'Activity',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -300,7 +300,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Message de l\'organisateur:',
+                            'Organizer message:',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -331,7 +331,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
                 child: OutlinedButton.icon(
                   onPressed: () => _cancelBooking(booking),
                   icon: const Icon(Icons.cancel, size: 18),
-                  label: const Text('Annuler la demande'),
+                  label: const Text('Cancel request'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
                     side: const BorderSide(color: Colors.red),
@@ -346,7 +346,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
             // Booking date
             const SizedBox(height: 8),
             Text(
-              'Demandé le ${DateFormat('dd/MM/yyyy à HH:mm').format(booking.dateDemande)}',
+              'Requested on ${DateFormat('dd/MM/yyyy HH:mm').format(booking.dateDemande)}',
               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ],
@@ -370,7 +370,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
             Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
             const SizedBox(height: 16),
             Text(
-              'Erreur de chargement',
+              'Loading error',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -390,7 +390,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
             ElevatedButton.icon(
               onPressed: _loadBookings,
               icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
+              label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D5016),
               ),
@@ -401,18 +401,32 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
     }
 
     if (bookings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bookmark_border, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              emptyMessage,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
+      return RefreshIndicator(
+        onRefresh: _loadBookings,
+        color: const Color(0xFFFF6B1A),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.bookmark_border,
+                    size: 80,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    emptyMessage,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       );
     }
@@ -439,20 +453,13 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
         elevation: 0,
         automaticallyImplyLeading: false,
         title: const Text(
-          'Mes Réservations',
+          'My Bookings',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadBookings,
-            tooltip: 'Actualiser',
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFFFF6B1A),
@@ -463,7 +470,7 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('En attente'),
+                  const Text('Pending'),
                   if (_enAttenteList.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -488,17 +495,17 @@ class _TouristBookingsScreenState extends State<TouristBookingsScreen>
                 ],
               ),
             ),
-            const Tab(text: 'Confirmées'),
-            const Tab(text: 'Refusées'),
+            const Tab(text: 'Confirmed'),
+            const Tab(text: 'Refused'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildTabContent(_enAttenteList, 'Aucune demande en attente'),
-          _buildTabContent(_approuveesList, 'Aucune réservation confirmée'),
-          _buildTabContent(_refuseesList, 'Aucune demande refusée'),
+          _buildTabContent(_enAttenteList, 'No pending requests'),
+          _buildTabContent(_approuveesList, 'No confirmed bookings'),
+          _buildTabContent(_refuseesList, 'No refused requests'),
         ],
       ),
     );

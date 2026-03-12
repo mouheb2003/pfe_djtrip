@@ -166,68 +166,372 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAvatarChangeDialog() {
+    final bool hasPhoto = _currentUser.avatar != null;
+
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Text(
-                    'Change Profile Picture',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                SizedBox(height: 8),
-                ListTile(
-                  leading: Icon(Icons.photo_camera, color: Color(0xFFFF6B1A)),
-                  title: Text('Take a photo'),
-                  subtitle: Text(
-                    'Works on real device',
-                    style: TextStyle(fontSize: 12, color: Colors.green[700]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickAndUploadAvatar(ImageSource.camera);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library, color: Color(0xFFFF6B1A)),
-                  title: Text('Choose from gallery'),
-                  subtitle: Text(
-                    'Works everywhere',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickAndUploadAvatar(ImageSource.gallery);
-                  },
-                ),
-                if (_currentUser.avatar != null)
-                  ListTile(
-                    leading: Icon(Icons.delete_outline, color: Colors.red),
-                    title: Text(
-                      'Remove photo',
-                      style: TextStyle(color: Colors.red),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[100],
+                      border: Border.all(
+                        color: const Color(0xFFFF6B1A).withOpacity(0.3),
+                        width: 2,
+                      ),
                     ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Optionally implement remove functionality
-                    },
+                    child: ClipOval(
+                      child: _currentUser.avatar != null
+                          ? Image.network(
+                              _currentUser.avatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
+                                Icons.person,
+                                size: 28,
+                                color: Colors.grey[400],
+                              ),
+                            )
+                          : Icon(
+                              Icons.person,
+                              size: 28,
+                              color: Colors.grey[400],
+                            ),
+                    ),
                   ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Profile Picture',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasPhoto
+                            ? 'Edit or delete your photo'
+                            : 'Add a profile picture',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildSheetBtn(
+                icon: Icons.edit_outlined,
+                label: 'Edit photo',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditSourcePicker();
+                },
+              ),
+              if (hasPhoto) ...[
+                const SizedBox(height: 12),
+                _buildSheetBtn(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete photo',
+                  color: Colors.red,
+                  bgColor: Colors.red.withOpacity(0.07),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmDeleteAvatar();
+                  },
+                ),
               ],
-            ),
+            ],
           ),
         );
       },
     );
+  }
+
+  void _showEditSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Choose a source',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildSheetBtn(
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                sublabel: 'Works on real device',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadAvatar(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildSheetBtn(
+                icon: Icons.photo_library_outlined,
+                label: 'From gallery',
+                sublabel: 'Works everywhere',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadAvatar(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSheetBtn({
+    required IconData icon,
+    required String label,
+    String? sublabel,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: color == Colors.red
+                            ? Colors.red
+                            : Colors.black87,
+                      ),
+                    ),
+                    if (sublabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        sublabel,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Colors.grey[400],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteAvatar() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Delete photo?',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your profile photo will be permanently deleted.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey[300]!),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _deleteAvatarCloud();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAvatarCloud() async {
+    setState(() {
+      _isUploadingAvatar = true;
+    });
+
+    final result = await UserService.deleteAvatarFromCloud();
+
+    setState(() {
+      _isUploadingAvatar = false;
+    });
+
+    if (result['success'] == true) {
+      await _refreshUserData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Profile photo deleted'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Error deleting photo'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _shareProfile(BuildContext context) async {
@@ -431,7 +735,7 @@ ${_currentUser.bio != null && _currentUser.bio!.isNotEmpty ? '📝 ${_currentUse
         slivers: [
           // AppBar with profile photo
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 240,
             pinned: true,
             backgroundColor: Color(0xFFFF6B1A),
             flexibleSpace: FlexibleSpaceBar(
@@ -448,7 +752,7 @@ ${_currentUser.bio != null && _currentUser.bio!.isNotEmpty ? '📝 ${_currentUse
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(height: 20),
+                      SizedBox(height: 4),
                       // Avatar with edit button
                       Stack(
                         children: [
@@ -530,6 +834,17 @@ ${_currentUser.bio != null && _currentUser.bio!.isNotEmpty ? '📝 ${_currentUse
                         ],
                       ),
                       SizedBox(height: 8),
+                      if (_currentUser.avatar == null) ...[
+                        Text(
+                          'Add photo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.85),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                      ],
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -671,7 +986,11 @@ ${_currentUser.bio != null && _currentUser.bio!.isNotEmpty ? '📝 ${_currentUse
                         ),
                         SizedBox(width: 8),
                         Text(
-                          _currentUser.userType,
+                          _currentUser.userType == 'Touriste'
+                              ? 'Tourist'
+                              : _currentUser.userType == 'Organisateur'
+                              ? 'Organizer'
+                              : _currentUser.userType,
                           style: TextStyle(
                             color: Color(0xFFFF6B1A),
                             fontWeight: FontWeight.bold,

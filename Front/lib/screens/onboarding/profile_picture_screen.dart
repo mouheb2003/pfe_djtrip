@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../models/user.dart';
@@ -70,7 +70,7 @@ class _ProfilePictureScreenState extends State<ProfilePictureScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Text(
-                    'Add Profile Picture',
+                    'Profile Picture',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -99,6 +99,25 @@ class _ProfilePictureScreenState extends State<ProfilePictureScreen> {
                     _pickImage(ImageSource.gallery);
                   },
                 ),
+                if (_imageFile != null) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                    ),
+                    title: const Text(
+                      'Delete photo',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _imageFile = null;
+                      });
+                    },
+                  ),
+                ],
               ],
             ),
           ),

@@ -22,7 +22,7 @@ class AuthErrorHandler {
       // Autre erreur
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(response['message'] ?? 'Une erreur est survenue'),
+          content: Text(response['message'] ?? 'An error occurred'),
           backgroundColor: Colors.red,
         ),
       );
@@ -42,11 +42,11 @@ class AuthErrorHandler {
           children: [
             Icon(Icons.timer_off, color: Colors.orange),
             SizedBox(width: 12),
-            Text('Session expirée'),
+            Text('Session Expired'),
           ],
         ),
         content: Text(
-          'Votre session a expiré. Veuillez vous reconnecter pour continuer.',
+          'Your session has expired. Please log in again to continue.',
           style: TextStyle(fontSize: 16),
         ),
         actions: [
@@ -61,7 +61,7 @@ class AuthErrorHandler {
               padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: Text(
-              'Se reconnecter',
+              'Log In Again',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -99,7 +99,7 @@ class AuthErrorHandler {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );

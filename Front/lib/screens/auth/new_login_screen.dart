@@ -204,6 +204,14 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
       });
 
       if (userInfo['success']) {
+        // Persist userId/email/userType so MessageService can identify the user.
+        final user = userInfo['user'] as User;
+        await StorageService.saveUserInfo(
+          userId: user.id,
+          email: user.email,
+          userType: user.userType,
+        );
+
         // Show success notification
         NotificationHelper.showSuccess(
           context,
@@ -214,7 +222,7 @@ class _NewLoginScreenState extends State<NewLoginScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
 
         // Navigate to appropriate screen based on user type
-        _navigateToHomeScreen(userInfo['user']);
+        _navigateToHomeScreen(user);
       } else {
         _showErrorDialog('Error retrieving information');
       }

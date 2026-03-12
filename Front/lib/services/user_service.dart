@@ -126,6 +126,31 @@ class UserService {
     return uploadAvatar(avatarPath);
   }
 
+  // Delete avatar from cloud and DB
+  static Future<Map<String, dynamic>> deleteAvatarFromCloud() async {
+    try {
+      final headers = await HttpClient.getAuthHeaders();
+      final response = await HttpClient.delete(
+        ApiConfig.deleteAvatar,
+        headers: headers,
+        timeout: ApiConfig.connectionTimeout,
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Error deleting avatar',
+        };
+      }
+    } on TokenExpiredException catch (e) {
+      return {'success': false, 'message': e.message, 'requiresLogin': true};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+
   // Update notification preferences
   static Future<Map<String, dynamic>> updateNotificationPreferences({
     required bool emailNotifications,

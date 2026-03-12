@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'storage_service.dart';
 import 'auth_service.dart';
@@ -100,7 +100,7 @@ class HttpClient {
             // Nettoyer le storage
             await StorageService.clearAll();
             throw TokenExpiredException(
-              'Session expirée. Veuillez vous reconnecter.',
+              'Session expired. Please log in again.',
             );
           }
         }

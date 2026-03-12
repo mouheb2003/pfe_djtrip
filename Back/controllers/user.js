@@ -1,6 +1,7 @@
 const User = require("../models/user");
 const Touriste = require("../models/touriste");
 const Organisator = require("../models/organisator");
+const Activite = require("../models/activite");
 const bcrypt = require("bcryptjs");
 const { generateTokens } = require("../middleware/auth");
 const emailService = require("../services/email");
@@ -268,6 +269,79 @@ exports.updateProfile = async (req, res) => {
       message: "Error updating profile",
       error: err.message,
     });
+  }
+};
+
+// Get current user's favorites (GET /users/me/favorites)
+exports.getFavorites = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).populate("favorites").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const favorites = user.favorites || [];
+    res.json(favorites);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Add activity to favorites (POST /users/me/favorites/:activityId)
+exports.addFavorite = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { activityId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.favorites) user.favorites = [];
+    if (user.favorites.some((id) => id.toString() === activityId)) {
+      return res.json({ message: "Already in favorites", favorites: user.favorites });
+    }
+    const activite = await Activite.findById(activityId);
+    if (!activite) return res.status(404).json({ message: "Activity not found" });
+    user.favorites.push(activityId);
+    await user.save();
+    res.json({ message: "Added to favorites", favorites: user.favorites });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Remove activity from favorites (DELETE /users/me/favorites/:activityId)
+exports.removeFavorite = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { activityId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user.favorites) user.favorites = [];
+    user.favorites = user.favorites.filter((id) => id.toString() !== activityId);
+    await user.save();
+    res.json({ message: "Removed from favorites", favorites: user.favorites });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Delete avatar (DELETE /users/me/avatar)
+exports.deleteAvatar = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("🗑️ Delete avatar request from user:", userId);
+
+    const updatedUser = await AvatarService.deleteAvatar(userId);
+
+    res.status(200).json({
+      message: "Avatar deleted successfully",
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.error("❌ Error in deleteAvatar:", err);
+    if (err.message === "User not found") {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res
+      .status(500)
+      .json({ message: "Error deleting avatar", error: err.message });
   }
 };
 

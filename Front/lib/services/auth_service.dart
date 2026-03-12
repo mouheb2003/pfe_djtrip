@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
+import 'message_service.dart';
 import 'storage_service.dart';
 
 class AuthService {
@@ -172,6 +173,8 @@ class AuthService {
 
   // Logout
   static Future<void> logout() async {
+    // Disconnect socket immediately so the next user gets a fresh connection.
+    MessageService.disconnect();
     try {
       final accessToken = await StorageService.getAccessToken();
 

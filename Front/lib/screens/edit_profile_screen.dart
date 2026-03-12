@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -29,7 +29,122 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   File? _selectedImage;
   bool _isLoading = false;
   bool _isUploadingImage = false;
+  bool _avatarDeleted = false;
   final ImagePicker _picker = ImagePicker();
+
+  // Country code picker state
+  String? _selectedDialCode;
+  String? _selectedFlag;
+  String? _phoneFormat;
+
+  static const List<Map<String, String>> _countryCodes = [
+    {'flag': '🇹🇳', 'name': 'Tunisia', 'dial': '+216', 'format': '20 123 456'},
+    {
+      'flag': '🇩🇿',
+      'name': 'Algeria',
+      'dial': '+213',
+      'format': '655 123 456',
+    },
+    {
+      'flag': '🇲🇦',
+      'name': 'Morocco',
+      'dial': '+212',
+      'format': '6 12 34 56 78',
+    },
+    {'flag': '🇱🇾', 'name': 'Libya', 'dial': '+218', 'format': '91 234 5678'},
+    {'flag': '🇪🇬', 'name': 'Egypt', 'dial': '+20', 'format': '10 1234 5678'},
+    {
+      'flag': '🇫🇷',
+      'name': 'France',
+      'dial': '+33',
+      'format': '6 12 34 56 78',
+    },
+    {
+      'flag': '🇧🇪',
+      'name': 'Belgium',
+      'dial': '+32',
+      'format': '470 12 34 56',
+    },
+    {
+      'flag': '🇨🇭',
+      'name': 'Switzerland',
+      'dial': '+41',
+      'format': '76 123 45 67',
+    },
+    {
+      'flag': '🇩🇪',
+      'name': 'Germany',
+      'dial': '+49',
+      'format': '151 12345678',
+    },
+    {'flag': '🇮🇹', 'name': 'Italy', 'dial': '+39', 'format': '312 345 6789'},
+    {'flag': '🇪🇸', 'name': 'Spain', 'dial': '+34', 'format': '612 345 678'},
+    {
+      'flag': '🇬🇧',
+      'name': 'United Kingdom',
+      'dial': '+44',
+      'format': '7911 123456',
+    },
+    {
+      'flag': '🇳🇱',
+      'name': 'Netherlands',
+      'dial': '+31',
+      'format': '6 12345678',
+    },
+    {
+      'flag': '🇵🇹',
+      'name': 'Portugal',
+      'dial': '+351',
+      'format': '912 345 678',
+    },
+    {'flag': '🇸🇪', 'name': 'Sweden', 'dial': '+46', 'format': '70 123 45 67'},
+    {
+      'flag': '🇹🇷',
+      'name': 'Turkey',
+      'dial': '+90',
+      'format': '532 123 45 67',
+    },
+    {
+      'flag': '🇸🇦',
+      'name': 'Saudi Arabia',
+      'dial': '+966',
+      'format': '50 123 4567',
+    },
+    {
+      'flag': '🇦🇪',
+      'name': 'United Arab Emirates',
+      'dial': '+971',
+      'format': '50 123 4567',
+    },
+    {'flag': '🇶🇦', 'name': 'Qatar', 'dial': '+974', 'format': '3312 3456'},
+    {'flag': '🇰🇼', 'name': 'Kuwait', 'dial': '+965', 'format': '5012 3456'},
+    {
+      'flag': '🇺🇸',
+      'name': 'United States',
+      'dial': '+1',
+      'format': '(555) 123-4567',
+    },
+    {
+      'flag': '🇨🇦',
+      'name': 'Canada',
+      'dial': '+1',
+      'format': '(555) 123-4567',
+    },
+    {
+      'flag': '🇧🇷',
+      'name': 'Brazil',
+      'dial': '+55',
+      'format': '11 91234-5678',
+    },
+    {
+      'flag': '🇦🇺',
+      'name': 'Australia',
+      'dial': '+61',
+      'format': '412 345 678',
+    },
+    {'flag': '🇯🇵', 'name': 'Japan', 'dial': '+81', 'format': '90 1234 5678'},
+    {'flag': '🇨🇳', 'name': 'China', 'dial': '+86', 'format': '131 2345 6789'},
+  ];
 
   @override
   void initState() {
@@ -38,12 +153,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _ageController = TextEditingController(
       text: widget.user.age != null ? widget.user.age.toString() : '',
     );
-    _phoneController = TextEditingController(text: widget.user.numTel ?? '');
     _bioController = TextEditingController(text: widget.user.bio ?? '');
     _selectedCountry = widget.user.paysOrigine;
     _selectedLanguage = widget.user is Touriste
         ? (widget.user as Touriste).languePreferee
         : null;
+    // Parse existing phone number to extract dial code
+    final existingPhone = widget.user.numTel ?? '';
+    String rawPhone = existingPhone;
+    for (final c in _countryCodes) {
+      if (existingPhone.startsWith(c['dial']!)) {
+        _selectedDialCode = c['dial'];
+        _selectedFlag = c['flag'];
+        _phoneFormat = c['format'];
+        rawPhone = existingPhone.substring(c['dial']!.length).trim();
+        break;
+      }
+    }
+    _phoneController = TextEditingController(text: rawPhone);
   }
 
   @override
@@ -70,7 +197,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _selectedImage = File(image.path);
         });
 
-        // Upload immédiatement
+        // Upload immediately
         await _uploadAvatar();
       } else {
         print('❌ No image selected');
@@ -141,55 +268,459 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _showImageSourceDialog() {
+  void _showCountryCodePicker() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Text(
-                'Change Profile Picture',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Select dial code',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _countryCodes.length,
+                    itemBuilder: (ctx, index) {
+                      final c = _countryCodes[index];
+                      final isSelected =
+                          c['dial'] == _selectedDialCode &&
+                          c['flag'] == _selectedFlag;
+                      return ListTile(
+                        leading: Text(
+                          c['flag']!,
+                          style: const TextStyle(fontSize: 26),
+                        ),
+                        title: Text(c['name']!),
+                        trailing: Text(
+                          c['dial']!,
+                          style: const TextStyle(
+                            color: Color(0xFFFF6B1A),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedTileColor: const Color(
+                          0xFFFF6B1A,
+                        ).withOpacity(0.08),
+                        onTap: () {
+                          setState(() {
+                            _selectedDialCode = c['dial'];
+                            _selectedFlag = c['flag'];
+                            _phoneFormat = c['format'];
+                          });
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showImageSourceDialog() {
+    final bool hasPhoto =
+        !_avatarDeleted &&
+        (_selectedImage != null || widget.user.avatar != null);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFFFF6B1A)),
-              title: const Text('Take a photo'),
-              subtitle: Text(
-                'Works on real device',
-                style: TextStyle(fontSize: 12, color: Colors.green[700]),
+              // Title + avatar preview
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[100],
+                      border: Border.all(
+                        color: const Color(0xFFFF6B1A).withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: _selectedImage != null
+                          ? Image.file(_selectedImage!, fit: BoxFit.cover)
+                          : !_avatarDeleted && widget.user.avatar != null
+                          ? Image.network(
+                              widget.user.avatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
+                                Icons.person,
+                                size: 28,
+                                color: Colors.grey[400],
+                              ),
+                            )
+                          : Icon(
+                              Icons.person,
+                              size: 28,
+                              color: Colors.grey[400],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Profile Picture',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasPhoto
+                            ? 'Edit or delete your photo'
+                            : 'Add a profile picture',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.photo_library,
-                color: Color(0xFFFF6B1A),
+              const SizedBox(height: 24),
+              // Modifier button
+              _buildSheetButton(
+                icon: Icons.edit_outlined,
+                label: 'Edit photo',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditSourcePicker();
+                },
               ),
-              title: const Text('Choose from gallery'),
-              subtitle: Text(
-                'Works everywhere',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              if (hasPhoto) ...[
+                const SizedBox(height: 12),
+                _buildSheetButton(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete photo',
+                  color: Colors.red,
+                  bgColor: Colors.red.withOpacity(0.07),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmDeleteAvatar();
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Choose a source',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildSheetButton(
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                sublabel: 'Works on real device',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              const SizedBox(height: 12),
+              _buildSheetButton(
+                icon: Icons.photo_library_outlined,
+                label: 'From gallery',
+                sublabel: 'Works everywhere',
+                color: const Color(0xFFFF6B1A),
+                bgColor: const Color(0xFFFF6B1A).withOpacity(0.08),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSheetButton({
+    required IconData icon,
+    required String label,
+    String? sublabel,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: color == Colors.red
+                            ? Colors.red
+                            : Colors.black87,
+                      ),
+                    ),
+                    if (sublabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        sublabel,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Colors.grey[400],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _confirmDeleteAvatar() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Delete photo?',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your profile photo will be removed. This will take effect after saving.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey[300]!),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _deleteAvatar();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAvatar() async {
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    final result = await UserService.deleteAvatarFromCloud();
+
+    setState(() {
+      _isUploadingImage = false;
+    });
+
+    if (result['success'] == true) {
+      setState(() {
+        _selectedImage = null;
+        _avatarDeleted = true;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile photo deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors de la suppression'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -206,11 +737,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_ageController.text.isNotEmpty)
         'age': int.tryParse(_ageController.text),
       if (_phoneController.text.isNotEmpty)
-        'num_tel': _phoneController.text.trim(),
+        'num_tel':
+            '${_selectedDialCode != null ? '${_selectedDialCode!} ' : ''}${_phoneController.text.trim()}',
+      if (_phoneController.text.isEmpty) 'num_tel': null,
       if (_bioController.text.isNotEmpty) 'bio': _bioController.text.trim(),
       if (_selectedCountry != null) 'pays_origine': _selectedCountry,
       if (_selectedLanguage != null && widget.user.userType == 'Touriste')
         'langue_preferee': _selectedLanguage,
+      if (_avatarDeleted) 'avatar': null,
     };
 
     final result = await UserService.updateProfile(updateData);
@@ -278,7 +812,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ? const Center(child: CircularProgressIndicator())
                               : _selectedImage != null
                               ? Image.file(_selectedImage!, fit: BoxFit.cover)
-                              : widget.user.avatar != null
+                              : !_avatarDeleted && widget.user.avatar != null
                               ? Image.network(
                                   widget.user.avatar!,
                                   fit: BoxFit.cover,
@@ -320,6 +854,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ],
                   ),
                 ),
+                if (_avatarDeleted ||
+                    (_selectedImage == null && widget.user.avatar == null)) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'Tap to add a photo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFFF6B1A),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
 
                 // Full name
@@ -359,11 +907,85 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 SizedBox(height: 20),
 
                 // Phone
-                _buildTextField(
-                  controller: _phoneController,
-                  label: 'Phone',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Phone',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _showCountryCodePicker,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  right: BorderSide(color: Colors.grey[200]!),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _selectedFlag ?? '🌍',
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _selectedDialCode ?? '+??',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedDialCode != null
+                                          ? Colors.black87
+                                          : Colors.grey[500],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.keyboard_arrow_down,
+                                    size: 18,
+                                    color: Colors.grey[500],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                hintText: _phoneFormat ?? 'Phone number',
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 20),
 

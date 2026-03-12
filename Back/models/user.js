@@ -29,6 +29,8 @@ const userSchema = new mongoose.Schema(
     // Password reset fields
     passwordResetCode: String,
     passwordResetCodeExpiry: Date,
+    // Favoris (activités)
+    favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Activite" }],
   },
   {
     discriminatorKey: "userType",

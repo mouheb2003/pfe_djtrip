@@ -25,6 +25,15 @@ router.post("/refresh-token", refreshToken);
 // GET /me - Get current user info (protected route)
 router.get("/me", verifyToken, userController.myInfo);
 
+// GET /me/favorites - Get current user's favorite activities
+router.get("/me/favorites", verifyToken, userController.getFavorites);
+
+// POST /me/favorites/:activityId - Add activity to favorites
+router.post("/me/favorites/:activityId", verifyToken, userController.addFavorite);
+
+// DELETE /me/favorites/:activityId - Remove activity from favorites
+router.delete("/me/favorites/:activityId", verifyToken, userController.removeFavorite);
+
 // PUT /me - Update current user profile (protected route)
 router.put("/me", verifyToken, userController.updateProfile);
 
@@ -35,6 +44,9 @@ router.put(
   upload.single("avatar"),
   userController.updateAvatar,
 );
+
+// DELETE /me/avatar - Delete current user avatar (protected route)
+router.delete("/me/avatar", verifyToken, userController.deleteAvatar);
 
 // PUT /:id/status - Update account status (protected route)
 router.put("/:id/status", verifyToken, userController.updateAccountStatus);

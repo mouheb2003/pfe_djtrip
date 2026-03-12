@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/inscription.dart';
 import '../services/inscription_service.dart';
+import '../services/message_service.dart';
+import 'chat_screen.dart';
 import 'package:intl/intl.dart';
 
 class BookingRequestsScreen extends StatefulWidget {
@@ -69,7 +71,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'Approuver la demande',
+          'Approve Request',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Color(0xFF2D5016),
@@ -80,7 +82,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Approuver la réservation de ${inscription.touriste?.fullname ?? "ce touriste"} ?',
+              'Approve the booking of ${inscription.touriste?.fullname ?? "this tourist"} ?',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
@@ -89,8 +91,8 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
               maxLines: 3,
               maxLength: 500,
               decoration: InputDecoration(
-                labelText: 'Message de confirmation (optionnel)',
-                hintText: 'Ex: Bienvenue ! Rendez-vous à l\'heure prévue...',
+                labelText: 'Confirmation message (optional)',
+                hintText: 'E.g: Welcome! See you at the scheduled time...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -101,12 +103,12 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Approuver'),
+            child: const Text('Approve'),
           ),
         ],
       ),
@@ -124,7 +126,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✓ Demande approuvée avec succès'),
+              content: Text('✓ Request approved successfully'),
               backgroundColor: Colors.green,
             ),
           );
@@ -134,7 +136,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur: ${e.toString()}'),
+              content: Text('Error: ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -153,7 +155,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'Refuser la demande',
+          'Refuse Request',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
         ),
         content: Column(
@@ -161,7 +163,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Refuser la réservation de ${inscription.touriste?.fullname ?? "ce touriste"} ?',
+              'Refuse the booking of ${inscription.touriste?.fullname ?? "this tourist"} ?',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
@@ -170,8 +172,8 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
               maxLines: 3,
               maxLength: 500,
               decoration: InputDecoration(
-                labelText: 'Raison du refus (recommandé)',
-                hintText: 'Ex: Activité complète, dates non compatibles...',
+                labelText: 'Reason for refusal (recommended)',
+                hintText: 'E.g: Activity full, incompatible dates...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -182,12 +184,12 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Refuser'),
+            child: const Text('Refuse'),
           ),
         ],
       ),
@@ -205,7 +207,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Demande refusée'),
+              content: Text('Request refused'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -215,7 +217,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur: ${e.toString()}'),
+              content: Text('Error: ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -233,7 +235,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (sheetCtx) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -317,13 +319,21 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Messaging feature coming soon'),
-                        ),
-                      );
+                    onPressed: () async {
+                      final nav = Navigator.of(sheetCtx);
+                      nav.pop();
+                      await MessageService.connect();
+                      if (context.mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              partnerId: inscription.touristeId,
+                              partnerName: inscription.touriste!.fullname,
+                              partnerAvatar: inscription.touriste!.avatar,
+                            ),
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.message_outlined, size: 20),
                     label: const Text('Send Message'),
@@ -365,7 +375,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                 ),
               ],
             ),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+            SizedBox(height: MediaQuery.of(sheetCtx).viewInsets.bottom),
           ],
         ),
       ),
@@ -470,7 +480,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        inscription.activite?.titre ?? 'Activité',
+                        inscription.activite?.titre ?? 'Activity',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -562,7 +572,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            inscription.touriste?.fullname ?? 'Touriste',
+                            inscription.touriste?.fullname ?? 'Tourist',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -668,7 +678,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                     child: OutlinedButton.icon(
                       onPressed: () => _handleRefuser(inscription),
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Refuser'),
+                      label: const Text('Refuse'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -683,7 +693,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                     child: ElevatedButton.icon(
                       onPressed: () => _handleApprouver(inscription),
                       icon: const Icon(Icons.check, size: 18),
-                      label: const Text('Approuver'),
+                      label: const Text('Approve'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
@@ -700,7 +710,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
             // Date de demande
             const SizedBox(height: 8),
             Text(
-              'Demandé le ${DateFormat('dd/MM/yyyy à HH:mm').format(inscription.dateDemande)}',
+              'Requested on ${DateFormat('dd/MM/yyyy HH:mm').format(inscription.dateDemande)}',
               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ],
@@ -715,56 +725,74 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Erreur de chargement',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+      return RefreshIndicator(
+        onRefresh: _loadDemandes,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading error',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _loadDemandes,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D5016),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadDemandes,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2D5016),
-              ),
-            ),
-          ],
+          ),
         ),
       );
     }
 
     if (inscriptions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              emptyMessage,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
+      return RefreshIndicator(
+        onRefresh: _loadDemandes,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    emptyMessage,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       );
     }
@@ -786,18 +814,11 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Demandes de réservation',
+          'Booking Requests',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFF2D5016),
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadDemandes,
-            tooltip: 'Actualiser',
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -808,7 +829,7 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('En attente'),
+                  const Text('Pending'),
                   if (_enAttenteList.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -832,17 +853,17 @@ class _BookingRequestsScreenState extends State<BookingRequestsScreen>
                 ],
               ),
             ),
-            const Tab(text: 'Approuvées'),
-            const Tab(text: 'Refusées'),
+            const Tab(text: 'Approved'),
+            const Tab(text: 'Refused'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildTabContent(_enAttenteList, 'Aucune demande en attente'),
-          _buildTabContent(_approuveesList, 'Aucune demande approuvée'),
-          _buildTabContent(_refuseesList, 'Aucune demande refusée'),
+          _buildTabContent(_enAttenteList, 'No pending requests'),
+          _buildTabContent(_approuveesList, 'No approved requests'),
+          _buildTabContent(_refuseesList, 'No refused requests'),
         ],
       ),
     );

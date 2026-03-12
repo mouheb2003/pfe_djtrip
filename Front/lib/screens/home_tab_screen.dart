@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/inscription_service.dart';
+import '../theme/app_theme.dart';
 import 'booking_requests_screen.dart';
 
 class HomeTabScreen extends StatefulWidget {
@@ -37,6 +38,12 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     super.dispose();
   }
 
+  Future<void> _onRefresh() async {
+    if (widget.user.userType == 'Organisator') {
+      await _loadPendingRequests();
+    }
+  }
+
   Future<void> _loadPendingRequests() async {
     setState(() => _isLoadingRequests = true);
     try {
@@ -58,22 +65,15 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
   Widget build(BuildContext context) {
     final isOrganisator = widget.user.userType == 'Organisator';
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Row(
-          children: [
-            Text(
-              'DJTrip',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFFF6B1A),
-                letterSpacing: 1.5,
-              ),
-            ),
-          ],
+        title: Text(
+          'DJTrip',
+          style: AppTextStyles.headlineSmall.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
         ),
         actions: [
           IconButton(
@@ -84,219 +84,228 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with greeting
-            Container(
-              padding: EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hello,',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    widget.user.fullname,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  // Search bar
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Where do you want to go?',
-                        border: InputBorder.none,
-                        icon: Icon(Icons.search, color: Colors.grey[600]),
-                        suffixIcon: Icon(Icons.tune, color: Color(0xFFFF6B1A)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-
-            // Booking requests alert for Organisator
-            if (isOrganisator && _pendingRequestsCount > 0)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const BookingRequestsScreen(),
-                      ),
-                    ).then((_) => _loadPendingRequests());
-                  },
-                  child: Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFFF6B1A), Color(0xFFFF8C42)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0xFFFF6B1A).withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.inbox,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Nouvelles demandes',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                '$_pendingRequestsCount réservation(s) en attente',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white.withOpacity(0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ],
-                    ),
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with greeting
+              Container(
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
                   ),
                 ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hello,',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      widget.user.fullname,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Search bar
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Where do you want to go?',
+                          border: InputBorder.none,
+                          icon: Icon(Icons.search, color: Colors.grey[600]),
+                          suffixIcon: Icon(
+                            Icons.tune,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            if (isOrganisator && _pendingRequestsCount > 0)
               SizedBox(height: 24),
 
-            // Categories
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Categories',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+              // Booking requests alert for Organisator
+              if (isOrganisator && _pendingRequestsCount > 0)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BookingRequestsScreen(),
+                        ),
+                      ).then((_) => _loadPendingRequests());
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.primary, AppColors.primaryLight],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.inbox,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'New Requests',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '$_pendingRequestsCount pending booking(s)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withOpacity(0.9),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildCategoryCard(
-                        'Beaches',
-                        Icons.beach_access,
-                        Colors.blue,
-                      ),
-                      _buildCategoryCard(
-                        'Mountains',
-                        Icons.terrain,
-                        Colors.green,
-                      ),
-                      _buildCategoryCard(
-                        'Cities',
-                        Icons.location_city,
-                        Colors.orange,
-                      ),
-                      _buildCategoryCard('Adventure', Icons.hiking, Colors.red),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
+                ),
+              if (isOrganisator && _pendingRequestsCount > 0)
+                SizedBox(height: 24),
 
-            // Popular destinations
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Popular destinations',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'See all',
-                      style: TextStyle(color: Color(0xFFFF6B1A)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
+              // Categories
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
-                children: [
-                  _buildDestinationCard('Paris', 'France', '1,299 DH'),
-                  SizedBox(width: 16),
-                  _buildDestinationCard('Marrakech', 'Maroc', '799 DH'),
-                  SizedBox(width: 16),
-                  _buildDestinationCard('Istanbul', 'Turquie', '1,099 DH'),
-                ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Categories',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildCategoryCard(
+                          'Beaches',
+                          Icons.beach_access,
+                          Colors.blue,
+                        ),
+                        _buildCategoryCard(
+                          'Mountains',
+                          Icons.terrain,
+                          Colors.green,
+                        ),
+                        _buildCategoryCard(
+                          'Cities',
+                          Icons.location_city,
+                          Colors.orange,
+                        ),
+                        _buildCategoryCard(
+                          'Adventure',
+                          Icons.hiking,
+                          Colors.red,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: 24),
-          ],
+              SizedBox(height: 24),
+
+              // Popular destinations
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Popular destinations',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: Text('See all', style: TextStyle(color: AppColors.primary)),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  children: [
+                    _buildDestinationCard('Paris', 'France', '1,299 DH'),
+                    SizedBox(width: 16),
+                    _buildDestinationCard('Marrakech', 'Maroc', '799 DH'),
+                    SizedBox(width: 16),
+                    _buildDestinationCard('Istanbul', 'Turquie', '1,099 DH'),
+                  ],
+                ),
+              ),
+              SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -364,7 +373,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
               color: Colors.grey[300],
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               gradient: LinearGradient(
-                colors: [Color(0xFFFFB84D), Color(0xFFFF6B1A)],
+                colors: [AppColors.secondary, AppColors.primary],
               ),
             ),
             child: Center(
@@ -399,7 +408,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF6B1A),
+                        color: AppColors.primary,
                       ),
                     ),
                   ],

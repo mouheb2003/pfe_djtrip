@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'theme/app_theme.dart';
 import 'splash_screen.dart';
 
 void main() {
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -13,16 +15,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'DJTrip',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: Color(0xFFFF6B1A),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Color(0xFFFF6B1A),
-          primary: Color(0xFFFF6B1A),
-          secondary: Color(0xFFFFB84D),
-        ),
-        useMaterial3: true,
-      ),
-      home: SplashScreen(), // On démarre avec le splash screen
+      theme: AppTheme.light,
+      home: const SplashScreen(),
     );
   }
 }

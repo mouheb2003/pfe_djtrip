@@ -23,7 +23,7 @@ class InscriptionTouristeInfo {
   factory InscriptionTouristeInfo.fromJson(Map<String, dynamic> json) {
     return InscriptionTouristeInfo(
       id: json['_id'] ?? '',
-      fullname: json['fullname'] ?? 'Touriste',
+      fullname: json['fullname'] ?? 'Tourist',
       email: json['email'] ?? '',
       avatar: json['avatar'],
       numTel: json['num_tel'],
@@ -83,6 +83,7 @@ class Inscription {
   final String touristeId;
   final String activiteId;
   final String organisateurId;
+  final String? organisateurNom;
   final String statut; // en_attente, approuvee, refusee, annulee
   final int nombreParticipants;
   final String? messageTouriste;
@@ -100,6 +101,7 @@ class Inscription {
     required this.touristeId,
     required this.activiteId,
     required this.organisateurId,
+    this.organisateurNom,
     required this.statut,
     required this.nombreParticipants,
     this.messageTouriste,
@@ -147,10 +149,12 @@ class Inscription {
     }
 
     String organisateurId = '';
+    String? organisateurNom;
     if (json['organisateur_id'] is String) {
       organisateurId = json['organisateur_id'];
     } else if (json['organisateur_id'] is Map) {
       organisateurId = json['organisateur_id']['_id'] ?? '';
+      organisateurNom = json['organisateur_id']['fullname'];
     }
 
     return Inscription(
@@ -158,6 +162,7 @@ class Inscription {
       touristeId: touristeId,
       activiteId: activiteId,
       organisateurId: organisateurId,
+      organisateurNom: organisateurNom,
       statut: json['statut'] ?? 'en_attente',
       nombreParticipants: json['nombre_participants'] ?? 1,
       messageTouriste: json['message_touriste'],
@@ -207,13 +212,13 @@ class Inscription {
   String get statutLibelle {
     switch (statut) {
       case 'en_attente':
-        return 'En attente';
+        return 'Pending';
       case 'approuvee':
-        return 'Approuvée';
+        return 'Approved';
       case 'refusee':
-        return 'Refusée';
+        return 'Refused';
       case 'annulee':
-        return 'Annulée';
+        return 'Cancelled';
       default:
         return statut;
     }

@@ -85,7 +85,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     IconButton(
                       onPressed: _handleLogout,
                       icon: Icon(Icons.logout, color: Colors.white),
-                      tooltip: 'Déconnexion',
+                      tooltip: 'Logout',
                     ),
                   ],
                 ),
@@ -141,9 +141,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                             SizedBox(height: 30),
 
-                            // Message de bienvenue
+                            // Welcome message
                             Text(
-                              'Bienvenue!',
+                              'Welcome!',
                               style: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
@@ -229,8 +229,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   SizedBox(height: 16),
                                   Text(
                                     widget.user.userType == 'Touriste'
-                                        ? 'Votre compte touristique est prêt!'
-                                        : 'Votre compte organisateur est prêt!',
+                                        ? 'Your tourist account is ready!'
+                                        : 'Your organizer account is ready!',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 18,
@@ -241,8 +241,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   SizedBox(height: 8),
                                   Text(
                                     widget.user.userType == 'Touriste'
-                                        ? 'Explorez, réservez et vivez des expériences inoubliables'
-                                        : 'Organisez des voyages et créez des expériences mémorables',
+                                        ? 'Explore, book and live unforgettable experiences'
+                                        : 'Organize trips and create memorable experiences',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 14,
@@ -263,7 +263,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   // TODO: Naviguer vers le dashboard ou l'écran principal
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Dashboard à venir...'),
+                                      content: Text('Dashboard coming soon...'),
                                       backgroundColor: Color(0xFF2D5016),
                                     ),
                                   );
@@ -281,7 +281,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Commencer l\'aventure',
+                                      'Start the Adventure',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -305,7 +305,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Membre depuis ${_formatDate(widget.user.dateInscription)}',
+                  'Member since ${_formatDate(widget.user.dateInscription)}',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 12,
@@ -321,19 +321,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   String _formatDate(DateTime date) {
     final months = [
-      'janvier',
-      'février',
-      'mars',
-      'avril',
-      'mai',
-      'juin',
-      'juillet',
-      'août',
-      'septembre',
-      'octobre',
-      'novembre',
-      'décembre',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

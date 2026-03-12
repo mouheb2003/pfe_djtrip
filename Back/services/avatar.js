@@ -85,6 +85,39 @@ class AvatarService {
   }
 
   /**
+   * Supprime l'avatar d'un utilisateur (Cloudinary + DB)
+   * @param {String} userId - ID de l'utilisateur
+   * @returns {Promise<Object>} Utilisateur mis à jour
+   */
+  static async deleteAvatar(userId) {
+    const user = await User.findById(userId).select("avatar");
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.avatar) {
+      try {
+        await this.deleteFromCloudinary(user.avatar);
+      } catch (error) {
+        console.warn(
+          "⚠️ Could not delete avatar from Cloudinary:",
+          error.message,
+        );
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $unset: { avatar: 1 } },
+      { new: true },
+    ).select("-mot_de_passe");
+
+    console.log("✅ Avatar deleted for user:", userId);
+    return updatedUser;
+  }
+
+  /**
    * Remplace l'avatar d'un utilisateur (supprime l'ancien et upload le nouveau)
    * @param {String} userId - ID de l'utilisateur
    * @param {Buffer} fileBuffer - Buffer du nouveau fichier

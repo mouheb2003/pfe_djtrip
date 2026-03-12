@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/user.dart';
 import 'profile_picture_screen.dart';
@@ -32,6 +32,110 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final bool _canSkip = true;
   bool _isAgeValid = true;
   String? _ageErrorMessage;
+
+  // Country code picker state
+  String? _selectedDialCode;
+  String? _selectedFlag;
+  String? _phoneFormat;
+
+  static const List<Map<String, String>> _countryCodes = [
+    {'flag': '🇹🇳', 'name': 'Tunisia', 'dial': '+216', 'format': '20 123 456'},
+    {
+      'flag': '🇩🇿',
+      'name': 'Algeria',
+      'dial': '+213',
+      'format': '655 123 456',
+    },
+    {
+      'flag': '🇲🇦',
+      'name': 'Morocco',
+      'dial': '+212',
+      'format': '6 12 34 56 78',
+    },
+    {'flag': '🇱🇾', 'name': 'Libya', 'dial': '+218', 'format': '91 234 5678'},
+    {'flag': '🇪🇬', 'name': 'Egypt', 'dial': '+20', 'format': '10 1234 5678'},
+    {
+      'flag': '🇫🇷',
+      'name': 'France',
+      'dial': '+33',
+      'format': '6 12 34 56 78',
+    },
+    {
+      'flag': '🇧🇪',
+      'name': 'Belgium',
+      'dial': '+32',
+      'format': '470 12 34 56',
+    },
+    {'flag': '🇨🇭', 'name': 'Switzerland', 'dial': '+41', 'format': '76 123 45 67'},
+    {
+      'flag': '🇩🇪',
+      'name': 'Germany',
+      'dial': '+49',
+      'format': '151 12345678',
+    },
+    {'flag': '🇮🇹', 'name': 'Italy', 'dial': '+39', 'format': '312 345 6789'},
+    {'flag': '🇪🇸', 'name': 'Spain', 'dial': '+34', 'format': '612 345 678'},
+    {
+      'flag': '🇬🇧',
+      'name': 'United Kingdom',
+      'dial': '+44',
+      'format': '7911 123456',
+    },
+    {'flag': '🇳🇱', 'name': 'Netherlands', 'dial': '+31', 'format': '6 12345678'},
+    {
+      'flag': '🇵🇹',
+      'name': 'Portugal',
+      'dial': '+351',
+      'format': '912 345 678',
+    },
+    {'flag': '🇸🇪', 'name': 'Sweden', 'dial': '+46', 'format': '70 123 45 67'},
+    {
+      'flag': '🇹🇷',
+      'name': 'Turkey',
+      'dial': '+90',
+      'format': '532 123 45 67',
+    },
+    {
+      'flag': '🇸🇦',
+      'name': 'Saudi Arabia',
+      'dial': '+966',
+      'format': '50 123 4567',
+    },
+    {
+      'flag': '🇦🇪',
+      'name': 'United Arab Emirates',
+      'dial': '+971',
+      'format': '50 123 4567',
+    },
+    {'flag': '🇶🇦', 'name': 'Qatar', 'dial': '+974', 'format': '3312 3456'},
+    {'flag': '🇰🇼', 'name': 'Kuwait', 'dial': '+965', 'format': '5012 3456'},
+    {
+      'flag': '🇺🇸',
+      'name': 'United States',
+      'dial': '+1',
+      'format': '(555) 123-4567',
+    },
+    {
+      'flag': '🇨🇦',
+      'name': 'Canada',
+      'dial': '+1',
+      'format': '(555) 123-4567',
+    },
+    {
+      'flag': '🇧🇷',
+      'name': 'Brazil',
+      'dial': '+55',
+      'format': '11 91234-5678',
+    },
+    {
+      'flag': '🇦🇺',
+      'name': 'Australia',
+      'dial': '+61',
+      'format': '412 345 678',
+    },
+    {'flag': '🇯🇵', 'name': 'Japan', 'dial': '+81', 'format': '90 1234 5678'},
+    {'flag': '🇨🇳', 'name': 'China', 'dial': '+86', 'format': '131 2345 6789'},
+  ];
 
   @override
   void initState() {
@@ -74,6 +178,93 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     }
   }
 
+  void _showCountryCodePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Select dial code',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _countryCodes.length,
+                    itemBuilder: (ctx, index) {
+                      final c = _countryCodes[index];
+                      final isSelected =
+                          c['dial'] == _selectedDialCode &&
+                          c['flag'] == _selectedFlag;
+                      return ListTile(
+                        leading: Text(
+                          c['flag']!,
+                          style: const TextStyle(fontSize: 26),
+                        ),
+                        title: Text(c['name']!),
+                        trailing: Text(
+                          c['dial']!,
+                          style: const TextStyle(
+                            color: Color(0xFFFF6B1A),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedTileColor: const Color(
+                          0xFFFF6B1A,
+                        ).withOpacity(0.08),
+                        onTap: () {
+                          setState(() {
+                            _selectedDialCode = c['dial'];
+                            _selectedFlag = c['flag'];
+                            _phoneFormat = c['format'];
+                          });
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _ageController.removeListener(_validateAge);
@@ -102,13 +293,13 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   }
 
   void _continueToPermissions() {
-    // Créer un objet avec les données collectées
+    // Create an object with the collected data
     final profileData = {
       'age': _ageController.text.isNotEmpty
           ? int.tryParse(_ageController.text)
           : null,
       'num_tel': _phoneController.text.isNotEmpty
-          ? _phoneController.text.trim()
+          ? '${_selectedDialCode != null ? '${_selectedDialCode!} ' : ''}${_phoneController.text.trim()}'
           : null,
       'bio': _bioController.text.isNotEmpty ? _bioController.text.trim() : null,
       'pays_origine': _selectedCountry,
@@ -382,26 +573,70 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
         ),
         SizedBox(height: 8),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          decoration: InputDecoration(
-            hintText: '+33 6 12 34 56 78',
-            prefixIcon: Icon(Icons.phone_outlined, color: Color(0xFFFF6B1A)),
-            filled: true,
-            fillColor: Colors.grey[50],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.grey[200]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Color(0xFFFF6B1A), width: 2),
-            ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Row(
+            children: [
+              // Country code button
+              GestureDetector(
+                onTap: _showCountryCodePicker,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border(right: BorderSide(color: Colors.grey[200]!)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _selectedFlag ?? '🌍',
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _selectedDialCode ?? '+??',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedDialCode != null
+                              ? Colors.black87
+                              : Colors.grey[500],
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 18,
+                        color: Colors.grey[500],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Phone number input
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: _phoneFormat ?? 'Phone number',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(height: 24),

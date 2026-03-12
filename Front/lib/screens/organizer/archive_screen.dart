@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../models/activite.dart';
 import '../../models/user.dart';
 import '../../models/organisator.dart';
@@ -191,7 +191,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Statistiques de toutes vos activités (actives, terminées, futures)',
+                        'Overview of all your activities (active, finished, upcoming)',
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.white.withOpacity(0.7),
@@ -208,7 +208,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                                   .toString(),
                               Icons.event,
                               Colors.blue,
-                              subtitle: 'Créées',
+                              subtitle: 'Created',
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -226,7 +226,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                                   .toString(),
                               Icons.people,
                               Colors.green,
-                              subtitle: 'Toutes activités',
+                              subtitle: 'All activities',
                             ),
                           ),
                         ],
@@ -241,7 +241,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                               '${([..._archivedActivities, ..._allActivities].fold<double>(0, (sum, a) => sum + (a.prix * a.nombreReservations))).toStringAsFixed(0)} DT',
                               Icons.attach_money,
                               Colors.orange,
-                              subtitle: 'Toutes activités',
+                              subtitle: 'All activities',
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -263,7 +263,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                                     .toStringAsFixed(1),
                                 Icons.star,
                                 Colors.amber,
-                                subtitle: 'Toutes activités',
+                                subtitle: 'All activities',
                               );
                             }(),
                           ),

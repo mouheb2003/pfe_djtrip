@@ -140,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen>
                   SizedBox(height: 24),
                   // Text with animation
                   Text(
-                    "Découvrez Djerba avec nous",
+                    "Discover Djerba with us",
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.white,
