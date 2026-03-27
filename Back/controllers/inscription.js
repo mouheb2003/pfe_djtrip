@@ -2,50 +2,84 @@ const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
 
-// Créer une nouvelle inscription (Touriste s'inscrit à une activité)
+// Auto-expire pending requests for activities already ended.
+// Business rule: if organizer did not respond before activity end date,
+// request is automatically cancelled for the tourist.
+async function expirePendingInscriptionsForEndedActivities() {
+  const now = new Date();
+  const endedActivityIds = await Activite.find({
+    date_fin: { $lt: now },
+  }).distinct("_id");
+
+  if (!endedActivityIds.length) return 0;
+
+  const result = await Inscription.updateMany(
+    {
+      activite_id: { $in: endedActivityIds },
+      statut: "en_attente",
+    },
+    {
+      $set: {
+        statut: "annulee",
+        date_reponse: now,
+        message_organisateur:
+          "Automatically cancelled because the activity has ended without organizer response.",
+      },
+    },
+  );
+
+  return result.modifiedCount || 0;
+}
+
+// Create a new registration (Tourist registers for an activity)
 exports.createInscription = async (req, res) => {
   try {
-    const touristeId = req.user.userId; // ID du touriste connecté
+    const touristeId = req.user.userId; // Logged-in tourist ID
     const { activite_id, nombre_participants, message_touriste } = req.body;
 
-    // Vérifier que l'utilisateur est un touriste
+    // Verify the user is a tourist
     const touriste = await Touriste.findById(touristeId);
     if (!touriste) {
       return res.status(403).json({
-        message: "Seuls les touristes peuvent s'inscrire aux activités",
+        message: "Only tourists can register for activities",
       });
     }
 
-    // Vérifier que l'activité existe et est active
+    // Verify the activity exists and is active
     const activite = await Activite.findById(activite_id);
     if (!activite) {
-      return res.status(404).json({ message: "Activité non trouvée" });
+      return res.status(404).json({ message: "Activity not found" });
     }
 
     if (activite.statut !== "active") {
       return res.status(400).json({
-        message: "Cette activité n'est plus disponible",
+        message: "This activity is no longer available",
+      });
+    }
+    if (new Date(activite.date_fin) <= new Date()) {
+      return res.status(400).json({
+        message: "This activity has already ended",
       });
     }
 
-    // Vérifier s'il reste des places disponibles
+    // Check if spots are still available
     const placesDisponibles =
       activite.capacite_max - activite.nombre_reservations;
     const nombreParticipants = nombre_participants || 1;
 
     if (placesDisponibles <= 0) {
       return res.status(400).json({
-        message: "Désolé, cette activité est complète",
+        message: "Sorry, this activity is fully booked",
       });
     }
 
     if (nombreParticipants > placesDisponibles) {
       return res.status(400).json({
-        message: `Désolé, il ne reste que ${placesDisponibles} place${placesDisponibles > 1 ? "s" : ""} disponible${placesDisponibles > 1 ? "s" : ""}`,
+        message: `Sorry, only ${placesDisponibles} place${placesDisponibles > 1 ? "s" : ""} left available`,
       });
     }
 
-    // Vérifier si le touriste est déjà inscrit à cette activité
+    // Check if the tourist is already registered for this activity
     const inscriptionExistante = await Inscription.findOne({
       touriste_id: touristeId,
       activite_id: activite_id,
@@ -54,14 +88,14 @@ exports.createInscription = async (req, res) => {
 
     if (inscriptionExistante) {
       return res.status(400).json({
-        message: "Vous êtes déjà inscrit à cette activité",
+        message: "You are already registered for this activity",
       });
     }
 
-    // Calculer le prix total
+    // Calculate total price
     const prixTotal = activite.prix * (nombre_participants || 1);
 
-    // Créer l'inscription
+    // Create the registration
     const inscription = new Inscription({
       touriste_id: touristeId,
       activite_id: activite_id,
@@ -73,28 +107,30 @@ exports.createInscription = async (req, res) => {
 
     await inscription.save();
 
-    // Note: nombre_reservations sera incrémenté lors de l'approbation, pas maintenant
+    // Note: nombre_reservations will be incremented upon approval, not now
 
-    // Populate les informations pour la réponse
+    // Populate information for the response
     const inscriptionPopulated = await Inscription.findById(inscription._id)
       .populate("activite_id", "titre date_debut date_fin lieu prix")
       .populate("touriste_id", "fullname email avatar");
 
     res.status(201).json({
-      message: "Inscription créée avec succès. En attente d'approbation.",
+      message: "Registration created successfully. Pending approval.",
       inscription: inscriptionPopulated,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la création de l'inscription",
+      message: "Error creating registration",
       error: error.message,
     });
   }
 };
 
-// Obtenir les inscriptions d'un touriste
+// Get registrations for a tourist
 exports.getInscriptionsByTouriste = async (req, res) => {
   try {
+    await expirePendingInscriptionsForEndedActivities();
+
     const touristeId = req.user.userId;
     const { statut } = req.query;
 
@@ -114,15 +150,17 @@ exports.getInscriptionsByTouriste = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération des inscriptions",
+      message: "Error retrieving registrations",
       error: error.message,
     });
   }
 };
 
-// Obtenir les inscriptions pour un organisateur (toutes les demandes)
+// Get registrations for an organizer (all requests)
 exports.getInscriptionsByOrganisateur = async (req, res) => {
   try {
+    await expirePendingInscriptionsForEndedActivities();
+
     const organisateurId = req.user.userId;
     const { statut, activite_id } = req.query;
 
@@ -145,15 +183,17 @@ exports.getInscriptionsByOrganisateur = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération des inscriptions",
+      message: "Error retrieving registrations",
       error: error.message,
     });
   }
 };
 
-// Obtenir les inscriptions en attente pour un organisateur
+// Get pending registrations for an organizer
 exports.getInscriptionsEnAttente = async (req, res) => {
   try {
+    await expirePendingInscriptionsForEndedActivities();
+
     const organisateurId = req.user.userId;
 
     const inscriptions = await Inscription.find({
@@ -162,7 +202,7 @@ exports.getInscriptionsEnAttente = async (req, res) => {
     })
       .populate("touriste_id", "fullname email avatar num_tel")
       .populate("activite_id", "titre date_debut lieu")
-      .sort({ createdAt: 1 }); // Plus anciennes en premier
+      .sort({ createdAt: 1 }); // Oldest first
 
     res.status(200).json({
       count: inscriptions.length,
@@ -170,40 +210,52 @@ exports.getInscriptionsEnAttente = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération des demandes en attente",
+      message: "Error retrieving pending requests",
       error: error.message,
     });
   }
 };
 
-// Approuver une inscription (Organisateur)
+// Approve a registration (Organizer)
 exports.approuverInscription = async (req, res) => {
   try {
+    await expirePendingInscriptionsForEndedActivities();
+
     const organisateurId = req.user.userId;
     const { inscriptionId } = req.params;
     const { message_organisateur } = req.body;
 
     const inscription = await Inscription.findById(inscriptionId);
     if (!inscription) {
-      return res.status(404).json({ message: "Inscription non trouvée" });
+      return res.status(404).json({ message: "Registration not found" });
     }
 
-    // Vérifier que l'organisateur est bien le propriétaire
+    // Verify the organizer is the owner
     if (inscription.organisateur_id.toString() !== organisateurId) {
       return res.status(403).json({
-        message: "Vous n'êtes pas autorisé à approuver cette inscription",
+        message: "You are not authorized to approve this registration",
       });
     }
 
     if (inscription.statut !== "en_attente") {
       return res.status(400).json({
-        message: "Cette inscription a déjà été traitée",
+        message: "This registration has already been processed",
+      });
+    }
+
+    const activite = await Activite.findById(inscription.activite_id);
+    if (!activite) {
+      return res.status(404).json({ message: "Activity not found" });
+    }
+    if (new Date(activite.date_fin) <= new Date()) {
+      return res.status(400).json({
+        message: "Cannot approve: activity has already ended",
       });
     }
 
     await inscription.approuver(message_organisateur);
 
-    // Incrémenter le nombre de places réservées (nombre de participants)
+    // Increment the number of reserved spots (number of participants)
     await Activite.findByIdAndUpdate(inscription.activite_id, {
       $inc: { nombre_reservations: inscription.nombre_participants },
     });
@@ -213,64 +265,66 @@ exports.approuverInscription = async (req, res) => {
       .populate("activite_id", "titre date_debut");
 
     res.status(200).json({
-      message: "Inscription approuvée avec succès",
+      message: "Registration approved successfully",
       inscription: inscriptionPopulated,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de l'approbation de l'inscription",
+      message: "Error approving registration",
       error: error.message,
     });
   }
 };
 
-// Refuser une inscription (Organisateur)
+// Reject a registration (Organizer)
 exports.refuserInscription = async (req, res) => {
   try {
+    await expirePendingInscriptionsForEndedActivities();
+
     const organisateurId = req.user.userId;
     const { inscriptionId } = req.params;
     const { message_organisateur } = req.body;
 
     const inscription = await Inscription.findById(inscriptionId);
     if (!inscription) {
-      return res.status(404).json({ message: "Inscription non trouvée" });
+      return res.status(404).json({ message: "Registration not found" });
     }
 
-    // Vérifier que l'organisateur est bien le propriétaire
+    // Verify the organizer is the owner
     if (inscription.organisateur_id.toString() !== organisateurId) {
       return res.status(403).json({
-        message: "Vous n'êtes pas autorisé à refuser cette inscription",
+        message: "You are not authorized to reject this registration",
       });
     }
 
     if (inscription.statut !== "en_attente") {
       return res.status(400).json({
-        message: "Cette inscription a déjà été traitée",
+        message: "This registration has already been processed",
       });
     }
 
     await inscription.refuser(message_organisateur);
 
-    // Note: pas besoin de décrémenter nombre_reservations car il n'était pas encore incrémenté
-    // (seulement les inscriptions approuvées sont comptées)
+    // Note: no need to decrement nombre_reservations as it was not yet incremented
+    // (only approved registrations are counted)
 
     const inscriptionPopulated = await Inscription.findById(inscriptionId)
       .populate("touriste_id", "fullname email")
       .populate("activite_id", "titre date_debut");
 
     res.status(200).json({
-      message: "Inscription refusée",
+      message: "Registration rejected",
       inscription: inscriptionPopulated,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors du refus de l'inscription",
+      message: "Error rejecting registration",
       error: error.message,
     });
   }
 };
 
-// Annuler une inscription (Touriste)
+// Cancel a registration (Tourist)
 exports.annulerInscription = async (req, res) => {
   try {
     const touristeId = req.user.userId;
@@ -278,24 +332,24 @@ exports.annulerInscription = async (req, res) => {
 
     const inscription = await Inscription.findById(inscriptionId);
     if (!inscription) {
-      return res.status(404).json({ message: "Inscription non trouvée" });
+      return res.status(404).json({ message: "Registration not found" });
     }
 
-    // Vérifier que le touriste est bien le propriétaire
+    // Verify the tourist is the owner
     if (inscription.touriste_id.toString() !== touristeId) {
       return res.status(403).json({
-        message: "Vous n'êtes pas autorisé à annuler cette inscription",
+        message: "You are not authorized to cancel this registration",
       });
     }
 
     if (inscription.statut === "annulee") {
       return res.status(400).json({
-        message: "Cette inscription est déjà annulée",
+        message: "This registration is already canceled",
       });
     }
 
-    // Décrémenter le nombre de places réservées si elle était approuvée
-    // (doit être fait AVANT d'annuler pour vérifier le statut)
+    // Decrement the number of reserved spots if registration was approved
+    // (must be done BEFORE cancelling to check the status)
     const wasApproved = inscription.statut === "approuvee";
     const nombreParticipants = inscription.nombre_participants;
 
@@ -308,17 +362,17 @@ exports.annulerInscription = async (req, res) => {
     }
 
     res.status(200).json({
-      message: "Inscription annulée avec succès",
+      message: "Registration canceled successfully",
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de l'annulation de l'inscription",
+      message: "Error canceling registration",
       error: error.message,
     });
   }
 };
 
-// Obtenir une inscription par ID
+// Get a registration by ID
 exports.getInscriptionById = async (req, res) => {
   try {
     const { inscriptionId } = req.params;
@@ -329,13 +383,67 @@ exports.getInscriptionById = async (req, res) => {
       .populate("organisateur_id", "fullname email avatar num_tel");
 
     if (!inscription) {
-      return res.status(404).json({ message: "Inscription non trouvée" });
+      return res.status(404).json({ message: "Registration not found" });
     }
 
     res.status(200).json({ inscription });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération de l'inscription",
+      message: "Error retrieving registration",
+      error: error.message,
+    });
+  }
+};
+
+// Organizer statistics (activities, bookings, revenue)
+exports.getOrganizerStats = async (req, res) => {
+  try {
+    const organisateurId = req.user.userId;
+
+    const [totalBookings, approvedInscriptions, activitiesCount] =
+      await Promise.all([
+        Inscription.countDocuments({ organisateur_id: organisateurId }),
+        Inscription.find({
+          organisateur_id: organisateurId,
+          statut: "approuvee",
+        }).select("prix_total"),
+        Activite.countDocuments({
+          organisateur_id: organisateurId,
+          statut: { $ne: "archive" },
+        }),
+      ]);
+
+    const totalRevenue = approvedInscriptions.reduce(
+      (sum, i) => sum + (i.prix_total || 0),
+      0,
+    );
+
+    res.status(200).json({
+      activitiesCount,
+      totalBookings,
+      totalRevenue,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving statistics",
+      error: error.message,
+    });
+  }
+};
+
+// Tourist statistics (bookings, reviews)
+exports.getTouristStats = async (req, res) => {
+  try {
+    const touristeId = req.user.userId;
+
+    const [totalBookings] = await Promise.all([
+      Inscription.countDocuments({ touriste_id: touristeId }),
+    ]);
+
+    res.status(200).json({ totalBookings });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving statistics",
       error: error.message,
     });
   }

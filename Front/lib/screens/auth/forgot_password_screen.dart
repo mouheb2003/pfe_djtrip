@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/app_routes.dart';
 import '../../services/auth_service.dart';
 import 'reset_password_screen.dart';
 import 'auth_widgets/custom_text_field.dart';
@@ -37,9 +38,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await AuthService.forgotPassword(
-        email: _emailController.text.trim(),
-      );
+      final result = await AuthService.forgotPassword(_emailController.text.trim());
 
       if (!mounted) return;
 
@@ -264,7 +263,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () => Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          AppRoutes.login,
+                          (route) => false,
+                        ),
                         child: const Text(
                           'Sign In',
                           style: TextStyle(

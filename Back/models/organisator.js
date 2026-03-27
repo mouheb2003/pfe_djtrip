@@ -1,37 +1,37 @@
 const mongoose = require("mongoose");
 const User = require("./user");
 
-// Schéma spécifique pour Organisator (Organisateur d'activités simple)
+// Specific schema for Organisator (Simple activity organizer)
 const organisatorSchema = new mongoose.Schema({
-  // Lien vers l'utilisateur de base (héritage)
+  // Link to the base user (inheritance)
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
-  // Types d'activités proposées (ex: "Sports nautiques", "Randonnée", "Visites culturelles", etc.)
+  // Offered activity types (e.g. "Water Sports", "Hiking", "Cultural Visits", etc.)
   types_activites: {
     type: [String],
     default: [],
     enum: [
-      "Sports nautiques",
-      "Randonnée",
-      "Escalade",
-      "Vélo",
-      "Visites culturelles",
-      "Gastronomie",
-      "Aventure",
-      "Sports extrêmes",
-      "Cours et ateliers",
-      "Détente et bien-être",
-      "Photographie",
-      "Observation nature",
-      "Sports d'hiver",
-      "Activités nautiques",
+      "Water Sports",
+      "Hiking",
+      "Climbing",
+      "Cycling",
+      "Cultural Visits",
+      "Gastronomy",
+      "Adventure",
+      "Extreme Sports",
+      "Courses and Workshops",
+      "Relaxation and Wellness",
+      "Photography",
+      "Nature Observation",
+      "Winter Sports",
+      "Water Activities",
       "Excursions",
-      "Autres",
+      "Other",
     ],
   },
-  // Liste des activités créées par cet organisateur (références aux IDs des activités)
+  // List of activities created by this organizer (references to activity IDs)
   liste_activites: {
     type: [mongoose.Schema.Types.ObjectId],
     ref: "Activite",
@@ -47,19 +47,19 @@ const organisatorSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  // Langues parlées pour les activités
+  // Languages spoken for activities
   langues_proposees: {
     type: [String],
     default: [],
   },
-  // Description de l'organisateur et de ses services
+  // Description of the organizer and their services
   description: {
     type: String,
     maxlength: 1000,
   },
 });
 
-// Utilisation du discriminator pour hériter de User
+// Using the discriminator to inherit from User
 const Organisator = User.discriminator("Organisator", organisatorSchema);
 
 module.exports = Organisator;

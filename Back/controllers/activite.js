@@ -1,21 +1,37 @@
-const Activite = require("../models/activite");
+﻿const Activite = require("../models/activite");
 const Organisator = require("../models/organisator");
 const ActiviteService = require("../services/activite");
+const cloudinary = require("../config/cloudinary");
 
-// Créer une nouvelle activité
+// Helper: extract Cloudinary public_id from a URL
+const extractCloudinaryPublicId = (url) => {
+  try {
+    // URL pattern: https://res.cloudinary.com/<cloud>/image/upload/v<version>/<public_id>.<ext>
+    const parts = url.split("/upload/");
+    if (parts.length < 2) return null;
+    const withVersion = parts[1]; // e.g. v1234567/folder/filename.jpg
+    const withoutVersion = withVersion.replace(/^v\d+\//, ""); // remove v<number>/
+    const withoutExtension = withoutVersion.replace(/\.[^/.]+$/, ""); // remove extension
+    return withoutExtension;
+  } catch {
+    return null;
+  }
+};
+
+// Create a new activity
 exports.createActivite = async (req, res) => {
   try {
-    const userId = req.user.userId; // ID de l'organisateur connecté
+    const userId = req.user.userId; // Logged-in organizer ID
 
     console.log("📝 Creating activite for user:", userId);
     console.log("📄 Received files:", req.files);
     console.log("📦 Received body:", req.body);
 
-    // Vérifier que l'utilisateur est un organisateur
+    // Verify the user is an organizer
     const organisator = await Organisator.findById(userId);
     if (!organisator) {
       return res.status(403).json({
-        message: "Seuls les organisateurs peuvent créer des activités",
+        message: "Only organizers can create activities",
       });
     }
 
@@ -53,7 +69,16 @@ exports.createActivite = async (req, res) => {
       }
     }
 
-    // Upload des photos vers Cloudinary si des fichiers sont fournis
+    let parsedEquipementsInclus = equipements_inclus;
+    if (typeof equipements_inclus === "string") {
+      try {
+        parsedEquipementsInclus = JSON.parse(equipements_inclus);
+      } catch (e) {
+        parsedEquipementsInclus = [equipements_inclus];
+      }
+    }
+
+    // Upload photos to Cloudinary if files are provided
     let photosUrls = [];
     if (req.files && req.files.length > 0) {
       console.log(`☁️ Uploading ${req.files.length} photos to Cloudinary...`);
@@ -64,13 +89,13 @@ exports.createActivite = async (req, res) => {
       } catch (uploadError) {
         console.error("❌ Error uploading photos:", uploadError);
         return res.status(500).json({
-          message: "Erreur lors de l'upload des photos",
+          message: "Error uploading photos",
           error: uploadError.message,
         });
       }
     }
 
-    // Créer la nouvelle activité
+    // Create the new activity
     const activite = new Activite({
       titre,
       description,
@@ -84,7 +109,7 @@ exports.createActivite = async (req, res) => {
       langues_disponibles,
       photos: photosUrls,
       niveau_difficulte,
-      equipements_inclus,
+      equipements_inclus: parsedEquipementsInclus,
       a_apporter,
       dates_disponibles,
       date_debut: date_debut || dateDebut,
@@ -99,34 +124,34 @@ exports.createActivite = async (req, res) => {
 
     await activite.save();
 
-    // Ajouter l'activité à la liste de l'organisateur
+    // Add activity to organizer's list
     organisator.liste_activites.push(activite._id);
     await organisator.save();
 
-    // Populate organisateur_id avant de retourner
+    // Populate organisateur_id before returning
     const activitePopulated = await Activite.findById(activite._id).populate(
       "organisateur_id",
       "fullname avatar email num_tel note_moyenne nombre_avis description",
     );
 
     console.log(
-      "✅ Activité créée et populated:",
+      "✅ Activity created and populated:",
       JSON.stringify(activitePopulated, null, 2),
     );
 
     res.status(201).json({
-      message: "Activité créée avec succès",
+      message: "Activity created successfully",
       activite: activitePopulated,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la création de l'activité",
+      message: "Error creating activity",
       error: error.message,
     });
   }
 };
 
-// Obtenir toutes les activités (avec filtres optionnels)
+// Get all activities (with optional filters)
 exports.getAllActivites = async (req, res) => {
   try {
     const {
@@ -137,16 +162,27 @@ exports.getAllActivites = async (req, res) => {
       prix_min,
       prix_max,
       organisateur_id,
-      temporalite, // 'en_cours', 'a_venir', 'passees'
+      temporalite, // 'en_cours', 'a_venir', 'passees', 'disponibles'
+      search, // text search across titre, description, lieu
+      sort, // 'prix_asc', 'prix_desc', 'note_desc', 'date_asc', 'recent' (default)
     } = req.query;
 
     const filter = {};
 
     if (type_activite) filter.type_activite = type_activite;
-    if (lieu) filter.lieu = { $regex: lieu, $options: "i" }; // Recherche insensible à la casse
+    if (lieu) filter.lieu = { $regex: lieu, $options: "i" };
     if (statut) filter.statut = statut;
     if (niveau_difficulte) filter.niveau_difficulte = niveau_difficulte;
     if (organisateur_id) filter.organisateur_id = organisateur_id;
+
+    // Unified text search across titre, description, lieu
+    if (search && search.trim()) {
+      filter.$or = [
+        { titre: { $regex: search.trim(), $options: "i" } },
+        { description: { $regex: search.trim(), $options: "i" } },
+        { lieu: { $regex: search.trim(), $options: "i" } },
+      ];
+    }
 
     if (prix_min || prix_max) {
       filter.prix = {};
@@ -154,53 +190,45 @@ exports.getAllActivites = async (req, res) => {
       if (prix_max) filter.prix.$lte = parseFloat(prix_max);
     }
 
-    // Filtrer par temporalité
+    // Filter by temporality
     const maintenant = new Date();
     if (temporalite === "en_cours") {
-      // Activités en cours maintenant
       filter.date_debut = { $lte: maintenant };
       filter.date_fin = { $gte: maintenant };
     } else if (temporalite === "a_venir") {
-      // Activités à venir (pas encore commencées)
       filter.date_debut = { $gt: maintenant };
     } else if (temporalite === "passees") {
-      // Activités terminées
       filter.date_fin = { $lt: maintenant };
     } else if (temporalite === "disponibles") {
-      // Activités en cours ou à venir
       filter.date_fin = { $gte: maintenant };
     }
 
+    // Determine sort order
+    let sortOption = { createdAt: -1 }; // default: most recent first
+    if (sort === "prix_asc") sortOption = { prix: 1 };
+    else if (sort === "prix_desc") sortOption = { prix: -1 };
+    else if (sort === "note_desc") sortOption = { note_moyenne: -1 };
+    else if (sort === "date_asc") sortOption = { date_debut: 1 };
+
     const activites = await Activite.find(filter)
       .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
-      .sort({ createdAt: -1 });
-
-    console.log(`📊 getAllActivites: Found ${activites.length} activities`);
-    console.log("🕐 Server time:", new Date().toISOString());
-    if (activites.length > 0) {
-      console.log("  - Sample activity dates:");
-      activites.slice(0, 3).forEach((act) => {
-        console.log(
-          `    * ${act.titre}: date_debut=${act.date_debut?.toISOString()}, date_fin=${act.date_fin?.toISOString()}`,
-        );
-      });
-    }
+      .sort(sortOption);
 
     res.status(200).json({
       success: true,
       count: activites.length,
-      activities: activites, // Changed from 'activites' to 'activities' for consistency
+      activities: activites,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Erreur lors de la récupération des activités",
+      message: "Error retrieving activities",
       error: error.message,
     });
   }
 };
 
-// Obtenir une activité par ID
+// Get an activity by ID
 exports.getActiviteById = async (req, res) => {
   try {
     const activite = await Activite.findById(req.params.id).populate(
@@ -209,19 +237,19 @@ exports.getActiviteById = async (req, res) => {
     );
 
     if (!activite) {
-      return res.status(404).json({ message: "Activité non trouvée" });
+      return res.status(404).json({ message: "Activity not found" });
     }
 
     res.status(200).json({ activite });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération de l'activité",
+      message: "Error retrieving activity",
       error: error.message,
     });
   }
 };
 
-// Obtenir les activités d'un organisateur
+// Get activities for an organizer
 exports.getActivitesByOrganisateur = async (req, res) => {
   try {
     const { organisateurId } = req.params;
@@ -236,13 +264,13 @@ exports.getActivitesByOrganisateur = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération des activités de l'organisateur",
+      message: "Error retrieving organizer activities",
       error: error.message,
     });
   }
 };
 
-// Mettre à jour une activité
+// Update an activity
 exports.updateActivite = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -252,24 +280,24 @@ exports.updateActivite = async (req, res) => {
     console.log("📄 Received files:", req.files);
     console.log("📦 Received body:", req.body);
 
-    // Trouver l'activité
+    // Find the activity
     const activite = await Activite.findById(activiteId);
     if (!activite) {
-      return res.status(404).json({ message: "Activité non trouvée" });
+      return res.status(404).json({ message: "Activity not found" });
     }
 
-    // Vérifier que l'utilisateur est le propriétaire de l'activité
+    // Verify the user owns the activity
     if (activite.organisateur_id.toString() !== userId) {
       return res.status(403).json({
-        message: "Vous n'êtes pas autorisé à modifier cette activité",
+        message: "You are not authorized to modify this activity",
       });
     }
 
-    // Empêcher la modification des activités terminées
+    // Prevent modification of completed activities
     const maintenant = new Date();
     if (activite.date_fin < maintenant) {
       return res.status(400).json({
-        message: "Impossible de modifier une activité terminée",
+        message: "Cannot modify a completed activity",
       });
     }
 
@@ -295,7 +323,7 @@ exports.updateActivite = async (req, res) => {
       date_fin,
       dateFin,
       statut,
-      keepExistingPhotos, // "true" pour garder les photos existantes et ajouter les nouvelles
+      keepExistingPhotos, // "true" to keep existing photos and add the new ones
     } = req.body;
 
     // Parse JSON fields that may come as strings from multipart/form-data
@@ -305,6 +333,18 @@ exports.updateActivite = async (req, res) => {
         parsedCoordonnees = JSON.parse(coordonnees);
       } catch (e) {
         console.warn("⚠️ Failed to parse coordonnees:", e);
+      }
+    }
+
+    let parsedEquipementsInclus = equipements_inclus;
+    if (
+      equipements_inclus !== undefined &&
+      typeof equipements_inclus === "string"
+    ) {
+      try {
+        parsedEquipementsInclus = JSON.parse(equipements_inclus);
+      } catch (e) {
+        parsedEquipementsInclus = [equipements_inclus];
       }
     }
 
@@ -324,8 +364,8 @@ exports.updateActivite = async (req, res) => {
       updateData.langues_disponibles = langues_disponibles;
     if (niveau_difficulte !== undefined)
       updateData.niveau_difficulte = niveau_difficulte;
-    if (equipements_inclus !== undefined)
-      updateData.equipements_inclus = equipements_inclus;
+    if (parsedEquipementsInclus !== undefined)
+      updateData.equipements_inclus = parsedEquipementsInclus;
     if (a_apporter !== undefined) updateData.a_apporter = a_apporter;
     if (dates_disponibles !== undefined)
       updateData.dates_disponibles = dates_disponibles;
@@ -335,7 +375,7 @@ exports.updateActivite = async (req, res) => {
       updateData.date_fin = date_fin || dateFin;
     if (statut !== undefined) updateData.statut = statut;
 
-    // Gérer les photos uploadées
+    // Handle uploaded photos
     if (req.files && req.files.length > 0) {
       console.log(
         `☁️ Uploading ${req.files.length} new photos to Cloudinary...`,
@@ -346,17 +386,17 @@ exports.updateActivite = async (req, res) => {
           await ActiviteService.uploadMultipleImages(fileBuffers);
         console.log("✅ New photos uploaded successfully:", newPhotosUrls);
 
-        // Si keepExistingPhotos est true, ajouter les nouvelles photos aux anciennes
+        // If keepExistingPhotos is true, append new photos to existing ones
         if (keepExistingPhotos === "true" || keepExistingPhotos === true) {
           updateData.photos = [...(activite.photos || []), ...newPhotosUrls];
         } else {
-          // Sinon, remplacer toutes les photos
+          // Otherwise, replace all photos
           updateData.photos = newPhotosUrls;
         }
       } catch (uploadError) {
         console.error("❌ Error uploading photos:", uploadError);
         return res.status(500).json({
-          message: "Erreur lors de l'upload des photos",
+          message: "Error uploading photos",
           error: uploadError.message,
         });
       }
@@ -369,63 +409,82 @@ exports.updateActivite = async (req, res) => {
     ).populate("organisateur_id", "fullname avatar note_moyenne nombre_avis");
 
     res.status(200).json({
-      message: "Activité mise à jour avec succès",
+      message: "Activity updated successfully",
       activite: activiteUpdated,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la mise à jour de l'activité",
+      message: "Error updating activity",
       error: error.message,
     });
   }
 };
 
-// Supprimer une activité
+// Delete an activity
 exports.deleteActivite = async (req, res) => {
   try {
     const userId = req.user.userId;
     const activiteId = req.params.id;
 
-    // Trouver l'activité
+    // Find the activity
     const activite = await Activite.findById(activiteId);
     if (!activite) {
-      return res.status(404).json({ message: "Activité non trouvée" });
+      return res.status(404).json({ message: "Activity not found" });
     }
 
-    // Vérifier que l'utilisateur est le propriétaire de l'activité
+    // Verify the user owns the activity
     if (activite.organisateur_id.toString() !== userId) {
       return res.status(403).json({
-        message: "Vous n'êtes pas autorisé à supprimer cette activité",
+        message: "You are not authorized to delete this activity",
       });
     }
 
-    // Supprimer l'activité de la liste de l'organisateur
+    // Delete Cloudinary photos (clean up orphaned assets)
+    if (activite.photos && activite.photos.length > 0) {
+      const deletePromises = activite.photos
+        .map(extractCloudinaryPublicId)
+        .filter(Boolean)
+        .map((publicId) =>
+          cloudinary.uploader.destroy(publicId).catch((err) => {
+            console.warn(
+              `⚠️ Could not delete Cloudinary asset ${publicId}:`,
+              err.message,
+            );
+          }),
+        );
+      await Promise.all(deletePromises);
+      console.log(
+        `🗑️ Deleted ${deletePromises.length} Cloudinary photos for activity ${activiteId}`,
+      );
+    }
+
+    // Remove activity from organizer's list
     await Organisator.findByIdAndUpdate(userId, {
       $pull: { liste_activites: activiteId },
     });
 
-    // Supprimer l'activité
+    // Delete the activity
     await Activite.findByIdAndDelete(activiteId);
 
     res.status(200).json({
-      message: "Activité supprimée avec succès",
+      message: "Activity deleted successfully",
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la suppression de l'activité",
+      message: "Error deleting activity",
       error: error.message,
     });
   }
 };
 
-// Rechercher des activités (recherche textuelle)
+// Search for activities (text search)
 exports.searchActivites = async (req, res) => {
   try {
     const { query } = req.query;
 
     if (!query) {
       return res.status(400).json({
-        message: "Le paramètre de recherche 'query' est requis",
+        message: "The 'query' search parameter is required",
       });
     }
 
@@ -446,13 +505,13 @@ exports.searchActivites = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la recherche d'activités",
+      message: "Error searching for activities",
       error: error.message,
     });
   }
 };
 
-// Obtenir les activités de l'organisateur connecté (en cours et à venir)
+// Get logged-in organizer's activities (ongoing and upcoming)
 exports.getMyActivities = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -463,13 +522,13 @@ exports.getMyActivities = async (req, res) => {
     console.log("  - Server time (UTC):", maintenant.toISOString());
     console.log("  - Server time (timestamp):", maintenant.getTime());
 
-    // Activités dont la date de fin n'est pas encore passée
+    // Activities whose end date has not yet passed
     const activities = await Activite.find({
       organisateur_id: userId,
-      date_fin: { $gte: maintenant }, // date_fin >= maintenant
+      date_fin: { $gte: maintenant }, // date_fin >= now
     })
       .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
-      .sort({ date_debut: 1 }); // Trier par date de début
+      .sort({ date_debut: 1 }); // Sort by start date
 
     console.log(`📋 Found ${activities.length} active activities`);
     if (activities.length > 0) {
@@ -485,26 +544,26 @@ exports.getMyActivities = async (req, res) => {
     console.error("❌ Error fetching my activities:", error);
     res.status(500).json({
       success: false,
-      message: "Erreur lors de la récupération des activités",
+      message: "Error retrieving activities",
       error: error.message,
     });
   }
 };
 
-// Obtenir les activités archivées de l'organisateur connecté (passées)
+// Get logged-in organizer's archived activities (past)
 exports.getArchivedActivities = async (req, res) => {
   try {
     const userId = req.user.userId;
 
     const maintenant = new Date();
 
-    // Activités dont la date de fin est passée
+    // Activities whose end date has passed
     const activities = await Activite.find({
       organisateur_id: userId,
-      date_fin: { $lt: maintenant }, // date_fin < maintenant
+      date_fin: { $lt: maintenant }, // date_fin < now
     })
       .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
-      .sort({ date_fin: -1 }); // Trier par date de fin (plus récentes d'abord)
+      .sort({ date_fin: -1 }); // Sort by end date (most recent first)
 
     res.status(200).json({
       success: true,
@@ -515,7 +574,7 @@ exports.getArchivedActivities = async (req, res) => {
     console.error("❌ Error fetching archived activities:", error);
     res.status(500).json({
       success: false,
-      message: "Erreur lors de la récupération des activités archivées",
+      message: "Error retrieving archived activities",
       error: error.message,
     });
   }

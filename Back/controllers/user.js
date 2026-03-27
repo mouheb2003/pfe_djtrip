@@ -21,6 +21,7 @@ exports.signUp = async (req, res) => {
       user._id,
       user.email,
       user.userType,
+      user.tokenVersion || 0,
     );
 
     // Return user without sensitive data
@@ -131,26 +132,29 @@ exports.signIn = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check and update account status based on activity
-    await UserService.updateAccountStatusBasedOnActivity(user._id);
-
-    // Re-fetch user after potential status update
-    const updatedUser = await UserService.getUserById(user._id, true);
+    // Check for lockout
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingSeconds = Math.ceil((user.lockUntil - Date.now()) / 1000);
+      return res.status(423).json({
+        message: "Account temporarily locked.",
+        remainingSeconds,
+      });
+    }
 
     // Check account status
-    if (updatedUser.accountStatus === "suspended") {
+    if (user.accountStatus === "suspended") {
       return res
         .status(403)
         .json({ message: "Account is suspended. Please contact support." });
     }
 
-    if (updatedUser.accountStatus === "banned") {
+    if (user.accountStatus === "banned") {
       return res
         .status(403)
         .json({ message: "Account is banned. Please contact support." });
     }
 
-    if (updatedUser.accountStatus === "inactive") {
+    if (user.accountStatus === "inactive") {
       return res
         .status(403)
         .json({ message: "Account is inactive. Please contact support." });
@@ -159,29 +163,76 @@ exports.signIn = async (req, res) => {
     // Verify password
     const isPasswordValid = await bcrypt.compare(
       mot_de_passe,
-      updatedUser.mot_de_passe,
+      user.mot_de_passe,
     );
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      // Increment login attempts
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 60 * 1000); // 1 minute lockout
+        user.loginAttempts = 0; // Reset for after lockout
+        await user.save();
+        return res.status(423).json({
+          message: "Too many attempts. Account locked for 1 minute.",
+          lockUntil: user.lockUntil,
+          remainingSeconds: 60,
+        });
+      }
+
+      await user.save();
+      return res
+        .status(401)
+        .json({
+          message: "Invalid email or password",
+          attempts: user.loginAttempts,
+        });
     }
 
-    // Update last connection
-    await UserService.updateLastConnection(updatedUser._id);
+    // Reset attempts on successful login
+    user.loginAttempts = 0;
+    user.lockUntil = undefined;
 
-    // Generate access and refresh tokens
-    const { accessToken, refreshToken } = generateTokens(
-      updatedUser._id,
-      updatedUser.email,
-      updatedUser.userType,
+    // 🚀 NEW: Force cleanup before login - mark all users as offline except this one
+    console.log(`🧹 [LOGIN] Forcing cleanup before login for user ${user._id}...`);
+    await User.updateMany(
+      { _id: { $ne: user._id }, isOnline: true },
+      { isOnline: false }
     );
+    console.log(`✅ [LOGIN] Marked all other users as offline`);
+
+    // Update last connection and set online
+    user.derniere_connexion = new Date();
+    await user.save();
+
+    // 🚀 NEW: Explicitly set online status
+    await UserService.updateOnlineStatus(user._id, true);
+    console.log(`✅ [LOGIN] User ${user._id} marked as online`);
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(
+      user._id,
+      user.email,
+      user.userType,
+      user.tokenVersion || 0,
+    );
+
+    // Return user without sensitive data
+    const userResponse = user.toObject();
+    delete userResponse.mot_de_passe;
+    delete userResponse.verificationCode;
+    delete userResponse.verificationCodeExpiry;
 
     res.status(200).json({
       message: "Login successful",
       accessToken,
       refreshToken,
+      user: userResponse,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error logging in", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error signing in", error: err.message });
   }
 };
 
@@ -211,19 +262,62 @@ exports.myInfo = async (req, res) => {
 // Get all users
 exports.getAllUsers = async (req, res) => {
   try {
-    // Use UserService to fetch all users
-    const users = await UserService.getAllUsers();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find().select("-mot_de_passe").skip(skip).limit(limit).lean(),
+      User.countDocuments(),
+    ]);
 
     res.status(200).json({
       message: "Users retrieved successfully",
       count: users.length,
-      users: users,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      users,
     });
   } catch (err) {
-    res.status(500).json({
-      message: "Error retrieving users",
-      error: err.message,
+    res
+      .status(500)
+      .json({ message: "Error retrieving users", error: err.message });
+  }
+};
+
+// 🚀 NEW: Get all users PUBLIC for testing online status
+exports.getAllUsersPublic = async (req, res) => {
+  try {
+    console.log('🔍 [PUBLIC] Fetching all users with online status...');
+    
+    const users = await User.find()
+      .select("-mot_de_passe -verificationCode -verificationCodeExpiry -passwordResetCode -passwordResetCodeExpiry")
+      .lean();
+
+    console.log(`📊 [PUBLIC] Found ${users.length} users`);
+
+    // Add online status info for debugging
+    const usersWithStatus = users.map(user => ({
+      ...user,
+      _debugInfo: {
+        isOnline: user.isOnline || false,
+        lastConnection: user.derniere_connexion || null,
+        accountStatus: user.accountStatus || 'unknown'
+      }
+    }));
+
+    res.status(200).json({
+      message: "Users retrieved successfully (PUBLIC)",
+      count: usersWithStatus.length,
+      timestamp: new Date().toISOString(),
+      users: usersWithStatus,
     });
+  } catch (err) {
+    console.error('❌ [PUBLIC] Error retrieving users:', err);
+    res
+      .status(500)
+      .json({ message: "Error retrieving users", error: err.message });
   }
 };
 
@@ -245,6 +339,39 @@ exports.getUserById = async (req, res) => {
       message: "Error retrieving user",
       error: err.message,
     });
+  }
+};
+
+// Change password (PUT /users/me/password)
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Current password and new password are required" });
+    }
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 8 characters" });
+    }
+
+    await UserService.updatePassword(userId, currentPassword, newPassword);
+
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (err) {
+    if (err.message === "User not found") {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (err.message === "Current password is incorrect") {
+      return res.status(400).json({ message: err.message });
+    }
+    res
+      .status(500)
+      .json({ message: "Error changing password", error: err.message });
   }
 };
 
@@ -294,10 +421,14 @@ exports.addFavorite = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     if (!user.favorites) user.favorites = [];
     if (user.favorites.some((id) => id.toString() === activityId)) {
-      return res.json({ message: "Already in favorites", favorites: user.favorites });
+      return res.json({
+        message: "Already in favorites",
+        favorites: user.favorites,
+      });
     }
     const activite = await Activite.findById(activityId);
-    if (!activite) return res.status(404).json({ message: "Activity not found" });
+    if (!activite)
+      return res.status(404).json({ message: "Activity not found" });
     user.favorites.push(activityId);
     await user.save();
     res.json({ message: "Added to favorites", favorites: user.favorites });
@@ -314,7 +445,9 @@ exports.removeFavorite = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
     if (!user.favorites) user.favorites = [];
-    user.favorites = user.favorites.filter((id) => id.toString() !== activityId);
+    user.favorites = user.favorites.filter(
+      (id) => id.toString() !== activityId,
+    );
     await user.save();
     res.json({ message: "Removed from favorites", favorites: user.favorites });
   } catch (err) {
@@ -456,14 +589,49 @@ exports.updateAccountStatus = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const userId = req.user.userId;
-
-    // Set user to offline status
+    console.log(`🔴 [LOGOUT] User ${userId} is logging out...`);
+    
+    // 🚀 UPDATE: Set user offline in database
     await UserService.updateOnlineStatus(userId, false);
-
-    res.status(200).json({
-      message: "Logout successful",
+    
+    console.log(`✅ [LOGOUT] User ${userId} marked as offline in database`);
+    
+    // 🚀 UPDATE: Emit offline status to partners
+    const Message = require("../models/message");
+    const io = req.app.get('io'); // Get socket.io instance from app
+    
+    if (io) {
+      // Find all conversation partners
+      const [sentTo, receivedFrom] = await Promise.all([
+        Message.distinct("receiver_id", { sender_id: userId }),
+        Message.distinct("sender_id", { receiver_id: userId }),
+      ]);
+      const partnerIds = [
+        ...new Set([...sentTo.map(String), ...receivedFrom.map(String)]),
+      ];
+      
+      // Emit offline status to all partners
+      partnerIds.forEach((partnerId) => {
+        io.to(`user_${partnerId}`).emit("user_status", { 
+          userId, 
+          isOnline: false,
+          timestamp: Date.now()
+        });
+        console.log(`📡 [LOGOUT] Emitted offline status to partner: ${partnerId}`);
+      });
+    } else {
+      console.log(`⚠️ [LOGOUT] Socket.io instance not available`);
+    }
+    
+    // Invalidate all existing refresh tokens by bumping tokenVersion
+    await require("../models/user").findByIdAndUpdate(userId, {
+      $inc: { tokenVersion: 1 },
     });
+    
+    console.log(`🎯 [LOGOUT] User ${userId} logout completed successfully`);
+    res.status(200).json({ message: "Logout successful" });
   } catch (err) {
+    console.error(`❌ [LOGOUT] Error during logout:`, err);
     res.status(500).json({ message: "Error logging out", error: err.message });
   }
 };

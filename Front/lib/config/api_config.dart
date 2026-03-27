@@ -1,41 +1,41 @@
 class ApiConfig {
-  // URL de base de l'API - Changez cette valeur selon votre environnement
+  // Base URL for the API.
+  // Set at build/run time with: --dart-define=API_URL=http://your-server:3000/api/v1
+  //
+  // Common values:
+  //   Android emulator  → http://10.0.2.2:3000/api/v1
+  //   Physical device   → http://<your-local-ip>:3000/api/v1
+  //   iOS simulator     → http://localhost:3000/api/v1
+  //   Production        → https://api.djtrip.com/api/v1
+  static const String _rawBaseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'http://10.0.2.2:3000/api/v1',
+  );
 
-  // ========================================
-  // CHOISISSEZ LA CONFIGURATION ADAPTÉE :
-  // ========================================
+  // Backward compatible normalization:
+  // if someone passes .../api, we automatically append /v1.
+  static String get baseUrl {
+    if (_rawBaseUrl.endsWith('/api')) return '${_rawBaseUrl}/v1';
+    if (_rawBaseUrl.endsWith('/api/')) return '${_rawBaseUrl}v1';
+    return _rawBaseUrl;
+  }
 
-  // 1. Pour ÉMULATEUR ANDROID (Android Studio AVD)
-  static const String baseUrl = 'http://192.168.173.99:3000/api';
+  // ── Endpoints ────────────────────────────────────────────────────────────
+  static String get signUp => '$baseUrl/users/signup';
+  static String get signIn => '$baseUrl/users/signin';
+  static String get forgotPassword => '$baseUrl/users/forgot-password';
+  static String get resetPassword => '$baseUrl/users/reset-password';
+  static String get logout => '$baseUrl/users/logout';
+  static String get refreshToken => '$baseUrl/users/refresh-token';
+  static String get myInfo => '$baseUrl/users/me';
+  static String get updateProfile => '$baseUrl/users/me';
+  static String get updateAvatar => '$baseUrl/users/me/avatar';
+  static String get deleteAvatar => '$baseUrl/users/me/avatar';
+  static String get users => '$baseUrl/users';
+  static String get touristes => '$baseUrl/touristes';
+  static String get organisators => '$baseUrl/organisators';
 
-  // 2. Pour APPAREIL PHYSIQUE (Android/iOS)
-  // Trouvez votre IP avec : ipconfig (Windows) ou ifconfig (Mac/Linux)
-  // Remplacez 192.168.1.X par VOTRE IP
-  // static const String baseUrl = 'http://192.168.173.99:3000/api';
-
-  // 3. Pour iOS SIMULATOR
-  // static const String baseUrl = 'http://localhost:3000/api';
-
-  // 4. Pour PRODUCTION
-  // static const String baseUrl = 'https://api.travelo.com/api';
-
-  // ========================================
-  // Endpoints
-  static const String signUp = '$baseUrl/users/signup';
-  static const String signIn = '$baseUrl/users/signin';
-  static const String forgotPassword = '$baseUrl/users/forgot-password';
-  static const String resetPassword = '$baseUrl/users/reset-password';
-  static const String logout = '$baseUrl/users/logout';
-  static const String refreshToken = '$baseUrl/users/refresh-token';
-  static const String myInfo = '$baseUrl/users/me';
-  static const String updateProfile = '$baseUrl/users/me';
-  static const String updateAvatar = '$baseUrl/users/me/avatar';
-  static const String deleteAvatar = '$baseUrl/users/me/avatar';
-  static const String users = '$baseUrl/users';
-  static const String touristes = '$baseUrl/touristes';
-  static const String organisators = '$baseUrl/organisators';
-
-  // Timeouts
-  static const Duration connectionTimeout = Duration(seconds: 60);
-  static const Duration receiveTimeout = Duration(seconds: 60);
+  // ── Timeouts ──────────────────────────────────────────────────────────────
+  static const Duration connectionTimeout = Duration(seconds: 15);
+  static const Duration receiveTimeout = Duration(seconds: 15);
 }

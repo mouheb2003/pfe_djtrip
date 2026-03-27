@@ -1,235 +1,220 @@
-import 'dart:async';
 import 'dart:convert';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
-
-import '../config/api_config.dart';
-import '../models/message.dart';
-import 'http_client.dart';
-import 'storage_service.dart';
+import 'dart:io';
+import 'dart:async';
+import 'api_client.dart';
+import 'auth_service.dart';
+import 'package:http/http.dart' as http;
+import '../models/conversation_model.dart';
 
 class MessageService {
-  static IO.Socket? _socket;
-  static bool _connecting = false;
-  static Completer<void>? _connectCompleter;
-
-  static final List<void Function(Message)> _messageCallbacks = [];
-  static final List<void Function(Message)> _sentCallbacks = [];
-  static final List<void Function(String partnerId)> _typingCallbacks = [];
-  static final List<void Function(String partnerId)> _typingStopCallbacks = [];
-
-  static String get _socketUrl {
-    final base = ApiConfig.baseUrl;
-
-    if (base.endsWith('/api')) {
-      return base.substring(0, base.length - 4);
+  static Map<String, dynamic> _safeDecodeObject(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {};
+    } catch (_) {
+      return {};
     }
-
-    return base;
   }
 
-  static Future<void> connect() async {
-    if (_socket != null && _socket!.connected) return;
-
-    if (_connecting) {
-      await _connectCompleter?.future;
-      return;
+  /// Get all conversations for the logged-in user.
+  static Future<List<ConversationModel>> getConversations() async {
+    final res = await ApiClient.get('/messages/conversations');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      return list
+          .map((c) => ConversationModel.fromJson(c as Map<String, dynamic>))
+          .toList();
     }
-
-    _connecting = true;
-    _connectCompleter = Completer();
-
-    final token = await StorageService.getAccessToken();
-
-    _socket = IO.io(
-      _socketUrl,
-      IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .setAuth({'token': token})
-          .enableReconnection() // active la reconnexion
-          .setReconnectionAttempts(10)
-          .setReconnectionDelay(2000) // <- ici en millisecondes
-          .disableAutoConnect()
-          .build(),
-    );
-
-    _socket!.onConnect((_) {
-      print('Socket connected');
-      _connectCompleter?.complete();
-    });
-
-    _socket!.onDisconnect((_) {
-      print('Socket disconnected');
-    });
-
-    _socket!.onConnectError((err) {
-      print('Socket connect error: $err');
-      _connectCompleter?.completeError(err);
-    });
-
-    _socket!.on('error', (data) {
-      print('Socket error: $data');
-    });
-
-    _socket!.on('new_message', (data) {
-      final msg = Message.fromJson(Map<String, dynamic>.from(data));
-
-      for (final cb in List.of(_messageCallbacks)) {
-        cb(msg);
+    // Surface backend/network error instead of silently returning an empty list.
+    try {
+      final body = jsonDecode(res.body);
+      if (body is Map<String, dynamic>) {
+        throw Exception((body['message'] as String?) ?? 'Unable to load conversations');
       }
-    });
-
-    _socket!.on('message_sent', (data) {
-      final msg = Message.fromJson(Map<String, dynamic>.from(data));
-      for (final cb in List.of(_sentCallbacks)) {
-        cb(msg);
-      }
-    });
-
-    _socket!.on('partner_typing', (data) {
-      final map = Map<String, dynamic>.from(data as Map);
-      final partnerId = map['partnerId']?.toString() ?? '';
-      for (final cb in List.of(_typingCallbacks)) {
-        cb(partnerId);
-      }
-    });
-
-    _socket!.on('partner_typing_stop', (data) {
-      final map = Map<String, dynamic>.from(data as Map);
-      final partnerId = map['partnerId']?.toString() ?? '';
-      for (final cb in List.of(_typingStopCallbacks)) {
-        cb(partnerId);
-      }
-    });
-
-    _socket!.connect();
-
-    await _connectCompleter?.future;
-
-    _connecting = false;
+    } catch (_) {
+      // Ignore JSON parse errors and fall through to generic message.
+    }
+    throw Exception('Unable to load conversations');
   }
 
-  static void disconnect() {
-    _socket?.dispose();
-    _socket = null;
+  /// Get total unread message count.
+  static Future<int> getUnreadCount() async {
+    final res = await ApiClient.get('/messages/unread-count');
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return (body['count'] as num? ?? 0).toInt();
+    }
+    return 0;
   }
 
-  static Future<void> sendMessage({
-    required String receiverId,
+  /// Get messages exchanged with a specific partner.
+  static Future<List<Map<String, dynamic>>> getMessages(
+    String partnerId,
+  ) async {
+    final res = await ApiClient.get('/messages/with/$partnerId');
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      return list.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// Send message to partner through REST API.
+  static Future<Map<String, dynamic>> sendMessage({
+    required String partnerId,
     required String content,
   }) async {
-    if (receiverId.isEmpty || content.trim().isEmpty) return;
-    await connect();
-
-    if (_socket == null || !_socket!.connected) {
-      throw Exception('Messagerie non connectée. Réessayez.');
-    }
-
-    _socket!.emit('send_message', {
-      'receiverId': receiverId.trim(),
-      'content': content.trim(),
-    });
-  }
-
-  static void onMessage(void Function(Message) callback) {
-    if (!_messageCallbacks.contains(callback)) {
-      _messageCallbacks.add(callback);
-    }
-  }
-
-  static void offMessage(void Function(Message) callback) {
-    _messageCallbacks.remove(callback);
-  }
-
-  static void onMessageSent(void Function(Message) callback) {
-    if (!_sentCallbacks.contains(callback)) {
-      _sentCallbacks.add(callback);
+    try {
+      final res = await ApiClient.post('/messages/with/$partnerId', {
+        'content': content,
+      });
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        final msg = body['message'] as Map<String, dynamic>?;
+        if (msg != null) return {'success': true, 'message': msg};
+      }
+      return {
+        'success': false,
+        'messageText': body['message'] ?? 'Error sending message',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'messageText': 'Network error while sending message',
+      };
     }
   }
 
-  static void offMessageSent(void Function(Message) callback) {
-    _sentCallbacks.remove(callback);
-  }
+  /// Send an audio message file to partner through multipart endpoint.
+  static Future<Map<String, dynamic>> sendAudioMessage({
+    required String partnerId,
+    required File audioFile,
+    int durationSec = 0,
+  }) async {
+    try {
+      final token = await AuthService.getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'messageText': 'Session expired.'};
+      }
 
-  static void onPartnerTyping(void Function(String partnerId) callback) {
-    if (!_typingCallbacks.contains(callback)) _typingCallbacks.add(callback);
-  }
+      final uri = Uri.parse(
+        '${ApiClient.baseUrl}/messages/with/$partnerId/audio',
+      );
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['duration_sec'] = durationSec.toString()
+        ..files.add(await http.MultipartFile.fromPath('audio', audioFile.path));
 
-  static void offPartnerTyping(void Function(String partnerId) callback) {
-    _typingCallbacks.remove(callback);
-  }
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final res = await http.Response.fromStream(streamed);
+      final body = _safeDecodeObject(res.body);
 
-  static void onPartnerTypingStop(void Function(String partnerId) callback) {
-    if (!_typingStopCallbacks.contains(callback)) _typingStopCallbacks.add(callback);
-  }
-
-  static void offPartnerTypingStop(void Function(String partnerId) callback) {
-    _typingStopCallbacks.remove(callback);
-  }
-
-  static void emitTyping(String partnerId) {
-    if (partnerId.isEmpty) return;
-    _socket?.emit('typing_start', {'receiverId': partnerId});
-  }
-
-  static void emitTypingStop(String partnerId) {
-    if (partnerId.isEmpty) return;
-    _socket?.emit('typing_stop', {'receiverId': partnerId});
-  }
-
-  static Future<List<Message>> getMessages(String partnerId) async {
-    final headers = await HttpClient.getAuthHeaders();
-
-    final response = await HttpClient.get(
-      '${ApiConfig.baseUrl}/messages/with/$partnerId',
-      headers: headers,
-    );
-
-    if (response.statusCode == 200) {
-      final list = jsonDecode(response.body) as List;
-
-      return list.map((e) => Message.fromJson(e)).toList();
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        final msg = body['message'] as Map<String, dynamic>?;
+        if (msg != null) return {'success': true, 'message': msg};
+      }
+      return {
+        'success': false,
+        'messageText':
+            body['message'] ??
+            'Error sending voice message (code ${res.statusCode})',
+      };
+    } on TimeoutException {
+      return {
+        'success': false,
+        'messageText': 'Voice message upload timed out.',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'messageText': 'Network error while sending voice message: $e',
+      };
     }
-
-    throw Exception('Failed to load messages');
   }
 
-  static Future<List<Conversation>> getConversations() async {
-    final headers = await HttpClient.getAuthHeaders();
+  /// Send a video message file to partner through multipart endpoint.
+  static Future<Map<String, dynamic>> sendVideoMessage({
+    required String partnerId,
+    required File videoFile,
+  }) async {
+    try {
+      final token = await AuthService.getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'messageText': 'Session expired.'};
+      }
 
-    final response = await HttpClient.get(
-      '${ApiConfig.baseUrl}/messages/conversations',
-      headers: headers,
-    );
+      final uri = Uri.parse(
+        '${ApiClient.baseUrl}/messages/with/$partnerId/video',
+      );
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(await http.MultipartFile.fromPath('video', videoFile.path));
 
-    if (response.statusCode == 200) {
-      final list = jsonDecode(response.body) as List;
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
+      final res = await http.Response.fromStream(streamed);
+      final body = _safeDecodeObject(res.body);
 
-      return list.map((e) => Conversation.fromJson(e)).toList();
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        final msg = body['message'] as Map<String, dynamic>?;
+        if (msg != null) return {'success': true, 'message': msg};
+      }
+      return {
+        'success': false,
+        'messageText':
+            body['message'] ??
+            'Error sending video message (code ${res.statusCode})',
+      };
+    } on TimeoutException {
+      return {
+        'success': false,
+        'messageText': 'Video message upload timed out.',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'messageText': 'Network error while sending video message: $e',
+      };
     }
-
-    throw Exception('Failed to load conversations');
   }
 
-  /// Notifie le serveur de marquer les messages d'une conversation comme lus (émet "mark_read").
-  static void markAsRead(String partnerId) {
-    if (partnerId.isEmpty) return;
-    _socket?.emit('mark_read', {'partnerId': partnerId});
-  }
-
-  static Future<int> getUnreadCount() async {
-    final headers = await HttpClient.getAuthHeaders();
-
-    final response = await HttpClient.get(
-      '${ApiConfig.baseUrl}/messages/unread-count',
-      headers: headers,
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      return data['count'] ?? 0;
+  /// Edit one of my messages.
+  static Future<Map<String, dynamic>> editMessage({
+    required String messageId,
+    required String content,
+  }) async {
+    try {
+      final res = await ApiClient.put('/messages/$messageId', {
+        'content': content,
+      });
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200) {
+        final msg = body['message'] as Map<String, dynamic>?;
+        if (msg != null) return {'success': true, 'message': msg};
+      }
+      return {
+        'success': false,
+        'messageText': body['message'] ?? 'Error editing message',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'messageText': 'Network error during edit',
+      };
     }
+  }
 
-    return 0;
+  /// Delete one of my messages.
+  static Future<bool> deleteMessage(String messageId) async {
+    try {
+      final res = await ApiClient.delete('/messages/$messageId');
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }

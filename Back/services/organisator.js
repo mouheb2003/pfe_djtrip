@@ -2,13 +2,13 @@ const Organisator = require("../models/organisator");
 const UserService = require("./user");
 
 /**
- * Service pour gérer les opérations spécifiques aux organisateurs
+ * Service for managing organizer-specific operations
  */
 class OrganisatorService {
   /**
-   * Récupère un organisateur par son ID
-   * @param {String} organisatorId - ID de l'organisateur
-   * @returns {Promise<Object>} Organisateur
+   * Get an organizer by ID
+   * @param {String} organisatorId - Organizer ID
+   * @returns {Promise<Object>} Organizer
    */
   static async getOrganisatorById(organisatorId) {
     const organisator =
@@ -22,8 +22,8 @@ class OrganisatorService {
   }
 
   /**
-   * Récupère tous les organisateurs
-   * @returns {Promise<Array>} Liste des organisateurs
+   * Get all organizers
+   * @returns {Promise<Array>} Organizer list
    */
   static async getAllOrganisators() {
     const organisators = await Organisator.find().select("-mot_de_passe");
@@ -31,10 +31,10 @@ class OrganisatorService {
   }
 
   /**
-   * Met à jour les informations spécifiques d'un organisateur
-   * @param {String} organisatorId - ID de l'organisateur
-   * @param {Object} updateData - Données à mettre à jour
-   * @returns {Promise<Object>} Organisateur mis à jour
+   * Update an organizer's specific information
+   * @param {String} organisatorId - Organizer ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated organizer
    */
   static async updateOrganisatorProfile(organisatorId, updateData) {
     // Fields specific to Organisator
@@ -72,9 +72,9 @@ class OrganisatorService {
   }
 
   /**
-   * Récupère les statistiques d'un organisateur
-   * @param {String} organisatorId - ID de l'organisateur
-   * @returns {Promise<Object>} Statistiques de l'organisateur
+   * Get statistics for an organizer
+   * @param {String} organisatorId - Organizer ID
+   * @returns {Promise<Object>} Organizer statistics
    */
   static async getOrganisatorStats(organisatorId) {
     const organisator = await this.getOrganisatorById(organisatorId);
@@ -92,9 +92,9 @@ class OrganisatorService {
   }
 
   /**
-   * Vérifie si un utilisateur est un organisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Boolean>} True si organisateur
+   * Check if a user is an organizer
+   * @param {String} userId - User ID
+   * @returns {Promise<Boolean>} True if organizer
    */
   static async isOrganisator(userId) {
     const user = await Organisator.findById(userId);

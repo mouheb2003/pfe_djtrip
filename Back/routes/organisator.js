@@ -3,23 +3,23 @@ const router = express.Router();
 const organisatorController = require("../controllers/organisator");
 const { verifyToken, verifyOrganisator } = require("../middleware/auth");
 
-// Compléter le profil organisateur (protégé, nécessite un token)
+// Complete organizer profile (protected, requires token)
 router.put(
   "/complete-profile",
   verifyToken,
   organisatorController.completeProfileOrganisator,
 );
 
-// Obtenir tous les organisateurs
+// Get all organizers
 router.get("/", organisatorController.getAllOrganisators);
 
-// Obtenir un organisateur par ID
+// Get an organizer by ID
 router.get("/:id", organisatorController.getOrganisatorById);
 
-// Mettre à jour un organisateur (protégé)
+// Update an organizer (protected)
 router.put("/:id", verifyToken, organisatorController.updateOrganisator);
 
-// Supprimer un organisateur (protégé, seulement organisateurs)
+// Delete an organizer (protected, organizers only)
 router.delete(
   "/:id",
   verifyToken,

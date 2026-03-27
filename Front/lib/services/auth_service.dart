@@ -1,478 +1,272 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import '../config/api_config.dart';
-import '../models/user.dart';
-import 'message_service.dart';
-import 'storage_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'api_client.dart';
 
 class AuthService {
-  // Sign Up
+  static const _storage = FlutterSecureStorage();
+
+  static const _keyAccess = 'djtrip_access_token';
+  static const _keyRefresh = 'djtrip_refresh_token';
+  static const _keyUser = 'djtrip_user_data';
+
+  // ── In-memory cache ──────────────────────────────────────────
+  static Map<String, dynamic>? _cachedUser;
+
+  // ── Token accessors ──────────────────────────────────────────
+  static Future<String?> getAccessToken() => _storage.read(key: _keyAccess);
+  static Future<String?> getRefreshToken() => _storage.read(key: _keyRefresh);
+
+  static Future<void> _saveTokens(
+    String accessToken,
+    String refreshToken,
+  ) async {
+    await Future.wait([
+      _storage.write(key: _keyAccess, value: accessToken),
+      _storage.write(key: _keyRefresh, value: refreshToken),
+    ]);
+  }
+
+  // ── User cache ───────────────────────────────────────────────
+  static Future<void> saveUser(Map<String, dynamic> user) async {
+    _cachedUser = user;
+    await _storage.write(key: _keyUser, value: jsonEncode(user));
+  }
+
+  static Future<Map<String, dynamic>?> getUser() async {
+    if (_cachedUser != null) return _cachedUser;
+    final raw = await _storage.read(key: _keyUser);
+    if (raw != null) _cachedUser = jsonDecode(raw);
+    return _cachedUser;
+  }
+
+  static Map<String, dynamic>? get currentUser => _cachedUser;
+
+  // ── Convenience ──────────────────────────────────────────────
+  static Future<bool> isLoggedIn() async {
+    final token = await getAccessToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  static Future<String?> getUserType() async {
+    final user = await getUser();
+    return user?['userType'] as String?;
+  }
+
+  static Future<String?> getUserId() async {
+    final user = await getUser();
+    return user?['_id'] as String?;
+  }
+
+  // ── Auth API ─────────────────────────────────────────────────
+
+  /// Returns `{success: true, user: {...}}` or `{success: false, message: '…'}`
+  static Future<Map<String, dynamic>> signIn(
+    String email,
+    String password,
+  ) async {
+    try {
+      final res = await ApiClient.post('/users/signin', {
+        'email': email,
+        'mot_de_passe': password,
+      }, auth: false);
+
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        body = {};
+      }
+
+      if (res.statusCode == 200) {
+        final accessToken = body['accessToken'] as String?;
+        final refreshToken = body['refreshToken'] as String?;
+
+        if (accessToken == null || refreshToken == null) {
+          return {
+            'success': false,
+            'message': 'Invalid server response (missing tokens).',
+          };
+        }
+
+        await _saveTokens(accessToken, refreshToken);
+
+        Map<String, dynamic>? user;
+        if (body['user'] is Map<String, dynamic>) {
+          user = body['user'] as Map<String, dynamic>;
+        } else {
+          final meRes = await ApiClient.get('/users/me');
+          if (meRes.statusCode == 200) {
+            final meBody = jsonDecode(meRes.body) as Map<String, dynamic>;
+            if (meBody['user'] is Map<String, dynamic>) {
+              user = meBody['user'] as Map<String, dynamic>;
+            }
+          }
+        }
+
+        if (user == null) {
+          return {
+            'success': false,
+            'message':
+                'Sign-in successful, but unable to retrieve user profile.',
+          };
+        }
+
+        await saveUser(user);
+        return {'success': true, 'user': user};
+      }
+
+      if (res.statusCode == 423) {
+        return {
+          'success': false,
+          'locked': true,
+          'message': body['message'] ?? 'Account temporarily locked.',
+          'remainingSeconds': body['remainingSeconds'] ?? 60,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Sign-in error',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message':
+            'Cannot connect to the server. Please check your network connection.',
+      };
+    }
+  }
+
+  /// Returns `{success: true, user: {...}}` or `{success: false, message: '…'}`
   static Future<Map<String, dynamic>> signUp({
     required String fullname,
     required String email,
     required String password,
-    required String userType, // "Touriste" or "Organisator"
+    required String userType, // 'Touriste' | 'Organisator'
   }) async {
     try {
-      // Prepare the body
-      final body = {
+      final res = await ApiClient.post('/users/signup', {
         'fullname': fullname,
         'email': email,
         'mot_de_passe': password,
         'userType': userType,
-      };
+      }, auth: false);
 
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.signUp),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 201) {
-        // Succès - Sauvegarder les tokens
-        await StorageService.saveTokens(
-          accessToken: data['accessToken'],
-          refreshToken: data['refreshToken'],
-        );
-
-        // Save user information
-        final user = User.fromJson(data['user']);
-        await StorageService.saveUserInfo(
-          userId: user.id,
-          email: user.email,
-          userType: user.userType,
-        );
-
-        return {'success': true, 'message': data['message'], 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error during registration',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Erreur de connexion: ${e.toString()}',
-      };
-    }
-  }
-
-  // Sign In
-  static Future<Map<String, dynamic>> signIn({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.signIn),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email, 'mot_de_passe': password}),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        // Succès - Sauvegarder les tokens
-        await StorageService.saveTokens(
-          accessToken: data['accessToken'],
-          refreshToken: data['refreshToken'],
-        );
-
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error during login',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Erreur de connexion: ${e.toString()}',
-      };
-    }
-  }
-
-  // Get logged-in user information
-  static Future<Map<String, dynamic>> getMyInfo() async {
-    try {
-      final accessToken = await StorageService.getAccessToken();
-
-      if (accessToken == null) {
-        return {'success': false, 'message': 'Not logged in'};
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        body = {};
       }
 
-      final response = await http
-          .get(
-            Uri.parse(ApiConfig.myInfo),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $accessToken',
-            },
-          )
-          .timeout(ApiConfig.connectionTimeout);
+      if (res.statusCode == 201) {
+        final accessToken = body['accessToken'] as String?;
+        final refreshToken = body['refreshToken'] as String?;
+        final user = body['user'] as Map<String, dynamic>?;
 
-      final data = jsonDecode(response.body);
+        if (accessToken == null || refreshToken == null || user == null) {
+          return {
+            'success': false,
+            'message': 'Invalid server response during sign-up.',
+          };
+        }
 
-      if (response.statusCode == 200) {
-        final user = User.fromJson(data['user']);
+        await _saveTokens(accessToken, refreshToken);
+        await saveUser(user);
         return {'success': true, 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error retrieving information',
-        };
       }
-    } catch (e) {
+
       return {
         'success': false,
-        'message': 'Erreur de connexion: ${e.toString()}',
+        'message': body['message'] ?? 'Sign-up error',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message':
+            'Cannot connect to the server. Please check your network connection.',
       };
     }
   }
 
-  // Refresh token
+  /// Sends `/forgot-password` with the user's email.
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final res = await ApiClient.post('/users/forgot-password', {
+      'email': email,
+    }, auth: false);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+  }
+
+  /// Tries to refresh the access token. Returns true on success.
   static Future<bool> refreshAccessToken() async {
     try {
-      final refreshToken = await StorageService.getRefreshToken();
-
-      if (refreshToken == null) {
-        return false;
-      }
-
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.refreshToken),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': refreshToken}),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        await StorageService.saveTokens(
-          accessToken: data['accessToken'],
-          refreshToken: refreshToken,
-        );
+      final refreshToken = await getRefreshToken();
+      if (refreshToken == null) return false;
+      final res = await ApiClient.post('/users/refresh-token', {
+        'refreshToken': refreshToken,
+      }, auth: false);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        await _storage.write(key: _keyAccess, value: body['accessToken']);
         return true;
       }
       return false;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  // Logout
-  static Future<void> logout() async {
-    // Disconnect socket immediately so the next user gets a fresh connection.
-    MessageService.disconnect();
-    try {
-      final accessToken = await StorageService.getAccessToken();
-
-      // Call backend to set status to inactive
-      if (accessToken != null) {
-        await http
-            .post(
-              Uri.parse(ApiConfig.logout),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $accessToken',
-              },
-            )
-            .timeout(ApiConfig.connectionTimeout);
-      }
-    } catch (e) {
-      // Even if the call fails, continue with local logout
-      print('Error during backend logout: $e');
-    } finally {
-      // Always clear local storage
-      await StorageService.clearAll();
-    }
+  /// Verify email with 6-digit code (requires valid access token).
+  static Future<Map<String, dynamic>> verifyEmail(String code) async {
+    final res = await ApiClient.post('/auth/verify-email', {'code': code});
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
   }
 
-  // Google Sign In
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
-
-  static Future<Map<String, dynamic>> signInWithGoogle({
-    required String userType, // "Touriste" or "Organisator"
-  }) async {
-    try {
-      // Disconnect any previous session
-      await _googleSignIn.signOut();
-
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        return {'success': false, 'message': 'Google sign-in cancelled'};
-      }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Prepare the body for backend
-      final body = {
-        'fullname': googleUser.displayName ?? googleUser.email.split('@')[0],
-        'email': googleUser.email,
-        'googleId': googleUser.id,
-        'googleToken': googleAuth.idToken,
-        'userType': userType,
-        'authProvider': 'google',
-      };
-
-      // Send to backend
-      final response = await http
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/google-signup'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Success - Save tokens
-        await StorageService.saveTokens(
-          accessToken: data['accessToken'],
-          refreshToken: data['refreshToken'],
-        );
-
-        // Save user information
-        final user = User.fromJson(data['user']);
-        await StorageService.saveUserInfo(
-          userId: user.id,
-          email: user.email,
-          userType: user.userType,
-        );
-
-        return {'success': true, 'message': data['message'], 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error with Google sign-in',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error with Google sign-in: ${e.toString()}',
-      };
-    }
+  /// Resend the email verification code to [email].
+  static Future<Map<String, dynamic>> resendVerification(String email) async {
+    final res = await ApiClient.post('/auth/resend-verification', {
+      'email': email,
+    }, auth: false);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
   }
 
-  // Facebook Sign In
-  static Future<Map<String, dynamic>> signInWithFacebook({
-    required String userType, // "Touriste" or "Organisator"
-  }) async {
-    try {
-      // Trigger the authentication flow
-      final LoginResult result = await FacebookAuth.instance.login(
-        permissions: ['email', 'public_profile'],
-      );
-
-      if (result.status != LoginStatus.success) {
-        return {
-          'success': false,
-          'message': 'Facebook sign-in cancelled or failed',
-        };
-      }
-
-      // Get user data
-      final userData = await FacebookAuth.instance.getUserData();
-      final accessToken = result.accessToken!.tokenString;
-
-      // Prepare the body for backend
-      final body = {
-        'fullname':
-            userData['name'] ?? userData['email']?.split('@')[0] ?? 'User',
-        'email': userData['email'] ?? '',
-        'facebookId': userData['id'],
-        'facebookToken': accessToken,
-        'userType': userType,
-        'authProvider': 'facebook',
-      };
-
-      // Send to backend
-      final response = await http
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/facebook-signup'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Success - Save tokens
-        await StorageService.saveTokens(
-          accessToken: data['accessToken'],
-          refreshToken: data['refreshToken'],
-        );
-
-        // Save user information
-        final user = User.fromJson(data['user']);
-        await StorageService.saveUserInfo(
-          userId: user.id,
-          email: user.email,
-          userType: user.userType,
-        );
-
-        return {'success': true, 'message': data['message'], 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error with Facebook sign-in',
-        };
-      }
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error with Facebook sign-in: ${e.toString()}',
-      };
-    }
-  }
-
-  // Verify Email with Code
-  static Future<Map<String, dynamic>> verifyEmail({
-    required String code,
-  }) async {
-    try {
-      final accessToken = await StorageService.getAccessToken();
-
-      if (accessToken == null) {
-        return {'success': false, 'message': 'Not logged in'};
-      }
-
-      final response = await http
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/verify-email'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $accessToken',
-            },
-            body: jsonEncode({'code': code}),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Verification failed',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Error: ${e.toString()}'};
-    }
-  }
-
-  // Resend Verification Code
-  static Future<Map<String, dynamic>> resendVerificationCode({
-    required String email,
-  }) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('${ApiConfig.baseUrl}/auth/resend-verification'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error sending code',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Error: ${e.toString()}'};
-    }
-  }
-
-  // ============= FORGOT PASSWORD & RESET =============
-
-  /// Send password reset code to email
-  static Future<Map<String, dynamic>> forgotPassword({
-    required String email,
-  }) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.forgotPassword),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Failed to send reset code',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
-    }
-  }
-
-  /// Reset password with verification code
+  /// Resets password via forgot-password code (no auth required).
   static Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String code,
     required String newPassword,
   }) async {
+    final res = await ApiClient.post('/users/reset-password', {
+      'email': email,
+      'code': code,
+      'newPassword': newPassword,
+    }, auth: false);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+  }
+
+  /// Changes the current user's password.
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final res = await ApiClient.put('/users/me/password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+  }
+
+  /// Logs out the user: calls the API, clears local storage.
+  static Future<void> logout() async {
     try {
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.resetPassword),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'email': email,
-              'code': code,
-              'newPassword': newPassword,
-            }),
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Failed to reset password',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
-    }
+      await ApiClient.post('/users/logout', {});
+    } catch (_) {}
+    _cachedUser = null;
+    await _storage.deleteAll();
   }
 }

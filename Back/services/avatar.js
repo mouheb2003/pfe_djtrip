@@ -2,14 +2,14 @@ const cloudinary = require("../config/cloudinary");
 const User = require("../models/user");
 
 /**
- * Service pour gérer les avatars des utilisateurs
+ * Service to manage user avatars
  */
 class AvatarService {
   /**
-   * Upload un avatar vers Cloudinary
-   * @param {Buffer} fileBuffer - Buffer du fichier image
-   * @param {Object} options - Options d'upload
-   * @returns {Promise<Object>} Résultat de l'upload avec secure_url
+   * Upload an avatar to Cloudinary
+   * @param {Buffer} fileBuffer - Image file buffer
+   * @param {Object} options - Upload options
+   * @returns {Promise<Object>} Upload result with secure_url
    */
   static async uploadToCloudinary(fileBuffer, options = {}) {
     const defaultOptions = {
@@ -43,10 +43,10 @@ class AvatarService {
   }
 
   /**
-   * Met à jour l'avatar d'un utilisateur dans la base de données
-   * @param {String} userId - ID de l'utilisateur
-   * @param {String} avatarUrl - URL de l'avatar
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Updates a user's avatar in the database
+   * @param {String} userId - User ID
+   * @param {String} avatarUrl - Avatar URL
+   * @returns {Promise<Object>} Updated user
    */
   static async updateUserAvatar(userId, avatarUrl) {
     const user = await User.findByIdAndUpdate(
@@ -64,13 +64,13 @@ class AvatarService {
   }
 
   /**
-   * Supprime un avatar de Cloudinary
-   * @param {String} avatarUrl - URL de l'avatar à supprimer
-   * @returns {Promise<Object>} Résultat de la suppression
+   * Deletes an avatar from Cloudinary
+   * @param {String} avatarUrl - URL of the avatar to delete
+   * @returns {Promise<Object>} Deletion result
    */
   static async deleteFromCloudinary(avatarUrl) {
     try {
-      // Extraire le public_id de l'URL Cloudinary
+      // Extract the public_id from the Cloudinary URL
       const urlParts = avatarUrl.split("/");
       const filename = urlParts[urlParts.length - 1];
       const publicId = `DJTrip/avatars/${filename.split(".")[0]}`;
@@ -85,9 +85,9 @@ class AvatarService {
   }
 
   /**
-   * Supprime l'avatar d'un utilisateur (Cloudinary + DB)
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Deletes a user's avatar (Cloudinary + DB)
+   * @param {String} userId - User ID
+   * @returns {Promise<Object>} Updated user
    */
   static async deleteAvatar(userId) {
     const user = await User.findById(userId).select("avatar");
@@ -118,33 +118,33 @@ class AvatarService {
   }
 
   /**
-   * Remplace l'avatar d'un utilisateur (supprime l'ancien et upload le nouveau)
-   * @param {String} userId - ID de l'utilisateur
-   * @param {Buffer} fileBuffer - Buffer du nouveau fichier
-   * @returns {Promise<Object>} Utilisateur mis à jour avec le nouvel avatar
+   * Replaces a user's avatar (deletes the old one and uploads the new one)
+   * @param {String} userId - User ID
+   * @param {Buffer} fileBuffer - New file buffer
+   * @returns {Promise<Object>} Updated user with the new avatar
    */
   static async replaceAvatar(userId, fileBuffer) {
-    // Récupérer l'utilisateur actuel
+    // Retrieve the current user
     const currentUser = await User.findById(userId).select("avatar");
 
     if (!currentUser) {
       throw new Error("User not found");
     }
 
-    // Supprimer l'ancien avatar si existant
+    // Delete the old avatar if it exists
     if (currentUser.avatar) {
       try {
         await this.deleteFromCloudinary(currentUser.avatar);
       } catch (error) {
         console.warn("⚠️ Could not delete old avatar:", error.message);
-        // Continue même si la suppression échoue
+        // Continue even if deletion fails
       }
     }
 
-    // Upload le nouvel avatar
+    // Upload the new avatar
     const uploadResult = await this.uploadToCloudinary(fileBuffer);
 
-    // Mettre à jour l'utilisateur
+    // Update the user
     const updatedUser = await this.updateUserAvatar(
       userId,
       uploadResult.secure_url,

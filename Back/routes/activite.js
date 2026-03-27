@@ -3,16 +3,23 @@ const router = express.Router();
 const activiteController = require("../controllers/activite");
 const { verifyToken, verifyOrganisator } = require("../middleware/auth");
 const upload = require("../middleware/upload");
+const validate = require("../middleware/validate");
+const {
+  createActiviteSchema,
+  updateActiviteSchema,
+} = require("../validators/activite");
 
-// Routes publiques - Consultation des activités
-// Obtenir toutes les activités (avec filtres optionnels)
+// ─── Public routes ────────────────────────────────────────────────────────────
+
+// Get all activities (optional filters: search, sort, prix_min, prix_max, type_activite, niveau_difficulte, temporalite)
 router.get("/", activiteController.getAllActivites);
 
-// Rechercher des activités
+// Search for activities (legacy endpoint — unified search now via GET / with ?search=)
 router.get("/search", activiteController.searchActivites);
 
-// Routes protégées - Mes activités (organisateur)
-// Obtenir mes activités actives (en cours et à venir)
+// ─── Protected Organizer routes ───────────────────────────────────────────────
+
+// Get my active activities (ongoing and upcoming)
 router.get(
   "/my-activities",
   verifyToken,
@@ -20,7 +27,7 @@ router.get(
   activiteController.getMyActivities,
 );
 
-// Obtenir mes activités archivées (passées)
+// Get my archived activities (past)
 router.get(
   "/archived",
   verifyToken,
@@ -28,35 +35,41 @@ router.get(
   activiteController.getArchivedActivities,
 );
 
-// Obtenir une activité par ID
+// ─── Parameterized public routes ──────────────────────────────────────────────
+
+// ⚠️  These MUST come after named routes above to avoid route conflicts
+// Get an activity by ID
 router.get("/:id", activiteController.getActiviteById);
 
-// Obtenir les activités d'un organisateur spécifique
+// Get activities for a specific organizer
 router.get(
   "/organisateur/:organisateurId",
   activiteController.getActivitesByOrganisateur,
 );
 
-// Routes protégées - Gestion des activités (nécessite authentification)
-// Créer une nouvelle activité (réservé aux organisateurs)
+// ─── Protected write routes ───────────────────────────────────────────────────
+
+// Create a new activity (organizers only) — with Joi validation
 router.post(
   "/",
   verifyToken,
   verifyOrganisator,
   upload.array("photos", 10),
+  validate(createActiviteSchema),
   activiteController.createActivite,
 );
 
-// Mettre à jour une activité (réservé au propriétaire)
+// Update an activity (owner only) — with Joi validation
 router.put(
   "/:id",
   verifyToken,
   verifyOrganisator,
   upload.array("photos", 10),
+  validate(updateActiviteSchema),
   activiteController.updateActivite,
 );
 
-// Supprimer une activité (réservé au propriétaire)
+// Delete an activity (owner only)
 router.delete(
   "/:id",
   verifyToken,

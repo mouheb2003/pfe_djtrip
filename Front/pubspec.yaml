@@ -35,8 +35,14 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # State management
+  provider: ^6.1.1
+
   # HTTP client for API calls
   http: ^1.2.0
+
+  # WebRTC for video and voice calls (^1.x compatible with Flutter embedding v2)
+  flutter_webrtc: ^1.0.0
 
   # Local storage
   shared_preferences: ^2.2.2
@@ -67,6 +73,15 @@ dependencies:
   # Share (activity link, profile)
   share_plus: ^10.0.0
 
+  # Voice recording
+  record: ^6.0.0
+  path_provider: ^2.1.5
+  just_audio: ^0.10.4
+
+  # Permissions (micro/caméra pour appels)
+  permission_handler: ^11.3.0
+  url_launcher: ^6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -87,6 +102,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/sounds/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

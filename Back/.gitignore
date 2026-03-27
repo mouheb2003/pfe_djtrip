@@ -1,14 +1,14 @@
 # Node modules
 node_modules/
 
-# Fichiers logs
+# Log files
 *.log
 
-# Fichiers de build
+# Build files
 dist/
 build/
 
-# Configuration locale
+# Local configuration
 .env
 
 # Uploaded files (temporary storage before Cloudinary)

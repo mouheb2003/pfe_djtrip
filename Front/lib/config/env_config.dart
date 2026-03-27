@@ -1,6 +1,6 @@
-/// Configuration par environnement (dev / staging / prod).
-/// Utilisation: flutter run --dart-define=ENV=prod
-/// Par défaut: dev
+/// Environment configuration (dev / staging / prod).
+/// Usage: flutter run --dart-define=ENV=prod
+/// Default: dev
 class EnvConfig {
   static const String env = String.fromEnvironment(
     'ENV',

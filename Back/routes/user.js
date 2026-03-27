@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user");
-const { refreshToken, verifyToken } = require("../middleware/auth");
+const {
+  refreshToken,
+  verifyToken,
+  verifyAdmin,
+} = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
 // POST /signup - Register a new user
@@ -29,10 +33,21 @@ router.get("/me", verifyToken, userController.myInfo);
 router.get("/me/favorites", verifyToken, userController.getFavorites);
 
 // POST /me/favorites/:activityId - Add activity to favorites
-router.post("/me/favorites/:activityId", verifyToken, userController.addFavorite);
+router.post(
+  "/me/favorites/:activityId",
+  verifyToken,
+  userController.addFavorite,
+);
 
 // DELETE /me/favorites/:activityId - Remove activity from favorites
-router.delete("/me/favorites/:activityId", verifyToken, userController.removeFavorite);
+router.delete(
+  "/me/favorites/:activityId",
+  verifyToken,
+  userController.removeFavorite,
+);
+
+// PUT /me/password - Change current user password (protected route)
+router.put("/me/password", verifyToken, userController.changePassword);
 
 // PUT /me - Update current user profile (protected route)
 router.put("/me", verifyToken, userController.updateProfile);
@@ -48,11 +63,19 @@ router.put(
 // DELETE /me/avatar - Delete current user avatar (protected route)
 router.delete("/me/avatar", verifyToken, userController.deleteAvatar);
 
-// PUT /:id/status - Update account status (protected route)
-router.put("/:id/status", verifyToken, userController.updateAccountStatus);
+// PUT /:id/status - Update account status (Admin only)
+router.put(
+  "/:id/status",
+  verifyToken,
+  verifyAdmin,
+  userController.updateAccountStatus,
+);
 
-// GET / - Get all users
-router.get("/", userController.getAllUsers);
+// GET / - Get all users (Admin only)
+router.get("/", verifyToken, verifyAdmin, userController.getAllUsers);
+
+// GET /all - Get all users (PUBLIC for testing)
+router.get("/all", userController.getAllUsersPublic);
 
 // GET /:id - Get user by ID
 router.get("/:id", userController.getUserById);

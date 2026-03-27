@@ -2,14 +2,14 @@ const Activite = require("../models/activite");
 const cloudinary = require("../config/cloudinary");
 
 /**
- * Service pour gérer les opérations sur les activités
+ * Service for managing activity operations
  */
 class ActiviteService {
   /**
-   * Upload une image vers Cloudinary
-   * @param {Buffer} fileBuffer - Buffer du fichier image
-   * @param {Object} options - Options d'upload
-   * @returns {Promise<Object>} Résultat de l'upload avec secure_url
+   * Uploads an image to Cloudinary
+   * @param {Buffer} fileBuffer - Image file buffer
+   * @param {Object} options - Upload options
+   * @returns {Promise<Object>} Upload result with secure_url
    */
   static async uploadImageToCloudinary(fileBuffer, options = {}) {
     const defaultOptions = {
@@ -43,9 +43,9 @@ class ActiviteService {
   }
 
   /**
-   * Upload plusieurs images vers Cloudinary
-   * @param {Array<Buffer>} fileBuffers - Array de buffers des fichiers images
-   * @returns {Promise<Array<String>>} Array des URLs des images uploadées
+   * Uploads multiple images to Cloudinary
+   * @param {Array<Buffer>} fileBuffers - Array of image file buffers
+   * @returns {Promise<Array<String>>} Array of uploaded image URLs
    */
   static async uploadMultipleImages(fileBuffers) {
     try {
@@ -62,13 +62,13 @@ class ActiviteService {
   }
 
   /**
-   * Supprime une image de Cloudinary
-   * @param {String} imageUrl - URL de l'image à supprimer
-   * @returns {Promise<Object>} Résultat de la suppression
+   * Deletes an image from Cloudinary
+   * @param {String} imageUrl - URL of the image to delete
+   * @returns {Promise<Object>} Deletion result
    */
   static async deleteImageFromCloudinary(imageUrl) {
     try {
-      // Extraire le public_id de l'URL Cloudinary
+      // Extract the public_id from the Cloudinary URL
       const urlParts = imageUrl.split("/");
       const filename = urlParts[urlParts.length - 1];
       const publicId = `DJTrip/activites/${filename.split(".")[0]}`;
@@ -81,11 +81,12 @@ class ActiviteService {
       throw error;
     }
   }
+
   /**
-   * Crée une nouvelle activité
-   * @param {Object} activiteData - Données de l'activité
-   * @param {String} organisatorId - ID de l'organisateur
-   * @returns {Promise<Object>} Activité créée
+   * Creates a new activity
+   * @param {Object} activiteData - Activity data
+   * @param {String} organisatorId - Organizer ID
+   * @returns {Promise<Object>} Created activity
    */
   static async createActivite(activiteData, organisatorId) {
     const {
@@ -125,9 +126,9 @@ class ActiviteService {
   }
 
   /**
-   * Récupère une activité par son ID
-   * @param {String} activiteId - ID de l'activité
-   * @returns {Promise<Object>} Activité
+   * Retrieves an activity by its ID
+   * @param {String} activiteId - Activity ID
+   * @returns {Promise<Object>} Activity
    */
   static async getActiviteById(activiteId) {
     const activite = await Activite.findById(activiteId).populate(
@@ -143,9 +144,9 @@ class ActiviteService {
   }
 
   /**
-   * Récupère toutes les activités
-   * @param {Object} filters - Filtres de recherche (optionnel)
-   * @returns {Promise<Array>} Liste des activités
+   * Retrieves all activities
+   * @param {Object} filters - Search filters (optional)
+   * @returns {Promise<Array>} List of activities
    */
   static async getAllActivites(filters = {}) {
     const query = {};
@@ -176,9 +177,9 @@ class ActiviteService {
   }
 
   /**
-   * Récupère les activités d'un organisateur
-   * @param {String} organisatorId - ID de l'organisateur
-   * @returns {Promise<Array>} Liste des activités de l'organisateur
+   * Retrieves activities for an organizer
+   * @param {String} organisatorId - Organizer ID
+   * @returns {Promise<Array>} List of organizer's activities
    */
   static async getActivitesByOrganisator(organisatorId) {
     const activites = await Activite.find({
@@ -189,11 +190,11 @@ class ActiviteService {
   }
 
   /**
-   * Met à jour une activité
-   * @param {String} activiteId - ID de l'activité
-   * @param {Object} updateData - Données à mettre à jour
-   * @param {String} organisatorId - ID de l'organisateur (pour vérification)
-   * @returns {Promise<Object>} Activité mise à jour
+   * Updates an activity
+   * @param {String} activiteId - Activity ID
+   * @param {Object} updateData - Data to update
+   * @param {String} organisatorId - Organizer ID (for verification)
+   * @returns {Promise<Object>} Updated activity
    */
   static async updateActivite(activiteId, updateData, organisatorId) {
     // First verify that the activity belongs to the organisator
@@ -226,10 +227,10 @@ class ActiviteService {
   }
 
   /**
-   * Supprime une activité
-   * @param {String} activiteId - ID de l'activité
-   * @param {String} organisatorId - ID de l'organisateur (pour vérification)
-   * @returns {Promise<Boolean>} Succès de l'opération
+   * Deletes an activity
+   * @param {String} activiteId - Activity ID
+   * @param {String} organisatorId - Organizer ID (for verification)
+   * @returns {Promise<Boolean>} Operation success
    */
   static async deleteActivite(activiteId, organisatorId) {
     // First verify that the activity belongs to the organisator
@@ -250,9 +251,9 @@ class ActiviteService {
   }
 
   /**
-   * Recherche des activités avec filtre avancé
-   * @param {Object} searchParams - Paramètres de recherche
-   * @returns {Promise<Array>} Liste des activités trouvées
+   * Searches activities with advanced filters
+   * @param {Object} searchParams - Search parameters
+   * @returns {Promise<Array>} List of found activities
    */
   static async searchActivites(searchParams) {
     const { keyword, categorie, lieu, prixMin, prixMax, dateDebut, dateFin } =
@@ -304,11 +305,11 @@ class ActiviteService {
   }
 
   /**
-   * Met à jour la disponibilité d'une activité
-   * @param {String} activiteId - ID de l'activité
-   * @param {Boolean} disponible - Nouvelle disponibilité
-   * @param {String} organisatorId - ID de l'organisateur (pour vérification)
-   * @returns {Promise<Object>} Activité mise à jour
+   * Updates an activity's availability
+   * @param {String} activiteId - Activity ID
+   * @param {Boolean} disponible - New availability value
+   * @param {String} organisatorId - Organizer ID (for verification)
+   * @returns {Promise<Object>} Updated activity
    */
   static async updateDisponibilite(activiteId, disponible, organisatorId) {
     const activite = await Activite.findById(activiteId);

@@ -8,10 +8,10 @@ const {
 } = require("../middleware/auth");
 
 // ========================================
-// ROUTES TOURISTE (Gérer ses inscriptions)
+// TOURIST ROUTES (Manage registrations)
 // ========================================
 
-// Créer une inscription à une activité (Touriste uniquement)
+// Create a registration for an activity (Tourist only)
 router.post(
   "/",
   verifyToken,
@@ -19,7 +19,7 @@ router.post(
   inscriptionController.createInscription,
 );
 
-// Obtenir toutes les inscriptions du touriste connecté
+// Get all registrations for the logged-in tourist
 router.get(
   "/mes-inscriptions",
   verifyToken,
@@ -27,7 +27,7 @@ router.get(
   inscriptionController.getInscriptionsByTouriste,
 );
 
-// Annuler une inscription (Touriste uniquement)
+// Cancel a registration (Tourist only)
 router.put(
   "/:inscriptionId/annuler",
   verifyToken,
@@ -36,10 +36,10 @@ router.put(
 );
 
 // ========================================
-// ROUTES ORGANISATEUR (Gérer les demandes)
+// ORGANIZER ROUTES (Manage requests)
 // ========================================
 
-// Obtenir les inscriptions en attente pour l'organisateur
+// Get pending registrations for the organizer
 router.get(
   "/organisateur/en-attente",
   verifyToken,
@@ -47,7 +47,7 @@ router.get(
   inscriptionController.getInscriptionsEnAttente,
 );
 
-// Obtenir toutes les inscriptions de l'organisateur
+// Get all registrations for the organizer
 router.get(
   "/organisateur/mes-demandes",
   verifyToken,
@@ -55,7 +55,7 @@ router.get(
   inscriptionController.getInscriptionsByOrganisateur,
 );
 
-// Approuver une inscription (Organisateur uniquement)
+// Approve a registration (Organizer only)
 router.put(
   "/:inscriptionId/approuver",
   verifyToken,
@@ -63,7 +63,7 @@ router.put(
   inscriptionController.approuverInscription,
 );
 
-// Refuser une inscription (Organisateur uniquement)
+// Reject a registration (Organizer only)
 router.put(
   "/:inscriptionId/refuser",
   verifyToken,
@@ -72,14 +72,30 @@ router.put(
 );
 
 // ========================================
-// ROUTES COMMUNES (Consultation)
+// COMMON ROUTES (Read access)
 // ========================================
 
-// Obtenir une inscription par ID (Protégé - Touriste ou Organisateur)
+// Get a registration by ID (Protected - Tourist or Organizer)
 router.get(
   "/:inscriptionId",
   verifyToken,
   inscriptionController.getInscriptionById,
+);
+
+// GET /stats/organizer - Organizer stats (bookings, revenue, activities)
+router.get(
+  "/stats/organizer",
+  verifyToken,
+  verifyOrganisator,
+  inscriptionController.getOrganizerStats,
+);
+
+// GET /stats/tourist - Tourist stats (bookings count)
+router.get(
+  "/stats/tourist",
+  verifyToken,
+  verifyTouriste,
+  inscriptionController.getTouristStats,
 );
 
 module.exports = router;

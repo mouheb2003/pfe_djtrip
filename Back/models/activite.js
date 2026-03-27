@@ -1,63 +1,63 @@
 const mongoose = require("mongoose");
 
-// Schéma pour les Activités touristiques
+// Schema for tourist Activities
 const activiteSchema = new mongoose.Schema(
   {
-    // Titre de l'activité
+    // Activity title
     titre: {
       type: String,
-      required: [true, "Le titre de l'activité est requis"],
+      required: [true, "Activity title is required"],
       trim: true,
-      maxlength: [100, "Le titre ne peut pas dépasser 100 caractères"],
+      maxlength: [100, "Title cannot exceed 100 characters"],
     },
-    // Description détaillée
+    // Detailed description
     description: {
       type: String,
-      required: [true, "La description est requise"],
-      maxlength: [2000, "La description ne peut pas dépasser 2000 caractères"],
+      required: [true, "Description is required"],
+      maxlength: [2000, "Description cannot exceed 2000 characters"],
     },
-    // Type d'activité
+    // Activity type
     type_activite: {
       type: String,
-      required: [true, "Le type d'activité est requis"],
+      required: [true, "Activity type is required"],
       enum: [
-        "Visite guidée",
+        "Guided Tour",
         "Excursion",
-        "Randonnée",
-        "Aventure",
+        "Hiking",
+        "Adventure",
         "Culture",
-        "Gastronomie",
+        "Gastronomy",
         "Sport",
-        "Autre",
+        "Other",
         // Legacy values for backward compatibility
-        "Sports nautiques",
-        "Escalade",
-        "Vélo",
-        "Visites culturelles",
-        "Sports extrêmes",
-        "Cours et ateliers",
-        "Détente et bien-être",
-        "Photographie",
-        "Observation nature",
-        "Sports d'hiver",
-        "Activités nautiques",
+        "Water Sports",
+        "Climbing",
+        "Cycling",
+        "Cultural Visits",
+        "Extreme Sports",
+        "Courses and Workshops",
+        "Relaxation and Wellness",
+        "Photography",
+        "Nature Observation",
+        "Winter Sports",
+        "Water Activities",
         "Excursions",
-        "Autres",
+        "Others",
       ],
     },
-    // Référence à l'organisateur
+    // Reference to the organizer
     organisateur_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organisator",
-      required: [true, "L'organisateur est requis"],
+      required: [true, "Organizer is required"],
     },
-    // Lieu de l'activité
+    // Activity location
     lieu: {
       type: String,
-      required: [true, "Le lieu est requis"],
+      required: [true, "Location is required"],
       trim: true,
     },
-    // Coordonnées GPS (optionnel)
+    // GPS coordinates (optional)
     coordonnees: {
       latitude: {
         type: Number,
@@ -70,72 +70,72 @@ const activiteSchema = new mongoose.Schema(
         max: 180,
       },
     },
-    // Durée de l'activité (en heures)
+    // Activity duration (in hours)
     duree: {
       type: Number,
-      required: [true, "La durée est requise"],
-      min: [0.1, "La durée minimale est de 0.1 heure (6 minutes)"],
+      required: [true, "Duration is required"],
+      min: [0.1, "Minimum duration is 0.1 hour (6 minutes)"],
     },
-    // Prix par personne (en devise locale)
+    // Price per person (in local currency)
     prix: {
       type: Number,
-      required: [true, "Le prix est requis"],
-      min: [0, "Le prix ne peut pas être négatif"],
+      required: [true, "Price is required"],
+      min: [0, "Price cannot be negative"],
     },
-    // Capacité maximale de participants
+    // Maximum participant capacity
     capacite_max: {
       type: Number,
-      required: [true, "La capacité maximale est requise"],
-      min: [1, "La capacité minimale est de 1 personne"],
+      required: [true, "Maximum capacity is required"],
+      min: [1, "Minimum capacity is 1 person"],
     },
-    // Langues disponibles pour l'activité
+    // Languages available for the activity
     langues_disponibles: {
       type: [String],
-      default: ["Français"],
+      default: ["English"],
     },
-    // Photos de l'activité
+    // Activity photos
     photos: {
       type: [String],
       default: [],
     },
-    // Niveau de difficulté
+    // Difficulty level
     niveau_difficulte: {
       type: String,
-      enum: ["Facile", "Modéré", "Difficile", "Expert"],
-      default: "Facile",
+      enum: ["Easy", "Moderate", "Difficult", "Expert"],
+      default: "Easy",
     },
-    // Équipements inclus
+    // Included equipment
     equipements_inclus: {
       type: [String],
       default: [],
     },
-    // Ce qu'il faut apporter
+    // What to bring
     a_apporter: {
       type: [String],
       default: [],
     },
-    // Dates disponibles (tableau de dates)
+    // Available dates (array of dates)
     dates_disponibles: {
       type: [Date],
       default: [],
     },
-    // Date et heure de début de l'activité
+    // Activity start date and time
     date_debut: {
       type: Date,
-      required: [true, "La date de début est requise"],
+      required: [true, "Start date is required"],
     },
-    // Date et heure de fin de l'activité
+    // Activity end date and time
     date_fin: {
       type: Date,
-      required: [true, "La date de fin est requise"],
+      required: [true, "End date is required"],
     },
-    // Statut de l'activité
+    // Activity status
     statut: {
       type: String,
-      enum: ["active", "inactive", "archivée", "terminée"],
+      enum: ["active", "inactive", "archived", "completed"],
       default: "active",
     },
-    // Système d'évaluation
+    // Rating system
     note_moyenne: {
       type: Number,
       default: 0,
@@ -146,21 +146,23 @@ const activiteSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    // Nombre de réservations
+    // Number of bookings
     nombre_reservations: {
       type: Number,
       default: 0,
     },
   },
   {
-    timestamps: true, // Ajoute automatiquement createdAt et updatedAt
+    timestamps: true, // Automatically adds createdAt and updatedAt
   },
 );
 
-// Index pour améliorer les performances de recherche
+// Indexes to improve search performance
 activiteSchema.index({ type_activite: 1, statut: 1 });
 activiteSchema.index({ organisateur_id: 1 });
-activiteSchema.index({ lieu: "text", titre: "text" });
+activiteSchema.index({ lieu: "text", titre: "text", description: "text" });
+// Geospatial index for proximity queries (e.g. activities near a location)
+activiteSchema.index({ "coordonnees.latitude": 1, "coordonnees.longitude": 1 });
 
 const Activite = mongoose.model("Activite", activiteSchema);
 

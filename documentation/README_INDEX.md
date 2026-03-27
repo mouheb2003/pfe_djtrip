@@ -32,6 +32,7 @@ Ce document liste tous les fichiers README présents dans le projet DJTrip avec 
     - FEATURES.md (Fonctionnalités)
     - CHANGELOG_28-02-2026.md (Modifications du 28/02)
     - CHANGELOG_2026-03-08.md (Modifications du 8/03)
+    - CHANGELOG_2026-03-14.md (Modifications du 14/03)
     - GOOGLE_SIGNIN_FIX_2026-03-08.md (Fix Google Sign-In)
 
 ---
@@ -145,6 +146,7 @@ DJTrip/
 | **FEATURES.md**                     | Février 2026    | Liste détaillée des fonctionnalités  |
 | **CHANGELOG_28-02-2026.md**         | 28 février 2026 | Modifications du 28 février          |
 | **CHANGELOG_2026-03-08.md**         | 8 mars 2026     | Modifications du 8 mars (ce jour)    |
+| **CHANGELOG_2026-03-14.md**         | 14 mars 2026    | Messagerie, profils publics, reviews |
 | **CHANGELOG_2026-03-07.md**         | 7 mars 2026     | Modifications du 7 mars              |
 | **GOOGLE_SIGNIN_FIX_2026-03-08.md** | 8 mars 2026     | Guide fix erreur Google Sign-In      |
 | **GOOGLE_FACEBOOK_AUTH_SETUP.md**   | Mars 2026       | Configuration OAuth complète         |
@@ -211,6 +213,12 @@ DJTrip/
 - ✅ Création de **GOOGLE_SIGNIN_FIX_2026-03-08.md**
 - ✅ Création de **CHANGELOG_2026-03-08.md**
 - ✅ Documentation complète du fix Google Sign-In
+
+### 14 mars 2026
+
+- ✅ Création de **CHANGELOG_2026-03-14.md**
+- ✅ Documentation de la messagerie texte/audio/vidéo
+- ✅ Documentation des profils publics organisateur et utilisateur
 
 ### 28 février 2026
 

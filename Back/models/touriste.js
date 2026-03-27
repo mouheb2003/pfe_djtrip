@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("./user");
 
-// Création du schéma Touriste qui hérite de User via discriminator
+// Creating the Tourist schema that inherits from User via discriminator
 const touristeSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -13,11 +13,11 @@ const touristeSchema = new mongoose.Schema({
   },
   langue_preferee: {
     type: String,
-    default: "Français",
+    default: "English",
   },
 });
 
-// Utilisation du discriminator pour hériter de User
+// Using the discriminator to inherit from User
 const Touriste = User.discriminator("Touriste", touristeSchema);
 
 module.exports = Touriste;

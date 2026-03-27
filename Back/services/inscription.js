@@ -3,18 +3,18 @@ const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
 
 /**
- * Service pour gérer les inscriptions aux activités
+ * Service for managing activity registrations
  */
 class InscriptionService {
   /**
-   * Crée une nouvelle inscription
-   * @param {String} touristeId - ID du touriste
-   * @param {String} activiteId - ID de l'activité
-   * @param {Object} inscriptionData - Données supplémentaires (optionnel)
-   * @returns {Promise<Object>} Inscription créée
+   * Creates a new registration
+   * @param {String} touristeId - Tourist ID
+   * @param {String} activiteId - Activity ID
+   * @param {Object} inscriptionData - Additional data (optional)
+   * @returns {Promise<Object>} Created registration
    */
   static async createInscription(touristeId, activiteId, inscriptionData = {}) {
-    // Vérifier que l'activité existe et est disponible
+    // Verify the activity exists and is available
     const activite = await Activite.findById(activiteId);
 
     if (!activite) {
@@ -25,14 +25,14 @@ class InscriptionService {
       throw new Error("Activity is not available");
     }
 
-    // Vérifier que le touriste existe
+    // Verify the tourist exists
     const touriste = await Touriste.findById(touristeId);
 
     if (!touriste) {
-      throw new Error("Touriste not found");
+      throw new Error("Tourist not found");
     }
 
-    // Vérifier si le touriste n'est pas déjà inscrit
+    // Check if the tourist is not already registered
     const existingInscription = await Inscription.findOne({
       touriste_id: touristeId,
       activite_id: activiteId,
@@ -43,7 +43,7 @@ class InscriptionService {
       throw new Error("You are already registered for this activity");
     }
 
-    // Vérifier les places disponibles
+    // Check available spots
     if (
       activite.places_disponibles !== undefined &&
       activite.places_disponibles <= 0
@@ -51,7 +51,7 @@ class InscriptionService {
       throw new Error("No places available for this activity");
     }
 
-    // Créer l'inscription
+    // Create the registration
     const inscription = new Inscription({
       touriste_id: touristeId,
       activite_id: activiteId,
@@ -63,7 +63,7 @@ class InscriptionService {
 
     await inscription.save();
 
-    // Décrémenter les places disponibles si applicable
+    // Decrement available spots if applicable
     if (activite.places_disponibles !== undefined) {
       activite.places_disponibles -= 1;
       await activite.save();
@@ -74,9 +74,9 @@ class InscriptionService {
   }
 
   /**
-   * Récupère une inscription par son ID
-   * @param {String} inscriptionId - ID de l'inscription
-   * @returns {Promise<Object>} Inscription
+   * Get a registration by ID
+   * @param {String} inscriptionId - Registration ID
+   * @returns {Promise<Object>} Registration
    */
   static async getInscriptionById(inscriptionId) {
     const inscription = await Inscription.findById(inscriptionId)
@@ -91,9 +91,9 @@ class InscriptionService {
   }
 
   /**
-   * Récupère toutes les inscriptions d'un touriste
-   * @param {String} touristeId - ID du touriste
-   * @returns {Promise<Array>} Liste des inscriptions
+   * Get all registrations for a tourist
+   * @param {String} touristeId - Tourist ID
+   * @returns {Promise<Array>} Registration list
    */
   static async getInscriptionsByTouriste(touristeId) {
     const inscriptions = await Inscription.find({
@@ -106,9 +106,9 @@ class InscriptionService {
   }
 
   /**
-   * Récupère toutes les inscriptions pour une activité
-   * @param {String} activiteId - ID de l'activité
-   * @returns {Promise<Array>} Liste des inscriptions
+   * Get all registrations for an activity
+   * @param {String} activiteId - Activity ID
+   * @returns {Promise<Array>} Registration list
    */
   static async getInscriptionsByActivite(activiteId) {
     const inscriptions = await Inscription.find({
@@ -121,10 +121,10 @@ class InscriptionService {
   }
 
   /**
-   * Met à jour le statut d'une inscription
-   * @param {String} inscriptionId - ID de l'inscription
-   * @param {String} statut - Nouveau statut
-   * @returns {Promise<Object>} Inscription mise à jour
+   * Update the status of a registration
+   * @param {String} inscriptionId - Registration ID
+   * @param {String} statut - New status
+   * @returns {Promise<Object>} Updated registration
    */
   static async updateStatut(inscriptionId, statut) {
     const validStatuts = ["en attente", "confirmée", "annulée", "terminée"];
@@ -141,7 +141,7 @@ class InscriptionService {
       throw new Error("Inscription not found");
     }
 
-    // Si on annule une inscription confirmée ou en attente, libérer la place
+    // If cancelling a confirmed or pending registration, free up the spot
     if (
       (inscription.statut === "confirmée" ||
         inscription.statut === "en attente") &&
@@ -162,10 +162,10 @@ class InscriptionService {
   }
 
   /**
-   * Annule une inscription
-   * @param {String} inscriptionId - ID de l'inscription
-   * @param {String} touristeId - ID du touriste (pour vérification)
-   * @returns {Promise<Object>} Inscription annulée
+   * Cancel a registration
+   * @param {String} inscriptionId - Registration ID
+   * @param {String} touristeId - Tourist ID (for verification)
+   * @returns {Promise<Object>} Cancelled registration
    */
   static async cancelInscription(inscriptionId, touristeId) {
     const inscription = await Inscription.findById(inscriptionId);
@@ -188,7 +188,7 @@ class InscriptionService {
       throw new Error("Cannot cancel a completed inscription");
     }
 
-    // Libérer la place
+    // Free up the spot
     const activite = await Activite.findById(inscription.activite_id);
     if (activite && activite.places_disponibles !== undefined) {
       activite.places_disponibles += 1;
@@ -203,9 +203,9 @@ class InscriptionService {
   }
 
   /**
-   * Supprime une inscription
-   * @param {String} inscriptionId - ID de l'inscription
-   * @returns {Promise<Boolean>} Succès de l'opération
+   * Delete a registration
+   * @param {String} inscriptionId - Registration ID
+   * @returns {Promise<Boolean>} Operation success
    */
   static async deleteInscription(inscriptionId) {
     const inscription = await Inscription.findById(inscriptionId);
@@ -214,7 +214,7 @@ class InscriptionService {
       throw new Error("Inscription not found");
     }
 
-    // Libérer la place si l'inscription n'était pas déjà annulée
+    // Free up the spot if the registration was not already cancelled
     if (inscription.statut !== "annulée") {
       const activite = await Activite.findById(inscription.activite_id);
       if (activite && activite.places_disponibles !== undefined) {
@@ -230,9 +230,9 @@ class InscriptionService {
   }
 
   /**
-   * Récupère les statistiques d'inscriptions pour une activité
-   * @param {String} activiteId - ID de l'activité
-   * @returns {Promise<Object>} Statistiques
+   * Get registration statistics for an activity
+   * @param {String} activiteId - Activity ID
+   * @returns {Promise<Object>} Statistics
    */
   static async getActivityInscriptionStats(activiteId) {
     const inscriptions = await Inscription.find({ activite_id: activiteId });

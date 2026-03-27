@@ -1,11 +1,17 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/user");
 
-// JWT Secrets (in production, use environment variables)
-const JWT_SECRET = process.env.JWT_SECRET || "your_secret_key";
-const REFRESH_TOKEN_SECRET =
-  process.env.REFRESH_TOKEN_SECRET || "your_refresh_secret_key";
+// JWT Secrets — must be defined in .env
+const JWT_SECRET = process.env.JWT_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "2h";
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || "7d";
+
+if (!JWT_SECRET || !REFRESH_TOKEN_SECRET) {
+  throw new Error(
+    "FATAL: JWT_SECRET and REFRESH_TOKEN_SECRET must be set in environment variables.",
+  );
+}
 
 // Generate Access Token (short-lived)
 exports.generateAccessToken = (userId, email, userType) => {
@@ -14,35 +20,36 @@ exports.generateAccessToken = (userId, email, userType) => {
   });
 };
 
-// Generate Refresh Token (long-lived)
-exports.generateRefreshToken = (userId, email, userType) => {
-  return jwt.sign({ userId, email, userType }, REFRESH_TOKEN_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-  });
+// Generate Refresh Token (long-lived, includes tokenVersion to support revocation)
+exports.generateRefreshToken = (userId, email, userType, tokenVersion = 0) => {
+  return jwt.sign(
+    { userId, email, userType, tokenVersion },
+    REFRESH_TOKEN_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN },
+  );
 };
 
 // Generate both tokens
-exports.generateTokens = (userId, email, userType) => {
+exports.generateTokens = (userId, email, userType, tokenVersion = 0) => {
   const accessToken = exports.generateAccessToken(userId, email, userType);
-  const refreshToken = exports.generateRefreshToken(userId, email, userType);
-
-  return {
-    accessToken,
-    refreshToken,
-  };
+  const refreshToken = exports.generateRefreshToken(
+    userId,
+    email,
+    userType,
+    tokenVersion,
+  );
+  return { accessToken, refreshToken };
 };
 
 // Middleware to verify access token
 exports.verifyToken = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1]; // Bearer TOKEN
-
+    const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
-
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Add user info to request
+    req.user = decoded;
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
@@ -72,7 +79,17 @@ exports.verifyTouriste = (req, res, next) => {
   next();
 };
 
-// Refresh Token Handler
+// Middleware to verify Admin userType
+exports.verifyAdmin = (req, res, next) => {
+  if (req.user.userType !== "Admin") {
+    return res
+      .status(403)
+      .json({ message: "Access denied. Admin access required." });
+  }
+  next();
+};
+
+// Refresh Token Handler — verifies tokenVersion to detect revoked tokens
 exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -81,10 +98,20 @@ exports.refreshToken = async (req, res) => {
       return res.status(401).json({ message: "Refresh token required" });
     }
 
-    // Verify refresh token
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
 
-    // Generate new access token
+    // Check tokenVersion against the database to catch revoked tokens (e.g. after logout)
+    const user = await User.findById(decoded.userId).select("tokenVersion");
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      return res.status(401).json({
+        message: "Token has been revoked. Please log in again.",
+      });
+    }
+
     const newAccessToken = exports.generateAccessToken(
       decoded.userId,
       decoded.email,
@@ -99,7 +126,7 @@ exports.refreshToken = async (req, res) => {
     if (err.name === "TokenExpiredError") {
       return res
         .status(401)
-        .json({ message: "Refresh token expired. Please login again." });
+        .json({ message: "Refresh token expired. Please log in again." });
     }
     return res.status(401).json({ message: "Invalid refresh token" });
   }

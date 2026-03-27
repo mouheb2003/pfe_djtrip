@@ -1,227 +1,145 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import '../models/user.dart';
-import 'storage_service.dart';
-import 'http_client.dart';
+import 'api_client.dart';
+import 'auth_service.dart';
+import '../models/user_model.dart';
 
 class UserService {
-  // Update user profile avec auto-refresh du token
+  /// Fetch the current user's profile from the backend & update local cache.
+  static Future<UserModel?> getProfile() async {
+    try {
+      final res = await ApiClient.get('/users/me');
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final data = (body['user'] ?? body) as Map<String, dynamic>;
+        await AuthService.saveUser(data);
+        return UserModel.fromJson(data);
+      }
+    } catch (_) {
+      // Keep null on failures to avoid crashing profile screens.
+    }
+    return null;
+  }
+
+  /// Update profile fields. Returns `{success, user?, message?}`.
   static Future<Map<String, dynamic>> updateProfile(
-    Map<String, dynamic> updateData,
+    Map<String, dynamic> data,
   ) async {
     try {
-      final headers = await HttpClient.getAuthHeaders();
-
-      final response = await HttpClient.put(
-        ApiConfig.updateProfile,
-        headers: headers,
-        body: jsonEncode(updateData),
-        timeout: ApiConfig.connectionTimeout,
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        final user = User.fromJson(data['user']);
-        return {'success': true, 'message': data['message'], 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error updating profile',
-        };
-      }
-    } on TokenExpiredException catch (e) {
-      return {'success': false, 'message': e.message, 'requiresLogin': true};
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
-    }
-  }
-
-  // Get user information avec auto-refresh du token
-  static Future<Map<String, dynamic>> getUserInfo() async {
-    try {
-      final headers = await HttpClient.getAuthHeaders();
-
-      final response = await HttpClient.get(
-        ApiConfig.myInfo,
-        headers: headers,
-        timeout: ApiConfig.connectionTimeout,
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        final user = User.fromJson(data['user']);
+      final res = await ApiClient.put('/users/me', data);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200) {
+        final user = (body['user'] ?? body) as Map<String, dynamic>;
+        await AuthService.saveUser(user);
         return {'success': true, 'user': user};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error retrieving information',
-        };
       }
-    } on TokenExpiredException catch (e) {
-      return {'success': false, 'message': e.message, 'requiresLogin': true};
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Update error',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message':
+            'Unable to reach the server. Check your connection.',
+      };
     }
   }
 
-  // Update avatar - accepts File object or path string
-  static Future<Map<String, dynamic>> uploadAvatar(dynamic avatar) async {
+  /// Upload a new avatar image.
+  static Future<bool> updateAvatar(File imageFile) async {
     try {
-      final accessToken = await StorageService.getAccessToken();
-
-      if (accessToken == null) {
-        return {'success': false, 'message': 'Not logged in'};
-      }
-
-      var request = http.MultipartRequest(
-        'PUT',
-        Uri.parse(ApiConfig.updateAvatar),
-      );
-
-      request.headers['Authorization'] = 'Bearer $accessToken';
-
-      // Support both File object and path string
-      if (avatar is File) {
-        request.files.add(
-          await http.MultipartFile.fromPath('avatar', avatar.path),
+      final token = await AuthService.getAccessToken();
+      if (token == null) return false;
+      final uri = Uri.parse('${ApiClient.baseUrl}/users/me/avatar');
+      final request = http.MultipartRequest('PUT', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(
+          await http.MultipartFile.fromPath('avatar', imageFile.path),
         );
-      } else if (avatar is String) {
-        request.files.add(await http.MultipartFile.fromPath('avatar', avatar));
-      } else {
-        return {'success': false, 'message': 'Invalid avatar parameter'};
-      }
-
-      final streamedResponse = await request.send().timeout(
-        ApiConfig.connectionTimeout,
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 20),
       );
-
-      final response = await http.Response.fromStream(streamedResponse);
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        final user = User.fromJson(data['user']);
-        return {
-          'success': true,
-          'message': data['message'],
-          'avatar': data['avatar'],
-          'user': user,
-        };
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error uploading avatar',
-        };
+      final res = await http.Response.fromStream(streamed);
+      if (res.statusCode == 200) {
+        try {
+          final body = jsonDecode(res.body) as Map<String, dynamic>;
+          final user = body['user'];
+          if (user is Map<String, dynamic>) {
+            await AuthService.saveUser(user);
+          }
+        } catch (_) {}
+        return true;
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 
-  // Legacy method for backward compatibility
-  static Future<Map<String, dynamic>> updateAvatar(String avatarPath) async {
-    return uploadAvatar(avatarPath);
-  }
-
-  // Delete avatar from cloud and DB
-  static Future<Map<String, dynamic>> deleteAvatarFromCloud() async {
-    try {
-      final headers = await HttpClient.getAuthHeaders();
-      final response = await HttpClient.delete(
-        ApiConfig.deleteAvatar,
-        headers: headers,
-        timeout: ApiConfig.connectionTimeout,
-      );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error deleting avatar',
-        };
-      }
-    } on TokenExpiredException catch (e) {
-      return {'success': false, 'message': e.message, 'requiresLogin': true};
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+  /// Get a public user profile by id (no auth required).
+  static Future<UserModel?> getUserById(String userId) async {
+    final res = await ApiClient.get('/users/$userId', auth: false);
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return UserModel.fromJson((body['user'] ?? body) as Map<String, dynamic>);
     }
+    return null;
   }
 
-  // Update notification preferences
-  static Future<Map<String, dynamic>> updateNotificationPreferences({
-    required bool emailNotifications,
-    required bool smsNotifications,
-  }) async {
-    return updateProfile({
-      'notifications_email': emailNotifications,
-      'notifications_sms': smsNotifications,
-    });
-  }
-
-  // Update account status (for administrator)
-  static Future<Map<String, dynamic>> updateAccountStatus(
-    String userId,
-    String status,
+  /// Update tourist interests.
+  static Future<bool> updateInterests(
+    String touristeId,
+    List<String> interests,
   ) async {
     try {
-      final accessToken = await StorageService.getAccessToken();
-
-      if (accessToken == null) {
-        return {'success': false, 'message': 'Not logged in'};
-      }
-
-      final response = await http
-          .put(
-            Uri.parse('${ApiConfig.baseUrl}/users/$userId/status'),
+      final token = await AuthService.getAccessToken();
+      if (token == null) return false;
+      final uri = Uri.parse(
+        '${ApiClient.baseUrl}/touristes/$touristeId/centres-interet',
+      );
+      final res = await http
+          .patch(
+            uri,
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $accessToken',
+              'Authorization': 'Bearer $token',
             },
-            body: jsonEncode({'status': status}),
+            body: jsonEncode({'centres_interet': interests}),
           )
-          .timeout(ApiConfig.connectionTimeout);
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': data['message']};
-      } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Error updating status',
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+          .timeout(const Duration(seconds: 15));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 
-  // Get current account status
-  static Future<Map<String, dynamic>> getAccountStatus() async {
-    try {
-      final result = await getUserInfo();
-      if (result['success']) {
-        final User user = result['user'];
-        return {
-          'success': true,
-          'status': user.status,
-          'derniereConnexion': user.derniereConnexion,
-        };
+  /// Get current user's favourite activities.
+  static Future<List<Map<String, dynamic>>> getFavorites() async {
+    final res = await ApiClient.get('/users/me/favorites');
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body);
+      if (body is List) {
+        return List<Map<String, dynamic>>.from(body);
       }
-      return result;
-    } catch (e) {
-      return {'success': false, 'message': 'Error: ${e.toString()}'};
+      final list = body['favorites'] ?? body;
+      if (list is List) {
+        return List<Map<String, dynamic>>.from(list);
+      }
     }
+    return [];
   }
 
-  // Update interests (preferences)
-  static Future<Map<String, dynamic>> updatePreferences(
-    List<String> preferences,
-  ) async {
-    return updateProfile({'centres_interet': preferences});
+  /// Add an activity to favourites. Returns updated list or null on fail.
+  static Future<bool> addFavorite(String activityId) async {
+    final res = await ApiClient.post('/users/me/favorites/$activityId', {});
+    return res.statusCode == 200 || res.statusCode == 201;
+  }
+
+  /// Remove an activity from favourites.
+  static Future<bool> removeFavorite(String activityId) async {
+    final res = await ApiClient.delete('/users/me/favorites/$activityId');
+    return res.statusCode == 200;
   }
 }

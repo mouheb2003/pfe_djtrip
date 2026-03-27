@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Couleurs et thème global de l'app DJTrip.
+/// Global colors and theme for the DJTrip app.
 class AppColors {
   AppColors._();
 
@@ -24,6 +24,18 @@ class AppColors {
   static const Color bubbleOther = Color(0xFFF0F0F0);
   static const Color online = Color(0xFF4CAF50);
   static const Color offline = Color(0xFF9E9E9E);
+
+  // Compatibility aliases for newer screens
+  static const Color background = surface;
+  static const Color backgroundLight = surfaceVariant;
+  static const Color textPrimary = onSurface;
+  static const Color textSecondary = onSurfaceVariant;
+  static const Color textLight = Color(0xFF9E9E9E);
+  static const Color textDark = onSurface;
+  static const Color textGrey = onSurfaceVariant;
+  static const Color borderLight = outline;
+  static const Color accentSoft = Color(0xFF4A702A);
+  static const Color backgroundDark = Color(0xFF1A1A1A);
 }
 
 class AppTextStyles {
@@ -59,7 +71,6 @@ class AppTextStyles {
     fontSize: 16,
     fontWeight: FontWeight.normal,
     color: AppColors.onSurface,
-    height: 1.4,
   );
   static const TextStyle bodyMedium = TextStyle(
     fontSize: 14,
@@ -185,6 +196,54 @@ class AppTheme {
         linearTrackColor: AppColors.outline,
         circularTrackColor: AppColors.outline,
       ),
+    );
+  }
+
+  static ThemeData get dark {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.primary,
+        onPrimary: Colors.white,
+        secondary: AppColors.secondary,
+        surface: Color(0xFF1E1E1E),
+        onSurface: Color(0xFFE5E7EB),
+        error: AppColors.error,
+        outline: Color(0xFF2E2E2E),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF1A1A1A),
+        foregroundColor: Color(0xFFE5E7EB),
+        elevation: 0,
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1E1E1E),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF202020),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2E2E2E)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(color: Color(0xFF2E2E2E)),
     );
   }
 }

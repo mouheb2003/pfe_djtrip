@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'screens/auth/new_login_screen.dart';
-import 'services/storage_service.dart';
+import 'config/app_routes.dart';
 import 'services/auth_service.dart';
-import 'models/user.dart';
-import 'screens/main_screen.dart';
-import 'screens/organizer_main_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -57,39 +53,37 @@ class _SplashScreenState extends State<SplashScreen>
     // Wait 4 seconds to see the splash with animation
     await Future.delayed(Duration(seconds: 4));
 
-    final isLoggedIn = await StorageService.isLoggedIn();
+    final isLoggedIn = await AuthService.isLoggedIn();
 
     if (isLoggedIn) {
       // User logged in - retrieve info and go to Main
-      final result = await AuthService.getMyInfo();
-      if (result['success']) {
-        final User user = result['user'];
+      final user = await AuthService.getUser();
+      if (user != null) {
+        final String? userType = user['userType'];
         // Navigate to appropriate screen based on user type
-        if (user.userType == 'Organisator') {
-          Navigator.pushReplacement(
+        if (userType == 'Organisator' || userType == 'Organizer') {
+          Navigator.pushReplacementNamed(
             context,
-            MaterialPageRoute(
-              builder: (context) => OrganizerMainScreen(user: user),
-            ),
+            AppRoutes.organizerMain,
           );
         } else {
-          Navigator.pushReplacement(
+          Navigator.pushReplacementNamed(
             context,
-            MaterialPageRoute(builder: (context) => MainScreen(user: user)),
+            AppRoutes.touristMain,
           );
         }
       } else {
-        // Invalid token - go to login
-        Navigator.pushReplacement(
+        // Invalid session - go to login
+        Navigator.pushReplacementNamed(
           context,
-          MaterialPageRoute(builder: (context) => NewLoginScreen()),
+          AppRoutes.login,
         );
       }
     } else {
       // Not logged in - go to login
-      Navigator.pushReplacement(
+      Navigator.pushReplacementNamed(
         context,
-        MaterialPageRoute(builder: (context) => NewLoginScreen()),
+        AppRoutes.login,
       );
     }
   }

@@ -1,9 +1,9 @@
 const Organisator = require("../models/organisator");
 
-// Compléter le profil organisator (après inscription via user/signup)
+// Complete the organizer profile (after registration via user/signup)
 exports.completeProfileOrganisator = async (req, res) => {
   try {
-    const userId = req.user.userId; // Récupéré depuis le token JWT
+    const userId = req.user.userId; // Retrieved from the JWT token
     const {
       age,
       num_tel,
@@ -18,20 +18,18 @@ exports.completeProfileOrganisator = async (req, res) => {
       consentement_donnees,
     } = req.body;
 
-    // Trouver l'organisator par ID
+    // Find the organizer by ID
     const organisator = await Organisator.findById(userId);
     if (!organisator) {
-      return res.status(404).json({ message: "Organisator non trouvé" });
+      return res.status(404).json({ message: "Organizer not found" });
     }
 
-    // Vérifier que c'est bien un organisator
+    // Verify this is indeed an organizer
     if (organisator.userType !== "Organisator") {
-      return res
-        .status(403)
-        .json({ message: "Cet utilisateur n'est pas un organisateur" });
+      return res.status(403).json({ message: "This user is not an organizer" });
     }
 
-    // Mettre à jour les attributs généraux (du User)
+    // Update general user attributes
     if (age !== undefined) organisator.age = age;
     if (num_tel !== undefined) organisator.num_tel = num_tel;
     if (bio !== undefined) organisator.bio = bio;
@@ -44,7 +42,7 @@ exports.completeProfileOrganisator = async (req, res) => {
     if (consentement_donnees !== undefined)
       organisator.consentement_donnees = consentement_donnees;
 
-    // Mettre à jour les attributs spécifiques à l'organisator
+    // Update organizer-specific attributes
     if (types_activites !== undefined)
       organisator.types_activites = types_activites;
     if (langues_proposees !== undefined)
@@ -53,54 +51,67 @@ exports.completeProfileOrganisator = async (req, res) => {
 
     await organisator.save();
 
-    // Retourner l'organisator sans le mot de passe
+    // Return the organizer without the password
     const organisatorResponse = organisator.toObject();
     delete organisatorResponse.mot_de_passe;
 
     res.status(200).json({
-      message: "Profil organisateur complété avec succès",
+      message: "Organizer profile completed successfully",
       organisator: organisatorResponse,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la complétion du profil organisateur",
+      message: "Error completing organizer profile",
       error: error.message,
     });
   }
 };
 
-// Obtenir tous les organisators
+// Get all organizers
 exports.getAllOrganisators = async (req, res) => {
   try {
-    const organisators = await Organisator.find().select("-mot_de_passe");
-    res.status(200).json({ organisators });
-  } catch (error) {
-    res.status(500).json({
-      message: "Erreur lors de la récupération des organisateurs",
-      error: error.message,
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [organisators, total] = await Promise.all([
+      Organisator.find().select("-mot_de_passe").skip(skip).limit(limit).lean(),
+      Organisator.countDocuments(),
+    ]);
+
+    res.status(200).json({
+      organisators,
+      count: organisators.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
     });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error retrieving organizers", error: error.message });
   }
 };
 
-// Obtenir un organisator par ID
+// Get an organizer by ID
 exports.getOrganisatorById = async (req, res) => {
   try {
     const organisator = await Organisator.findById(req.params.id).select(
       "-mot_de_passe",
     );
     if (!organisator) {
-      return res.status(404).json({ message: "Organisator non trouvé" });
+      return res.status(404).json({ message: "Organizer not found" });
     }
     res.status(200).json({ organisator });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la récupération de l'organisateur",
+      message: "Error retrieving organizer",
       error: error.message,
     });
   }
 };
 
-// Mettre à jour un organisator
+// Update an organizer
 exports.updateOrganisator = async (req, res) => {
   try {
     const {
@@ -146,31 +157,31 @@ exports.updateOrganisator = async (req, res) => {
       );
 
     if (!organisator) {
-      return res.status(404).json({ message: "Organisator non trouvé" });
+      return res.status(404).json({ message: "Organizer not found" });
     }
 
     res
       .status(200)
-      .json({ message: "Organisateur mis à jour avec succès", organisator });
+      .json({ message: "Organizer updated successfully", organisator });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la mise à jour de l'organisateur",
+      message: "Error updating organizer",
       error: error.message,
     });
   }
 };
 
-// Supprimer un organisator
+// Delete an organizer
 exports.deleteOrganisator = async (req, res) => {
   try {
     const organisator = await Organisator.findByIdAndDelete(req.params.id);
     if (!organisator) {
-      return res.status(404).json({ message: "Organisator non trouvé" });
+      return res.status(404).json({ message: "Organizer not found" });
     }
-    res.status(200).json({ message: "Organisateur supprimé avec succès" });
+    res.status(200).json({ message: "Organizer deleted successfully" });
   } catch (error) {
     res.status(500).json({
-      message: "Erreur lors de la suppression de l'organisateur",
+      message: "Error deleting the organizer",
       error: error.message,
     });
   }

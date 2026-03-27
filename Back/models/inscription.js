@@ -1,58 +1,58 @@
 const mongoose = require("mongoose");
 
-// Schéma pour les inscriptions aux activités
+// Schema for activity registrations
 const inscriptionSchema = new mongoose.Schema(
   {
-    // Référence au touriste qui s'inscrit
+    // Reference to the tourist registering
     touriste_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Touriste",
-      required: [true, "Le touriste est requis"],
+      required: [true, "Tourist is required"],
     },
-    // Référence à l'activité
+    // Reference to the activity
     activite_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Activite",
-      required: [true, "L'activité est requise"],
+      required: [true, "Activity is required"],
     },
-    // Référence à l'organisateur (pour faciliter les requêtes)
+    // Reference to the organizer (to facilitate queries)
     organisateur_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organisator",
-      required: [true, "L'organisateur est requis"],
+      required: [true, "Organizer is required"],
     },
-    // Statut de l'inscription
+    // Registration status
     statut: {
       type: String,
       enum: ["en_attente", "approuvee", "refusee", "annulee"],
       default: "en_attente",
     },
-    // Nombre de participants (si le touriste inscrit plusieurs personnes)
+    // Number of participants (if the tourist registers multiple people)
     nombre_participants: {
       type: Number,
       default: 1,
-      min: [1, "Le nombre minimum de participants est 1"],
+      min: [1, "Minimum number of participants is 1"],
     },
-    // Message du touriste (optionnel)
+    // Tourist's message (optional)
     message_touriste: {
       type: String,
       maxlength: 500,
     },
-    // Message de l'organisateur (optionnel - pour refus ou confirmation)
+    // Organizer's message (optional - for rejection or confirmation)
     message_organisateur: {
       type: String,
       maxlength: 500,
     },
-    // Date de la demande
+    // Date of the registration request
     date_demande: {
       type: Date,
       default: Date.now,
     },
-    // Date de réponse (approbation ou refus)
+    // Response date (approval or rejection)
     date_reponse: {
       type: Date,
     },
-    // Prix total au moment de l'inscription
+    // Total price at the time of registration
     prix_total: {
       type: Number,
       required: true,
@@ -63,12 +63,12 @@ const inscriptionSchema = new mongoose.Schema(
   },
 );
 
-// Index pour optimiser les recherches
+// Index to optimize searches
 inscriptionSchema.index({ touriste_id: 1, statut: 1 });
 inscriptionSchema.index({ activite_id: 1, statut: 1 });
 inscriptionSchema.index({ organisateur_id: 1, statut: 1 });
 
-// Méthode pour approuver une inscription
+// Method to approve a registration
 inscriptionSchema.methods.approuver = function (messageOrganisateur) {
   this.statut = "approuvee";
   this.date_reponse = new Date();
@@ -78,7 +78,7 @@ inscriptionSchema.methods.approuver = function (messageOrganisateur) {
   return this.save();
 };
 
-// Méthode pour refuser une inscription
+// Method to reject a registration
 inscriptionSchema.methods.refuser = function (messageOrganisateur) {
   this.statut = "refusee";
   this.date_reponse = new Date();
@@ -88,7 +88,7 @@ inscriptionSchema.methods.refuser = function (messageOrganisateur) {
   return this.save();
 };
 
-// Méthode pour annuler une inscription
+// Method to cancel a registration
 inscriptionSchema.methods.annuler = function () {
   this.statut = "annulee";
   return this.save();

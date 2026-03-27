@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-// Schéma de base User (classe abstraite)
+// Base User schema (abstract class)
 const userSchema = new mongoose.Schema(
   {
     fullname: String,
@@ -13,10 +13,10 @@ const userSchema = new mongoose.Schema(
     bio: String,
     pays_origine: String,
     isOnline: { type: Boolean, default: false },
-    accountStatus: { 
-      type: String, 
-      enum: ["active", "suspended", "banned", "inactive"], 
-      default: "active" 
+    accountStatus: {
+      type: String,
+      enum: ["active", "suspended", "banned", "inactive"],
+      default: "active",
     },
     derniere_connexion: Date,
     notifications_email: { type: Boolean, default: true },
@@ -29,7 +29,12 @@ const userSchema = new mongoose.Schema(
     // Password reset fields
     passwordResetCode: String,
     passwordResetCodeExpiry: Date,
-    // Favoris (activités)
+    // Brute force protection
+    loginAttempts: { type: Number, default: 0 },
+    lockUntil: Date,
+    // Token versioning (used to invalidate refresh tokens on logout)
+    tokenVersion: { type: Number, default: 0 },
+    // Favorites (activities)
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Activite" }],
   },
   {
@@ -39,5 +44,12 @@ const userSchema = new mongoose.Schema(
 );
 
 const User = mongoose.model("User", userSchema);
+
+// ─── Indexes for Performance ───────────────────────────────────────
+userSchema.index({ accountStatus: 1 });
+userSchema.index({ userType: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ favorites: 1 });
+userSchema.index({ accountStatus: 1, userType: 1 });
 
 module.exports = User;

@@ -1,9 +1,9 @@
 const Touriste = require("../models/touriste");
 
-// Compléter le profil touriste (après inscription via user/signup)
+// Complete the tourist profile (after registration via user/signup)
 exports.completeProfileTouriste = async (req, res) => {
   try {
-    const userId = req.user.userId; // Récupéré depuis le token JWT
+    const userId = req.user.userId; // Retrieved from the JWT token
     const {
       age,
       num_tel,
@@ -17,20 +17,18 @@ exports.completeProfileTouriste = async (req, res) => {
       consentement_donnees,
     } = req.body;
 
-    // Trouver le touriste par ID
+    // Find the tourist by ID
     const touriste = await Touriste.findById(userId);
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
 
-    // Vérifier que c'est bien un touriste
+    // Verify this is indeed a tourist
     if (touriste.userType !== "Touriste") {
-      return res
-        .status(403)
-        .json({ message: "Cet utilisateur n'est pas un touriste" });
+      return res.status(403).json({ message: "This user is not a tourist" });
     }
 
-    // Mettre à jour les attributs généraux (du User)
+    // Update general user attributes
     if (age !== undefined) touriste.age = age;
     if (num_tel !== undefined) touriste.num_tel = num_tel;
     if (bio !== undefined) touriste.bio = bio;
@@ -43,7 +41,7 @@ exports.completeProfileTouriste = async (req, res) => {
     if (consentement_donnees !== undefined)
       touriste.consentement_donnees = consentement_donnees;
 
-    // Mettre à jour les attributs spécifiques au touriste
+    // Update tourist-specific attributes
     if (centres_interet !== undefined)
       touriste.centres_interet = centres_interet;
     if (langue_preferee !== undefined)
@@ -51,62 +49,67 @@ exports.completeProfileTouriste = async (req, res) => {
 
     await touriste.save();
 
-    // Retourner le touriste sans le mot de passe
+    // Return the tourist without the password
     const touristeResponse = touriste.toObject();
     delete touristeResponse.mot_de_passe;
 
-    res
-      .status(200)
-      .json({
-        message: "Profil touriste complété avec succès",
-        touriste: touristeResponse,
-      });
+    res.status(200).json({
+      message: "Tourist profile completed successfully",
+      touriste: touristeResponse,
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la complétion du profil touriste",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error completing tourist profile",
+      error: error.message,
+    });
   }
 };
 
-// Obtenir tous les touristes
+// Get all tourists
 exports.getAllTouristes = async (req, res) => {
   try {
-    const touristes = await Touriste.find().select("-mot_de_passe");
-    res.status(200).json({ touristes });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [touristes, total] = await Promise.all([
+      Touriste.find().select("-mot_de_passe").skip(skip).limit(limit).lean(),
+      Touriste.countDocuments(),
+    ]);
+
+    res.status(200).json({
+      touristes,
+      count: touristes.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    });
   } catch (error) {
     res
       .status(500)
-      .json({
-        message: "Erreur lors de la récupération des touristes",
-        error: error.message,
-      });
+      .json({ message: "Error retrieving tourists", error: error.message });
   }
 };
 
-// Obtenir un touriste par ID
+// Get a tourist by ID
 exports.getTouristeById = async (req, res) => {
   try {
     const touriste = await Touriste.findById(req.params.id).select(
       "-mot_de_passe",
     );
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
     res.status(200).json({ touriste });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la récupération du touriste",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error retrieving tourist",
+      error: error.message,
+    });
   }
 };
 
-// Mettre à jour un touriste
+// Update a tourist
 exports.updateTouriste = async (req, res) => {
   try {
     const {
@@ -145,41 +148,35 @@ exports.updateTouriste = async (req, res) => {
     ).select("-mot_de_passe");
 
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Touriste mis à jour avec succès", touriste });
+    res.status(200).json({ message: "Tourist updated successfully", touriste });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la mise à jour du touriste",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating tourist",
+      error: error.message,
+    });
   }
 };
 
-// Supprimer un touriste
+// Delete a tourist
 exports.deleteTouriste = async (req, res) => {
   try {
     const touriste = await Touriste.findByIdAndDelete(req.params.id);
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
-    res.status(200).json({ message: "Touriste supprimé avec succès" });
+    res.status(200).json({ message: "Tourist deleted successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la suppression du touriste",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error deleting the tourist",
+      error: error.message,
+    });
   }
 };
 
-// Mettre à jour les centres d'intérêt
+// Update interests
 exports.updateCentresInteret = async (req, res) => {
   try {
     const { centres_interet } = req.body;
@@ -191,23 +188,21 @@ exports.updateCentresInteret = async (req, res) => {
     ).select("-mot_de_passe");
 
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
 
     res
       .status(200)
-      .json({ message: "Centres d'intérêt mis à jour avec succès", touriste });
+      .json({ message: "Interests updated successfully", touriste });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la mise à jour des centres d'intérêt",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating interests",
+      error: error.message,
+    });
   }
 };
 
-// Mettre à jour la langue préférée
+// Update preferred language
 exports.updateLanguePreferee = async (req, res) => {
   try {
     const { langue_preferee } = req.body;
@@ -219,18 +214,16 @@ exports.updateLanguePreferee = async (req, res) => {
     ).select("-mot_de_passe");
 
     if (!touriste) {
-      return res.status(404).json({ message: "Touriste non trouvé" });
+      return res.status(404).json({ message: "Tourist not found" });
     }
 
     res
       .status(200)
-      .json({ message: "Langue préférée mise à jour avec succès", touriste });
+      .json({ message: "Preferred language updated successfully", touriste });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Erreur lors de la mise à jour de la langue préférée",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating preferred language",
+      error: error.message,
+    });
   }
 };

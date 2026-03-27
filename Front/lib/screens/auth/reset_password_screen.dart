@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/app_routes.dart';
 import '../../services/auth_service.dart';
 import 'auth_widgets/travelo_logo.dart';
 
@@ -78,7 +79,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await AuthService.forgotPassword(email: widget.email);
+      final result = await AuthService.forgotPassword(widget.email);
 
       if (!mounted) return;
 
@@ -271,8 +272,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Navigate back to login screen
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AppRoutes.login,
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2D5016),

@@ -1,246 +1,132 @@
-﻿import 'dart:convert';
-import '../config/api_config.dart';
-import '../models/inscription.dart';
-import 'http_client.dart';
+import 'dart:convert';
+import 'api_client.dart';
+import '../models/inscription_model.dart';
 
 class InscriptionService {
-  static const String baseUrl = '${ApiConfig.baseUrl}/inscriptions';
+  /// Tourist: get all my inscriptions (optionally filtered by status).
+  static Future<List<InscriptionModel>> getMyInscriptions({
+    String? statut,
+  }) async {
+    final query = statut != null ? <String, String>{'statut': statut} : null;
+    final res = await ApiClient.get(
+      '/inscriptions/mes-inscriptions',
+      query: query,
+    );
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = body['inscriptions'] as List? ?? [];
+      return list
+          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
+          .toList();
+    }
+    // Surface the backend/network error instead of returning an empty list silently.
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception((body['message'] as String?) ?? 'Unable to load inscriptions');
+    } catch (_) {
+      throw Exception('Unable to load inscriptions');
+    }
+  }
 
-  // ========================================
-  // TOURISTE - Gérer ses inscriptions
-  // ========================================
-
-  /// S'inscrire à une activité (Touriste)
+  /// Tourist: book an activity.
   static Future<Map<String, dynamic>> createInscription({
     required String activiteId,
-    int nombreParticipants = 1,
-    String? messageTouriste,
+    required int nombreParticipants,
+    String? message,
   }) async {
-    try {
-      final body = {
-        'activite_id': activiteId,
-        'nombre_participants': nombreParticipants,
-      };
-
-      if (messageTouriste != null && messageTouriste.isNotEmpty) {
-        body['message_touriste'] = messageTouriste;
-      }
-
-      final response = await HttpClient.post(
-        baseUrl,
-        headers: await HttpClient.getAuthHeaders(),
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 201) {
-        return jsonDecode(response.body);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors de l\'inscription');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+    final body = <String, dynamic>{
+      'activite_id': activiteId,
+      'nombre_participants': nombreParticipants,
+    };
+    if (message != null && message.isNotEmpty) {
+      body['message_touriste'] = message;
     }
-  }
-
-  /// Obtenir les inscriptions du touriste connecté
-  static Future<List<Inscription>> getMesInscriptions({String? statut}) async {
-    try {
-      final queryParams = <String, String>{};
-      if (statut != null) {
-        queryParams['statut'] = statut;
-      }
-
-      final uri = Uri.parse(
-        '$baseUrl/mes-inscriptions',
-      ).replace(queryParameters: queryParams);
-
-      final response = await HttpClient.get(
-        uri.toString(),
-        headers: await HttpClient.getAuthHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic> inscriptionsJson = data['inscriptions'];
-        return inscriptionsJson
-            .map((json) => Inscription.fromJson(json))
-            .toList();
-      } else {
-        throw Exception('Error fetching inscriptions');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+    final res = await ApiClient.post('/inscriptions', body);
+    final resBody = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) {
+      return {'success': true, 'inscription': resBody['inscription']};
     }
+    return {
+      'success': false,
+      'message': resBody['message'] ?? 'Booking error',
+    };
   }
 
-  /// Obtenir les inscriptions approuvées (activités rejointes)
-  static Future<List<Inscription>> getActivitesRejointes() async {
-    return getMesInscriptions(statut: 'approuvee');
+  /// Tourist: cancel an inscription.
+  static Future<bool> cancelInscription(String inscriptionId) async {
+    final res = await ApiClient.put('/inscriptions/$inscriptionId/annuler', {});
+    return res.statusCode == 200;
   }
 
-  /// Obtenir les inscriptions en attente
-  static Future<List<Inscription>> getInscriptionsEnAttente() async {
-    return getMesInscriptions(statut: 'en_attente');
-  }
-
-  /// Annuler une inscription (Touriste)
-  static Future<void> annulerInscription(String inscriptionId) async {
-    try {
-      final response = await HttpClient.put(
-        '$baseUrl/$inscriptionId/annuler',
-        headers: await HttpClient.getAuthHeaders(),
-        body: jsonEncode({}),
-      );
-
-      if (response.statusCode != 200) {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors de l\'annulation');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+  /// Organizer: pending requests.
+  static Future<List<InscriptionModel>> getOrganizerPendingRequests() async {
+    final res = await ApiClient.get('/inscriptions/organisateur/en-attente');
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = body['inscriptions'] as List? ?? [];
+      return list
+          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
+          .toList();
     }
+    return [];
   }
 
-  // ========================================
-  // ORGANISATEUR - Gérer les demandes
-  // ========================================
-
-  /// Obtenir toutes les demandes d'inscription (Organisateur)
-  static Future<List<Inscription>> getMesDemandes({
-    String? statut,
-    String? activiteId,
-  }) async {
-    try {
-      final queryParams = <String, String>{};
-      if (statut != null) {
-        queryParams['statut'] = statut;
-      }
-      if (activiteId != null) {
-        queryParams['activite_id'] = activiteId;
-      }
-
-      final uri = Uri.parse(
-        '$baseUrl/organisateur/mes-demandes',
-      ).replace(queryParameters: queryParams);
-
-      final response = await HttpClient.get(
-        uri.toString(),
-        headers: await HttpClient.getAuthHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic> inscriptionsJson = data['inscriptions'];
-        return inscriptionsJson
-            .map((json) => Inscription.fromJson(json))
-            .toList();
-      } else {
-        throw Exception('Error fetching requests');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+  /// Organizer: all requests (all statuses).
+  static Future<List<InscriptionModel>> getOrganizerAllRequests() async {
+    final res = await ApiClient.get('/inscriptions/organisateur/mes-demandes');
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = body['inscriptions'] as List? ?? [];
+      return list
+          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
+          .toList();
     }
+    return [];
   }
 
-  /// Obtenir les demandes en attente (Organisateur)
-  static Future<List<Inscription>> getDemandesEnAttente() async {
-    try {
-      final response = await HttpClient.get(
-        '$baseUrl/organisateur/en-attente',
-        headers: await HttpClient.getAuthHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic> inscriptionsJson = data['inscriptions'];
-        return inscriptionsJson
-            .map((json) => Inscription.fromJson(json))
-            .toList();
-      } else {
-        throw Exception('Error fetching requests');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
-    }
-  }
-
-  /// Approuver une inscription (Organisateur)
-  static Future<Map<String, dynamic>> approuverInscription(
+  /// Organizer: approve an inscription.
+  static Future<bool> approveInscription(
     String inscriptionId, {
-    String? messageOrganisateur,
+    String? message,
   }) async {
-    try {
-      final body = <String, dynamic>{};
-      if (messageOrganisateur != null && messageOrganisateur.isNotEmpty) {
-        body['message_organisateur'] = messageOrganisateur;
-      }
-
-      final response = await HttpClient.put(
-        '$baseUrl/$inscriptionId/approuver',
-        headers: await HttpClient.getAuthHeaders(),
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors de l\'approbation');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
-    }
+    final body = <String, dynamic>{};
+    if (message != null) body['message_organisateur'] = message;
+    final res = await ApiClient.put(
+      '/inscriptions/$inscriptionId/approuver',
+      body,
+    );
+    return res.statusCode == 200;
   }
 
-  /// Refuser une inscription (Organisateur)
-  static Future<Map<String, dynamic>> refuserInscription(
+  /// Organizer: reject an inscription.
+  static Future<bool> rejectInscription(
     String inscriptionId, {
-    String? messageOrganisateur,
+    String? message,
   }) async {
-    try {
-      final body = <String, dynamic>{};
-      if (messageOrganisateur != null && messageOrganisateur.isNotEmpty) {
-        body['message_organisateur'] = messageOrganisateur;
-      }
-
-      final response = await HttpClient.put(
-        '$baseUrl/$inscriptionId/refuser',
-        headers: await HttpClient.getAuthHeaders(),
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Erreur lors du refus');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
-    }
+    final body = <String, dynamic>{};
+    if (message != null) body['message_organisateur'] = message;
+    final res = await ApiClient.put(
+      '/inscriptions/$inscriptionId/refuser',
+      body,
+    );
+    return res.statusCode == 200;
   }
 
-  // ========================================
-  // COMMUN - Consultation
-  // ========================================
-
-  /// Obtenir une inscription par ID
-  static Future<Inscription> getInscriptionById(String inscriptionId) async {
-    try {
-      final response = await HttpClient.get(
-        '$baseUrl/$inscriptionId',
-        headers: await HttpClient.getAuthHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return Inscription.fromJson(data['inscription']);
-      } else {
-        throw Exception('Booking not found');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+  /// Organizer stats: activitiesCount, totalBookings, totalRevenue.
+  static Future<Map<String, dynamic>> getOrganizerStats() async {
+    final res = await ApiClient.get('/inscriptions/stats/organizer');
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
     }
+    return {'activitiesCount': 0, 'totalBookings': 0, 'totalRevenue': 0.0};
+  }
+
+  /// Tourist stats: totalBookings.
+  static Future<Map<String, dynamic>> getTouristStats() async {
+    final res = await ApiClient.get('/inscriptions/stats/tourist');
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    return {'totalBookings': 0};
   }
 }

@@ -6,15 +6,16 @@ cloudinary.config({
   api_secret: process.env.API_SECRET,
 });
 
-// Log configuration status with values for debugging
-console.log("🔧 Cloudinary Configuration:");
-console.log("  - cloud_name:", process.env.CLOUD_NAME);
-console.log("  - api_key:", process.env.API_KEY);
-console.log(
-  "  - api_secret:",
-  process.env.API_SECRET
-    ? `${process.env.API_SECRET.substring(0, 5)}...${process.env.API_SECRET.substring(process.env.API_SECRET.length - 3)} (length: ${process.env.API_SECRET.length})`
-    : "MISSING",
-);
+if (
+  !process.env.CLOUD_NAME ||
+  !process.env.API_KEY ||
+  !process.env.API_SECRET
+) {
+  console.warn(
+    "⚠️  Cloudinary credentials are not fully configured. Image uploads will fail.",
+  );
+} else {
+  console.log("✅ Cloudinary configured for cloud:", process.env.CLOUD_NAME);
+}
 
 module.exports = cloudinary;

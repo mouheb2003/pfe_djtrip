@@ -1,18 +1,19 @@
 const User = require("../models/user");
 const Touriste = require("../models/touriste");
 const Organisator = require("../models/organisator");
+const Admin = require("../models/admin");
 const bcrypt = require("bcryptjs");
 const emailService = require("./email");
 
 /**
- * Service pour gérer les opérations sur les utilisateurs
+ * Service for managing user operations
  */
 class UserService {
   /**
-   * Récupère un utilisateur par son ID
-   * @param {String} userId - ID de l'utilisateur
-   * @param {Boolean} includePassword - Inclure le mot de passe (par défaut: false)
-   * @returns {Promise<Object>} Utilisateur
+   * Retrieves a user by their ID
+   * @param {String} userId - User ID
+   * @param {Boolean} includePassword - Include password (default: false)
+   * @returns {Promise<Object>} User
    */
   static async getUserById(userId, includePassword = false) {
     const query = User.findById(userId);
@@ -31,8 +32,8 @@ class UserService {
   }
 
   /**
-   * Récupère tous les utilisateurs
-   * @returns {Promise<Array>} Liste des utilisateurs
+   * Retrieves all users
+   * @returns {Promise<Array>} List of users
    */
   static async getAllUsers() {
     const users = await User.find().select("-mot_de_passe");
@@ -40,10 +41,10 @@ class UserService {
   }
 
   /**
-   * Récupère un utilisateur par email
-   * @param {String} email - Email de l'utilisateur
-   * @param {Boolean} includePassword - Inclure le mot de passe
-   * @returns {Promise<Object>} Utilisateur
+   * Retrieves a user by email
+   * @param {String} email - User email
+   * @param {Boolean} includePassword - Include password (default: false)
+   * @returns {Promise<Object>} User
    */
   static async getUserByEmail(email, includePassword = false) {
     const query = User.findOne({ email });
@@ -62,10 +63,10 @@ class UserService {
   }
 
   /**
-   * Met à jour le profil d'un utilisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @param {Object} updateData - Données à mettre à jour
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Updates a user's profile
+   * @param {String} userId - User ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated user
    */
   static async updateProfile(userId, updateData) {
     // Fields that cannot be updated via this method
@@ -104,11 +105,11 @@ class UserService {
   }
 
   /**
-   * Met à jour le mot de passe d'un utilisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @param {String} currentPassword - Mot de passe actuel
-   * @param {String} newPassword - Nouveau mot de passe
-   * @returns {Promise<Boolean>} Succès de l'opération
+   * Updates a user's password
+   * @param {String} userId - User ID
+   * @param {String} currentPassword - Current password
+   * @param {String} newPassword - New password
+   * @returns {Promise<Boolean>} Operation success
    */
   static async updatePassword(userId, currentPassword, newPassword) {
     // Get user with password
@@ -140,10 +141,10 @@ class UserService {
   }
 
   /**
-   * Met à jour le statut du compte d'un utilisateur (active, suspended, banned, inactive)
-   * @param {String} userId - ID de l'utilisateur
-   * @param {String} accountStatus - Nouveau statut (active/suspended/banned/inactive)
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Updates account status (active, suspended, banned, inactive)
+   * @param {String} userId - User ID
+   * @param {String} accountStatus - New status (active/suspended/banned/inactive)
+   * @returns {Promise<Object>} Updated user
    */
   static async updateAccountStatus(userId, accountStatus) {
     if (
@@ -169,9 +170,9 @@ class UserService {
   }
 
   /**
-   * Met à jour la dernière connexion et l'état en ligne d'un utilisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Updates last connection and online status of a user
+   * @param {String} userId - User ID
+   * @returns {Promise<Object>} Updated user
    */
   static async updateLastConnection(userId) {
     const user = await User.findByIdAndUpdate(
@@ -191,10 +192,10 @@ class UserService {
   }
 
   /**
-   * Met à jour l'état en ligne de l'utilisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @param {Boolean} isOnline - État en ligne
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Updates online status
+   * @param {String} userId - User ID
+   * @param {Boolean} isOnline - Online state
+   * @returns {Promise<Object>} Updated user
    */
   static async updateOnlineStatus(userId, isOnline) {
     const user = await User.findByIdAndUpdate(
@@ -214,11 +215,11 @@ class UserService {
   }
 
   /**
-   * Vérifie et met à jour le statut du compte basé sur l'activité
-   * NOTE: Cette méthode ne change plus automatiquement accountStatus
-   * Elle sert maintenant uniquement à des fins de monitoring
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Object>} Utilisateur mis à jour
+   * Checks and updates account status based on activity
+   * NOTE: This method no longer automatically changes accountStatus
+   * It now serves only for monitoring purposes
+   * @param {String} userId - User ID
+   * @returns {Promise<Object>} Updated user
    */
   static async updateAccountStatusBasedOnActivity(userId) {
     const user = await User.findById(userId);
@@ -246,9 +247,9 @@ class UserService {
   }
 
   /**
-   * Crée un nouvel utilisateur (utilisé pour l'inscription)
-   * @param {Object} userData - Données de l'utilisateur
-   * @returns {Promise<Object>} Utilisateur créé
+   * Creates a new user (used for registration)
+   * @param {Object} userData - User data
+   * @returns {Promise<Object>} Created user
    */
   static async createUser(userData) {
     const { fullname, email, mot_de_passe, userType, ...additionalData } =
@@ -260,8 +261,10 @@ class UserService {
     }
 
     // Validate userType
-    if (!userType || !["Touriste", "Organisator"].includes(userType)) {
-      throw new Error('userType must be either "Touriste" or "Organisator"');
+    if (!userType || !["Touriste", "Organisator", "Admin"].includes(userType)) {
+      throw new Error(
+        'userType must be either "Touriste", "Organisator", or "Admin"',
+      );
     }
 
     // Check if user already exists
@@ -297,6 +300,8 @@ class UserService {
       user = new Touriste(baseData);
     } else if (userType === "Organisator") {
       user = new Organisator(baseData);
+    } else if (userType === "Admin") {
+      user = new Admin(baseData);
     }
 
     await user.save();
@@ -333,10 +338,10 @@ class UserService {
   }
 
   /**
-   * Vérifie le code de vérification email
-   * @param {String} email - Email de l'utilisateur
-   * @param {String} code - Code de vérification
-   * @returns {Promise<Object>} Utilisateur vérifié
+   * Verifies the email verification code
+   * @param {String} email - User email
+   * @param {String} code - Verification code
+   * @returns {Promise<Object>} Verified user
    */
   static async verifyEmail(email, code) {
     const user = await User.findOne({ email });
@@ -368,9 +373,9 @@ class UserService {
   }
 
   /**
-   * Renvoie un code de vérification email
-   * @param {String} email - Email de l'utilisateur
-   * @returns {Promise<Object>} Utilisateur avec nouveau code
+   * Resends an email verification code
+   * @param {String} email - User email
+   * @returns {Promise<Object>} User with new code
    */
   static async resendVerificationCode(email) {
     const user = await User.findOne({ email });
@@ -415,9 +420,9 @@ class UserService {
   }
 
   /**
-   * Supprime un utilisateur
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Boolean>} Succès de l'opération
+   * Deletes a user
+   * @param {String} userId - User ID
+   * @returns {Promise<Boolean>} Operation success
    */
   static async deleteUser(userId) {
     const user = await User.findByIdAndDelete(userId);

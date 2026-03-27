@@ -3,38 +3,45 @@ const router = express.Router();
 const touristeController = require("../controllers/touriste");
 const { verifyToken } = require("../middleware/auth");
 
-// Routes pour les touristes
-// Note: Inscription (signup) et connexion (signin) sont dans routes/user.js
+// Tourist routes
+// Note: Registration (signup) and sign-in are in routes/user.js
 
-// Compléter le profil touriste après inscription (protégé)
+// Complete tourist profile after registration (protected)
 router.put(
   "/complete-profile",
   verifyToken,
   touristeController.completeProfileTouriste,
 );
 
-// Obtenir tous les touristes
+// Get all tourists
 router.get("/", touristeController.getAllTouristes);
 
-// Obtenir un touriste par ID
+// Get a tourist by ID
 router.get("/:id", touristeController.getTouristeById);
 
-// Mettre à jour un touriste (protégé)
+// Update a tourist (protected)
 router.put("/:id", verifyToken, touristeController.updateTouriste);
 
-// Supprimer un touriste (protégé)
+// Delete a tourist (protected)
 router.delete("/:id", verifyToken, touristeController.deleteTouriste);
 
-// Routes spécifiques pour les attributs du touriste
+// Tourist-specific attribute routes
 
-// Mettre à jour les centres d'intérêt (protégé)
+// Update interests (protected)
 router.patch(
   "/:id/centres-interet",
   verifyToken,
   touristeController.updateCentresInteret,
 );
 
-// Mettre à jour la langue préférée (protégé)
+// Compat: accept PUT as well as PATCH for clients still using PUT
+router.put(
+  "/:id/centres-interet",
+  verifyToken,
+  touristeController.updateCentresInteret,
+);
+
+// Update preferred language (protected)
 router.patch(
   "/:id/langue-preferee",
   verifyToken,

@@ -2,28 +2,28 @@ const Touriste = require("../models/touriste");
 const UserService = require("./user");
 
 /**
- * Service pour gérer les opérations spécifiques aux touristes
+ * Service for managing tourist-specific operations
  */
 class TouristeService {
   /**
-   * Récupère un touriste par son ID
-   * @param {String} touristeId - ID du touriste
-   * @returns {Promise<Object>} Touriste
+   * Get a tourist by ID
+   * @param {String} touristeId - Tourist ID
+   * @returns {Promise<Object>} Tourist
    */
   static async getTouristeById(touristeId) {
     const touriste =
       await Touriste.findById(touristeId).select("-mot_de_passe");
 
     if (!touriste) {
-      throw new Error("Touriste not found");
+      throw new Error("Tourist not found");
     }
 
     return touriste;
   }
 
   /**
-   * Récupère tous les touristes
-   * @returns {Promise<Array>} Liste des touristes
+   * Get all tourists
+   * @returns {Promise<Array>} Tourist list
    */
   static async getAllTouristes() {
     const touristes = await Touriste.find().select("-mot_de_passe");
@@ -31,10 +31,10 @@ class TouristeService {
   }
 
   /**
-   * Met à jour les informations spécifiques d'un touriste
-   * @param {String} touristeId - ID du touriste
-   * @param {Object} updateData - Données à mettre à jour
-   * @returns {Promise<Object>} Touriste mis à jour
+   * Update tourist-specific information
+   * @param {String} touristeId - Tourist ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated tourist
    */
   static async updateTouristeProfile(touristeId, updateData) {
     // Fields specific to Touriste
@@ -63,7 +63,7 @@ class TouristeService {
     ).select("-mot_de_passe");
 
     if (!touriste) {
-      throw new Error("Touriste not found");
+      throw new Error("Tourist not found");
     }
 
     console.log("✅ Touriste profile updated:", touristeId);
@@ -71,9 +71,9 @@ class TouristeService {
   }
 
   /**
-   * Récupère les statistiques d'un touriste
-   * @param {String} touristeId - ID du touriste
-   * @returns {Promise<Object>} Statistiques du touriste
+   * Get statistics for a tourist
+   * @param {String} touristeId - Tourist ID
+   * @returns {Promise<Object>} Tourist statistics
    */
   static async getTouristeStats(touristeId) {
     const touriste = await this.getTouristeById(touristeId);
@@ -90,9 +90,9 @@ class TouristeService {
   }
 
   /**
-   * Vérifie si un utilisateur est un touriste
-   * @param {String} userId - ID de l'utilisateur
-   * @returns {Promise<Boolean>} True si touriste
+   * Check if a user is a tourist
+   * @param {String} userId - User ID
+   * @returns {Promise<Boolean>} True if tourist
    */
   static async isTouriste(userId) {
     const user = await Touriste.findById(userId);
