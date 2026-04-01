@@ -13,6 +13,7 @@ class ArchiveTab extends StatefulWidget {
 
 class _ArchiveTabState extends State<ArchiveTab> {
   List<ActivityModel> _archivedActivities = [];
+  List<ActivityModel> _filteredActivities = []; // 🚀 NEW: Activités filtrées
   bool _isLoading = true;
   double _totalRevenue = 0;
   int _totalParticipants = 0;
