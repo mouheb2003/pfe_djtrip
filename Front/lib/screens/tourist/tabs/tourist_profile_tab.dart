@@ -43,8 +43,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       recentActivitiesFuture,
     ]);
     if (!mounted) return;
+    
+    final userData = results[0] as Map<String, dynamic>?;
+    final user = userData != null ? UserModel.fromJson(userData) : null;
+    
     setState(() {
-      _user = results[0] as UserModel?;
+      _user = user;
       final stats = results[1] as Map<String, dynamic>;
       _bookingsCount = (stats['totalBookings'] as num?)?.toInt() ?? 0;
       _favoritesCount = (results[2] as List).length;

@@ -48,16 +48,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
 
   List<ActivityModel> get _currentActivities {
     List<ActivityModel> activities;
-    switch (_tabIndex) {
-      case 0:
-        activities = _activeActivities.where((a) => a.statut == 'active').toList();
-        break;
-      case 1:
-        activities = _archivedActivities;
-        break;
-      default:
-        activities = _activeActivities;
-    }
+    // Ne garder que les activités actives
+    activities = _activeActivities.where((a) => a.statut == 'active').toList();
 
     if (_searchQuery.isNotEmpty) {
       activities = activities
@@ -71,7 +63,6 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
 
   List<String> get _tabs => [
         'Active (${_activeActivities.where((a) => a.statut == 'active').length})',
-        'Completed (${_archivedActivities.length})',
       ];
 
   @override

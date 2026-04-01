@@ -85,8 +85,54 @@ class UserService {
       "derniere_connexion",
     ];
 
+    // 🚀 NEW: Auto-normalize data before saving
+    const normalizedData = { ...updateData };
+    
+    // Auto-normalize language preference
+    if (normalizedData.langue_preferee) {
+      normalizedData.langue_preferee = this._normalizeLanguage(normalizedData.langue_preferee);
+    }
+    
+    // Auto-normalize country
+    if (normalizedData.pays_origine) {
+      normalizedData.pays_origine = this._normalizeCountry(normalizedData.pays_origine);
+    }
+    
+    // 🚀 NEW: Validate and format phone number
+    if (normalizedData.num_tel) {
+      const phoneValidation = this._validateAndFormatPhone(
+        normalizedData.num_tel, 
+        normalizedData.pays_telephone || normalizedData.pays_origine || 'France'
+      );
+      
+      if (!phoneValidation.valid) {
+        throw new Error(phoneValidation.error);
+      }
+      
+      normalizedData.num_tel = phoneValidation.phone;
+      normalizedData.pays_telephone = phoneValidation.country;
+      console.log(`📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`);
+    }
+    
+    // Auto-validate interests array
+    if (normalizedData.centres_interet && Array.isArray(normalizedData.centres_interet)) {
+      normalizedData.centres_interet = normalizedData.centres_interet
+        .filter(interest => interest && interest.trim().length > 0)
+        .map(interest => interest.trim())
+        .filter((interest, index, arr) => arr.indexOf(interest) === index); // Remove duplicates
+    }
+
+    // 🚀 NEW: Auto-validate specialties array
+    if (normalizedData.specialites_activites && Array.isArray(normalizedData.specialites_activites)) {
+      normalizedData.specialites_activites = normalizedData.specialites_activites
+        .filter(specialty => specialty && specialty.trim().length > 0)
+        .map(specialty => specialty.trim())
+        .filter((specialty, index, arr) => arr.indexOf(specialty) === index); // Remove duplicates
+      console.log(`🎯 Specialties validated: ${normalizedData.specialites_activites.length} items`);
+    }
+
     // Remove restricted fields from update data
-    const sanitizedData = { ...updateData };
+    const sanitizedData = { ...normalizedData };
     restrictedFields.forEach((field) => delete sanitizedData[field]);
 
     // Find and update user
@@ -101,6 +147,327 @@ class UserService {
     }
 
     console.log("✅ User profile updated:", userId);
+    return user;
+  }
+
+  // 🚀 NEW: Helper methods for normalization
+  static _normalizeLanguage(raw) {
+    const v = raw.trim().toLowerCase();
+    if (v === 'français' || v === 'francais' || v === 'french' || v === 'fr') {
+      return 'French';
+    }
+    if (v === 'english' || v === 'en' || v === 'anglais') return 'English';
+    if (v === 'arabic' || v === 'ar' || v === 'العربية') return 'العربية';
+    if (v === 'german' || v === 'deutsch' || v === 'de' || v === 'allemand') {
+      return 'Deutsch';
+    }
+    return raw;
+  }
+
+  static _normalizeCountry(raw) {
+    const v = raw.trim().toLowerCase();
+    if (v === 'tunisia' || v === 'tunisie') return 'Tunisie';
+    if (v === 'morocco' || v === 'maroc') return 'Maroc';
+    if (v === 'germany' || v === 'allemagne') return 'Allemagne';
+    if (v === 'united kingdom' || v === 'uk' || v === 'royaume-uni') {
+      return 'Royaume-Uni';
+    }
+    if (v === 'france') return 'France';
+    return raw;
+  }
+
+  // 🚀 NEW: Phone number validation and formatting by country - Top 15 countries visiting Tunisia
+  static _validateAndFormatPhone(phone, country) {
+    if (!phone || !phone.trim()) {
+      return { valid: false, error: 'Phone number is required' };
+    }
+
+    const cleanPhone = phone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+    
+    const countryPhoneFormats = {
+      'France': {
+        code: '+33',
+        pattern: /^(\+33|0)[1-9](\d{2}){4}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('33')) {
+            return '+33' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+33' + digits.substring(1);
+          }
+          return '+33' + digits;
+        }
+      },
+      'Tunisie': {
+        code: '+216',
+        pattern: /^(\+216|0)[2-9]\d{7}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('216')) {
+            return '+216' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+216' + digits.substring(1);
+          }
+          return '+216' + digits;
+        }
+      },
+      'Algérie': {
+        code: '+213',
+        pattern: /^(\+213|0)[5-9]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('213')) {
+            return '+213' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+213' + digits.substring(1);
+          }
+          return '+213' + digits;
+        }
+      },
+      'Libye': {
+        code: '+218',
+        pattern: /^(\+218|0)[2-9]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('218')) {
+            return '+218' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+218' + digits.substring(1);
+          }
+          return '+218' + digits;
+        }
+      },
+      'Maroc': {
+        code: '+212',
+        pattern: /^(\+212|0)[5-9]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('212')) {
+            return '+212' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+212' + digits.substring(1);
+          }
+          return '+212' + digits;
+        }
+      },
+      'Italie': {
+        code: '+39',
+        pattern: /^(\+39|0)[3]\d{8,9}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('39')) {
+            return '+39' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+39' + digits.substring(1);
+          }
+          return '+39' + digits;
+        }
+      },
+      'Allemagne': {
+        code: '+49',
+        pattern: /^(\+49|0)[1-9]\d{1,14}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('49')) {
+            return '+49' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+49' + digits.substring(1);
+          }
+          return '+49' + digits;
+        }
+      },
+      'Royaume-Uni': {
+        code: '+44',
+        pattern: /^(\+44|0)[1-9]\d{9,10}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('44')) {
+            return '+44' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+44' + digits.substring(1);
+          }
+          return '+44' + digits;
+        }
+      },
+      'Espagne': {
+        code: '+34',
+        pattern: /^(\+34|0)[6-9]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('34')) {
+            return '+34' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+34' + digits.substring(1);
+          }
+          return '+34' + digits;
+        }
+      },
+      'Belgique': {
+        code: '+32',
+        pattern: /^(\+32|0)[4-9]\d{7,8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('32')) {
+            return '+32' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+32' + digits.substring(1);
+          }
+          return '+32' + digits;
+        }
+      },
+      'Suisse': {
+        code: '+41',
+        pattern: /^(\+41|0)[7-9]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('41')) {
+            return '+41' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+41' + digits.substring(1);
+          }
+          return '+41' + digits;
+        }
+      },
+      'Canada': {
+        code: '+1',
+        pattern: /^(\+1)[2-9]\d{2}[2-9]\d{6}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('1')) {
+            return '+1' + digits.substring(1);
+          }
+          return '+1' + digits;
+        }
+      },
+      'Égypte': {
+        code: '+20',
+        pattern: /^(\+20|0)[1-9]\d{8,9}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('20')) {
+            return '+20' + digits.substring(2);
+          }
+          if (digits.startsWith('0')) {
+            return '+20' + digits.substring(1);
+          }
+          return '+20' + digits;
+        }
+      },
+      'Russie': {
+        code: '+7',
+        pattern: /^(\+7|8)[9]\d{9}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('7')) {
+            return '+7' + digits.substring(1);
+          }
+          if (digits.startsWith('8')) {
+            return '+7' + digits.substring(1);
+          }
+          return '+7' + digits;
+        }
+      },
+      'Arabie Saoudite': {
+        code: '+966',
+        pattern: /^(\+966|0)[5]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('966')) {
+            return '+966' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+966' + digits.substring(1);
+          }
+          return '+966' + digits;
+        }
+      },
+      'Émirats Arabes Unis': {
+        code: '+971',
+        pattern: /^(\+971|0)[5]\d{8}$/,
+        format: (phone) => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.startsWith('971')) {
+            return '+971' + digits.substring(3);
+          }
+          if (digits.startsWith('0')) {
+            return '+971' + digits.substring(1);
+          }
+          return '+971' + digits;
+        }
+      }
+    };
+
+    const format = countryPhoneFormats[country];
+    if (!format) {
+      return { valid: false, error: 'Unsupported country' };
+    }
+
+    if (!format.pattern.test(cleanPhone)) {
+      return { 
+        valid: false, 
+        error: `Invalid ${country} phone number format. Expected format: ${format.code} followed by valid number` 
+      };
+    }
+
+    const formattedPhone = format.format(cleanPhone);
+    return { 
+      valid: true, 
+      phone: formattedPhone,
+      country: country,
+      code: format.code
+    };
+  }
+
+  /**
+   * Updates user privacy settings
+   * @param {String} userId - User ID
+   * @param {Object} privacyData - Privacy settings to update
+   * @returns {Promise<Object>} Updated user
+   */
+  static async updatePrivacySettings(userId, privacyData) {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: privacyData },
+      { new: true, runValidators: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    console.log("✅ Privacy settings updated:", userId);
+    return user;
+  }
+
+  /**
+   * Updates user advanced privacy settings
+   * @param {String} userId - User ID
+   * @param {Object} advancedData - Advanced settings to update
+   * @returns {Promise<Object>} Updated user
+   */
+  static async updateAdvancedSettings(userId, advancedData) {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: advancedData },
+      { new: true, runValidators: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    console.log("✅ Advanced settings updated:", userId);
     return user;
   }
 

@@ -63,6 +63,9 @@ router.put(
 // DELETE /me/avatar - Delete current user avatar (protected route)
 router.delete("/me/avatar", verifyToken, userController.deleteAvatar);
 
+// DELETE /me - Delete current user account (protected route)
+router.delete("/me", verifyToken, userController.deleteAccount);
+
 // PUT /:id/status - Update account status (Admin only)
 router.put(
   "/:id/status",
@@ -76,6 +79,8 @@ router.get("/", verifyToken, verifyAdmin, userController.getAllUsers);
 
 // GET /all - Get all users (PUBLIC for testing)
 router.get("/all", userController.getAllUsersPublic);
+router.put("/privacy", verifyToken, userController.updatePrivacySettings);
+router.put("/advanced-privacy", verifyToken, userController.updateAdvancedSettings);
 
 // GET /:id - Get user by ID
 router.get("/:id", userController.getUserById);

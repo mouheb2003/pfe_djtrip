@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
+import '../../services/auth_service.dart';
+import '../../models/user_model.dart';
+import 'edit_activity_specialties_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -15,18 +20,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
-  String _country = 'France';
-  String _language = 'French';
-  final _interests = <String>[];
+  String _country = 'FR';  // 🚀 FIX: Default country key instead of name
+  String _language = 'English'; // 🚀 FIX: Default language (not French)
+  final _interests = <String>[]; // 🚀 FIX: Initialize empty interests (pour touristes)
   String? _avatarUrl;
   bool _isSaving = false;
   bool _isAvatarUploading = false;
+  bool _isPhoneValid = false;
+  String _userType = ''; // 🚀 NEW: Stocker le type d'utilisateur
+  Map<String, dynamic>? _userData; // 🚀 NEW: Stocker les données utilisateur pour l'affichage
+  String? _lastSavedPhone; // 🚀 NEW: Éviter les sauvegardes en double
+  Timer? _phoneSaveTimer; // 🚀 NEW: Timer pour le debounce
+  bool _hasNetworkError = false; // 🚀 NEW: Suivre les erreurs réseau
+  
+  // 🚀 NEW: Détecter si c'est un organisateur
+  bool get _isOrganizer {
+    return _userType == 'Organisator';
+  }
   static const List<String> _countries = [
-    'France',
-    'Tunisie',
-    'Maroc',
-    'Allemagne',
-    'Royaume-Uni',
+    'FR', // France
+    'TN', // Tunisie
+    'DZ', // Algérie
+    'LY', // Libye 
+    'MA', // Maroc
+    'IT', // Italie
+    'DE', // Allemagne
+    'GB', // Royaume-Uni
+    'ES', // Espagne
+    'BE', // Belgique
+    'CH', // Suisse
+    'CA', // Canada
+    'EG', // Égypte
+    'RU', // Russie
+    'SA', // Arabie Saoudite
+    'AE', // Émirats Arabes Unis
   ];
   static const List<String> _languages = [
     'French',
@@ -39,31 +66,171 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _checkConnectivity(); // 🚀 NEW: Check connectivity on init
   }
 
   Future<void> _loadProfile() async {
+    print('🔄 Loading profile...');
     final user = await UserService.getProfile();
+    print('👤 User data received: ${user != null ? 'YES' : 'NULL'}');
+    
+    if (user != null) {
+      print('📋 User keys: ${user.keys.toList()}');
+      print('🖼️ Avatar: ${user['avatar']}');
+      print('🌍 Country: ${user['pays_origine']}');
+      print('🌍 Phone country: ${user['pays_telephone']}');
+    }
+    
     if (mounted && user != null) {
       setState(() {
-        _nameCtrl.text = user.fullname;
-        _phoneCtrl.text = user.numTel ?? '';
-        _bioCtrl.text = user.bio ?? '';
-        _avatarUrl = user.avatar;
-        if (user.paysOrigine != null && user.paysOrigine!.trim().isNotEmpty) {
-          final c = _normalizeCountry(user.paysOrigine!);
-          _country = _countries.contains(c) ? c : _countries.first;
+        _userData = user; // 🚀 NEW: Stocker les données utilisateur
+        _nameCtrl.text = user['fullname'] ?? '';
+        
+        // 🚀 NEW: Extract phone number without country code
+        String phoneNumber = user['numTel'] ?? '';
+        if (phoneNumber.isNotEmpty) {
+          // Remove country code if present
+          final countryCode = _getCountryCode(_normalizeCountryKey(user['pays_origine'] ?? 'France'));
+          if (phoneNumber.startsWith(countryCode)) {
+            phoneNumber = phoneNumber.replaceFirst(countryCode, '').trim();
+          }
         }
-        if (user.languePreferee.isNotEmpty) {
-          final l = _normalizeLanguage(user.languePreferee);
-          _language = _languages.contains(l) ? l : _languages.first;
+        _phoneCtrl.text = phoneNumber;
+        _lastSavedPhone = phoneNumber; // 🚀 NEW: Initialize last saved phone
+        
+        _bioCtrl.text = user['bio'] ?? '';
+        _avatarUrl = user['avatar'];
+        _userType = user['userType'] ?? ''; // 🚀 NEW: Charger le type d'utilisateur
+        
+        // 🚀 FIX: Handle country with proper field names
+        if (user['pays_origine'] != null && user['pays_origine']!.trim().isNotEmpty) {
+          final countryKey = _normalizeCountryKey(user['pays_origine']!);
+          if (_countries.contains(countryKey)) {
+            _country = countryKey;
+          }
         }
-        if (user.centresInteret.isNotEmpty) {
+        
+        // 🚀 FIX: Handle language with proper field names
+        if (user['langue_preferee'] != null && user['langue_preferee']!.trim().isNotEmpty) {
+          final l = _normalizeLanguage(user['langue_preferee']!);
+          if (_languages.contains(l)) {
+            _language = l;
+          }
+        }
+        
+        // 🚀 FIX: Handle interests with proper field names (pour touristes)
+        if (user['centres_interet'] != null && user['centres_interet']!.isNotEmpty) {
           _interests
             ..clear()
-            ..addAll(user.centresInteret);
+            ..addAll(user['centres_interet']!);
         }
       });
+      
+      print('✅ Profile loaded successfully');
+    } else {
+      print('❌ Failed to load profile');
     }
+  }
+
+  // 🚀 NEW: Check network connectivity
+  Future<bool> _checkConnectivity() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://www.google.com'),
+      ).timeout(const Duration(seconds: 5));
+      _hasNetworkError = response.statusCode != 200;
+      return !_hasNetworkError;
+    } catch (e) {
+      _hasNetworkError = true;
+      print('❌ Network check failed: $e');
+      return false;
+    }
+  }
+
+  // 🚀 NEW: Show network error dialog
+  void _showNetworkErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Connection Error'),
+        content: const Text(
+          'Unable to load images due to network issues. Please check your internet connection.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkConnectivity();
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🚀 NEW: Auto-save phone number change
+  Future<void> _savePhoneChange() async {
+    // 🚀 NEW: Cancel previous timer
+    _phoneSaveTimer?.cancel();
+    
+    // 🚀 NEW: Check if phone actually changed
+    final currentPhone = _phoneCtrl.text.trim();
+    if (currentPhone == _lastSavedPhone) {
+      return; // No change, don't save
+    }
+    
+    // 🚀 NEW: Set new timer with longer debounce
+    _phoneSaveTimer = Timer(const Duration(milliseconds: 1500), () async {
+      if (!mounted) return;
+      
+      try {
+        // 🚀 NEW: Include country code in the saved phone number
+        final fullPhoneNumber = '${_getCountryCode(_country)} $currentPhone';
+        final result = await UserService.updateProfile({
+          'numTel': fullPhoneNumber,
+          'pays_telephone': _getCountryName(_country), // 🚀 NEW: Save country name, not key
+        });
+        
+        if (result['success'] == true) {
+          print('✅ Phone number updated: $fullPhoneNumber');
+          // 🚀 NEW: Update last saved phone
+          _lastSavedPhone = currentPhone;
+          // Update local data
+          if (_userData != null) {
+            _userData!['numTel'] = fullPhoneNumber;
+          }
+        }
+      } catch (e) {
+        print('❌ Error auto-saving phone: $e');
+      }
+    });
+  }
+
+  // 🚀 NEW: Normalize country name to country key
+  String _normalizeCountryKey(String raw) {
+    final v = raw.trim().toLowerCase();
+    if (v == 'france' || v == 'fr') return 'FR';
+    if (v == 'tunisie' || v == 'tn') return 'TN';
+    if (v == 'algérie' || v == 'algerie' || v == 'dz') return 'DZ';
+    if (v == 'libye' || v == 'ly') return 'LY';
+    if (v == 'maroc' || v == 'ma') return 'MA';
+    if (v == 'italie' || v == 'it') return 'IT';
+    if (v == 'allemagne' || v == 'de') return 'DE';
+    if (v == 'royaume-uni' || v == 'united kingdom' || v == 'gb') return 'GB';
+    if (v == 'espagne' || v == 'es') return 'ES';
+    if (v == 'belgique' || v == 'be') return 'BE';
+    if (v == 'suisse' || v == 'ch') return 'CH';
+    if (v == 'canada' || v == 'ca') return 'CA';
+    if (v == 'égypte' || v == 'egypte' || v == 'eg') return 'EG';
+    if (v == 'russie' || v == 'ru') return 'RU';
+    if (v == 'arabie saoudite' || v == 'sa') return 'SA';
+    if (v == 'émirats arabes unis' || v == 'emirates' || v == 'ae') return 'AE';
+    return 'FR'; // Default to France
   }
 
   String _normalizeLanguage(String raw) {
@@ -93,14 +260,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
-    final result = await UserService.updateProfile({
+    final data = {
       'fullname': _nameCtrl.text.trim(),
-      'num_tel': _phoneCtrl.text.trim(),
       'bio': _bioCtrl.text.trim(),
-      'pays_origine': _country,
-      'langue_preferee': _language,
-      'centres_interet': _interests,
-    });
+      'pays_origine': _getCountryName(_country), // 🚀 FIX: Save country name, not key
+      'langue_preferee': _language, // 🚀 FIX: Correct field name
+      'centres_interet': _interests, // 🚀 FIX: Correct field name (pour touristes)
+    };
+    final result = await UserService.updateProfile(data);
     if (!mounted) return;
     setState(() => _isSaving = false);
     if (result['success'] == true) {
@@ -117,10 +284,322 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  // 🚀 Phone validation methods
+  String _getCountryCode(String countryKey) {
+    const codes = {
+      'FR': '+33',
+      'TN': '+216',
+      'DZ': '+213',
+      'LY': '+218',
+      'MA': '+212',
+      'IT': '+39',
+      'DE': '+49',
+      'GB': '+44',
+      'ES': '+34',
+      'BE': '+32',
+      'CH': '+41',
+      'CA': '+1',
+      'EG': '+20',
+      'RU': '+7',
+      'SA': '+966',
+      'AE': '+971',
+    };
+    return codes[countryKey] ?? '+33';
+  }
+
+  // 🚀 NEW: Get country flag emoji
+  String _getCountryFlag(String countryKey) {
+    const flags = {
+      'FR': '🇫🇷',
+      'TN': '🇹🇳',
+      'DZ': '🇩🇿',
+      'LY': '🇱🇾',
+      'MA': '🇲🇦',
+      'IT': '🇮🇹',
+      'DE': '🇩🇪',
+      'GB': '🇬🇧',
+      'ES': '🇪🇸',
+      'BE': '🇧🇪',
+      'CH': '🇨🇭',
+      'CA': '🇨🇦',
+      'EG': '🇪🇬',
+      'RU': '🇷🇺',
+      'SA': '🇸🇦',
+      'AE': '🇦🇪',
+    };
+    return flags[countryKey] ?? '🇫🇷';
+  }
+
+  // 🚀 NEW: Get country name from key
+  String _getCountryName(String countryKey) {
+    const names = {
+      'FR': 'France',
+      'TN': 'Tunisie',
+      'DZ': 'Algérie',
+      'LY': 'Libye',
+      'MA': 'Maroc',
+      'IT': 'Italie',
+      'DE': 'Allemagne',
+      'GB': 'Royaume-Uni',
+      'ES': 'Espagne',
+      'BE': 'Belgique',
+      'CH': 'Suisse',
+      'CA': 'Canada',
+      'EG': 'Égypte',
+      'RU': 'Russie',
+      'SA': 'Arabie Saoudite',
+      'AE': 'Émirats Arabes Unis',
+    };
+    return names[countryKey] ?? 'France';
+  }
+
+  // 🚀 NEW: Get maximum digits allowed for each country
+  int _getMaxDigits(String countryKey) {
+    const maxDigits = {
+      'FR': 9,
+      'TN': 8,
+      'DZ': 9,
+      'LY': 8,
+      'MA': 9,
+      'IT': 10,
+      'DE': 11,
+      'GB': 10,
+      'ES': 9,
+      'BE': 9,
+      'CH': 9,
+      'CA': 10,
+      'EG': 10,
+      'RU': 11,
+      'SA': 9,
+      'AE': 9,
+    };
+    return maxDigits[countryKey] ?? 8;
+  }
+
+  String _getPhoneExample(String countryKey) {
+    const examples = {
+      'FR': '06 12 34 56 78',
+      'TN': '98 765 432',
+      'DZ': '55 123 4567',
+      'LY': '21 234 567',
+      'MA': '06 12 34 56 78',
+      'IT': '312 3456789',
+      'DE': '030 1234567',
+      'GB': '020 1234 5678',
+      'ES': '612 345 678',
+      'BE': '485 12 34 56',
+      'CH': '079 123 45 67',
+      'CA': '416 123 4567',
+      'EG': '010 1234 567',
+      'RU': '916 123 45 67',
+      'SA': '050 123 4567',
+      'AE': '050 123 4567',
+    };
+    return examples[countryKey] ?? 'Enter phone number';
+  }
+
+  void _formatPhoneNumber() {
+    // Auto-format will be applied as user types
+    final text = _phoneCtrl.text;
+    if (text.isEmpty) return;
+    
+    // Simple formatting: add spaces every 2-3 digits
+    final digits = text.replaceAll(RegExp(r'\s'), '');
+    String formatted = digits;
+    
+    switch (_country) {
+      case 'FR': // France: XX XX XX XX XX
+        if (digits.length > 2) {
+          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(4, digits.length))}';
+          if (digits.length > 4) formatted += ' ${digits.substring(4, min(6, digits.length))}';
+          if (digits.length > 6) formatted += ' ${digits.substring(6, min(8, digits.length))}';
+          if (digits.length > 8) formatted += ' ${digits.substring(8)}';
+        }
+        break;
+      case 'TN': // Tunisia: XX XXX XXX
+      case 'LY': // Libya: XX XXX XXX
+        if (digits.length > 2) {
+          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
+          if (digits.length > 5) formatted += ' ${digits.substring(5)}';
+        }
+        break;
+      default:
+        // Generic formatting
+        if (digits.length > 2) {
+          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
+          if (digits.length > 5) formatted += ' ${digits.substring(5, min(8, digits.length))}';
+          if (digits.length > 8) formatted += ' ${digits.substring(8)}';
+        }
+    }
+    
+    // Only update if different to avoid cursor jumping
+    if (formatted != text) {
+      _phoneCtrl.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+  }
+
+  int min(int a, int b) => a < b ? a : b;
+
+  void _validatePhone() {
+    final phone = _phoneCtrl.text.trim();
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    
+    // 🚀 NEW: Limit digits based on country maximum
+    final maxDigits = _getMaxDigits(_country);
+    if (digits.length > maxDigits) {
+      // Truncate excess digits
+      final truncatedDigits = digits.substring(0, maxDigits);
+      _phoneCtrl.text = truncatedDigits;
+      _formatPhoneNumber();
+      return;
+    }
+    
+    // Minimum digits based on country
+    int minDigits = 8;
+    switch (_country) {
+      case 'FR': minDigits = 9; break;
+      case 'TN': minDigits = 8; break;
+      case 'DZ': minDigits = 9; break;
+      case 'LY': minDigits = 8; break;
+      case 'MA': minDigits = 9; break;
+      default: minDigits = 8;
+    }
+    
+    final isValid = digits.length >= minDigits;
+    if (isValid != _isPhoneValid) {
+      setState(() => _isPhoneValid = isValid);
+    }
+  }
+
   Future<void> _pickAndUploadAvatar() async {
+    // 🚀 Show modern bottom sheet with options
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Change Profile Photo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Gallery option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.photo_library,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    'From Gallery',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Choose from your photos',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+                const Divider(height: 1),
+                // Camera option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.camera_alt,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    'Take a Photo',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Use your camera',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+                const SizedBox(height: 10),
+                // Cancel button
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (source == null) return;
+
     final picker = ImagePicker();
     final file = await picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 85,
       maxWidth: 1200,
     );
@@ -156,36 +635,172 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _bioCtrl.dispose();
+    _phoneSaveTimer?.cancel(); // 🚀 NEW: Cancel timer on dispose
     super.dispose();
   }
 
   void _addInterest() {
+    final TextEditingController interestCtrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (_) {
-        final ctrl = TextEditingController();
-        return AlertDialog(
-          title: const Text('Add Interest'),
-          content: TextField(
-            controller: ctrl,
-            decoration: const InputDecoration(hintText: 'Enter interest'),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (ctrl.text.isNotEmpty)
-                  setState(() => _interests.add(ctrl.text.trim()));
-                Navigator.pop(context);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title with icon
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.interests,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Add Interest',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Modern input field
+              TextField(
+                controller: interestCtrl,
+                autofocus: true,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF0F172A),
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Enter your interest',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 16,
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.add_circle_outline,
+                    color: AppColors.primary,
+                  ),
+                ),
+                onSubmitted: (value) {
+                  if (value.trim().isNotEmpty) {
+                    setState(() {
+                      _interests.add(value.trim());
+                    });
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              const SizedBox(height: 24),
+              // Modern action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final value = interestCtrl.text.trim();
+                        if (value.isNotEmpty) {
+                          setState(() {
+                            _interests.add(value);
+                          });
+                        }
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Add',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -204,6 +819,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🚀 NEW: Network connectivity warning
+            if (_hasNetworkError)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Network issues detected. Some images may not load.',
+                        style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        setState(() => _hasNetworkError = false);
+                        await _checkConnectivity();
+                        if (mounted) setState(() {});
+                      },
+                      child: const Icon(
+                        Icons.refresh,
+                        color: Colors.orange,
+                        size: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
             // Profile photo
             Center(
               child: Stack(
@@ -213,17 +872,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     backgroundColor: AppColors.primary.withOpacity(0.1),
                     child: CircleAvatar(
                       radius: 48,
-                      backgroundImage: _avatarUrl != null
-                          ? NetworkImage(_avatarUrl!)
-                          : null,
                       backgroundColor: Colors.grey[200],
-                      child: _avatarUrl == null
-                          ? const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.grey,
+                      child: _avatarUrl != null && _avatarUrl!.isNotEmpty && !_hasNetworkError
+                          ? ClipOval(
+                              child: Image.network(
+                                _avatarUrl!,
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  print('❌ Error loading avatar: $error');
+                                  _hasNetworkError = true;
+                                  return const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  );
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  );
+                                },
+                              ),
                             )
-                          : null,
+                          : Stack(
+                              children: [
+                                const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                                if (_hasNetworkError && _avatarUrl != null && _avatarUrl!.isNotEmpty)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: GestureDetector(
+                                      onTap: () async {
+                                        setState(() => _hasNetworkError = false);
+                                        await _checkConnectivity();
+                                        if (mounted) setState(() {});
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.refresh,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                     ),
                   ),
                   Positioned(
@@ -240,51 +948,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             BoxShadow(color: Colors.black26, blurRadius: 6),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.photo_camera,
-                          color: Colors.white,
-                          size: 18,
-                        ),
+                        child: _isAvatarUploading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.photo_camera,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Name field
+            const Text(
+              'Full Name',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Center(
-              child: Text(
-                _nameCtrl.text.isNotEmpty ? _nameCtrl.text : 'Profile',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            Center(
-              child: TextButton(
-                onPressed: _isAvatarUploading ? null : _pickAndUploadAvatar,
-                child: Text(
-                  _isAvatarUploading ? 'Uploading...' : 'Change Profile Photo',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Form
-            _FieldLabel('Full Name'),
-            const SizedBox(height: 6),
             TextFormField(
               controller: _nameCtrl,
               decoration: InputDecoration(
-                prefixIcon: const Icon(
-                  Icons.person,
-                  color: AppColors.textGrey,
-                  size: 20,
-                ),
+                prefixIcon: const Icon(Icons.person, color: AppColors.textGrey, size: 20),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: AppColors.borderLight),
@@ -305,39 +1000,261 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _FieldLabel('Phone Number'),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(
-                  Icons.phone,
-                  color: AppColors.textGrey,
-                  size: 20,
+
+            // Phone number field with country selector and auto-validation
+            const Text(
+              'Phone Number',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            
+            // 🚀 NEW: Modern phone field design
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.2),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderLight),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderLight),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                filled: true,
-                fillColor: Colors.white,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🚀 NEW: Current phone display with clear button
+                  if (_userData?['numTel']?.isNotEmpty == true)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.05),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: AppColors.primary.withOpacity(0.1),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.phone_android,
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Current: ${_userData!['numTel']}',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _phoneCtrl.clear();
+                                _lastSavedPhone = '';
+                                // Clear from local data
+                                if (_userData != null) {
+                                  _userData!['numTel'] = '';
+                                }
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.clear,
+                                color: Colors.red,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // Country selector and input
+                  Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        // Country selector
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border(
+                              right: BorderSide(
+                                color: AppColors.primary.withOpacity(0.2),
+                              ),
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _country,
+                              isDense: true,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                              items: _countries.map((String countryKey) {
+                                return DropdownMenuItem<String>(
+                                  value: countryKey,
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        _getCountryFlag(countryKey),
+                                        style: const TextStyle(fontSize: 16),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(_getCountryName(countryKey)),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (v) {
+                                setState(() {
+                                  _country = v!;
+                                  _formatPhoneNumber();
+                                  _validatePhone();
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        
+                        // Phone input field
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            onChanged: (value) {
+                              _formatPhoneNumber();
+                              _validatePhone();
+                              _savePhoneChange();
+                            },
+                            decoration: InputDecoration(
+                              prefixText: '${_getCountryCode(_country)} ',
+                              prefixStyle: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              hintText: 'Enter new phone number',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                              suffixIcon: _isPhoneValid
+                                  ? Container(
+                                      margin: const EdgeInsets.all(8),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
-            _FieldLabel('Country'),
-            const SizedBox(height: 6),
+            
+            // 🚀 NEW: Modern validation status
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _isPhoneValid ? Colors.green.withOpacity(0.08) : Colors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isPhoneValid ? Colors.green.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _isPhoneValid ? Colors.green : Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isPhoneValid ? Icons.check : Icons.info_outline,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isPhoneValid ? 'Valid Phone Number' : 'Phone Format Required',
+                          style: TextStyle(
+                            color: _isPhoneValid ? Colors.green : Colors.blue,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isPhoneValid
+                              ? 'Number is correctly formatted for ${_getCountryName(_country)}'
+                              : 'Example: ${_getPhoneExample(_country)} (${_getMaxDigits(_country)} digits max)',
+                          style: TextStyle(
+                            color: _isPhoneValid ? Colors.green.shade600 : Colors.blue.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Country dropdown
+            const Text(
+              'Country',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -361,35 +1278,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _FieldLabel('Bio'),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _bioCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderLight),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderLight),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                alignLabelWithHint: true,
-              ),
+
+            // Language dropdown
+            const Text(
+              'Preferred Language',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
-            _FieldLabel('Language'),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -412,95 +1307,156 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            // Interests
+            const SizedBox(height: 16),
+
+            // Bio field
             const Text(
-              'Interests',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              'Bio',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._interests.map(
-                  (interest) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _bioCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 🚀 NEW: Edit Activity Specialties button (pour organisateurs)
+            if (_isOrganizer) ...[
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const EditActivitySpecialtiesScreen(),
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          interest,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.category,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Edit Activity Specialties',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _interests.remove(interest)),
-                          child: const Icon(
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // 🚀 OLD: Interests section (pour touristes seulement)
+            if (!_isOrganizer) ...[
+              const Text(
+                'Interests',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_interests.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _interests.map((interest) {
+                        return Chip(
+                          label: Text(interest),
+                          onDeleted: () {
+                            setState(() {
+                              _interests.remove(interest);
+                            });
+                          },
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          deleteIcon: const Icon(
                             Icons.close,
-                            size: 14,
+                            size: 16,
                             color: AppColors.primary,
                           ),
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _addInterest,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.borderLight),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add, size: 14, color: AppColors.textGrey),
-                        SizedBox(width: 4),
-                        Text(
-                          'Add',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textGrey,
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _addInterest,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            'Add Interest',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
             const SizedBox(height: 32),
+
             // Save button
             SizedBox(
               width: double.infinity,
-              height: 54,
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 4,
-                  shadowColor: AppColors.primary.withOpacity(0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _isSaving
@@ -508,37 +1464,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
                           strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text(
                         'Save Profile',
                         style: TextStyle(
+                          color: Colors.white,
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
     );
   }
 }

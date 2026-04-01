@@ -271,43 +271,59 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   }
 
   Widget _buildOtpBox(int index) {
-    return Container(
-      width: 45,
-      height: 55,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: KeyboardListener(
-        focusNode: FocusNode(),
-        onKeyEvent: (event) {
-          if (event is KeyDownEvent &&
-              event.logicalKey == LogicalKeyboardKey.backspace &&
-              _ctrl[index].text.isEmpty &&
-              index > 0) {
-            _focus[index - 1].requestFocus();
-          }
-        },
-        child: TextField(
-          controller: _ctrl[index],
-          focusNode: _focus[index],
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          maxLength: 1,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          decoration: const InputDecoration(counterText: '', border: InputBorder.none),
-          onChanged: (v) {
-            if (v.isNotEmpty && index < 5) {
-              _focus[index + 1].requestFocus();
-            } else if (v.isEmpty && index > 0) {
-              _focus[index - 1].requestFocus();
-            }
-          },
+  return Container(
+    width: 50,
+    height: 60,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 8,
+          offset: const Offset(0, 3),
         ),
+      ],
+    ),
+    child: TextField(
+      controller: _ctrl[index],
+      focusNode: _focus[index],
+      textAlign: TextAlign.center,
+      textAlignVertical: TextAlignVertical.center,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      maxLength: 1,
+      style: const TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.black,
+        height: 1.0,
       ),
-    );
-  }
+      decoration: const InputDecoration(
+        counterText: '',
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        disabledBorder: InputBorder.none,
+        errorBorder: InputBorder.none,
+        focusedErrorBorder: InputBorder.none,
+        filled: false,
+        contentPadding: EdgeInsets.zero,
+        isCollapsed: true,
+      ),
+      onChanged: (v) {
+        if (v.isNotEmpty && index < 5) {
+          _focus[index + 1].requestFocus();
+        } else if (v.isEmpty && index > 0) {
+          _focus[index - 1].requestFocus();
+        }
+      },
+    ),
+  );
+}
 
   Widget _buildTimerUnit(String value, String label) {
     return Column(

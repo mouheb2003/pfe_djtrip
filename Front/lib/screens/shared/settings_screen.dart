@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
+import '../settings/privacy_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -142,7 +143,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsTile(
               icon: Icons.security,
               label: 'Privacy Settings',
-              onTap: () => _showInfo('Privacy section coming soon.'),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen()),
+              ),
             ),
             const SizedBox(height: 8),
 

@@ -244,6 +244,29 @@ exports.myInfo = async (req, res) => {
     // Use UserService to fetch user
     const user = await UserService.getUserById(userId);
 
+    // 🚀 NEW: Ajouter les spécialités d'activités prédéfinies si organisateur
+    if (user && user.userType === 'Organisator' && (!user.specialites_activites || user.specialites_activites.length === 0)) {
+      // Spécialités par défaut pour les organisateurs
+      const defaultSpecialties = [
+        'Sports & Aventure',
+        'Musique & Concerts', 
+        'Art & Culture',
+        'Gastronomie & Cuisine',
+        'Plage & Mer',
+        'Montagne & Randonnée',
+        'Histoire & Patrimoine',
+        'Jeux & Divertissement',
+        'Bien-être & Spa',
+        'Photographie & Tour',
+        'Transport & Excursion',
+        'Camping & Nature',
+        'Festivals & Événements'
+      ];
+      
+      user.specialites_activites = defaultSpecialties;
+      await user.save();
+    }
+
     res.status(200).json({
       message: "User info retrieved successfully",
       user: user,
@@ -586,6 +609,50 @@ exports.updateAccountStatus = async (req, res) => {
 };
 
 // Logout - Set user offline (POST /users/logout)
+// 🚀 NEW: Privacy settings endpoints
+exports.updatePrivacySettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const privacyData = req.body;
+
+    const updatedUser = await UserService.updatePrivacySettings(userId, privacyData);
+
+    res.status(200).json({
+      success: true,
+      message: "Privacy settings updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating privacy settings:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error updating privacy settings",
+    });
+  }
+};
+
+exports.updateAdvancedSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const advancedData = req.body;
+
+    const updatedUser = await UserService.updateAdvancedSettings(userId, advancedData);
+
+    res.status(200).json({
+      success: true,
+      message: "Advanced settings updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating advanced settings:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Error updating advanced settings",
+    });
+  }
+};
+
+// Logout - Set user offline (POST /users/logout)
 exports.logout = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -714,6 +781,34 @@ exports.resendVerificationCode = async (req, res) => {
 
     res.status(500).json({
       message: "Error resending verification code",
+      error: err.message,
+    });
+  }
+};
+
+// Delete user account (DELETE /users/me)
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("🗑️ Delete account request from user:", userId);
+
+    // Find and delete user
+    const user = await User.findByIdAndDelete(userId);
+    
+    if (!user) {
+      console.log("❌ User not found:", userId);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ Account deleted successfully:", userId);
+    res.status(200).json({
+      message: "Account deleted successfully",
+      success: true,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting account:", err);
+    res.status(500).json({
+      message: "Error deleting account",
       error: err.message,
     });
   }

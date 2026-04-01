@@ -20,6 +20,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   int _activitiesCount = 0;
   int _totalBookings = 0;
   double _totalRevenue = 0.0;
+  List<String> _specialties = []; // 🚀 NEW: Stocker les spécialités d'activités
 
   @override
   void initState() {
@@ -33,19 +34,30 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
       InscriptionService.getOrganizerStats(),
     ]);
     if (!mounted) return;
+    
+    final userData = results[0] as Map<String, dynamic>?;
+    final user = userData != null ? UserModel.fromJson(userData) : null;
+    
     setState(() {
-      _user = results[0] as UserModel?;
+      _user = user;
       final stats = results[1] as Map<String, dynamic>;
       _activitiesCount = (stats['activitiesCount'] as num?)?.toInt() ?? 0;
       _totalBookings = (stats['totalBookings'] as num?)?.toInt() ?? 0;
       _totalRevenue = (stats['totalRevenue'] as num?)?.toDouble() ?? 0.0;
+      
+      // 🚀 NEW: Charger les spécialités d'activités
+      if (userData != null && userData['specialites_activites'] != null) {
+        _specialties = List<String>.from(userData['specialites_activites'] ?? []);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: _loadAll,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
         child: Column(
           children: [
             // Cover + profile header
@@ -305,24 +317,29 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Specialties
+                  // 🚀 NEW: Dynamic Activity Specialties
                   const Text(
                     'Activity Specialties',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: const [
-                      _SpecialtyChip('🏄 Water Sports'),
-                      _SpecialtyChip('🐪 Camel Rides'),
-                      _SpecialtyChip('🤿 Diving'),
-                      _SpecialtyChip('🚵 Quad Biking'),
-                      _SpecialtyChip('🏇 Horse Riding'),
-                      _SpecialtyChip('🛶 Boat Tours'),
-                    ],
-                  ),
+                  if (_specialties.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _specialties.map((specialty) {
+                        return _SpecialtyChip(specialty);
+                      }).toList(),
+                    )
+                  else
+                    const Text(
+                      'No specialties added yet',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   // Monthly Performance
                   Container(
@@ -421,15 +438,6 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
-  const _Divider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 40, color: AppColors.borderLight);
-  }
-}
-
 class _SpecialtyChip extends StatelessWidget {
   final String label;
 
@@ -453,6 +461,15 @@ class _SpecialtyChip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 40, color: AppColors.borderLight);
   }
 }
 

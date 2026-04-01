@@ -3,6 +3,7 @@ import '../../../theme/app_theme.dart';
 import '../../../services/activity_service.dart';
 import '../../../models/activity_model.dart';
 import 'package:intl/intl.dart';
+import 'dart:async'; // 🚀 NEW: Import pour Timer
 
 class ArchiveTab extends StatefulWidget {
   const ArchiveTab({super.key});
@@ -17,11 +18,23 @@ class _ArchiveTabState extends State<ArchiveTab> {
   bool _isLoading = true;
   double _totalRevenue = 0;
   int _totalParticipants = 0;
+  final _searchController = TextEditingController(); // 🚀 NEW: Controller recherche
+  Timer? _debounceTimer; // 🚀 NEW: Timer pour debounce
 
   @override
   void initState() {
     super.initState();
     _fetchArchives();
+    
+    // 🚀 NEW: Ajouter un listener pour la recherche automatique
+    _searchController.addListener(() {
+      print('🔍 TextField changé: "${_searchController.text}"'); // DEBUG
+      
+      // 🚀 SIMPLIFIÉ: Test sans debounce pour l'instant
+      if (mounted) {
+        _filterActivities(_searchController.text);
+      }
+    });
   }
 
   Future<void> _fetchArchives() async {
@@ -30,19 +43,29 @@ class _ArchiveTabState extends State<ArchiveTab> {
       final activities = await ActivityService.getArchivedActivities();
       double revenue = 0;
       int participants = 0;
-      for (var activity in activities) {
-        revenue += (activity.prix * activity.nombreReservations);
-        participants += activity.nombreReservations;
+      
+      try {
+        for (var activity in activities) {
+          revenue += (activity.prix * activity.nombreReservations);
+          participants += activity.nombreReservations;
+        }
+      } catch (e) {
+        print('⚠️ Error calculating stats: $e');
+        // Continuer avec des valeurs par défaut
       }
-      setState(() {
-        _archivedActivities = activities;
-        _totalRevenue = revenue;
-        _totalParticipants = participants;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
+      
       if (mounted) {
+        setState(() {
+          _archivedActivities = activities;
+          _filteredActivities = activities; // 🚀 NEW: Initialiser les activités filtrées
+          _totalRevenue = revenue;
+          _totalParticipants = participants;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading archives: $e')),
         );
@@ -50,149 +73,216 @@ class _ArchiveTabState extends State<ArchiveTab> {
     }
   }
 
+  // 🚀 NEW: Méthode de recherche
+  void _filterActivities(String query) {
+    print('🔍 _filterActivities appelé avec: "$query"'); // 🚀 DEBUG: Vérifier si méthode appelée
+    print('🔍 Recherche: "$query"'); // 🚀 DEBUG: Vérifier la recherche
+    setState(() {
+      if (query.isEmpty) {
+        _filteredActivities = _archivedActivities;
+      } else {
+        _filteredActivities = _archivedActivities.where((activity) {
+          return activity.titre.toLowerCase().contains(query.toLowerCase()) ||
+                 activity.lieu.toLowerCase().contains(query.toLowerCase()) ||
+                 activity.typeActivite.toLowerCase().contains(query.toLowerCase());
+        }).toList();
+      }
+    });
+    print('📊 Résultats trouvés: ${_filteredActivities.length}'); // 🚀 DEBUG: Nombre de résultats
+  }
+
+  // 🚀 NEW: Navigation vers participants
+  void _viewParticipants(ActivityModel activity) {
+    // TODO: Naviguer vers l'écran des participants
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Viewing participants for: ${activity.titre}'),
+        action: SnackBarAction(
+          label: 'View Details',
+          onPressed: () {
+            // TODO: Implémenter la navigation vers les détails participants
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose(); // 🚀 NEW: Nettoyer le controller
+    _debounceTimer?.cancel(); // 🚀 NEW: Nettoyer le timer
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                          )
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.textGrey,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Text(
-                      'Activity Archives',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: _fetchArchives,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 16),
-                            // Stats row
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.payments,
-                                    iconColor: const Color(0xFF6366F1),
-                                    label: 'Total Revenue',
-                                    value: '${_totalRevenue.toStringAsFixed(0)} TND',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _StatCard(
-                                    icon: Icons.people,
-                                    iconColor: const Color(0xFF22C55E),
-                                    label: 'Participants',
-                                    value: _totalParticipants.toString(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Archived Activities (${_archivedActivities.length})',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (_archivedActivities.isEmpty)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 40),
-                                  child: Column(
-                                    children: [
-                                      Icon(Icons.archive_outlined,
-                                          size: 64, color: Colors.grey[300]),
-                                      const SizedBox(height: 12),
-                                      const Text(
-                                        'No archived activities yet.',
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            else
-                              ..._archivedActivities.map((activity) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _ArchiveCard(
-                                    imageUrl: activity.thumbnailUrl,
-                                    badge: activity.statut == 'completed'
-                                        ? 'Completed'
-                                        : 'Archived',
-                                    badgeColor: activity.statut == 'completed'
-                                        ? const Color(0xFF22C55E)
-                                        : const Color(0xFF6366F1),
-                                    title: activity.titre,
-                                    date: activity.dateFin != null
-                                        ? DateFormat('dd MMM yyyy', 'en')
-                                            .format(activity.dateFin!)
-                                        : 'N/A',
-                                    revenue:
-                                        '${(activity.prix * activity.nombreReservations).toStringAsFixed(0)} TND',
-                                    attendees: activity.nombreReservations.toString(),
-                                    avatarUrls: const [], // Can be populated if registrations are fetched
-                                  ),
-                                );
-                              }).toList(),
-                            const SizedBox(height: 80),
-                          ],
+    print('🏗️ Build appelé - _filteredActivities.length: ${_filteredActivities.length}'); // DEBUG
+    return PopScope(
+      canPop: false, // 🚀 NEW: Empêche le retour arrière
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFAFAFA),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    // 🚀 NEW: Flèche de retour désactivée
+                    const SizedBox(width: 16), // Maintient l'espacement
+                    const Expanded(
+                      child: Text(
+                        'Activity Archives',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
                         ),
                       ),
                     ),
-            ),
-          ],
+                  ],
+                ),
+              ),
+              // Content
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _fetchArchives,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              // Stats row
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _StatCard(
+                                      icon: Icons.payments,
+                                      iconColor: const Color(0xFF6366F1),
+                                      label: 'Total Revenue',
+                                      value: '${_totalRevenue.toStringAsFixed(0)} TND',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _StatCard(
+                                      icon: Icons.people,
+                                      iconColor: const Color(0xFF22C55E),
+                                      label: 'Participants',
+                                      value: _totalParticipants.toString(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              
+                              // 🚀 NEW: Champ de recherche
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: TextField(
+                                  controller: _searchController,
+                                  // 🚀 REMOVED: Le listener gère maintenant la recherche
+                                  decoration: InputDecoration(
+                                    hintText: 'Search activities...',
+                                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                    border: InputBorder.none,
+                                    suffixIcon: _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, color: Colors.grey),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              _filterActivities('');
+                                            },
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 16),
+                              Text(
+                                'Archived Activities (${_filteredActivities.length})', // 🚀 NEW: Utiliser les activités filtrées
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_filteredActivities.isEmpty && _archivedActivities.isNotEmpty) // 🚀 NEW: Message si aucun résultat
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 40),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'No activities found for your search.',
+                                          style: TextStyle(color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else if (_archivedActivities.isEmpty)
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 40),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.archive_outlined,
+                                            size: 64, color: Colors.grey[300]),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'No archived activities yet.',
+                                          style: TextStyle(color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                ..._filteredActivities.map((activity) { // 🚀 NEW: Utiliser les activités filtrées
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _ArchiveCard(
+                                      imageUrl: activity.thumbnailUrl,
+                                      badge: '', // Badge vide pour les activités archivées
+                                      badgeColor: Colors.transparent, // Couleur transparente
+                                      title: activity.titre,
+                                      date: activity.dateFin != null
+                                          ? DateFormat('dd MMM yyyy', 'en')
+                                              .format(activity.dateFin!)
+                                          : 'N/A',
+                                      revenue:
+                                          '${(activity.prix * activity.nombreReservations).toStringAsFixed(0)} TND',
+                                      attendees: activity.nombreReservations.toString(),
+                                      avatarUrls: const [], // Can be populated if registrations are fetched
+                                      onViewParticipants: () => _viewParticipants(activity), // 🚀 NEW: Callback participants
+                                    ),
+                                  );
+                                }).toList(),
+                              const SizedBox(height: 80),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ), // 🚀 NEW: Fermeture du PopScope
     );
   }
 }
@@ -277,6 +367,7 @@ class _ArchiveCard extends StatelessWidget {
   final String revenue;
   final String attendees;
   final List<String> avatarUrls;
+  final VoidCallback? onViewParticipants; // 🚀 NEW: Callback pour consulter les participants
 
   const _ArchiveCard({
     required this.imageUrl,
@@ -287,6 +378,7 @@ class _ArchiveCard extends StatelessWidget {
     required this.revenue,
     required this.attendees,
     required this.avatarUrls,
+    this.onViewParticipants, // 🚀 NEW: Callback optionnel
   });
 
   @override
@@ -331,119 +423,130 @@ class _ArchiveCard extends StatelessWidget {
                         ),
                 ),
               ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+            ],
+          ),
+          Padding(
+  padding: const EdgeInsets.all(16),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          color: Color(0xFF1E293B),
+        ),
+      ),
+      const SizedBox(height: 6),
+
+      Row(
+        children: [
+          const Icon(
+            Icons.calendar_today_outlined,
+            size: 12,
+            color: AppColors.textGrey,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Completed on $date',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textGrey,
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 16),
+
+      Row(
+        children: [
+          _InfoPill(
+            icon: Icons.account_balance_wallet_outlined,
+            text: revenue,
+            color: const Color(0xFF6366F1),
+          ),
+          const SizedBox(width: 12),
+          _InfoPill(
+            icon: Icons.people_outline,
+            text: '$attendees participants',
+            color: const Color(0xFF22C55E),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 16),
+
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Activity Report',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textGrey,
+            ),
+          ),
+
+          Row(
+            children: [
+              if (onViewParticipants != null)
+                OutlinedButton.icon(
+                  onPressed: onViewParticipants,
+                  icon: const Icon(Icons.people, size: 16),
+                  label: const Text('Participants'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF22C55E),
+                    side: const BorderSide(color: Color(0xFF22C55E)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(width: 8),
+
+              OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Detailed report coming soon.'),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                ),
+                child: const Text(
+                  'View Details',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textGrey),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Completed on $date',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _InfoPill(
-                      icon: Icons.account_balance_wallet_outlined,
-                      text: revenue,
-                      color: const Color(0xFF6366F1),
-                    ),
-                    const SizedBox(width: 12),
-                    _InfoPill(
-                      icon: Icons.people_outline,
-                      text: '$attendees participants',
-                      color: const Color(0xFF22C55E),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Stacked avatars (removed placeholder logic for cleaner real data look)
-                    const Text(
-                      'Activity Report',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                    OutlinedButton(
-                      onPressed: () =>
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Detailed report coming soon.',
-                              ),
-                            ),
-                          ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                      ),
-                      child: const Text(
-                        'View Details',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        ],
+      ),
+    ],
+  ),
+),
+        
         ],
       ),
     );

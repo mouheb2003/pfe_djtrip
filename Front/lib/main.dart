@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart'; // 👈 IMPORTANT
 import 'config/app_routes.dart';
 import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 👇 Initialisation des locales (corrige ton erreur)
+  await initializeDateFormatting();
+
+  // 👇 Ton service de thème
   await ThemeService.init();
+
   runApp(const MyApp());
 }
 

@@ -12,6 +12,35 @@ const userSchema = new mongoose.Schema(
     avatar: String,
     bio: String,
     pays_origine: String,
+    // 🚀 NEW: Language and interests fields
+    langue_preferee: { type: String, default: "English" }, // Default to English
+    centres_interet: [{ type: String }], // Array of interests
+    // 🚀 NEW: Phone country field for validation
+    pays_telephone: { type: String, default: "France" }, // Country for phone validation
+    // 🚀 NEW: Privacy settings fields
+    profileVisibility: { type: Boolean, default: true },
+    showOnlineStatus: { type: Boolean, default: true },
+    showLastSeen: { type: Boolean, default: false },
+    allowDirectMessages: { type: Boolean, default: true },
+    showPhone: { type: Boolean, default: false },
+    showEmail: { type: Boolean, default: false },
+    allowLocationSharing: { type: Boolean, default: false },
+    allowDataAnalytics: { type: Boolean, default: false },
+    // 🚀 NEW: Advanced privacy settings
+    discoverability: { type: Boolean, default: true },
+    searchIndexing: { type: Boolean, default: true },
+    activityTracking: { type: Boolean, default: false },
+    personalizedAds: { type: Boolean, default: false },
+    thirdPartySharing: { type: Boolean, default: false },
+    cookiesEnabled: { type: Boolean, default: true },
+    biometricAuth: { type: Boolean, default: false },
+    twoFactorAuth: { type: Boolean, default: false },
+    // 🚀 NEW: Additional privacy data
+    profileViews: { type: Number, default: 0 },
+    lastActive: { type: Date },
+    dataShared: { type: Boolean, default: false },
+    locationHistory: [{ type: String }], // Array of location data
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isOnline: { type: Boolean, default: false },
     accountStatus: {
       type: String,
@@ -36,6 +65,8 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     // Favorites (activities)
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Activite" }],
+    // 🚀 NEW: Activity specialties for organizers
+    specialites_activites: [{ type: String }],
   },
   {
     discriminatorKey: "userType",

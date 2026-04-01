@@ -76,37 +76,40 @@ class _RequestsTabState extends State<RequestsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back,
-                      color: AppColors.textGrey,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Text(
-                      'Booking Requests',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: false, // 🚀 NEW: Empêche le retour arrière
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    // 🚀 NEW: Flèche de retour désactivée
+                    // Container(
+                    //   width: 40,
+                    //   height: 40,
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.grey[100],
+                    //     shape: BoxShape.circle,
+                    //   ),
+                    //   child: const Icon(
+                    //     Icons.arrow_back,
+                    //     color: AppColors.textGrey,
+                    //   ),
+                    // ),
+                    const SizedBox(width: 16), // Maintient l'espacement
+                    const Expanded(
+                      child: Text(
+                        'Booking Requests',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
                   Icon(Icons.filter_list, color: Colors.grey[600]),
                 ],
               ),
@@ -207,6 +210,7 @@ class _RequestsTabState extends State<RequestsTab> {
           ],
         ),
       ),
+      ), // 🚀 NEW: Fermeture du PopScope
     );
   }
 }
