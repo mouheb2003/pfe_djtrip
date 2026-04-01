@@ -41,6 +41,7 @@ exports.createActivite = async (req, res) => {
       description,
       type_activite,
       typeActivite,
+      categorie,
       lieu,
       coordonnees,
       duree,
@@ -100,6 +101,7 @@ exports.createActivite = async (req, res) => {
       titre,
       description,
       type_activite: type_activite || typeActivite,
+      categorie,
       organisateur_id: userId,
       lieu,
       coordonnees: parsedCoordonnees,
@@ -307,6 +309,7 @@ exports.updateActivite = async (req, res) => {
       description,
       type_activite,
       typeActivite,
+      categorie,
       lieu,
       coordonnees,
       duree,
@@ -353,6 +356,7 @@ exports.updateActivite = async (req, res) => {
     if (description !== undefined) updateData.description = description;
     if (type_activite !== undefined || typeActivite !== undefined)
       updateData.type_activite = type_activite || typeActivite;
+    if (categorie !== undefined) updateData.categorie = categorie;
     if (lieu !== undefined) updateData.lieu = lieu;
     if (parsedCoordonnees !== undefined)
       updateData.coordonnees = parsedCoordonnees;

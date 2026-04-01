@@ -82,6 +82,60 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+    try {
+      final result = await AuthService.signInWithGoogle();
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final user = result['user'] as Map<String, dynamic>?;
+        final userType = user?['userType'] as String?;
+        final route = userType == 'Organisator'
+            ? AppRoutes.organizerMain
+            : AppRoutes.touristMain;
+        Navigator.pushReplacementNamed(context, route);
+      } else {
+        setState(() => _errorMsg = result['message'] as String?);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _errorMsg = 'Google authentication error.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loginWithFacebook() async {
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+    try {
+      final result = await AuthService.signInWithFacebook();
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final user = result['user'] as Map<String, dynamic>?;
+        final userType = user?['userType'] as String?;
+        final route = userType == 'Organisator'
+            ? AppRoutes.organizerMain
+            : AppRoutes.touristMain;
+        Navigator.pushReplacementNamed(context, route);
+      } else {
+        setState(() => _errorMsg = result['message'] as String?);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMsg = 'Facebook authentication error.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,7 +215,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-
                     // Forgot Password
                     Align(
                       alignment: Alignment.centerRight,
@@ -215,6 +268,41 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _loginWithGoogle,
+                            icon: const Icon(Icons.g_mobiledata, size: 28),
+                            label: const Text('Google'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              side: const BorderSide(color: Color(0xFFE0E0E0)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _loginWithFacebook,
+                            icon: const Icon(Icons.facebook, size: 20),
+                            label: const Text('Facebook'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              side: const BorderSide(color: Color(0xFFE0E0E0)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
                     // Bottom Navigation / Sign Up
                     Row(

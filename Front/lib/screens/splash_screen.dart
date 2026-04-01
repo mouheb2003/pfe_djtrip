@@ -79,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFF6B1A), Color(0xFFFFB84D)],
+            colors: [AppColors.oceanBlue, AppColors.primary],
           ),
         ),
         child: Stack(
@@ -93,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen>
                 height: 256,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withOpacity(0.08),
                 ),
               ),
             ),
@@ -106,7 +106,7 @@ class _SplashScreenState extends State<SplashScreen>
                 height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFFF8C00).withOpacity(0.2),
+                  color: AppColors.secondary.withOpacity(0.14),
                 ),
               ),
             ),
@@ -156,7 +156,7 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                                 child: const Icon(
                                   Icons.eco,
-                                  color: AppColors.primary,
+                                  color: AppColors.secondary,
                                   size: 24,
                                 ),
                               ),
@@ -225,7 +225,7 @@ class _SplashScreenState extends State<SplashScreen>
                               value: 0.3,
                               backgroundColor: Colors.white.withOpacity(0.2),
                               valueColor: const AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                                AppColors.secondary,
                               ),
                               minHeight: 6,
                             ),

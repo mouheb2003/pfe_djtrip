@@ -14,6 +14,12 @@ router.post("/signup", userController.signUp);
 // POST /signin - Login user
 router.post("/signin", userController.signIn);
 
+// POST /auth/google - Authenticate with Google
+router.post("/auth/google", userController.googleAuth);
+
+// POST /auth/facebook - Authenticate with Facebook
+router.post("/auth/facebook", userController.facebookAuth);
+
 // POST /forgot-password - Send password reset code
 router.post("/forgot-password", userController.forgotPassword);
 

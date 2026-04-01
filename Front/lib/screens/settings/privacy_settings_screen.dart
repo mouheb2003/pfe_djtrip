@@ -125,11 +125,11 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Privacy Settings'),
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.card,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: AppColors.textPrimary,
       ),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.background,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -142,7 +142,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: AppColors.textSecondary,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -195,7 +195,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey,
+                      color: AppColors.textSecondary,
                       letterSpacing: 1.0,
                     ),
                   ),

@@ -45,6 +45,12 @@ const activiteSchema = new mongoose.Schema(
         "Others",
       ],
     },
+    // Activity category used by home/explore filters
+    categorie: {
+      type: String,
+      trim: true,
+      default: "Other",
+    },
     // Reference to the organizer
     organisateur_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -159,6 +165,7 @@ const activiteSchema = new mongoose.Schema(
 
 // Indexes to improve search performance
 activiteSchema.index({ type_activite: 1, statut: 1 });
+activiteSchema.index({ categorie: 1, statut: 1 });
 activiteSchema.index({ organisateur_id: 1 });
 activiteSchema.index({ lieu: "text", titre: "text", description: "text" });
 // Geospatial index for proximity queries (e.g. activities near a location)

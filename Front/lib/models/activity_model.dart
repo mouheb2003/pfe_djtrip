@@ -3,6 +3,7 @@ class ActivityModel {
   final String titre;
   final String description;
   final String typeActivite;
+  final String categorie;
   final String lieu;
   final double duree;
   final double prix;
@@ -26,6 +27,7 @@ class ActivityModel {
     required this.titre,
     required this.description,
     required this.typeActivite,
+    this.categorie = '',
     required this.lieu,
     required this.duree,
     required this.prix,
@@ -51,6 +53,7 @@ class ActivityModel {
       titre: json['titre'] as String? ?? '',
       description: json['description'] as String? ?? '',
       typeActivite: json['type_activite'] as String? ?? '',
+      categorie: json['categorie'] as String? ?? '',
       lieu: json['lieu'] as String? ?? '',
       duree: (json['duree'] as num? ?? 0).toDouble(),
       prix: (json['prix'] as num? ?? 0).toDouble(),
@@ -89,6 +92,7 @@ class ActivityModel {
       'titre': titre,
       'description': description,
       'type_activite': typeActivite,
+      'categorie': categorie,
       'lieu': lieu,
       'duree': duree,
       'prix': prix,

@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_client.dart';
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   static const _keyAccess = 'djtrip_access_token';
   static const _keyRefresh = 'djtrip_refresh_token';
@@ -266,7 +269,129 @@ class AuthService {
     try {
       await ApiClient.post('/users/logout', {});
     } catch (_) {}
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+    try {
+      await FacebookAuth.instance.logOut();
+    } catch (_) {}
     _cachedUser = null;
     await _storage.deleteAll();
+  }
+
+  /// Sign in with Google, then authenticate against backend.
+  static Future<Map<String, dynamic>> signInWithGoogle() async {
+    try {
+      final account = await _googleSignIn.signIn();
+      if (account == null) {
+        return {'success': false, 'message': 'Google sign-in was cancelled.'};
+      }
+
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Google did not return an ID token.',
+        };
+      }
+
+      final res = await ApiClient.post('/users/auth/google', {
+        'idToken': idToken,
+      }, auth: false);
+
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        body = {};
+      }
+
+      if (res.statusCode != 200) {
+        return {
+          'success': false,
+          'message': body['message'] ?? 'Google authentication failed',
+        };
+      }
+
+      final accessToken = body['accessToken'] as String?;
+      final refreshToken = body['refreshToken'] as String?;
+      final user = body['user'] as Map<String, dynamic>?;
+
+      if (accessToken == null || refreshToken == null || user == null) {
+        return {
+          'success': false,
+          'message': 'Invalid server response during Google authentication.',
+        };
+      }
+
+      await _saveTokens(accessToken, refreshToken);
+      await saveUser(user);
+      return {'success': true, 'user': user};
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Google authentication failed. Please try again.',
+      };
+    }
+  }
+
+  /// Sign in with Facebook, then authenticate against backend.
+  static Future<Map<String, dynamic>> signInWithFacebook() async {
+    try {
+      final result = await FacebookAuth.instance.login();
+
+      if (result.status == LoginStatus.cancelled) {
+        return {
+          'success': false,
+          'message': 'Facebook sign-in was cancelled.',
+        };
+      }
+
+      if (result.status != LoginStatus.success || result.accessToken == null) {
+        return {
+          'success': false,
+          'message': result.message ?? 'Facebook sign-in failed.',
+        };
+      }
+
+      final res = await ApiClient.post('/users/auth/facebook', {
+        'accessToken': result.accessToken!.tokenString,
+      }, auth: false);
+
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        body = {};
+      }
+
+      if (res.statusCode != 200) {
+        return {
+          'success': false,
+          'message': body['message'] ?? 'Facebook authentication failed',
+        };
+      }
+
+      final accessToken = body['accessToken'] as String?;
+      final refreshToken = body['refreshToken'] as String?;
+      final user = body['user'] as Map<String, dynamic>?;
+
+      if (accessToken == null || refreshToken == null || user == null) {
+        return {
+          'success': false,
+          'message': 'Invalid server response during Facebook authentication.',
+        };
+      }
+
+      await _saveTokens(accessToken, refreshToken);
+      await saveUser(user);
+      return {'success': true, 'user': user};
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Facebook authentication failed. Please try again.',
+      };
+    }
   }
 }

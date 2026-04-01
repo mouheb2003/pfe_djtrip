@@ -85,6 +85,7 @@ class ActivityService {
   static Future<Map<String, dynamic>> createActivity({
     required String titre,
     required String typeActivite,
+    String? categorie,
     required String description,
     required double prix,
     required int capaciteMax,
@@ -113,6 +114,10 @@ class ActivityService {
         ..fields['lieu'] = lieu
         ..fields['duree'] = duree.toString()
         ..fields['date_debut'] = dateDebut.toIso8601String();
+
+      if (categorie != null && categorie.isNotEmpty) {
+        request.fields['categorie'] = categorie;
+      }
 
       if (dateFin != null) {
         request.fields['date_fin'] = dateFin.toIso8601String();
@@ -155,6 +160,7 @@ class ActivityService {
     required String id,
     required String titre,
     required String typeActivite,
+    String? categorie,
     required String description,
     required double prix,
     required int capaciteMax,
@@ -183,6 +189,10 @@ class ActivityService {
         ..fields['lieu'] = lieu
         ..fields['duree'] = duree.toString()
         ..fields['date_debut'] = dateDebut.toIso8601String();
+
+      if (categorie != null && categorie.isNotEmpty) {
+        request.fields['categorie'] = categorie;
+      }
 
       if (dateFin != null) {
         request.fields['date_fin'] = dateFin.toIso8601String();

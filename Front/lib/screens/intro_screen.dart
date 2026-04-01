@@ -71,7 +71,7 @@ class _IntroScreenState extends State<IntroScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F5F5),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -111,7 +111,7 @@ class _IntroScreenState extends State<IntroScreen> {
                               loadingBuilder: (ctx, child, progress) {
                                 if (progress == null) return child;
                                 return Container(
-                                  color: const Color(0xFFE7E7E7),
+                                  color: AppColors.surfaceVariant,
                                   child: const Center(
                                     child: CircularProgressIndicator(
                                       color: AppColors.primary,
@@ -120,12 +120,12 @@ class _IntroScreenState extends State<IntroScreen> {
                                 );
                               },
                               errorBuilder: (_, __, ___) => Container(
-                                color: const Color(0xFFE7E7E7),
+                                color: AppColors.surfaceVariant,
                                 child: const Center(
                                   child: Icon(
                                     Icons.image_not_supported,
                                     size: 54,
-                                    color: Colors.grey,
+                                    color: AppColors.textLight,
                                   ),
                                 ),
                               ),
@@ -136,7 +136,7 @@ class _IntroScreenState extends State<IntroScreen> {
                         Text(
                           slide.title,
                           style: const TextStyle(
-                            color: Color(0xFF0B163B),
+                            color: AppColors.textPrimary,
                             fontSize: 58 / 2,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.4,
@@ -149,7 +149,7 @@ class _IntroScreenState extends State<IntroScreen> {
                           child: Text(
                             slide.description,
                             style: const TextStyle(
-                              color: Color(0xFF4A5C78),
+                              color: AppColors.textSecondary,
                               fontSize: 40 / 2,
                               height: 1.45,
                               fontWeight: FontWeight.w500,
@@ -176,7 +176,7 @@ class _IntroScreenState extends State<IntroScreen> {
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppColors.primary
-                        : AppColors.primary.withOpacity(0.26),
+                        : AppColors.primary.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 );

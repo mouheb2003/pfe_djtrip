@@ -3,10 +3,32 @@ const Touriste = require("../models/touriste");
 const Organisator = require("../models/organisator");
 const Activite = require("../models/activite");
 const bcrypt = require("bcryptjs");
+const { OAuth2Client } = require("google-auth-library");
 const { generateTokens } = require("../middleware/auth");
 const emailService = require("../services/email");
 const AvatarService = require("../services/avatar");
 const UserService = require("../services/user");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+async function fetchFacebookProfile(accessToken) {
+  if (typeof fetch !== "function") {
+    throw new Error("Global fetch is not available on this Node.js runtime");
+  }
+
+  const fields = "id,name,email,picture.type(large)";
+  const response = await fetch(
+    `https://graph.facebook.com/me?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`,
+  );
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    const message = data?.error?.message || "Invalid Facebook token";
+    throw new Error(message);
+  }
+
+  return data;
+}
 
 // Sign Up - Register a new user (Phase 1: Basic info only)
 exports.signUp = async (req, res) => {
@@ -233,6 +255,191 @@ exports.signIn = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error signing in", error: err.message });
+  }
+};
+
+// Google Sign-In - Authenticate with Google ID token
+exports.googleAuth = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Google ID token is required" });
+    }
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({
+        message: "Google auth is not configured on server",
+      });
+    }
+
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        message: "Invalid Google token",
+        error: error.message,
+      });
+    }
+
+    const payload = ticket.getPayload();
+    const googleId = payload?.sub;
+    const email = payload?.email?.toLowerCase();
+    const fullname = payload?.name || "Google User";
+    const avatar = payload?.picture;
+    const isEmailVerified = Boolean(payload?.email_verified);
+
+    if (!googleId || !email) {
+      return res.status(400).json({
+        message: "Unable to retrieve required Google profile data",
+      });
+    }
+
+    let user = await User.findOne({
+      $or: [{ googleId }, { email }],
+    });
+    const isExistingUser = Boolean(user);
+
+    if (isExistingUser) {
+      if (!user.googleId) user.googleId = googleId;
+      if (isEmailVerified && !user.emailVerified) user.emailVerified = true;
+      if (!user.avatar && avatar) user.avatar = avatar;
+      user.derniere_connexion = new Date();
+      user.accountStatus = "active";
+      await user.save();
+    } else {
+      user = new User({
+        fullname,
+        email,
+        googleId,
+        avatar,
+        emailVerified: isEmailVerified,
+        userType: "Touriste",
+        accountStatus: "active",
+        derniere_connexion: new Date(),
+      });
+      await user.save();
+    }
+
+    await UserService.updateOnlineStatus(user._id, true);
+
+    const { accessToken, refreshToken } = generateTokens(
+      user._id,
+      user.email,
+      user.userType,
+      user.tokenVersion || 0,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.mot_de_passe;
+    delete userResponse.googleId;
+    delete userResponse.facebookId;
+
+    return res.status(200).json({
+      message: isExistingUser
+        ? "Google sign-in successful"
+        : "Google sign-up successful",
+      accessToken,
+      refreshToken,
+      user: userResponse,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: "Error during Google authentication",
+      error: err.message,
+    });
+  }
+};
+
+// Facebook Login - Authenticate with Facebook access token
+exports.facebookAuth = async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({
+        message: "Facebook access token is required",
+      });
+    }
+
+    let profile;
+    try {
+      profile = await fetchFacebookProfile(accessToken);
+    } catch (error) {
+      return res.status(401).json({
+        message: "Invalid Facebook token",
+        error: error.message,
+      });
+    }
+
+    const facebookId = profile?.id;
+    const email = profile?.email?.toLowerCase();
+    const fullname = profile?.name || "Facebook User";
+    const avatar = profile?.picture?.data?.url;
+    const normalizedEmail = email || `fb_${facebookId}@facebook.local`;
+
+    if (!facebookId) {
+      return res.status(400).json({
+        message: "Unable to retrieve Facebook profile information",
+      });
+    }
+
+    let user = await User.findOne({
+      $or: [{ facebookId }, { email: normalizedEmail }],
+    });
+    const isExistingUser = Boolean(user);
+
+    if (isExistingUser) {
+      if (!user.facebookId) user.facebookId = facebookId;
+      if (!user.emailVerified) user.emailVerified = true;
+      if (!user.avatar && avatar) user.avatar = avatar;
+      user.derniere_connexion = new Date();
+      user.accountStatus = "active";
+      await user.save();
+    } else {
+      user = new User({
+        fullname,
+        email: normalizedEmail,
+        facebookId,
+        avatar,
+        emailVerified: Boolean(email),
+        userType: "Touriste",
+        accountStatus: "active",
+        derniere_connexion: new Date(),
+      });
+      await user.save();
+    }
+
+    await UserService.updateOnlineStatus(user._id, true);
+
+    const { accessToken: appAccessToken, refreshToken } = generateTokens(
+      user._id,
+      user.email,
+      user.userType,
+      user.tokenVersion || 0,
+    );
+
+    const userResponse = user.toObject();
+    delete userResponse.mot_de_passe;
+    delete userResponse.googleId;
+    delete userResponse.facebookId;
+
+    return res.status(200).json({
+      message: isExistingUser
+        ? "Facebook sign-in successful"
+        : "Facebook sign-up successful",
+      accessToken: appAccessToken,
+      refreshToken,
+      user: userResponse,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: "Error during Facebook authentication",
+      error: err.message,
+    });
   }
 };
 

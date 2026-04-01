@@ -5,13 +5,19 @@ import 'package:flutter/services.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFFFF6B1A);
-  static const Color primaryDark = Color(0xFFE55A0A);
-  static const Color primaryLight = Color(0xFFFF8C42);
-  static const Color secondary = Color(0xFFFFB84D);
-  static const Color accent = Color(0xFF2D5016);
-
-  static const Color surface = Color(0xFFF5F5F5);
+  // Ocean Blue Theme (Primary) - from screenshot
+  static const Color primary = Color(0xFF0066CC); // Vibrant blue
+  static const Color primaryDark = Color(0xFF004D99); // Darker blue
+  static const Color primaryLight = Color(0xFF1A7FFF); // Lighter blue
+  static const Color oceanBlue = Color(0xFF1A4C86); // Hero blue
+  
+  // Orange Accent (Secondary) - from screenshot
+  static const Color secondary = Color(0xFFFF6B1A); // Vibrant orange
+  static const Color accent = Color(0xFFFFB31B); // Gold accent
+  static const Color accentSoft = Color(0xFFFFB31B);
+  
+  // Neutral tones
+  static const Color surface = Color(0xFFF6F8FB); // Light background (from screenshot)
   static const Color surfaceVariant = Color(0xFFFAFAFA);
   static const Color card = Colors.white;
   static const Color onPrimary = Colors.white;
@@ -34,7 +40,6 @@ class AppColors {
   static const Color textDark = onSurface;
   static const Color textGrey = onSurfaceVariant;
   static const Color borderLight = outline;
-  static const Color accentSoft = Color(0xFF4A702A);
   static const Color backgroundDark = Color(0xFF1A1A1A);
 }
 
@@ -155,21 +160,21 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceVariant,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        fillColor: Colors.white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.outline),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           borderSide: const BorderSide(color: AppColors.error),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         hintStyle: AppTextStyles.bodyMedium.copyWith(color: Colors.grey),
       ),
       chipTheme: ChipThemeData(
@@ -191,10 +196,16 @@ class AppTheme {
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.onSurfaceVariant,
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: AppColors.primary,
         linearTrackColor: AppColors.outline,
         circularTrackColor: AppColors.outline,
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
     );
   }

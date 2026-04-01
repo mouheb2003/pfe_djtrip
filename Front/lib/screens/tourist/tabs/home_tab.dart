@@ -14,6 +14,43 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   List<ActivityModel> _activities = [];
   bool _isLoading = true;
+  String _selectedCategory = 'All';
+
+  static const List<_CategoryItem> _categories = [
+    _CategoryItem(
+      keyName: 'All',
+      label: 'Beaches',
+      imageUrl:
+          'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=300&q=80',
+    ),
+    _CategoryItem(
+      keyName: 'Hotels',
+      label: 'Hotels',
+      imageUrl:
+          'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=300&q=80',
+    ),
+    _CategoryItem(
+      keyName: 'Restaurants',
+      label: 'Restaurants',
+      imageUrl:
+          'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=300&q=80',
+    ),
+    _CategoryItem(
+      keyName: 'Activities',
+      label: 'Activities',
+      imageUrl:
+          'https://images.unsplash.com/photo-1531058020387-3be344556be6?auto=format&fit=crop&w=300&q=80',
+    ),
+    _CategoryItem(
+      keyName: 'Excursions',
+      label: 'Excursions',
+      imageUrl:
+          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80',
+    ),
+  ];
+
+  static const String _heroImage =
+      'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
 
   @override
   void initState() {
@@ -22,286 +59,340 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadActivities() async {
-    final activities = await ActivityService.getActivities();
-    if (mounted) {
-      setState(() {
-        _activities = activities;
-        _isLoading = false;
-      });
+    try {
+      final activities = await ActivityService.getActivities();
+      if (mounted) {
+        setState(() {
+          _activities = activities;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
+  List<ActivityModel> get _filteredActivities {
+    if (_selectedCategory == 'All') return _activities;
+
+    return _activities.where((activity) {
+      final categoryValue = activity.categorie.isNotEmpty
+          ? activity.categorie
+          : activity.typeActivite;
+      final category = categoryValue.toLowerCase().trim();
+      if (category.isEmpty) return false;
+      return category.contains(_selectedCategory.toLowerCase().trim());
+    }).toList();
+  }
+
+  List<ActivityModel> get _visibleActivities {
+    final items = _filteredActivities;
+    if (items.isNotEmpty) return items;
+    return _activities;
+  }
+
+  List<ActivityModel> get _topDestinations =>
+      _visibleActivities.take(6).toList();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // Sticky header
-          SliverAppBar(
-            pinned: true,
-            floating: false,
-            backgroundColor: AppColors.backgroundLight.withOpacity(0.9),
-            elevation: 0,
-            toolbarHeight: 80,
-            automaticallyImplyLeading: false,
-            flexibleSpace: FlexibleSpaceBar(
-              background: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Hello 👋',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Ready for Djerba?',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textGrey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.notifications,
-                              color: AppColors.textGrey,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 40,
-                            height: 40,
+      backgroundColor: const Color(0xFFF3F3F3),
+      body: RefreshIndicator(
+        onRefresh: _loadActivities,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            _HomeHero(backgroundImage: _heroImage, onExploreTap: () {}),
+            Transform.translate(
+              offset: const Offset(0, -32),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF3F3F3),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 60,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary,
-                                width: 2,
-                              ),
-                              image: const DecorationImage(
-                                image: NetworkImage(
-                                  'https://lh3.googleusercontent.com/aida-public/AB6AXuBLPto61KBzyBDDF39yUXzs8Q2zeQDMmBndekpHCHyoyiRTnQvf8-DnDRkatYSQ4RLLsmjZQ_9aN16DLdoHXaUJvv9uxE2K09jp6B7fpx6FpoxqzKBTcxbGmepjKE6i-J8zZJjKIjgeMfx9AqOSo6JAXPASSX60a-PpoF09TOcKESa3BWgPjTHzAEhEPpN-ClA3pxFLnvxGGRVv0PO2s2C4i4aIhs3OoBtSZH3CT4JJ4sfUU_5yx3gINjfWhTK7uoWom0CoDF_vChM',
+                              color: const Color(0xFFE8ECF2),
+                              borderRadius: BorderRadius.circular(36),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.search,
+                                  color: Color(0xFF7A8BA6),
+                                  size: 22,
                                 ),
-                                fit: BoxFit.cover,
-                              ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Search beaches, hotels, activities..',
+                                    style: TextStyle(
+                                      color: Color(0xFF7A8BA6),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF167BFF),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF167BFF,
+                                ).withOpacity(0.35),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.tune,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      height: 116,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _categories.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 14),
+                        itemBuilder: (context, index) {
+                          final c = _categories[index];
+                          return _CategoryAvatar(
+                            label: c.label,
+                            imageUrl: c.imageUrl,
+                            selected: _selectedCategory == c.keyName,
+                            onTap: () =>
+                                setState(() => _selectedCategory = c.keyName),
+                          );
+                        },
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Top Destinations',
+                            style: TextStyle(
+                              fontSize: 44 / 2,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {},
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF167BFF),
+                          ),
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(Icons.chevron_right, size: 18),
+                          label: const Text(
+                            'See All',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _isLoading
+                        ? const SizedBox(
+                            height: 240,
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : _topDestinations.isEmpty
+                        ? _EmptyDestinations(onRetry: _loadActivities)
+                        : SizedBox(
+                            height: 280,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _topDestinations.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 16),
+                              itemBuilder: (context, index) {
+                                final activity = _topDestinations[index];
+                                return _TopDestinationCard(
+                                  activity: activity,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ActivityDetailScreen(
+                                        activityId: activity.id,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                    const SizedBox(height: 20),
+                    const _PlanTripCard(),
+                    const SizedBox(height: 100),
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+      floatingActionButton: SizedBox(
+        width: 48,
+        height: 48,
+        child: FloatingActionButton(
+          onPressed: () {},
+          backgroundColor: const Color(0xFFFF6B1A),
+          elevation: 8,
+          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeHero extends StatelessWidget {
+  final String backgroundImage;
+  final VoidCallback onExploreTap;
+
+  const _HomeHero({required this.backgroundImage, required this.onExploreTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 520,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            backgroundImage,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(color: const Color(0xFF167BFF)),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.only(bottom: 20),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Search bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                  child: Row(
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xAA0B3E8E),
+                  Color(0x66167BFF),
+                  Color(0x22000000),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Expanded(
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 12),
-                              const Icon(
-                                Icons.search,
-                                color: AppColors.textGrey,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  "Search for an activity...",
-                                  style: TextStyle(
-                                    color: AppColors.textGrey,
-                                    fontSize: 14,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      const _HeroAvatar(),
+                      const Spacer(),
+                      const _HeroIcon(icon: Icons.chat_bubble_outline),
                       const SizedBox(width: 12),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.tune,
-                          color: Colors.white,
-                          size: 22,
-                        ),
+                      const _HeroIcon(
+                        icon: Icons.notifications_none,
+                        badge: '3',
                       ),
                     ],
                   ),
-                ),
-                // Category chips
-                SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    children: [
-                      _CategoryChip(label: 'All', selected: true),
-                      _CategoryChip(label: 'Water Sports'),
-                      _CategoryChip(label: 'Hiking'),
-                      _CategoryChip(label: 'Culture'),
-                      _CategoryChip(label: 'Gastronomy'),
-                      _CategoryChip(label: 'Cycling'),
-                    ],
+                  const Spacer(),
+                  const Text(
+                    'Discover the\nBeauty of',
+                    style: TextStyle(
+                      fontSize: 24,
+                      height: 1.05,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
-                // Featured section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Featured',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                  const Text(
+                    'Djerba',
+                    style: TextStyle(
+                      fontSize: 38,
+                      height: 0.9,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFFF6B1A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Explore, Relax, Enjoy.',
+                    style: TextStyle(
+                      fontSize: 17,
+                      color: Color(0xFFF1F5F9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                  SizedBox(
+                    width: 206,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: onExploreTap,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF167BFF),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(34),
                         ),
+                        elevation: 0,
                       ),
-                      Text(
-                        'See all',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 260,
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _activities.isEmpty
-                      ? const Center(child: Text('No activity available'))
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: _activities.length > 5
-                              ? 5
-                              : _activities.length,
-                          itemBuilder: (_, i) {
-                            final a = _activities[i];
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 20),
-                              child: _FeaturedCard(
-                                imageUrl: a.thumbnailUrl,
-                                title: a.titre,
-                                location: a.lieu,
-                                price: a.prixFormatted,
-                                rating: a.noteMoyenne.toStringAsFixed(1),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        ActivityDetailScreen(activityId: a.id),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                const SizedBox(height: 32),
-                // Recommended section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: const Text(
-                    'Recommended',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: _activities
-                        .skip(5)
-                        .take(8)
-                        .map(
-                          (a) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _RecommendedCard(
-                              imageUrl: a.thumbnailUrl,
-                              title: a.titre,
-                              location: a.lieu,
-                              rating: a.noteMoyenne.toStringAsFixed(1),
-                              reviews: a.nombreAvis.toString(),
-                              price: a.prixFormatted,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      ActivityDetailScreen(activityId: a.id),
-                                ),
-                              ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Explore Now',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                        )
-                        .toList(),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward, size: 18),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ]),
+                  const SizedBox(height: 6),
+                ],
+              ),
             ),
           ),
         ],
@@ -310,181 +401,88 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool selected;
+class _HeroIcon extends StatelessWidget {
+  final IconData icon;
+  final String? badge;
 
-  const _CategoryChip({required this.label, this.selected = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? AppColors.primary : const Color(0xFFE2E8F0),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? Colors.white : AppColors.textGrey,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeaturedCard extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String location;
-  final String price;
-  final String rating;
-  final VoidCallback onTap;
-
-  const _FeaturedCard({
-    required this.imageUrl,
-    required this.title,
-    required this.location,
-    required this.price,
-    required this.rating,
-    required this.onTap,
-  });
+  const _HeroIcon({required this.icon, this.badge});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 300,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                children: [
-                  SizedBox(
-                    height: 180,
-                    width: double.infinity,
-                    child: Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          Container(color: Colors.grey[200]),
-                    ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: Color(0xFFEAB308),
-                            size: 14,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            rating,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+          ),
+          child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
+        ),
+        if (badge != null)
+          Positioned(
+            right: -1,
+            top: -2,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF6B1A),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                badge!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                ),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        location,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      price,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const Text(
-                      'Per person',
-                      style: TextStyle(fontSize: 9, color: AppColors.textGrey),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+          ),
+      ],
+    );
+  }
+}
+
+class _HeroAvatar extends StatelessWidget {
+  const _HeroAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: ClipOval(
+        child: Image.network(
+          'https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=220&q=80',
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.person, color: Color(0xFF334155)),
         ),
       ),
     );
   }
 }
 
-class _RecommendedCard extends StatelessWidget {
+class _CategoryAvatar extends StatelessWidget {
+  final String label;
   final String imageUrl;
-  final String title;
-  final String location;
-  final String rating;
-  final String reviews;
-  final String price;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _RecommendedCard({
+  const _CategoryAvatar({
+    required this.label,
     required this.imageUrl,
-    required this.title,
-    required this.location,
-    required this.rating,
-    required this.reviews,
-    required this.price,
+    required this.selected,
     required this.onTap,
   });
 
@@ -492,109 +490,275 @@ class _RecommendedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? const Color(0xFF167BFF) : Colors.transparent,
+                width: 2.5,
+              ),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 96,
-                height: 96,
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: ClipOval(
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: Colors.grey[200]),
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFDDE3ED),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.image, color: Color(0xFF7A8BA6)),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 12,
-                        color: AppColors.textGrey,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        location,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: AppColors.primary,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            rating,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '($reviews)',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textGrey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        price,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w500,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopDestinationCard extends StatelessWidget {
+  final ActivityModel activity;
+  final VoidCallback onTap;
+
+  const _TopDestinationCard({required this.activity, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = activity.thumbnailUrl.isNotEmpty
+        ? activity.thumbnailUrl
+        : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 260,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(34),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.16),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFFD0D9E8)),
+              ),
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x4D000000),
+                      Color(0xAA000000),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      activity.titre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          color: Color(0xFFFFC529),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${activity.noteMoyenne.toStringAsFixed(1)} (${activity.nombreAvis})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanTripCard extends StatelessWidget {
+  const _PlanTripCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 226,
+      padding: const EdgeInsets.fromLTRB(22, 20, 16, 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDE9F3),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFCFE0EE)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Plan Your Perfect Trip',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Discover & Book in one place!',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: 188,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF6B1A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(34),
+                      ),
+                    ),
+                    child: const Text(
+                      'Get Started',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 126,
+            height: 126,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFB9DDED),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.beach_access,
+                color: Color(0xFF2A6388),
+                size: 48,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyDestinations extends StatelessWidget {
+  final Future<void> Function() onRetry;
+
+  const _EmptyDestinations({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 220,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_off, color: Color(0xFF7A8BA6), size: 34),
+            const SizedBox(height: 10),
+            const Text(
+              'No destinations yet',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
         ),
       ),
     );
   }
+}
+
+class _CategoryItem {
+  final String keyName;
+  final String label;
+  final String imageUrl;
+
+  const _CategoryItem({
+    required this.keyName,
+    required this.label,
+    required this.imageUrl,
+  });
 }

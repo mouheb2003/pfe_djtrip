@@ -7,7 +7,13 @@ const userSchema = new mongoose.Schema(
     age: Number,
     num_tel: String,
     email: { type: String, required: true, unique: true },
-    mot_de_passe: { type: String, required: true },
+    mot_de_passe: {
+      type: String,
+      required: function () {
+        // Password is required only for classic email/password accounts.
+        return !this.googleId && !this.facebookId;
+      },
+    },
     date_inscription: { type: Date, default: Date.now },
     avatar: String,
     bio: String,
@@ -55,6 +61,17 @@ const userSchema = new mongoose.Schema(
     emailVerified: { type: Boolean, default: false },
     verificationCode: String,
     verificationCodeExpiry: Date,
+    // Social authentication IDs
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    facebookId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     // Password reset fields
     passwordResetCode: String,
     passwordResetCodeExpiry: Date,
@@ -82,5 +99,7 @@ userSchema.index({ userType: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ favorites: 1 });
 userSchema.index({ accountStatus: 1, userType: 1 });
+userSchema.index({ googleId: 1 }, { sparse: true });
+userSchema.index({ facebookId: 1 }, { sparse: true });
 
 module.exports = User;

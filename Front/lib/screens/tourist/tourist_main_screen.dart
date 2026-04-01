@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
+import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
 import 'tabs/tourist_profile_tab.dart';
@@ -23,6 +24,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pages = [
+      const HomeTab(),
       const ExploreTab(),
       const MyActivitiesScreen(),
       const BookingsTab(),
@@ -60,10 +62,18 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _NavItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home,
+                  label: 'Home',
+                  index: 0,
+                  currentIndex: _currentIndex,
+                  onTap: _goToTab,
+                ),
+                _NavItem(
                   icon: Icons.explore_outlined,
                   activeIcon: Icons.explore,
                   label: 'Explore',
-                  index: 0,
+                  index: 1,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),
@@ -71,7 +81,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                   icon: Icons.event_note_outlined,
                   activeIcon: Icons.event_note,
                   label: 'Activities',
-                  index: 1,
+                  index: 2,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),
@@ -79,7 +89,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                   icon: Icons.calendar_today_outlined,
                   activeIcon: Icons.calendar_today,
                   label: 'Bookings',
-                  index: 2,
+                  index: 3,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),
@@ -87,7 +97,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                   icon: Icons.chat_bubble_outline,
                   activeIcon: Icons.chat_bubble,
                   label: 'Messages',
-                  index: 3,
+                  index: 4,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                   showDot: true,
@@ -96,7 +106,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
                   label: 'Profile',
-                  index: 4,
+                  index: 5,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),

@@ -35,14 +35,25 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   }
 
   Future<void> _loadActivities() async {
-    final active = await ActivityService.getMyActivities();
-    final archived = await ActivityService.getArchivedActivities();
-    if (mounted) {
-      setState(() {
-        _activeActivities = active;
-        _archivedActivities = archived;
-        _isLoading = false;
-      });
+    try {
+      final active = await ActivityService.getMyActivities();
+      final archived = await ActivityService.getArchivedActivities();
+      if (mounted) {
+        setState(() {
+          _activeActivities = active;
+          _archivedActivities = archived;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to refresh activities: $e')),
+        );
+      }
     }
   }
 
@@ -53,17 +64,19 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
 
     if (_searchQuery.isNotEmpty) {
       activities = activities
-          .where((a) =>
-              a.titre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              a.lieu.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .where(
+            (a) =>
+                a.titre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                a.lieu.toLowerCase().contains(_searchQuery.toLowerCase()),
+          )
           .toList();
     }
     return activities;
   }
 
   List<String> get _tabs => [
-        'Active (${_activeActivities.where((a) => a.statut == 'active').length})',
-      ];
+    'Active (${_activeActivities.where((a) => a.statut == 'active').length})',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +95,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                     const Spacer(),
                     const Text(
                       'My Activities',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const Spacer(),
                   ] else
@@ -100,9 +116,17 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           decoration: InputDecoration(
                             hintText: 'Search an activity...',
                             border: InputBorder.none,
-                            prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textGrey),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              size: 20,
+                              color: AppColors.textGrey,
+                            ),
                             suffixIcon: IconButton(
-                              icon: const Icon(Icons.close, size: 20, color: AppColors.textGrey),
+                              icon: const Icon(
+                                Icons.close,
+                                size: 20,
+                                color: AppColors.textGrey,
+                              ),
                               onPressed: () {
                                 setState(() {
                                   _isSearching = false;
@@ -111,7 +135,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                 });
                               },
                             ),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                            ),
                           ),
                           onChanged: (val) {
                             setState(() {
@@ -131,7 +157,11 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           color: AppColors.primary.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.search, color: AppColors.primary, size: 22),
+                        child: const Icon(
+                          Icons.search,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
                       ),
                     ),
                 ],
@@ -159,15 +189,21 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                               _tabs[i],
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                                color: active ? AppColors.primary : AppColors.textGrey,
+                                fontWeight: active
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: active
+                                    ? AppColors.primary
+                                    : AppColors.textGrey,
                               ),
                             ),
                           ),
                           Container(
                             height: 2,
                             width: 60,
-                            color: active ? AppColors.primary : Colors.transparent,
+                            color: active
+                                ? AppColors.primary
+                                : Colors.transparent,
                           ),
                         ],
                       ),
@@ -181,6 +217,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
               child: RefreshIndicator(
                 onRefresh: _loadActivities,
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   children: [
                     if (_isLoading)
@@ -191,11 +228,20 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           padding: const EdgeInsets.only(top: 60),
                           child: Column(
                             children: [
-                              Icon(Icons.event_busy, size: 64, color: Colors.grey[200]),
+                              Icon(
+                                Icons.event_busy,
+                                size: 64,
+                                color: Colors.grey[200],
+                              ),
                               const SizedBox(height: 16),
                               Text(
-                                _searchQuery.isNotEmpty ? 'No results for "$_searchQuery"' : 'No activities',
-                                style: const TextStyle(color: AppColors.textGrey, fontSize: 14),
+                                _searchQuery.isNotEmpty
+                                    ? 'No results for "$_searchQuery"'
+                                    : 'No activities',
+                                style: const TextStyle(
+                                  color: AppColors.textGrey,
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
@@ -211,16 +257,18 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                             badgeColor: a.statut == 'active'
                                 ? const Color(0xFF22C55E)
                                 : a.statut == 'brouillon'
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF6B7280),
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF6B7280),
                             title: a.titre,
-                            spots: '${a.nombreReservations}/${a.capaciteMax} places',
+                            spots:
+                                '${a.nombreReservations}/${a.capaciteMax} places',
                             price: a.prixFormatted,
                             onTap: () async {
                               final updated = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => EditActivityScreen(activity: a),
+                                  builder: (_) =>
+                                      EditActivityScreen(activity: a),
                                 ),
                               );
                               if (updated == true) _loadActivities();
