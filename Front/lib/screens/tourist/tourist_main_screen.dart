@@ -3,7 +3,7 @@ import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
-import 'tabs/bookings_tab.dart';
+import 'tabs/screen_network.dart';
 import 'tabs/tourist_profile_tab.dart';
 import '../shared/messages_screen.dart';
 
@@ -24,12 +24,15 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pages = [
-      const HomeTab(),
+      HomeTab(
+        onExploreTap: () => _goToTab(1),
+        onMessagesTap: () => _goToTab(5),
+      ),
       const ExploreTab(),
       const MyActivitiesScreen(),
-      const BookingsTab(),
-      const MessagesScreen(),
+      const ScreenNetwork(),
       TouristProfileTab(onNavigateToTab: _goToTab),
+      const MessagesScreen(),
     ];
   }
 
@@ -86,27 +89,18 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                   onTap: _goToTab,
                 ),
                 _NavItem(
-                  icon: Icons.calendar_today_outlined,
-                  activeIcon: Icons.calendar_today,
-                  label: 'Bookings',
+                  icon: Icons.public_outlined,
+                  activeIcon: Icons.public,
+                  label: 'Network',
                   index: 3,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),
                 _NavItem(
-                  icon: Icons.chat_bubble_outline,
-                  activeIcon: Icons.chat_bubble,
-                  label: 'Messages',
-                  index: 4,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
-                  showDot: true,
-                ),
-                _NavItem(
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
                   label: 'Profile',
-                  index: 5,
+                  index: 4,
                   currentIndex: _currentIndex,
                   onTap: _goToTab,
                 ),

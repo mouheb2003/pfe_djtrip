@@ -22,7 +22,9 @@ class InscriptionService {
     // Surface the backend/network error instead of returning an empty list silently.
     try {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception((body['message'] as String?) ?? 'Unable to load inscriptions');
+      throw Exception(
+        (body['message'] as String?) ?? 'Unable to load inscriptions',
+      );
     } catch (_) {
       throw Exception('Unable to load inscriptions');
     }
@@ -46,10 +48,7 @@ class InscriptionService {
     if (res.statusCode == 201) {
       return {'success': true, 'inscription': resBody['inscription']};
     }
-    return {
-      'success': false,
-      'message': resBody['message'] ?? 'Booking error',
-    };
+    return {'success': false, 'message': resBody['message'] ?? 'Booking error'};
   }
 
   /// Tourist: cancel an inscription.
@@ -68,7 +67,14 @@ class InscriptionService {
           .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
           .toList();
     }
-    return [];
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+        (body['message'] as String?) ?? 'Unable to load pending requests',
+      );
+    } catch (_) {
+      throw Exception('Unable to load pending requests');
+    }
   }
 
   /// Organizer: all requests (all statuses).
@@ -81,7 +87,46 @@ class InscriptionService {
           .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
           .toList();
     }
-    return [];
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+        (body['message'] as String?) ?? 'Unable to load organizer requests',
+      );
+    } catch (_) {
+      throw Exception('Unable to load organizer requests');
+    }
+  }
+
+  /// Organizer: inscriptions filtered by status and/or activity.
+  static Future<List<InscriptionModel>> getOrganizerInscriptions({
+    String? statut,
+    String? activiteId,
+  }) async {
+    final query = <String, String>{};
+    if (statut != null && statut.isNotEmpty) query['statut'] = statut;
+    if (activiteId != null && activiteId.isNotEmpty) {
+      query['activite_id'] = activiteId;
+    }
+
+    final res = await ApiClient.get(
+      '/inscriptions/organisateur/mes-demandes',
+      query: query.isEmpty ? null : query,
+    );
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = body['inscriptions'] as List? ?? [];
+      return list
+          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
+          .toList();
+    }
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+        (body['message'] as String?) ?? 'Unable to load organizer inscriptions',
+      );
+    } catch (_) {
+      throw Exception('Unable to load organizer inscriptions');
+    }
   }
 
   /// Organizer: approve an inscription.

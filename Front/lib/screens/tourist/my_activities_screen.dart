@@ -4,6 +4,7 @@ import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
 import '../shared/activity_detail_screen.dart';
 import '../../widgets/review_bottom_sheet.dart';
+import 'tabs/bookings_tab.dart';
 
 class MyActivitiesScreen extends StatefulWidget {
   const MyActivitiesScreen({super.key});
@@ -138,19 +139,27 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                     current: _tabIndex,
                     onTap: (i) => setState(() => _tabIndex = i),
                   ),
+                  _SegmentTab(
+                    label: 'Bookings',
+                    index: 3,
+                    current: _tabIndex,
+                    onTap: (i) => setState(() => _tabIndex = i),
+                  ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _isLoading
+            child: _isLoading && _tabIndex != 3
                 ? const Center(child: CircularProgressIndicator())
                 : _tabIndex == 0
                 ? _ActivityList(inscriptions: _upcoming, onRefresh: _load)
                 : _tabIndex == 1
                 ? _ActivityList(inscriptions: _inProgress, onRefresh: _load)
-                : _ActivityList(inscriptions: _past, onRefresh: _load),
+                : _tabIndex == 2
+                ? _ActivityList(inscriptions: _past, onRefresh: _load)
+                : const BookingsTab(),
           ),
         ],
       ),
@@ -239,7 +248,13 @@ class _ActivityList extends StatelessWidget {
         itemCount: inscriptions.length,
         itemBuilder: (_, i) => _ActivityCard(
           inscription: inscriptions[i],
-          isPast: inscriptions == (inscriptions.isNotEmpty ? inscriptions.first.statut == 'past' ? inscriptions : [] : []), // This is a bit complex, let's just pass a flag if needed or check statut
+          isPast:
+              inscriptions ==
+              (inscriptions.isNotEmpty
+                  ? inscriptions.first.statut == 'past'
+                        ? inscriptions
+                        : []
+                  : []), // This is a bit complex, let's just pass a flag if needed or check statut
         ),
       ),
     );
@@ -258,10 +273,8 @@ class _ActivityCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ReviewBottomSheet(
-        activiteId: activityId,
-        activityTitle: title,
-      ),
+      builder: (context) =>
+          ReviewBottomSheet(activiteId: activityId, activityTitle: title),
     );
   }
 
@@ -388,9 +401,11 @@ class _ActivityCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    if (inscription.statut == 'approuvee' && activityId.isNotEmpty)
+                    if (inscription.statut == 'approuvee' &&
+                        activityId.isNotEmpty)
                       ElevatedButton(
-                        onPressed: () => _showReviewSheet(context, activityId, title),
+                        onPressed: () =>
+                            _showReviewSheet(context, activityId, title),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: cs.surface,
                           foregroundColor: AppColors.primary,

@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const { verifyToken } = require("../middleware/auth");
+const imageUpload = require("../middleware/upload");
 const messageController = require("../controllers/message");
 
 const audioUpload = multer({
@@ -48,6 +49,11 @@ router.use(verifyToken);
 router.get("/conversations", messageController.getConversations);
 router.get("/with/:partnerId", messageController.getMessages);
 router.post("/with/:partnerId", messageController.sendMessage);
+router.post(
+  "/with/:partnerId/image",
+  imageUpload.single("image"),
+  messageController.sendImageMessage,
+);
 router.post(
   "/with/:partnerId/audio",
   audioUpload.single("audio"),

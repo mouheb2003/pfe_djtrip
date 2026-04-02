@@ -2,12 +2,12 @@ const Message = require("../models/message");
 const User = require("../models/user");
 const cloudinary = require("../config/cloudinary");
 
-const uploadMediaBuffer = (buffer, folder) =>
+const uploadMediaBuffer = (buffer, folder, resourceType = "video") =>
   new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
-        resource_type: "video",
+        resource_type: resourceType,
       },
       (error, result) => {
         if (error) return reject(error);
@@ -124,6 +124,38 @@ exports.sendMessage = async (req, res) => {
       sender_id: senderId,
       receiver_id: partnerId,
       content: content.trim(),
+    });
+
+    await msg.save();
+    res.status(201).json({ message: msg });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Send an image message to a specific partner
+exports.sendImageMessage = async (req, res) => {
+  try {
+    const senderId = req.user.userId;
+    const { partnerId } = req.params;
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ message: "Image file is required" });
+    }
+
+    const uploaded = await uploadMediaBuffer(
+      req.file.buffer,
+      "djtrip/messages/image",
+      "image",
+    );
+
+    const msg = new Message({
+      sender_id: senderId,
+      receiver_id: partnerId,
+      content: "🖼️ Image message",
+      message_type: "image",
+      media_url: uploaded.secure_url,
+      media_duration: 0,
     });
 
     await msg.save();

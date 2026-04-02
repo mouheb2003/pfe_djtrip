@@ -67,7 +67,6 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                   index: 2,
                   currentIndex: _currentIndex,
                   onTap: (i) => setState(() => _currentIndex = i),
-                  badgeCount: 3,
                 ),
                 _OrgNavItem(
                   icon: Icons.chat_bubble,

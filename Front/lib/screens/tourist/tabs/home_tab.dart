@@ -5,7 +5,14 @@ import '../../../services/activity_service.dart';
 import '../../shared/activity_detail_screen.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  final VoidCallback onExploreTap;
+  final VoidCallback onMessagesTap;
+
+  const HomeTab({
+    super.key,
+    required this.onExploreTap,
+    required this.onMessagesTap,
+  });
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -108,7 +115,11 @@ class _HomeTabState extends State<HomeTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
-            _HomeHero(backgroundImage: _heroImage, onExploreTap: () {}),
+            _HomeHero(
+              backgroundImage: _heroImage,
+              onExploreTap: widget.onExploreTap,
+              onMessagesTap: widget.onMessagesTap,
+            ),
             Transform.translate(
               offset: const Offset(0, -32),
               child: Container(
@@ -284,8 +295,13 @@ class _HomeTabState extends State<HomeTab> {
 class _HomeHero extends StatelessWidget {
   final String backgroundImage;
   final VoidCallback onExploreTap;
+  final VoidCallback onMessagesTap;
 
-  const _HomeHero({required this.backgroundImage, required this.onExploreTap});
+  const _HomeHero({
+    required this.backgroundImage,
+    required this.onExploreTap,
+    required this.onMessagesTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -324,12 +340,12 @@ class _HomeHero extends StatelessWidget {
                     children: [
                       const _HeroAvatar(),
                       const Spacer(),
-                      const _HeroIcon(icon: Icons.chat_bubble_outline),
-                      const SizedBox(width: 12),
-                      const _HeroIcon(
-                        icon: Icons.notifications_none,
-                        badge: '3',
+                      _HeroIcon(
+                        icon: Icons.chat_bubble_outline,
+                        onTap: onMessagesTap,
                       ),
+                      const SizedBox(width: 12),
+                      const _HeroIcon(icon: Icons.notifications_none),
                     ],
                   ),
                   const Spacer(),
@@ -403,47 +419,24 @@ class _HomeHero extends StatelessWidget {
 
 class _HeroIcon extends StatelessWidget {
   final IconData icon;
-  final String? badge;
+  final VoidCallback? onTap;
 
-  const _HeroIcon({required this.icon, this.badge});
+  const _HeroIcon({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-          child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
         ),
-        if (badge != null)
-          Positioned(
-            right: -1,
-            top: -2,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFF6B1A),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                badge!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ),
-      ],
+        child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
+      ),
     );
   }
 }

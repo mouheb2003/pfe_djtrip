@@ -55,6 +55,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   // Pricing
   final _priceCtrl = TextEditingController(text: '0.00');
+  late final FocusNode _priceFocus = FocusNode();
   final _capacityCtrl = TextEditingController();
 
   // Location
@@ -63,9 +64,13 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   // Date & Time
   DateTime? _startDateTime;
+  DateTime? _endDateTime;
 
   // Duration
   _DurOption? _selectedDuration;
+  int _customHours = 0;
+  int _customMinutes = 30;
+  bool _isCustom = false;
 
   bool _isLoading = false;
 
@@ -81,6 +86,18 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _priceFocus.addListener(() {
+      if (_priceFocus.hasFocus && _priceCtrl.text == '0.00') {
+        _priceCtrl.clear();
+      } else if (!_priceFocus.hasFocus && _priceCtrl.text.isEmpty) {
+        _priceCtrl.text = '0.00';
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
@@ -88,6 +105,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     _capacityCtrl.dispose();
     _locationCtrl.dispose();
     _reqCtrl.dispose();
+    _priceFocus.dispose();
     super.dispose();
   }
 
@@ -147,12 +165,18 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         time.hour,
         time.minute,
       );
+      // Auto-calculate end date if duration is selected
+      if (_selectedDuration != null) {
+        _endDateTime = _startDateTime!.add(
+          Duration(minutes: (_selectedDuration!.hours * 60).round()),
+        );
+      }
     });
   }
 
   Future<void> _publish() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedDuration == null) {
+    if (_selectedDuration == null && !_isCustom) {
       _showError('Please select a duration.');
       return;
     }
@@ -163,9 +187,13 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
     setState(() => _isLoading = true);
 
-    final endDateTime = _startDateTime!.add(
-      Duration(minutes: (_selectedDuration!.hours * 60).round()),
-    );
+    final double durationHours = _isCustom
+        ? _customHours + (_customMinutes / 60.0)
+        : _selectedDuration!.hours;
+
+    final endDateTime =
+        _endDateTime ??
+        _startDateTime!.add(Duration(minutes: (durationHours * 60).round()));
 
     final result = await ActivityService.createActivity(
       titre: _titleCtrl.text.trim(),
@@ -174,7 +202,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       prix: double.tryParse(_priceCtrl.text) ?? 0,
       capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
       lieu: _locationCtrl.text.trim(),
-      duree: _selectedDuration!.hours,
+      duree: durationHours,
       dateDebut: _startDateTime!,
       dateFin: endDateTime,
       photos: _photos.map((x) => File(x.path)).toList(),
@@ -207,6 +235,216 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
+
+  void _showCustomDurationPicker() {
+    int tempH = _customHours;
+    int tempM = _customMinutes;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Custom Duration',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select hours and minutes',
+                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Hours',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[500],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 160,
+                          child: ListWheelScrollView.useDelegate(
+                            itemExtent: 44,
+                            perspective: 0.004,
+                            diameterRatio: 1.6,
+                            physics: const FixedExtentScrollPhysics(),
+                            controller: FixedExtentScrollController(
+                              initialItem: tempH,
+                            ),
+                            onSelectedItemChanged: (i) =>
+                                setModal(() => tempH = i),
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 13,
+                              builder: (ctx, i) => Center(
+                                child: Text(
+                                  '$i h',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: tempH == i
+                                        ? FontWeight.bold
+                                        : FontWeight.w400,
+                                    color: tempH == i
+                                        ? AppColors.primary
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Text(
+                      ':',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Minutes',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[500],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 160,
+                          child: ListWheelScrollView.useDelegate(
+                            itemExtent: 44,
+                            perspective: 0.004,
+                            diameterRatio: 1.6,
+                            physics: const FixedExtentScrollPhysics(),
+                            controller: FixedExtentScrollController(
+                              initialItem: tempM ~/ 5,
+                            ),
+                            onSelectedItemChanged: (i) =>
+                                setModal(() => tempM = i * 5),
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 12,
+                              builder: (ctx, i) {
+                                final mins = i * 5;
+                                return Center(
+                                  child: Text(
+                                    '${mins.toString().padLeft(2, '0')} min',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: tempM == mins
+                                          ? FontWeight.bold
+                                          : FontWeight.w400,
+                                      color: tempM == mins
+                                          ? AppColors.primary
+                                          : Colors.grey[500],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  tempH == 0 && tempM == 0
+                      ? 'Invalid duration (min. 5 min)'
+                      : '${tempH}h ${tempM}m',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (tempH == 0 && tempM == 0) return;
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _customHours = tempH;
+                      _customMinutes = tempM;
+                      _isCustom = true;
+                      _selectedDuration = null;
+                      // Auto-calculate end date
+                      if (_startDateTime != null) {
+                        final totalMinutes = (tempH * 60 + tempM).toDouble();
+                        _endDateTime = _startDateTime!.add(
+                          Duration(minutes: totalMinutes.round()),
+                        );
+                      }
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Confirm',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   //  Build
@@ -295,6 +533,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             _FieldLabel('Price per person'),
             TextFormField(
               controller: _priceCtrl,
+              focusNode: _priceFocus,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -388,7 +627,67 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             const SizedBox(height: 14),
 
             _FieldLabel('Duration'),
-            _durationDropdown(),
+            Row(
+              children: [
+                Expanded(child: _durationDropdown()),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _showCustomDurationPicker,
+                  child: Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: _isCustom ? AppColors.primary : Colors.white,
+                      border: Border.all(
+                        color: _isCustom
+                            ? AppColors.primary
+                            : AppColors.borderLight,
+                        width: 1.2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.tune,
+                      color: _isCustom ? Colors.white : AppColors.textGrey,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_selectedDuration != null || _isCustom) ...[
+              const SizedBox(height: 14),
+              _FieldLabel('End Date & Time'),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderLight, width: 1.2),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _endDateTime != null
+                            ? DateFormat(
+                                'MM/dd/yyyy, hh:mm a',
+                              ).format(_endDateTime!)
+                            : 'Auto-calculated',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.lock, size: 18, color: Colors.grey[400]),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 40),
 
             //  Preview + Publish
@@ -780,7 +1079,8 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         ),
       ),
       icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      validator: (v) => v == null ? 'Please select a duration' : null,
+      validator: (v) =>
+          v == null && !_isCustom ? 'Please select a duration' : null,
       items: _kDurOptions
           .map(
             (opt) => DropdownMenuItem<_DurOption>(
@@ -789,7 +1089,20 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             ),
           )
           .toList(),
-      onChanged: (v) => setState(() => _selectedDuration = v),
+      onChanged: (v) {
+        setState(() {
+          _selectedDuration = v;
+          _isCustom = false;
+          // Auto-calculate end date if start date is set
+          if (_startDateTime != null && v != null) {
+            _endDateTime = _startDateTime!.add(
+              Duration(minutes: (v.hours * 60).round()),
+            );
+          } else {
+            _endDateTime = null;
+          }
+        });
+      },
     );
   }
 

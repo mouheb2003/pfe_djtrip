@@ -30,7 +30,9 @@ class MessageService {
     try {
       final body = jsonDecode(res.body);
       if (body is Map<String, dynamic>) {
-        throw Exception((body['message'] as String?) ?? 'Unable to load conversations');
+        throw Exception(
+          (body['message'] as String?) ?? 'Unable to load conversations',
+        );
       }
     } catch (_) {
       // Ignore JSON parse errors and fall through to generic message.
@@ -82,6 +84,50 @@ class MessageService {
       return {
         'success': false,
         'messageText': 'Network error while sending message',
+      };
+    }
+  }
+
+  /// Send an image message file to partner through multipart endpoint.
+  static Future<Map<String, dynamic>> sendImageMessage({
+    required String partnerId,
+    required File imageFile,
+  }) async {
+    try {
+      final token = await AuthService.getAccessToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'messageText': 'Session expired.'};
+      }
+
+      final uri = Uri.parse(
+        '${ApiClient.baseUrl}/messages/with/$partnerId/image',
+      );
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
+      final res = await http.Response.fromStream(streamed);
+      final body = _safeDecodeObject(res.body);
+
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        final msg = body['message'] as Map<String, dynamic>?;
+        if (msg != null) return {'success': true, 'message': msg};
+      }
+      return {
+        'success': false,
+        'messageText':
+            body['message'] ??
+            'Error sending image message (code ${res.statusCode})',
+      };
+    } on TimeoutException {
+      return {'success': false, 'messageText': 'Image upload timed out.'};
+    } catch (e) {
+      return {
+        'success': false,
+        'messageText': 'Network error while sending image: $e',
       };
     }
   }
@@ -201,10 +247,7 @@ class MessageService {
         'messageText': body['message'] ?? 'Error editing message',
       };
     } catch (_) {
-      return {
-        'success': false,
-        'messageText': 'Network error during edit',
-      };
+      return {'success': false, 'messageText': 'Network error during edit'};
     }
   }
 

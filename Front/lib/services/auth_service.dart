@@ -3,10 +3,20 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_client.dart';
+import '../config/oauth_config.dart';
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
-  static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  /// GoogleSignIn with serverClientId for proper idToken generation
+  /// serverClientId is the Google Web Client ID from Google Cloud Console
+  /// This is REQUIRED to get ID tokens for backend authentication
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: OAuthConfig.googleServerClientId.isNotEmpty
+        ? OAuthConfig.googleServerClientId
+        : null,
+    scopes: ['email', 'profile'],
+  );
 
   static const _keyAccess = 'djtrip_access_token';
   static const _keyRefresh = 'djtrip_refresh_token';
@@ -127,10 +137,7 @@ class AuthService {
         };
       }
 
-      return {
-        'success': false,
-        'message': body['message'] ?? 'Sign-in error',
-      };
+      return {'success': false, 'message': body['message'] ?? 'Sign-in error'};
     } catch (_) {
       return {
         'success': false,
@@ -179,10 +186,7 @@ class AuthService {
         return {'success': true, 'user': user};
       }
 
-      return {
-        'success': false,
-        'message': body['message'] ?? 'Sign-up error',
-      };
+      return {'success': false, 'message': body['message'] ?? 'Sign-up error'};
     } catch (_) {
       return {
         'success': false,
@@ -342,10 +346,7 @@ class AuthService {
       final result = await FacebookAuth.instance.login();
 
       if (result.status == LoginStatus.cancelled) {
-        return {
-          'success': false,
-          'message': 'Facebook sign-in was cancelled.',
-        };
+        return {'success': false, 'message': 'Facebook sign-in was cancelled.'};
       }
 
       if (result.status != LoginStatus.success || result.accessToken == null) {

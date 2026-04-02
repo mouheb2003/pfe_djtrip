@@ -81,14 +81,6 @@ class _BookingsTabState extends State<BookingsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text(
-          'My Reservations',
-          style: TextStyle(fontSize: 31, fontWeight: FontWeight.w800),
-        ),
-        automaticallyImplyLeading: false,
-      ),
       body: Column(
         children: [
           // Tab selector
@@ -161,7 +153,8 @@ class _BookingsTabState extends State<BookingsTab> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => BookingDetailScreen(inscription: ins),
+                                builder: (_) =>
+                                    BookingDetailScreen(inscription: ins),
                               ),
                             );
                           },

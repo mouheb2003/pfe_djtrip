@@ -19,7 +19,7 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
-  static const LatLng _defaultCenter = LatLng(36.7372, 3.0863); // Algiers
+  static const LatLng _defaultCenter = LatLng(33.8076, 10.8451); // Djerba
 
   late LatLng _pickedLatLng;
   String _address = '';

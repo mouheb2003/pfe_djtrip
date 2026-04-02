@@ -10,11 +10,7 @@ class LieuxMapScreen extends StatefulWidget {
   final List<LieuModel> lieux;
   final String? initialLieuId;
 
-  const LieuxMapScreen({
-    super.key,
-    required this.lieux,
-    this.initialLieuId,
-  });
+  const LieuxMapScreen({super.key, required this.lieux, this.initialLieuId});
 
   @override
   State<LieuxMapScreen> createState() => _LieuxMapScreenState();
@@ -25,10 +21,23 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
   GoogleMapController? _controller;
   LieuModel? _selectedLieu;
   LatLng? _longPressedPoint;
+  String? _pickerLieuId;
 
   List<LieuModel> get _mappableLieux => widget.lieux
       .where((l) => l.latitude != null && l.longitude != null)
       .toList(growable: false);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialLieuId != null) {
+      final match = _mappableLieux.where((l) => l.id == widget.initialLieuId);
+      if (match.isNotEmpty) {
+        _selectedLieu = match.first;
+        _pickerLieuId = match.first.id;
+      }
+    }
+  }
 
   LatLng get _initialCenter {
     if (_mappableLieux.isEmpty) return _fallbackCenter;
@@ -44,20 +53,22 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
 
   Set<Marker> get _markers {
     final markers = _mappableLieux.map((l) {
+      final selected = _selectedLieu?.id == l.id;
+      final hue = selected
+          ? BitmapDescriptor.hueAzure
+          : l.topDestination
+          ? BitmapDescriptor.hueOrange
+          : BitmapDescriptor.hueRed;
       return Marker(
         markerId: MarkerId(l.id),
         position: LatLng(l.latitude!, l.longitude!),
-        icon:
-            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        icon: BitmapDescriptor.defaultMarkerWithHue(hue),
         infoWindow: InfoWindow(
           title: l.titre,
           snippet: l.sousTitre,
           onTap: () => _openDetail(l),
         ),
-        onTap: () => setState(() {
-          _selectedLieu = l;
-          _longPressedPoint = null;
-        }),
+        onTap: () => _selectLieu(l, animate: false),
       );
     }).toSet();
 
@@ -72,6 +83,19 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
       );
     }
     return markers;
+  }
+
+  Future<void> _selectLieu(LieuModel lieu, {bool animate = true}) async {
+    setState(() {
+      _selectedLieu = lieu;
+      _pickerLieuId = lieu.id;
+      _longPressedPoint = null;
+    });
+
+    if (!animate || _controller == null) return;
+    await _controller!.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(lieu.latitude!, lieu.longitude!), 14),
+    );
   }
 
   void _openDetail(LieuModel l) {
@@ -103,15 +127,21 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
     final lat = point.latitude;
     final lng = point.longitude;
 
-    // Try to open Google Maps app first (via geo:), then fall back to HTTPS.
+    final googleNavigationUri = Uri.parse(
+      'google.navigation:q=$lat,$lng&mode=d',
+    );
     final geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng');
     final directionsUri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving',
     );
-    final playUri = Uri.parse(
-      'https://play.google.com/store/apps/details?id=com.google.android.apps.maps',
-    );
 
+    if (await canLaunchUrl(googleNavigationUri)) {
+      await launchUrl(
+        googleNavigationUri,
+        mode: LaunchMode.externalApplication,
+      );
+      return;
+    }
     if (await canLaunchUrl(geoUri)) {
       await launchUrl(geoUri, mode: LaunchMode.externalApplication);
       return;
@@ -119,9 +149,6 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
     if (await canLaunchUrl(directionsUri)) {
       await launchUrl(directionsUri, mode: LaunchMode.externalApplication);
       return;
-    }
-    if (await canLaunchUrl(playUri)) {
-      await launchUrl(playUri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -132,10 +159,73 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
   }
 
   Future<void> _focusOn(LieuModel l) async {
-    if (_controller == null || l.latitude == null || l.longitude == null) return;
-    setState(() => _selectedLieu = l);
-    await _controller!.animateCamera(
-      CameraUpdate.newLatLngZoom(LatLng(l.latitude!, l.longitude!), 14),
+    if (l.latitude == null || l.longitude == null) return;
+    await _selectLieu(l);
+  }
+
+  Widget _buildPickerCard(ColorScheme cs) {
+    if (_mappableLieux.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surface.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Picker un lieu',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _pickerLieuId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: cs.surfaceVariant,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.outline),
+              ),
+            ),
+            hint: const Text('Choisir un lieu'),
+            items: _mappableLieux
+                .map(
+                  (l) => DropdownMenuItem<String>(
+                    value: l.id,
+                    child: Text(
+                      l.titre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value == null) return;
+              final match = _mappableLieux.where((l) => l.id == value);
+              if (match.isNotEmpty) {
+                _focusOn(match.first);
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -143,9 +233,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Carte des lieux'),
-      ),
+      appBar: AppBar(title: const Text('Carte des lieux')),
       body: Stack(
         children: [
           GoogleMap(
@@ -154,22 +242,35 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
               zoom: _mappableLieux.isEmpty ? 10 : 12,
             ),
             onMapCreated: (c) => _controller = c,
+            mapType: MapType.normal,
+            myLocationEnabled: false,
+            myLocationButtonEnabled: true,
+            compassEnabled: true,
+            zoomControlsEnabled: false,
+            tiltGesturesEnabled: true,
+            rotateGesturesEnabled: true,
+            mapToolbarEnabled: false,
             onTap: (_) => setState(() {
               _selectedLieu = null;
+              _pickerLieuId = null;
               _longPressedPoint = null;
             }),
             onLongPress: (point) => setState(() {
               _selectedLieu = null;
+              _pickerLieuId = null;
               _longPressedPoint = point;
             }),
             markers: _markers,
-            myLocationEnabled: false,
-            mapToolbarEnabled: false,
-            zoomControlsEnabled: true,
+          ),
+          Positioned(
+            top: 12,
+            left: 12,
+            right: 12,
+            child: SafeArea(bottom: false, child: _buildPickerCard(cs)),
           ),
           if (_mappableLieux.isEmpty)
             Positioned(
-              top: 12,
+              top: 86,
               left: 12,
               right: 12,
               child: Container(
@@ -183,11 +284,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                 ),
                 child: const Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.white,
-                      size: 16,
-                    ),
+                    Icon(Icons.info_outline, color: Colors.white, size: 16),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -203,7 +300,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
             Positioned(
               left: 12,
               right: 12,
-              top: 12,
+              top: 92,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -261,13 +358,13 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                         TextButton.icon(
                           onPressed: _openDirectionsToSelectedLieu,
                           icon: const Icon(Icons.alt_route, size: 16),
-                          label: const Text('Itinerary'),
+                          label: const Text('Itinéraire'),
                         ),
                         const SizedBox(width: 6),
                         TextButton.icon(
                           onPressed: () => _openDetail(_selectedLieu!),
                           icon: const Icon(Icons.info_outline, size: 16),
-                          label: const Text('View details'),
+                          label: const Text('Détails'),
                         ),
                       ],
                     ),
@@ -298,8 +395,11 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.place,
-                            color: AppColors.primary, size: 18),
+                        const Icon(
+                          Icons.place,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -322,7 +422,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                         onPressed: () =>
                             _openItineraryToLatLng(_longPressedPoint!),
                         icon: const Icon(Icons.alt_route, size: 16),
-                        label: const Text('Itinerary'),
+                        label: const Text('Itinéraire'),
                       ),
                     ),
                   ],
@@ -362,12 +462,10 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                         decoration: BoxDecoration(
                           color: selected
                               ? AppColors.primary.withOpacity(0.08)
-                                : cs.surfaceVariant,
+                              : cs.surfaceVariant,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: selected
-                                ? AppColors.primary
-                                  : cs.outline,
+                            color: selected ? AppColors.primary : cs.outline,
                           ),
                         ),
                         child: Row(

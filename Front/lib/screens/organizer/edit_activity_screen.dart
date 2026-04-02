@@ -45,6 +45,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   late String? _category;
   late final TextEditingController _descCtrl;
   late final TextEditingController _priceCtrl;
+  late final FocusNode _priceFocus = FocusNode();
   late final TextEditingController _capacityCtrl;
   late final TextEditingController _locationCtrl;
 
@@ -102,6 +103,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       // snap minutes to nearest 5
       _customMinutes = (_customMinutes / 5).round() * 5;
     }
+
+    // Setup price field focus listener
+    _priceFocus.addListener(() {
+      if (_priceFocus.hasFocus && _priceCtrl.text == '0.00') {
+        _priceCtrl.clear();
+      } else if (!_priceFocus.hasFocus && _priceCtrl.text.isEmpty) {
+        _priceCtrl.text = '0.00';
+      }
+    });
   }
 
   @override
@@ -111,6 +121,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     _priceCtrl.dispose();
     _capacityCtrl.dispose();
     _locationCtrl.dispose();
+    _priceFocus.dispose();
     super.dispose();
   }
 
@@ -511,7 +522,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             _inputField(
               controller: _titleCtrl,
               hint: 'e.g. Desert Safari in Douz',
-              validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Required field' : null,
             ),
             const SizedBox(height: 14),
 
@@ -524,7 +536,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               controller: _descCtrl,
               minLines: 4,
               maxLines: 6,
-              validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Required field' : null,
               decoration: _inputDecoration(
                 'Tell participants what makes this activity special...',
               ),
@@ -544,13 +557,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             _FieldLabel('Price per person'),
             TextFormField(
               controller: _priceCtrl,
+              focusNode: _priceFocus,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
               ],
-              validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Required field' : null,
               decoration: _inputDecoration('0.00').copyWith(
                 suffixText: 'TND',
                 suffixStyle: const TextStyle(
@@ -567,7 +582,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               hint: 'e.g. 15',
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Required field' : null,
             ),
             const SizedBox(height: 24),
 
@@ -578,7 +594,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               controller: _locationCtrl,
               hint: 'Enter activity address',
               prefixIcon: Icons.search,
-              validator: (v) => v == null || v.isEmpty ? 'Required field' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Required field' : null,
             ),
             const SizedBox(height: 10),
             _mapPickerButton(),
