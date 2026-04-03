@@ -9,23 +9,23 @@ class DJTripLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.accent, AppColors.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Text(
-        'DJTrip',
-        style: TextStyle(
-          fontSize: size * 0.25,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-          letterSpacing: 2,
-        ),
+      child: Image.asset(
+        'assets/logos/logo2.png',
+        height: size,
+        width: size,
+        fit: BoxFit.contain,
       ),
     );
   }

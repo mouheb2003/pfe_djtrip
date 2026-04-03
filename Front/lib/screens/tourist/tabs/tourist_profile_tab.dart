@@ -21,10 +21,12 @@ class TouristProfileTab extends StatefulWidget {
 
 class _TouristProfileTabState extends State<TouristProfileTab> {
   UserModel? _user;
-  int _bookingsCount = 0;
-  int _favoritesCount = 0;
+  int _postsCount = 0;
+  int _followers = 0;
+  int _following = 0;
   bool _savingInterests = false;
   List<InscriptionModel> _recentActivities = [];
+  String _selectedTab = 'Posts';
 
   @override
   void initState() {
@@ -43,18 +45,19 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       recentActivitiesFuture,
     ]);
     if (!mounted) return;
-    
+
     final userData = results[0] as Map<String, dynamic>?;
     final user = userData != null ? UserModel.fromJson(userData) : null;
-    
+
     setState(() {
       _user = user;
       final stats = results[1] as Map<String, dynamic>;
-      _bookingsCount = (stats['totalBookings'] as num?)?.toInt() ?? 0;
-      _favoritesCount = (results[2] as List).length;
+      _postsCount = (stats['totalBookings'] as num?)?.toInt() ?? 0;
+      _followers = (stats['followers'] as num?)?.toInt() ?? 1200;
+      _following = (stats['following'] as num?)?.toInt() ?? 500;
       _recentActivities = (results[3] as List<InscriptionModel>)
           .where((i) => i.statut == 'approuvee')
-          .take(5)
+          .take(6)
           .toList();
     });
   }
@@ -121,9 +124,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       (e) => e.toLowerCase().trim() == interest.toLowerCase(),
     );
     if (exists) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('This interest already exists.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This interest already exists.')),
+      );
       return;
     }
 
@@ -170,14 +173,17 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // Cover gradient
+                    // Cover image
                     Container(
-                      height: 192,
-                      decoration: const BoxDecoration(
+                      height: 320,
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [AppColors.primary, AppColors.primaryLight],
+                          colors: [
+                            const Color(0xFF87CEEB).withOpacity(0.8),
+                            const Color(0xFF4A90E2).withOpacity(0.8),
+                          ],
                         ),
                       ),
                     ),
@@ -250,85 +256,123 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         ],
                       ),
                     ),
-                    // Profile avatar
+                    // Profile avatar (bottom left)
                     Positioned(
-                      bottom: -56,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          width: 128,
-                          height: 128,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 12,
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: _user?.avatar != null
-                                ? Image.network(
-                                    _user!.avatar!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                : const Icon(
+                      bottom: 16,
+                      left: 16,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: _user?.avatar != null
+                              ? Image.network(
+                                  _user!.avatar!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
                                     Icons.person,
                                     size: 48,
                                     color: Colors.grey,
                                   ),
-                          ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  size: 48,
+                                  color: Colors.grey,
+                                ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 70),
-                // Name and location
-                Text(
-                  _user?.fullname ?? 'User',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 20),
+                // Name and user type
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _user?.fullname ?? 'User',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _user?.userType == 'Organisator'
+                                ? 'Organizer'
+                                : 'Travel Lover',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textGrey,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Following button or Edit
+                      _user?.userType != 'Organisator'
+                          ? FilledButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const EditProfileScreen(),
+                                ),
+                              ).then((_) => _loadAll()),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                              ),
+                              child: const Text(
+                                'Edit',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('📍', style: TextStyle(fontSize: 18)),
-                    const SizedBox(width: 6),
-                    Text(
-                      _user?.paysOrigine ?? 'Country not specified',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textGrey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 12),
+                // Bio
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    _user?.bio?.isNotEmpty == true
-                        ? _user!.bio!
-                        : 'Add a bio from your profile to introduce yourself to organizers.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      height: 1.5,
-                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '✈️ ${_user?.bio?.isNotEmpty == true ? _user!.bio! : 'Travel lover exploring the world'}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '@${(_user?.email?.split('@').firstOrNull ?? 'username').toLowerCase()} • ${_user?.paysOrigine ?? 'Country'}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -338,223 +382,204 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: _StatBox(
-                          value: '$_bookingsCount',
-                          label: 'Bookings',
-                        ),
+                        child: _StatBox(value: '$_postsCount', label: 'Posts'),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const FavoritesScreen(),
-                            ),
-                          ).then((_) => _loadAll()),
-                          child: _StatBox(
-                            value: '$_favoritesCount',
-                            label: 'Favorites',
-                          ),
+                        child: _StatBox(
+                          value: _followers > 1000
+                              ? '${(_followers / 1000).toStringAsFixed(1)}K'
+                              : '$_followers',
+                          label: 'Followers',
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _StatBox(
-                          value: '${_user?.nombreAvis ?? 0}',
-                          label: 'Reviews',
+                          value: '$_following',
+                          label: 'Following',
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Interests
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Interests',
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            alignment: WrapAlignment.start,
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              ...(_user?.centresInteret ?? const <String>[])
-                                  .map(
-                                    (interest) => _InterestChip(
-                                      label: interest,
-                                      active: true,
-                                      onDelete: _savingInterests
-                                          ? null
-                                          : () => _removeInterest(interest),
-                                    ),
-                                  ),
-                              _InterestChip(
-                                label: _savingInterests
-                                    ? 'Adding...'
-                                    : '+ Add More',
-                                active: false,
-                                onTap: _savingInterests
-                                    ? null
-                                    : _promptAddInterest,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Action buttons
+                // Tabs (Posts, Interests, etc)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.edit, size: 18),
-                          label: const Text('Edit Profile'),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const EditProfileScreen(),
-                            ),
-                          ).then((_) => _loadAll()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shadowColor: AppColors.primary.withOpacity(0.25),
-                            elevation: 4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.settings, size: 18),
-                          label: const Text('Settings'),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SettingsScreen(),
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE2E8F0),
-                            foregroundColor: AppColors.textDark,
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                // My Last Activities
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'My Last Activities',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                       GestureDetector(
-                        onTap: () => widget.onNavigateToTab?.call(1),
-                        child: Text(
-                          'View All',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
+                        onTap: () => setState(() => _selectedTab = 'Posts'),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Posts',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _selectedTab == 'Posts'
+                                    ? AppColors.primary
+                                    : Colors.grey,
+                              ),
+                            ),
+                            if (_selectedTab == 'Posts')
+                              Container(
+                                height: 3,
+                                width: 40,
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 32),
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedTab = 'Interests'),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Interests',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _selectedTab == 'Interests'
+                                    ? AppColors.primary
+                                    : Colors.grey,
+                              ),
+                            ),
+                            if (_selectedTab == 'Interests')
+                              Container(
+                                height: 3,
+                                width: 70,
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _recentActivities.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Container(
-                          height: 110,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                const SizedBox(height: 24),
+                // Tab content
+                if (_selectedTab == 'Posts') ...[const SizedBox.shrink()],
+                if (_selectedTab == 'Interests')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Interests',
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              alignment: WrapAlignment.start,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
-                                Icon(
-                                  Icons.explore_off,
-                                  color: AppColors.textGrey,
-                                  size: 32,
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'No activities yet',
-                                  style: TextStyle(
-                                    color: AppColors.textGrey,
-                                    fontSize: 13,
-                                  ),
+                                ...(_user?.centresInteret ?? const <String>[])
+                                    .map(
+                                      (interest) => _InterestChip(
+                                        label: interest,
+                                        active: true,
+                                        onDelete: _savingInterests
+                                            ? null
+                                            : () => _removeInterest(interest),
+                                      ),
+                                    ),
+                                _InterestChip(
+                                  label: _savingInterests
+                                      ? 'Adding...'
+                                      : '+ Add More',
+                                  active: false,
+                                  onTap: _savingInterests
+                                      ? null
+                                      : _promptAddInterest,
                                 ),
                               ],
                             ),
-                          ),
+                          ],
                         ),
-                      )
-                    : SizedBox(
-                        height: 182,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                // Posts list
+                if (_selectedTab == 'Posts')
+                  _recentActivities.isEmpty
+                      ? Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _recentActivities.length,
-                          itemBuilder: (_, i) {
-                            final insc = _recentActivities[i];
-                            final act = insc.activite;
-                            final photos = act?['photos'] as List? ?? [];
-                            final imageUrl = photos.isNotEmpty
-                                ? photos.first as String
-                                : '';
-                            final title =
-                                act?['titre'] as String? ?? 'Activity';
-                            final rating = (act?['note_moyenne'] as num? ?? 0)
-                                .toStringAsFixed(1);
-                            final activityId = act?['_id'] as String? ?? '';
-                            final d = insc.dateDemande;
-                            final date = d != null
-                                ? '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}'
-                                : '';
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: _ActivityCard(
-                                imageUrl: imageUrl,
-                                title: title,
-                                date: date,
-                                rating: rating,
-                                statusLabel: insc.statusLabel,
-                                statusColor: insc.statusColor,
+                          child: Container(
+                            height: 200,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFF1F5F9),
+                              ),
+                            ),
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.image_not_supported_outlined,
+                                    color: AppColors.textGrey,
+                                    size: 48,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No posts yet',
+                                    style: TextStyle(
+                                      color: AppColors.textGrey,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  childAspectRatio: 1,
+                                ),
+                            itemCount: _recentActivities.length,
+                            itemBuilder: (_, i) {
+                              final insc = _recentActivities[i];
+                              final act = insc.activite;
+                              final photos = act?['photos'] as List? ?? [];
+                              final imageUrl = photos.isNotEmpty
+                                  ? photos.first as String
+                                  : '';
+                              final activityId = act?['_id'] as String? ?? '';
+                              return GestureDetector(
                                 onTap: activityId.isNotEmpty
                                     ? () => Navigator.push(
                                         context,
@@ -566,11 +591,33 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                         ),
                                       )
                                     : null,
-                              ),
-                            );
-                          },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: imageUrl.isNotEmpty
+                                      ? Image.network(
+                                          imageUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(
+                                                color: Colors.grey[300],
+                                                child: const Icon(
+                                                  Icons.image_not_supported,
+                                                  size: 32,
+                                                ),
+                                              ),
+                                        )
+                                      : Container(
+                                          color: Colors.grey[300],
+                                          child: const Icon(
+                                            Icons.image_not_supported,
+                                            size: 32,
+                                          ),
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
                 const SizedBox(height: 24),
               ],
             ),

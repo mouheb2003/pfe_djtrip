@@ -20,7 +20,7 @@ class OAuthConfig {
     'GOOGLE_SERVER_CLIENT_ID',
     // Backend Web Client ID - Get this from Google Cloud Console
     defaultValue:
-        '891015623935-f9dmcdek9blg8gusgetuu52bor903lv8.apps.googleusercontent.com',
+        '510642344687-bbik9oh3gcb74aakqbrnuie8h1hhbhsm.apps.googleusercontent.com',
   );
 
   /// Facebook App ID

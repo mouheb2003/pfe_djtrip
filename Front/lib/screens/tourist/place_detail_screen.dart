@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
 
 class PlaceDetailScreen extends StatelessWidget {
@@ -8,13 +8,11 @@ class PlaceDetailScreen extends StatelessWidget {
 
   const PlaceDetailScreen({super.key, required this.place});
 
-  String get _title =>
-      (place['title'] ?? place['titre'] ?? 'Lieu').toString();
+  String get _title => (place['title'] ?? place['titre'] ?? 'Lieu').toString();
   String get _subtitle =>
       (place['subtitle'] ?? place['sousTitre'] ?? '').toString();
   String get _description =>
-      (place['description'] ??
-              'Aucune description disponible pour ce lieu.')
+      (place['description'] ?? 'Aucune description disponible pour ce lieu.')
           .toString();
   String get _image =>
       (place['image'] ?? place['imagePortrait'] ?? '').toString();
@@ -26,18 +24,13 @@ class PlaceDetailScreen extends StatelessWidget {
               '0.0')
           .toString();
   int get _reviewsCount => (place['nombreAvis'] as num?)?.toInt() ?? 0;
-  String get _bestTime =>
-      (place['meilleurePeriode'] ?? 'N/A').toString();
-  String get _duration =>
-      (place['dureeVisite'] ?? 'N/A').toString();
-  String get _price =>
-      (place['price'] ?? place['prix'] ?? 'N/A').toString();
+  String get _bestTime => (place['meilleurePeriode'] ?? 'N/A').toString();
+  String get _duration => (place['dureeVisite'] ?? 'N/A').toString();
+  String get _price => (place['price'] ?? place['prix'] ?? 'N/A').toString();
   String? get _activityId =>
       (place['activity_id'] ?? place['activiteLiee'])?.toString();
-  double? get _lat =>
-      (place['coordonnees']?['latitude'] as num?)?.toDouble();
-  double? get _lng =>
-      (place['coordonnees']?['longitude'] as num?)?.toDouble();
+  double? get _lat => (place['coordonnees']?['latitude'] as num?)?.toDouble();
+  double? get _lng => (place['coordonnees']?['longitude'] as num?)?.toDouble();
 
   List<String> get _tags {
     final raw = place['tags'];
@@ -155,13 +148,41 @@ class PlaceDetailScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(width: 24, height: 6, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(4))),
+                  Container(
+                    width: 24,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
                   const SizedBox(width: 4),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: Colors.white54, shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white54,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 4),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: Colors.white54, shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white54,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 4),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: Colors.white54, shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white54,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -179,7 +200,10 @@ class PlaceDetailScreen extends StatelessWidget {
           children: [
             if (_isTopDestination)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 margin: const EdgeInsets.only(right: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF0E6),
@@ -187,15 +211,29 @@ class PlaceDetailScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.local_activity, color: AppColors.primary, size: 12),
+                    const Icon(
+                      Icons.local_activity,
+                      color: AppColors.primary,
+                      size: 12,
+                    ),
                     const SizedBox(width: 4),
-                    const Text('TOP DESTINATION', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'TOP DESTINATION',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
             const Icon(Icons.star, color: Colors.orange, size: 14),
             const SizedBox(width: 4),
-            Text(_rating, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(
+              _rating,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             Text(
               ' ($_reviewsCount reviews)',
               style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
@@ -205,7 +243,12 @@ class PlaceDetailScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           _title,
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.5,
+          ),
         ),
         const SizedBox(height: 6),
         Row(
@@ -228,22 +271,33 @@ class PlaceDetailScreen extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: tags.map((t) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.tag, size: 14, color: AppColors.primary),
-            const SizedBox(width: 6),
-            Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-          ],
-        ),
-      )).toList(),
+      children: tags
+          .map(
+            (t) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.tag, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    t,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -251,14 +305,36 @@ class PlaceDetailScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildStatCard(Icons.calendar_month, 'BEST TIME', _bestTime, const Color(0xFFFFF5F0)),
-        _buildStatCard(Icons.access_time_filled, 'DURATION', _duration, const Color(0xFFFFF5F0)),
-        _buildStatCard(Icons.payments, 'PRICE', _price, const Color(0xFFF0FDF4), textColor: Colors.green),
+        _buildStatCard(
+          Icons.calendar_month,
+          'BEST TIME',
+          _bestTime,
+          const Color(0xFFFFF5F0),
+        ),
+        _buildStatCard(
+          Icons.access_time_filled,
+          'DURATION',
+          _duration,
+          const Color(0xFFFFF5F0),
+        ),
+        _buildStatCard(
+          Icons.payments,
+          'PRICE',
+          _price,
+          const Color(0xFFF0FDF4),
+          textColor: Colors.green,
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(IconData icon, String label, String value, Color bgColor, {Color? textColor}) {
+  Widget _buildStatCard(
+    IconData icon,
+    String label,
+    String value,
+    Color bgColor, {
+    Color? textColor,
+  }) {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -271,9 +347,23 @@ class PlaceDetailScreen extends StatelessWidget {
           children: [
             Icon(icon, color: AppColors.primary, size: 24),
             const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textColor ?? const Color(0xFF0F172A))),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: textColor ?? const Color(0xFF0F172A),
+              ),
+            ),
           ],
         ),
       ),
@@ -284,54 +374,84 @@ class PlaceDetailScreen extends StatelessWidget {
     return Column(
       children: [
         Row(
-           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-           children: [
-             const Text('Location', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-             Row(
-               children: [
-                 GestureDetector(
-                   onTap: _openMap,
-                   child: const Text('Full Map', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
-                 ),
-                 const Icon(Icons.chevron_right, color: AppColors.primary, size: 16),
-               ],
-             )
-           ],
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: _openMap,
+                  child: const Text(
+                    'Full Map',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+              ],
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: _openMap,
           child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 160,
-            width: double.infinity,
-            decoration: const BoxDecoration(color: Color(0xFFF3EFE0)),
-            child: Stack(
-              children: [
-                // Mock Map Image equivalent
-                Center(
-                  child: Icon(Icons.map, size: 100, color: Colors.green.withOpacity(0.3)),
-                ),
-                if (_lat != null && _lng != null)
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 160,
+              width: double.infinity,
+              decoration: const BoxDecoration(color: Color(0xFFF3EFE0)),
+              child: Stack(
+                children: [
+                  // Mock Map Image equivalent
                   Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.3),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                        child: const Icon(Icons.location_on, color: Colors.white, size: 16),
-                      ),
+                    child: Icon(
+                      Icons.map,
+                      size: 100,
+                      color: Colors.green.withOpacity(0.3),
                     ),
                   ),
-              ],
+                  if (_lat != null && _lng != null)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        )),
+        ),
       ],
     );
   }
@@ -342,7 +462,11 @@ class PlaceDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), offset: const Offset(0, -4), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, -4),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Row(
@@ -356,10 +480,20 @@ class PlaceDetailScreen extends StatelessWidget {
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.directions_outlined, color: Color(0xFF475569)),
+                child: const Icon(
+                  Icons.directions_outlined,
+                  color: Color(0xFF475569),
+                ),
               ),
               const SizedBox(height: 4),
-              const Text('Directions', style: TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+              const Text(
+                'Directions',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 16),
@@ -371,7 +505,8 @@ class PlaceDetailScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ActivityDetailScreen(activityId: activityId),
+                      builder: (context) =>
+                          ActivityDetailScreen(activityId: activityId),
                     ),
                   );
                 }
@@ -379,14 +514,23 @@ class PlaceDetailScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
                   Icon(Icons.local_activity, color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('Book Guided Tour', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text(
+                    'Book Guided Tour',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),

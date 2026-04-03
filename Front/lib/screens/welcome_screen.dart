@@ -48,20 +48,20 @@ class WelcomeScreen extends StatelessWidget {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(15),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(color: Colors.white.withOpacity(0.22)),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.22),
                             ),
-                            child: const Icon(
-                              Icons.beach_access_rounded,
-                              color: Colors.white,
-                              size: 30,
-                            ),
+                          ),
+                          child: Image.asset(
+                            'assets/logos/logochapeau.png',
+                            height: 40,
+                            width: 40,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
@@ -120,11 +120,14 @@ class WelcomeScreen extends StatelessWidget {
                       ],
                     ),
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pushNamed(context, AppRoutes.signup),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, AppRoutes.signup),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
                       child: const Text(
                         'Start the Adventure',
@@ -147,10 +150,13 @@ class WelcomeScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                          ),
                         ),
                         child: TextButton(
-                          onPressed: () => Navigator.pushNamed(context, AppRoutes.login),
+                          onPressed: () =>
+                              Navigator.pushNamed(context, AppRoutes.login),
                           child: const Text(
                             'Sign In',
                             style: TextStyle(
@@ -175,7 +181,9 @@ class WelcomeScreen extends StatelessWidget {
                         height: 8,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(4),
-                          color: index == 0 ? AppColors.secondary : Colors.white.withOpacity(0.3),
+                          color: index == 0
+                              ? AppColors.secondary
+                              : Colors.white.withOpacity(0.3),
                         ),
                       );
                     }),

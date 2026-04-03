@@ -62,29 +62,17 @@ class _SplashScreenState extends State<SplashScreen>
         final String? userType = user['userType'];
         // Navigate to appropriate screen based on user type
         if (userType == 'Organisator' || userType == 'Organizer') {
-          Navigator.pushReplacementNamed(
-            context,
-            AppRoutes.organizerMain,
-          );
+          Navigator.pushReplacementNamed(context, AppRoutes.organizerMain);
         } else {
-          Navigator.pushReplacementNamed(
-            context,
-            AppRoutes.touristMain,
-          );
+          Navigator.pushReplacementNamed(context, AppRoutes.touristMain);
         }
       } else {
         // Invalid session - go to login
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.login,
-        );
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     } else {
       // Not logged in - go to login
-      Navigator.pushReplacementNamed(
-        context,
-        AppRoutes.login,
-      );
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
     }
   }
 
@@ -109,7 +97,7 @@ class _SplashScreenState extends State<SplashScreen>
                 children: [
                   // DJTrip logo with animation
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(25),
@@ -121,14 +109,11 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-                    child: Text(
-                      "DJTrip",
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFFF6B1A),
-                        letterSpacing: 3,
-                      ),
+                    child: Image.asset(
+                      'assets/logos/logo2.png',
+                      height: 120,
+                      width: 120,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   SizedBox(height: 24),
