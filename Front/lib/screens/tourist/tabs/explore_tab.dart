@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-// Importations locales (Assure-toi que ces chemins sont corrects dans ton projet)
+// Imports de ton projet - Vérifie bien que ces chemins existent
 import '../../../models/lieu_model.dart';
 import '../../../services/lieu_service.dart';
 import '../place_detail_screen.dart';
@@ -15,24 +16,25 @@ class ExploreTab extends StatefulWidget {
 }
 
 class _ExploreTabState extends State<ExploreTab> {
+  // Coordonnées par défaut (Djerba)
   static const LatLng _djerbaCenter = LatLng(33.8076, 10.8451);
 
+  // Contrôleurs
+  GoogleMapController? _mapController;
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _originCtrl = TextEditingController(
     text: "Ma position actuelle",
   );
   final TextEditingController _destinationCtrl = TextEditingController();
 
-  GoogleMapController? _mapController;
-
+  // Données et État
   List<LieuModel> _lieux = const <LieuModel>[];
-  bool _isLoading = true;
   String _activeFilter = 'All';
-
   LieuModel? _selectedLieu;
   LatLng? _customPickedLocation;
   bool _showItineraryPanel = false;
 
+  // Filtres disponibles
   static const List<String> _filters = [
     'All',
     'Museums',
@@ -44,6 +46,7 @@ class _ExploreTabState extends State<ExploreTab> {
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _searchCtrl.addListener(() => setState(() {}));
     _loadLieux();
   }
@@ -56,30 +59,71 @@ class _ExploreTabState extends State<ExploreTab> {
     super.dispose();
   }
 
+  // --- INITIALISATION ---
+
+  Future<void> _checkPermissions() async {
+    await Permission.location.request();
+  }
+
   Future<void> _loadLieux() async {
     try {
       final lieux = await LieuService.getLieux();
       if (!mounted) return;
       setState(() {
         _lieux = lieux;
-        _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint("Erreur chargement lieux: $e");
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() {});
     }
   }
 
-  // --- LOGIQUE DE SELECTION ---
+  // --- LOGIQUE DE NAVIGATION (CORRIGÉE) ---
+
+  Future<void> _continueInGoogleMaps() async {
+    double? lat;
+    double? lng;
+
+    // On récupère les coordonnées de la destination
+    if (_selectedLieu != null) {
+      lat = _selectedLieu!.latitude;
+      lng = _selectedLieu!.longitude;
+    } else if (_customPickedLocation != null) {
+      lat = _customPickedLocation!.latitude;
+      lng = _customPickedLocation!.longitude;
+    }
+
+    if (lat == null || lng == null) return;
+
+    // IMPORTANT : On laisse 'origin' vide.
+    // Google Maps interprète l'absence d'origine comme "Ma position actuelle" (Current Location).
+    // Cela évite le bug de la Californie (Amphitheatre Pkwy).
+    final String url =
+        "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving";
+
+    final Uri uri = Uri.parse(url);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Impossible d'ouvrir Google Maps")),
+      );
+    }
+  }
+
+  // --- GESTION DES ACTIONS CARTE ---
 
   void _onMapLongPress(LatLng position) {
     setState(() {
       _customPickedLocation = position;
       _selectedLieu = null;
-      _destinationCtrl.text =
-          "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
-      _showItineraryPanel = false;
+      _destinationCtrl.text = "Position sélectionnée";
+      _showItineraryPanel =
+          true; // On affiche directement le panneau au clic long
     });
+    _mapController?.animateCamera(CameraUpdate.newLatLng(position));
   }
 
   void _selectLieu(LieuModel lieu) {
@@ -87,11 +131,22 @@ class _ExploreTabState extends State<ExploreTab> {
       _selectedLieu = lieu;
       _customPickedLocation = null;
       _destinationCtrl.text = lieu.titre;
-      _showItineraryPanel = false;
+      // On n'affiche pas le panneau tout de suite, on laisse l'utilisateur cliquer sur le bouton bleu
     });
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLng(LatLng(lieu.latitude!, lieu.longitude!)),
+    );
   }
 
-  // --- FILTRAGE ET MARQUEURS ---
+  Future<void> _recenterToDjerba() async {
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        const CameraPosition(target: _djerbaCenter, zoom: 12),
+      ),
+    );
+  }
+
+  // --- LOGIQUE DE FILTRAGE ---
 
   List<LieuModel> get _visibleLieux {
     final query = _searchCtrl.text.trim().toLowerCase();
@@ -132,6 +187,15 @@ class _ExploreTabState extends State<ExploreTab> {
                   : BitmapDescriptor.hueRose,
             ),
             onTap: () => _selectLieu(l),
+            infoWindow: InfoWindow(
+              title: l.titre,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PlaceDetailScreen(place: _toPlaceMap(l)),
+                ),
+              ),
+            ),
           ),
         )
         .toSet();
@@ -148,39 +212,6 @@ class _ExploreTabState extends State<ExploreTab> {
       );
     }
     return markers;
-  }
-
-  // --- ACTIONS ---
-
-  Future<void> _recenterToDjerba() async {
-    if (_mapController == null) return;
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        const CameraPosition(target: _djerbaCenter, zoom: 12),
-      ),
-    );
-  }
-
-  Future<void> _continueInGoogleMaps() async {
-    double? lat, lng;
-    if (_selectedLieu != null) {
-      lat = _selectedLieu!.latitude;
-      lng = _selectedLieu!.longitude;
-    } else if (_customPickedLocation != null) {
-      lat = _customPickedLocation!.latitude;
-      lng = _customPickedLocation!.longitude;
-    }
-
-    if (lat == null || lng == null) return;
-
-    // "origin=My+Location" utilise le GPS natif de Google Maps
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=$lat,$lng&travelmode=driving',
-    );
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   Map<String, dynamic> _toPlaceMap(LieuModel l) {
@@ -201,12 +232,15 @@ class _ExploreTabState extends State<ExploreTab> {
     };
   }
 
+  // --- INTERFACE (BUILD) ---
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 1. CARTE
+          // 1. LA CARTE
           GoogleMap(
             initialCameraPosition: const CameraPosition(
               target: _djerbaCenter,
@@ -216,11 +250,12 @@ class _ExploreTabState extends State<ExploreTab> {
             onLongPress: _onMapLongPress,
             mapType: MapType.hybrid,
             myLocationEnabled: true,
+            myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: _buildMarkers(),
           ),
 
-          // 2. INTERFACE SUPERIEURE (Recherche OU Itinéraire)
+          // 2. OVERLAY D'INTERFACE (RECHERCHE OU ITINERAIRE)
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -236,7 +271,7 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           ),
 
-          // 3. BOUTON ACTIONS (Itinerary / Continue)
+          // 3. BOUTONS FLOTTANTS (BAS)
           Positioned(
             bottom: 30,
             left: 20,
@@ -244,6 +279,7 @@ class _ExploreTabState extends State<ExploreTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Bouton Itinerary (S'affiche quand on sélectionne un point)
                 if ((_selectedLieu != null || _customPickedLocation != null) &&
                     !_showItineraryPanel)
                   FloatingActionButton.extended(
@@ -252,9 +288,14 @@ class _ExploreTabState extends State<ExploreTab> {
                     icon: const Icon(Icons.directions, color: Colors.white),
                     label: const Text(
                       "Itinerary",
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+
+                // Bouton Continue (S'affiche quand le panneau itinéraire est ouvert)
                 if (_showItineraryPanel)
                   SizedBox(
                     width: double.infinity,
@@ -266,6 +307,7 @@ class _ExploreTabState extends State<ExploreTab> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
+                        elevation: 5,
                       ),
                       child: const Text(
                         "Continue in Google Maps",
@@ -281,11 +323,11 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           ),
 
-          // 4. BOUTON RECENTRER
+          // 4. BOUTON RECENTRER (S'affiche si on n'est pas en mode itinéraire)
           if (!_showItineraryPanel)
             Positioned(
               right: 18,
-              bottom: 100,
+              bottom: 110,
               child: FloatingActionButton(
                 onPressed: _recenterToDjerba,
                 mini: true,
@@ -298,18 +340,18 @@ class _ExploreTabState extends State<ExploreTab> {
     );
   }
 
-  // --- WIDGETS DE COMPOSANTS ---
+  // --- COMPOSANTS DE L'INTERFACE ---
 
   Widget _buildSearchBar() {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFFE8EEF5),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A000000),
+            color: Colors.black12,
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -317,22 +359,23 @@ class _ExploreTabState extends State<ExploreTab> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search, color: Color(0xFF245CF7), size: 28),
+          const Icon(Icons.search, color: Color(0xFF245CF7), size: 26),
           const SizedBox(width: 12),
           Expanded(
             child: Container(
-              height: 44,
+              height: 40,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: TextField(
                 controller: _searchCtrl,
                 decoration: const InputDecoration(
                   hintText: 'Search destinations...',
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 15,
                     vertical: 10,
                   ),
                 ),
@@ -348,44 +391,60 @@ class _ExploreTabState extends State<ExploreTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 15)],
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 15,
+            offset: Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         children: [
+          // Colonne des icônes de chemin (Design de l'image)
           Column(
             children: [
               const Icon(Icons.circle, size: 12, color: Color(0xFF2D2D44)),
-              Container(height: 35, width: 1, color: Colors.grey.shade400),
-              const Icon(Icons.location_on, size: 18, color: Colors.red),
+              Container(height: 35, width: 1.5, color: Colors.grey.shade300),
+              const Icon(Icons.location_on, size: 20, color: Colors.redAccent),
             ],
           ),
           const SizedBox(width: 15),
+          // Champs de saisie
           Expanded(
             child: Column(
               children: [
-                _buildRouteInput(_originCtrl, Icons.my_location, "Origin"),
+                _buildRouteInput(
+                  _originCtrl,
+                  Icons.my_location,
+                  "Point de départ",
+                ),
                 const SizedBox(height: 10),
                 _buildRouteInput(
                   _destinationCtrl,
-                  Icons.close,
+                  Icons.location_on,
                   "Destination",
-                  isDest: true,
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
+          // Bouton pour fermer/revenir
           GestureDetector(
             onTap: () => setState(() => _showItineraryPanel = false),
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: const Color(0xFFE8EEF5),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.swap_vert, color: Color(0xFF2158F6)),
+              child: const Icon(
+                Icons.close,
+                color: Color(0xFF2158F6),
+                size: 20,
+              ),
             ),
           ),
         ],
@@ -396,11 +455,10 @@ class _ExploreTabState extends State<ExploreTab> {
   Widget _buildRouteInput(
     TextEditingController ctrl,
     IconData icon,
-    String hint, {
-    bool isDest = false,
-  }) {
+    String hint,
+  ) {
     return Container(
-      height: 40,
+      height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F4F9),
@@ -411,11 +469,18 @@ class _ExploreTabState extends State<ExploreTab> {
           Expanded(
             child: TextField(
               controller: ctrl,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              enabled: false,
+              readOnly: true,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF8A93A8),
+              ),
               decoration: InputDecoration(
                 hintText: hint,
                 border: InputBorder.none,
                 isDense: true,
+                hintStyle: const TextStyle(color: Color(0xFF8A93A8)),
               ),
             ),
           ),
@@ -427,20 +492,20 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Widget _buildFilterList() {
     return SizedBox(
-      height: 44,
+      height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _filters.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final item = _filters[index];
-          final selected = item == _activeFilter;
+          final isSelected = item == _activeFilter;
           return GestureDetector(
             onTap: () => setState(() => _activeFilter = item),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22),
               decoration: BoxDecoration(
-                color: selected
+                color: isSelected
                     ? const Color(0xFF2158F6)
                     : const Color(0xFFE8EEF5),
                 borderRadius: BorderRadius.circular(22),
@@ -449,7 +514,7 @@ class _ExploreTabState extends State<ExploreTab> {
                 child: Text(
                   item,
                   style: TextStyle(
-                    color: selected ? Colors.white : const Color(0xFF4D4E7A),
+                    color: isSelected ? Colors.white : const Color(0xFF4D4E7A),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
