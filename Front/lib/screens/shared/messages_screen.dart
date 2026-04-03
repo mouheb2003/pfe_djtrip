@@ -179,7 +179,25 @@ class _MessagesScreenState extends State<MessagesScreen>
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null
-                  ? Center(child: Text(_errorMessage!))
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _errorMessage!.replaceFirst('Exception: ', ''),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _loadConversations,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : _filteredConversations.isEmpty
                   ? const Center(child: Text('No conversations'))
                   : ListView.builder(

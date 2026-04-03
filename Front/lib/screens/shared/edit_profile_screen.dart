@@ -3,10 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import '../../api/api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
-import '../../services/auth_service.dart';
-import '../../models/user_model.dart';
 import 'edit_activity_specialties_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -20,28 +19,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
-  String _country = 'FR';  // 🚀 FIX: Default country key instead of name
+  final _interests = <String>[];
+  String _country = 'FR'; // 🚀 FIX: Default country key instead of name
   String _language = 'English'; // 🚀 FIX: Default language (not French)
-  final _interests = <String>[]; // 🚀 FIX: Initialize empty interests (pour touristes)
   String? _avatarUrl;
   bool _isSaving = false;
   bool _isAvatarUploading = false;
   bool _isPhoneValid = false;
   String _userType = ''; // 🚀 NEW: Stocker le type d'utilisateur
-  Map<String, dynamic>? _userData; // 🚀 NEW: Stocker les données utilisateur pour l'affichage
+  Map<String, dynamic>?
+  _userData; // 🚀 NEW: Stocker les données utilisateur pour l'affichage
   String? _lastSavedPhone; // 🚀 NEW: Éviter les sauvegardes en double
   Timer? _phoneSaveTimer; // 🚀 NEW: Timer pour le debounce
   bool _hasNetworkError = false; // 🚀 NEW: Suivre les erreurs réseau
-  
+
+  String? _toAbsoluteUrl(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    final apiUri = Uri.parse(ApiClient.baseUrl);
+    final origin =
+        '${apiUri.scheme}://${apiUri.host}${apiUri.hasPort ? ':${apiUri.port}' : ''}';
+    if (value.startsWith('/')) {
+      return '$origin$value';
+    }
+    return '$origin/$value';
+  }
+
+  String _storedPhone(Map<String, dynamic>? user) {
+    if (user == null) return '';
+    return (user['num_tel'] ?? user['numTel'] ?? '').toString().trim();
+  }
+
   // 🚀 NEW: Détecter si c'est un organisateur
   bool get _isOrganizer {
     return _userType == 'Organisator';
   }
+
   static const List<String> _countries = [
     'FR', // France
     'TN', // Tunisie
     'DZ', // Algérie
-    'LY', // Libye 
+    'LY', // Libye
     'MA', // Maroc
     'IT', // Italie
     'DE', // Allemagne
@@ -73,59 +95,75 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     print('🔄 Loading profile...');
     final user = await UserService.getProfile();
     print('👤 User data received: ${user != null ? 'YES' : 'NULL'}');
-    
+
     if (user != null) {
       print('📋 User keys: ${user.keys.toList()}');
       print('🖼️ Avatar: ${user['avatar']}');
       print('🌍 Country: ${user['pays_origine']}');
       print('🌍 Phone country: ${user['pays_telephone']}');
     }
-    
+
     if (mounted && user != null) {
       setState(() {
         _userData = user; // 🚀 NEW: Stocker les données utilisateur
         _nameCtrl.text = user['fullname'] ?? '';
-        
+
         // 🚀 NEW: Extract phone number without country code
-        String phoneNumber = user['numTel'] ?? '';
+        String phoneNumber = _storedPhone(user);
         if (phoneNumber.isNotEmpty) {
           // Remove country code if present
-          final countryCode = _getCountryCode(_normalizeCountryKey(user['pays_origine'] ?? 'France'));
+          final phoneCountry = _normalizeCountryKey(
+            (user['pays_telephone'] ?? user['pays_origine'] ?? 'France')
+                .toString(),
+          );
+          final countryCode = _getCountryCode(phoneCountry);
           if (phoneNumber.startsWith(countryCode)) {
             phoneNumber = phoneNumber.replaceFirst(countryCode, '').trim();
           }
         }
         _phoneCtrl.text = phoneNumber;
         _lastSavedPhone = phoneNumber; // 🚀 NEW: Initialize last saved phone
-        
+
         _bioCtrl.text = user['bio'] ?? '';
-        _avatarUrl = user['avatar'];
-        _userType = user['userType'] ?? ''; // 🚀 NEW: Charger le type d'utilisateur
-        
+        _avatarUrl =
+            _toAbsoluteUrl(user['avatar']?.toString()) ??
+            _toAbsoluteUrl(user['avatar_url']?.toString());
+        _userType =
+            user['userType'] ?? ''; // 🚀 NEW: Charger le type d'utilisateur
+
         // 🚀 FIX: Handle country with proper field names
-        if (user['pays_origine'] != null && user['pays_origine']!.trim().isNotEmpty) {
-          final countryKey = _normalizeCountryKey(user['pays_origine']!);
+        final phoneCountryRaw =
+            (user['pays_telephone'] ?? user['pays_origine'] ?? '').toString();
+        if (phoneCountryRaw.trim().isNotEmpty) {
+          final countryKey = _normalizeCountryKey(phoneCountryRaw);
           if (_countries.contains(countryKey)) {
             _country = countryKey;
           }
         }
-        
+
         // 🚀 FIX: Handle language with proper field names
-        if (user['langue_preferee'] != null && user['langue_preferee']!.trim().isNotEmpty) {
+        if (user['langue_preferee'] != null &&
+            user['langue_preferee']!.trim().isNotEmpty) {
           final l = _normalizeLanguage(user['langue_preferee']!);
           if (_languages.contains(l)) {
             _language = l;
           }
         }
-        
-        // 🚀 FIX: Handle interests with proper field names (pour touristes)
-        if (user['centres_interet'] != null && user['centres_interet']!.isNotEmpty) {
-          _interests
-            ..clear()
-            ..addAll(user['centres_interet']!);
-        }
+
+        final rawInterests =
+            (user['centres_interet'] as List?) ??
+            (user['centresInteret'] as List?) ??
+            (user['interests'] as List?) ??
+            const [];
+        _interests
+          ..clear()
+          ..addAll(
+            rawInterests
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty),
+          );
       });
-      
+
       print('✅ Profile loaded successfully');
     } else {
       print('❌ Failed to load profile');
@@ -135,9 +173,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // 🚀 NEW: Check network connectivity
   Future<bool> _checkConnectivity() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://www.google.com'),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(Uri.parse('https://www.google.com'))
+          .timeout(const Duration(seconds: 5));
       _hasNetworkError = response.statusCode != 200;
       return !_hasNetworkError;
     } catch (e) {
@@ -147,61 +185,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // 🚀 NEW: Show network error dialog
-  void _showNetworkErrorDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Connection Error'),
-        content: const Text(
-          'Unable to load images due to network issues. Please check your internet connection.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _checkConnectivity();
-            },
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // 🚀 NEW: Auto-save phone number change
   Future<void> _savePhoneChange() async {
     // 🚀 NEW: Cancel previous timer
     _phoneSaveTimer?.cancel();
-    
+
     // 🚀 NEW: Check if phone actually changed
     final currentPhone = _phoneCtrl.text.trim();
     if (currentPhone == _lastSavedPhone) {
       return; // No change, don't save
     }
-    
+
     // 🚀 NEW: Set new timer with longer debounce
     _phoneSaveTimer = Timer(const Duration(milliseconds: 1500), () async {
       if (!mounted) return;
-      
+
       try {
         // 🚀 NEW: Include country code in the saved phone number
-        final fullPhoneNumber = '${_getCountryCode(_country)} $currentPhone';
+        final fullPhoneNumber = currentPhone.isEmpty
+            ? ''
+            : '${_getCountryCode(_country)} $currentPhone';
         final result = await UserService.updateProfile({
+          'num_tel': fullPhoneNumber,
           'numTel': fullPhoneNumber,
-          'pays_telephone': _getCountryName(_country), // 🚀 NEW: Save country name, not key
+          'pays_telephone': _getCountryName(
+            _country,
+          ), // 🚀 NEW: Save country name, not key
         });
-        
+
         if (result['success'] == true) {
           print('✅ Phone number updated: $fullPhoneNumber');
           // 🚀 NEW: Update last saved phone
           _lastSavedPhone = currentPhone;
           // Update local data
           if (_userData != null) {
+            _userData!['num_tel'] = fullPhoneNumber;
             _userData!['numTel'] = fullPhoneNumber;
           }
         }
@@ -246,26 +264,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return raw;
   }
 
-  String _normalizeCountry(String raw) {
-    final v = raw.trim().toLowerCase();
-    if (v == 'tunisia' || v == 'tunisie') return 'Tunisie';
-    if (v == 'morocco' || v == 'maroc') return 'Maroc';
-    if (v == 'germany' || v == 'allemagne') return 'Allemagne';
-    if (v == 'united kingdom' || v == 'uk' || v == 'royaume-uni') {
-      return 'Royaume-Uni';
-    }
-    if (v == 'france') return 'France';
-    return raw;
-  }
-
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
+    final phone = _phoneCtrl.text.trim();
+    final fullPhoneNumber = phone.isEmpty
+        ? ''
+        : '${_getCountryCode(_country)} $phone';
     final data = {
       'fullname': _nameCtrl.text.trim(),
       'bio': _bioCtrl.text.trim(),
-      'pays_origine': _getCountryName(_country), // 🚀 FIX: Save country name, not key
+      'num_tel': fullPhoneNumber,
+      'numTel': fullPhoneNumber,
+      'centres_interet': _interests,
+      'pays_telephone': _getCountryName(_country),
+      'pays_origine': _getCountryName(
+        _country,
+      ), // 🚀 FIX: Save country name, not key
       'langue_preferee': _language, // 🚀 FIX: Correct field name
-      'centres_interet': _interests, // 🚀 FIX: Correct field name (pour touristes)
     };
     final result = await UserService.updateProfile(data);
     if (!mounted) return;
@@ -275,9 +290,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            result['message'] as String? ?? 'Error saving profile',
-          ),
+          content: Text(result['message'] as String? ?? 'Error saving profile'),
           backgroundColor: Colors.red,
         ),
       );
@@ -402,36 +415,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // Auto-format will be applied as user types
     final text = _phoneCtrl.text;
     if (text.isEmpty) return;
-    
+
     // Simple formatting: add spaces every 2-3 digits
     final digits = text.replaceAll(RegExp(r'\s'), '');
     String formatted = digits;
-    
+
     switch (_country) {
       case 'FR': // France: XX XX XX XX XX
         if (digits.length > 2) {
-          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(4, digits.length))}';
-          if (digits.length > 4) formatted += ' ${digits.substring(4, min(6, digits.length))}';
-          if (digits.length > 6) formatted += ' ${digits.substring(6, min(8, digits.length))}';
+          formatted =
+              '${digits.substring(0, 2)} ${digits.substring(2, min(4, digits.length))}';
+          if (digits.length > 4)
+            formatted += ' ${digits.substring(4, min(6, digits.length))}';
+          if (digits.length > 6)
+            formatted += ' ${digits.substring(6, min(8, digits.length))}';
           if (digits.length > 8) formatted += ' ${digits.substring(8)}';
         }
         break;
       case 'TN': // Tunisia: XX XXX XXX
       case 'LY': // Libya: XX XXX XXX
         if (digits.length > 2) {
-          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
+          formatted =
+              '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
           if (digits.length > 5) formatted += ' ${digits.substring(5)}';
         }
         break;
       default:
         // Generic formatting
         if (digits.length > 2) {
-          formatted = '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
-          if (digits.length > 5) formatted += ' ${digits.substring(5, min(8, digits.length))}';
+          formatted =
+              '${digits.substring(0, 2)} ${digits.substring(2, min(5, digits.length))}';
+          if (digits.length > 5)
+            formatted += ' ${digits.substring(5, min(8, digits.length))}';
           if (digits.length > 8) formatted += ' ${digits.substring(8)}';
         }
     }
-    
+
     // Only update if different to avoid cursor jumping
     if (formatted != text) {
       _phoneCtrl.value = TextEditingValue(
@@ -446,7 +465,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _validatePhone() {
     final phone = _phoneCtrl.text.trim();
     final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
-    
+
     // 🚀 NEW: Limit digits based on country maximum
     final maxDigits = _getMaxDigits(_country);
     if (digits.length > maxDigits) {
@@ -456,18 +475,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _formatPhoneNumber();
       return;
     }
-    
+
     // Minimum digits based on country
     int minDigits = 8;
     switch (_country) {
-      case 'FR': minDigits = 9; break;
-      case 'TN': minDigits = 8; break;
-      case 'DZ': minDigits = 9; break;
-      case 'LY': minDigits = 8; break;
-      case 'MA': minDigits = 9; break;
-      default: minDigits = 8;
+      case 'FR':
+        minDigits = 9;
+        break;
+      case 'TN':
+        minDigits = 8;
+        break;
+      case 'DZ':
+        minDigits = 9;
+        break;
+      case 'LY':
+        minDigits = 8;
+        break;
+      case 'MA':
+        minDigits = 9;
+        break;
+      default:
+        minDigits = 8;
     }
-    
+
     final isValid = digits.length >= minDigits;
     if (isValid != _isPhoneValid) {
       setState(() => _isPhoneValid = isValid);
@@ -515,24 +545,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      Icons.photo_library,
-                      color: AppColors.primary,
-                    ),
+                    child: Icon(Icons.photo_library, color: AppColors.primary),
                   ),
                   title: const Text(
                     'From Gallery',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                   ),
                   subtitle: const Text(
                     'Choose from your photos',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   onTap: () => Navigator.pop(context, ImageSource.gallery),
                 ),
@@ -545,24 +566,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: AppColors.primary,
-                    ),
+                    child: Icon(Icons.camera_alt, color: AppColors.primary),
                   ),
                   title: const Text(
                     'Take a Photo',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                   ),
                   subtitle: const Text(
                     'Use your camera',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   onTap: () => Navigator.pop(context, ImageSource.camera),
                 ),
@@ -640,166 +652,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _addInterest() {
-    final TextEditingController interestCtrl = TextEditingController();
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+      builder: (context) => AlertDialog(
+        title: const Text('Add Interest'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Enter your interest'),
+          onSubmitted: (_) {
+            final value = controller.text.trim();
+            if (value.isNotEmpty) {
+              setState(() => _interests.add(value));
+            }
+            Navigator.of(context).pop();
+          },
         ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title with icon
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.interests,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Add Interest',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // Modern input field
-              TextField(
-                controller: interestCtrl,
-                autofocus: true,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF0F172A),
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Enter your interest',
-                  hintStyle: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 16,
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: AppColors.primary,
-                      width: 2,
-                    ),
-                  ),
-                  prefixIcon: Icon(
-                    Icons.add_circle_outline,
-                    color: AppColors.primary,
-                  ),
-                ),
-                onSubmitted: (value) {
-                  if (value.trim().isNotEmpty) {
-                    setState(() {
-                      _interests.add(value.trim());
-                    });
-                  }
-                  Navigator.of(context).pop();
-                },
-              ),
-              const SizedBox(height: 24),
-              // Modern action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final value = interestCtrl.text.trim();
-                        if (value.isNotEmpty) {
-                          setState(() {
-                            _interests.add(value);
-                          });
-                        }
-                        Navigator.of(context).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Add',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) {
+                setState(() => _interests.add(value));
+              }
+              Navigator.of(context).pop();
+            },
+            child: const Text('Add'),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -809,10 +694,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Edit Profile'),
+        title: const Text(
+          'Edit Profile',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -862,7 +753,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ],
                 ),
               ),
-            
+
             // Profile photo
             Center(
               child: Stack(
@@ -873,7 +764,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: CircleAvatar(
                       radius: 48,
                       backgroundColor: Colors.grey[200],
-                      child: _avatarUrl != null && _avatarUrl!.isNotEmpty && !_hasNetworkError
+                      child:
+                          _avatarUrl != null &&
+                              _avatarUrl!.isNotEmpty &&
+                              !_hasNetworkError
                           ? ClipOval(
                               child: Image.network(
                                 _avatarUrl!,
@@ -889,14 +783,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     color: Colors.grey,
                                   );
                                 },
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Icon(
-                                    Icons.person,
-                                    size: 40,
-                                    color: Colors.grey,
-                                  );
-                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Icon(
+                                        Icons.person,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      );
+                                    },
                               ),
                             )
                           : Stack(
@@ -906,13 +801,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   size: 40,
                                   color: Colors.grey,
                                 ),
-                                if (_hasNetworkError && _avatarUrl != null && _avatarUrl!.isNotEmpty)
+                                if (_hasNetworkError &&
+                                    _avatarUrl != null &&
+                                    _avatarUrl!.isNotEmpty)
                                   Positioned(
                                     bottom: 0,
                                     right: 0,
                                     child: GestureDetector(
                                       onTap: () async {
-                                        setState(() => _hasNetworkError = false);
+                                        setState(
+                                          () => _hasNetworkError = false,
+                                        );
                                         await _checkConnectivity();
                                         if (mounted) setState(() {});
                                       },
@@ -954,7 +853,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Icon(
@@ -973,13 +874,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Name field
             const Text(
               'Full Name',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _nameCtrl,
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.person, color: AppColors.textGrey, size: 20),
+                prefixIcon: const Icon(
+                  Icons.person,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: AppColors.borderLight),
@@ -1004,18 +913,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Phone number field with country selector and auto-validation
             const Text(
               'Phone Number',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
-            
+
             // 🚀 NEW: Modern phone field design
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.primary.withOpacity(0.2),
-                ),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -1028,7 +939,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 🚀 NEW: Current phone display with clear button
-                  if (_userData?['numTel']?.isNotEmpty == true)
+                  if (_storedPhone(_userData).isNotEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -1054,7 +965,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Current: ${_userData!['numTel']}',
+                              'Current: ${_storedPhone(_userData)}',
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 13,
@@ -1069,6 +980,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 _lastSavedPhone = '';
                                 // Clear from local data
                                 if (_userData != null) {
+                                  _userData!['num_tel'] = '';
                                   _userData!['numTel'] = '';
                                 }
                               });
@@ -1089,7 +1001,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ],
                       ),
                     ),
-                  
+
                   // Country selector and input
                   Padding(
                     padding: const EdgeInsets.all(4),
@@ -1097,7 +1009,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       children: [
                         // Country selector
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          width: 104,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(8),
@@ -1111,6 +1027,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             child: DropdownButton<String>(
                               value: _country,
                               isDense: true,
+                              isExpanded: true,
                               style: const TextStyle(
                                 color: Colors.black87,
                                 fontSize: 14,
@@ -1125,7 +1042,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         style: const TextStyle(fontSize: 16),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(_getCountryName(countryKey)),
+                                      Expanded(
+                                        child: Text(
+                                          _getCountryCode(countryKey),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 );
@@ -1140,7 +1062,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ),
                         ),
-                        
+
                         // Phone input field
                         Expanded(
                           child: TextFormField(
@@ -1166,7 +1088,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 16,
+                              ),
                               suffixIcon: _isPhoneValid
                                   ? Container(
                                       margin: const EdgeInsets.all(8),
@@ -1191,16 +1116,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // 🚀 NEW: Modern validation status
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _isPhoneValid ? Colors.green.withOpacity(0.08) : Colors.blue.withOpacity(0.08),
+                color: _isPhoneValid
+                    ? Colors.green.withOpacity(0.08)
+                    : Colors.blue.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isPhoneValid ? Colors.green.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+                  color: _isPhoneValid
+                      ? Colors.green.withOpacity(0.2)
+                      : Colors.blue.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -1224,7 +1153,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _isPhoneValid ? 'Valid Phone Number' : 'Phone Format Required',
+                          _isPhoneValid
+                              ? 'Valid Phone Number'
+                              : 'Phone Format Required',
                           style: TextStyle(
                             color: _isPhoneValid ? Colors.green : Colors.blue,
                             fontSize: 14,
@@ -1237,7 +1168,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ? 'Number is correctly formatted for ${_getCountryName(_country)}'
                               : 'Example: ${_getPhoneExample(_country)} (${_getMaxDigits(_country)} digits max)',
                           style: TextStyle(
-                            color: _isPhoneValid ? Colors.green.shade600 : Colors.blue.shade600,
+                            color: _isPhoneValid
+                                ? Colors.green.shade600
+                                : Colors.blue.shade600,
                             fontSize: 12,
                           ),
                         ),
@@ -1252,7 +1185,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Country dropdown
             const Text(
               'Country',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
             Container(
@@ -1268,7 +1205,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   isExpanded: true,
                   icon: const Icon(
                     Icons.keyboard_arrow_down,
-                    color: AppColors.textGrey,
+                    color: AppColors.primary,
                   ),
                   items: _countries
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -1282,7 +1219,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Language dropdown
             const Text(
               'Preferred Language',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
             Container(
@@ -1298,7 +1239,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   isExpanded: true,
                   icon: const Icon(
                     Icons.keyboard_arrow_down,
-                    color: AppColors.textGrey,
+                    color: AppColors.primary,
                   ),
                   items: _languages
                       .map((l) => DropdownMenuItem(value: l, child: Text(l)))
@@ -1312,7 +1253,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // Bio field
             const Text(
               'Bio',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 8),
             TextFormField(
@@ -1340,32 +1285,111 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 16),
 
+            if (!_isOrganizer) ...[
+              const Text(
+                'INTERESTS',
+                style: TextStyle(
+                  fontSize: 16,
+                  letterSpacing: 1.8,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: _interests.isEmpty
+                    ? const Text(
+                        'No interests yet. Add one below.',
+                        style: TextStyle(color: AppColors.textGrey),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _interests.map((interest) {
+                          return Chip(
+                            label: Text(interest),
+                            onDeleted: () {
+                              setState(() => _interests.remove(interest));
+                            },
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            deleteIcon: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _addInterest,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Add Interest',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // 🚀 NEW: Edit Activity Specialties button (pour organisateurs)
             if (_isOrganizer) ...[
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const EditActivitySpecialtiesScreen(),
+                      builder: (context) =>
+                          const EditActivitySpecialtiesScreen(),
                     ),
                   );
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.category,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
+                      Icon(Icons.category, color: AppColors.primary, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Edit Activity Specialties',
@@ -1379,71 +1403,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-            ],
-
-            // 🚀 OLD: Interests section (pour touristes seulement)
-            if (!_isOrganizer) ...[
-              const Text(
-                'Interests',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_interests.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _interests.map((interest) {
-                        return Chip(
-                          label: Text(interest),
-                          onDeleted: () {
-                            setState(() {
-                              _interests.remove(interest);
-                            });
-                          },
-                          backgroundColor: AppColors.primary.withOpacity(0.1),
-                          deleteIcon: const Icon(
-                            Icons.close,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _addInterest,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.add,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Add Interest',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
             const SizedBox(height: 32),
 
@@ -1465,7 +1424,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Text(

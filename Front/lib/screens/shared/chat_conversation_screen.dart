@@ -38,6 +38,7 @@ class ChatConversationScreen extends StatefulWidget {
 class _ChatConversationScreenState extends State<ChatConversationScreen>
     with WidgetsBindingObserver {
   final TextEditingController _msgCtrl = TextEditingController();
+  final FocusNode _msgFocus = FocusNode();
   final ScrollController _scrollCtrl = ScrollController();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _voicePlayer = AudioPlayer();
@@ -55,6 +56,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   String _loadedAudioUrl = '';
   Duration _voicePosition = Duration.zero;
   Duration _voiceDuration = Duration.zero;
+  String _editingMessageId = '';
+  String _replacingMessageId = '';
 
   // 🚀 SIMPLIFIED: Simple online status tracking
   bool _partnerOnline = false;
@@ -89,9 +92,325 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       _audioRecorder.dispose();
       _recordTicker?.cancel();
       _msgCtrl.dispose();
+      _msgFocus.dispose();
       _scrollCtrl.dispose();
       super.dispose();
     });
+  }
+
+  bool _canEditMessage(_UiMessage msg) {
+    return msg.isMine &&
+        msg.type == 'text' &&
+        msg.text.trim().isNotEmpty &&
+        msg.id.isNotEmpty;
+  }
+
+  void _startEditingMessage(_UiMessage msg) {
+    if (!_canEditMessage(msg)) return;
+    setState(() {
+      _editingMessageId = msg.id;
+      _msgCtrl.text = msg.text;
+    });
+    _msgFocus.requestFocus();
+  }
+
+  void _cancelEditingMessage() {
+    if (_editingMessageId.isEmpty) return;
+    setState(() {
+      _editingMessageId = '';
+      _msgCtrl.clear();
+    });
+  }
+
+  void _cancelReplacingMessage() {
+    if (_replacingMessageId.isEmpty) return;
+    setState(() {
+      _replacingMessageId = '';
+    });
+  }
+
+  Future<void> _finalizeReplacement(Map<String, dynamic> payload) async {
+    final replacingId = _replacingMessageId;
+    _pushSocketMessage(payload, forceMine: true);
+
+    if (replacingId.isEmpty) return;
+
+    final ok = await MessageService.deleteMessage(replacingId);
+    if (!mounted) return;
+
+    setState(() {
+      if (ok) {
+        _messages.removeWhere((m) => m.id == replacingId);
+      }
+      _replacingMessageId = '';
+    });
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New message sent, old message not deleted.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateMessage() async {
+    final text = _msgCtrl.text.trim();
+    if (_editingMessageId.isEmpty || text.isEmpty) return;
+
+    final editingId = _editingMessageId;
+    final response = await MessageService.editMessage(
+      messageId: editingId,
+      content: text,
+    );
+
+    if (!mounted) return;
+    if (response['success'] == true) {
+      final msg = response['message'] as Map<String, dynamic>?;
+      final editedAt = DateTime.tryParse((msg?['edited_at'] ?? '').toString());
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == editingId);
+        if (index >= 0) {
+          final old = _messages[index];
+          _messages[index] = old.copyWith(
+            text: text,
+            isEdited: true,
+            editedAt: editedAt ?? DateTime.now(),
+          );
+        }
+        _editingMessageId = '';
+        _msgCtrl.clear();
+      });
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          (response['messageText'] ?? 'Unable to update message').toString(),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _showDeleteMessageDialog() async {
+    final confirmed = await showGeneralDialog<bool>(
+      context: context,
+      barrierLabel: 'Delete message',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.26),
+      pageBuilder: (dialogContext, _, __) {
+        return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 26),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F9FD),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Delete message?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF13213F),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Are you sure you want to delete this message?\nThis action cannot be undone.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.35,
+                        color: Color(0xFF5D6D8B),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () =>
+                                Navigator.pop(dialogContext, false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF3E4D6D),
+                              side: const BorderSide(color: Color(0xFFD3DBEA)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(dialogContext, true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFE63946),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return confirmed == true;
+  }
+
+  Future<void> _deleteMessageFlow(_UiMessage msg) async {
+    if (msg.id.isEmpty) return;
+    final confirmed = await _showDeleteMessageDialog();
+    if (!confirmed || !mounted) return;
+
+    final ok = await MessageService.deleteMessage(msg.id);
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _messages.removeWhere((m) => m.id == msg.id);
+        if (_editingMessageId == msg.id) {
+          _editingMessageId = '';
+          _msgCtrl.clear();
+        }
+        if (_replacingMessageId == msg.id) {
+          _replacingMessageId = '';
+        }
+      });
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Unable to delete message.')));
+  }
+
+  Future<void> _openMessageActions(_UiMessage msg) async {
+    if (!msg.isMine) return;
+
+    if (!_canEditMessage(msg)) {
+      await _deleteMessageFlow(msg);
+      return;
+    }
+
+    final action = await showGeneralDialog<String>(
+      context: context,
+      barrierLabel: 'Message actions',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.22),
+      pageBuilder: (dialogContext, _, __) {
+        return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF9FBFF),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(26),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD8E0EF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'MESSAGE OPTIONS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                          color: Color(0xFF9AA6BF),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _MessageOptionRow(
+                        icon: Icons.edit_rounded,
+                        iconBg: const Color(0xFFE7EDFF),
+                        iconColor: AppColors.primary,
+                        label: 'Edit Message',
+                        labelColor: const Color(0xFF2E3A58),
+                        onTap: () => Navigator.pop(dialogContext, 'edit'),
+                      ),
+                      const SizedBox(height: 12),
+                      _MessageOptionRow(
+                        icon: Icons.delete_outline_rounded,
+                        iconBg: const Color(0xFFFDE3E5),
+                        iconColor: const Color(0xFFE63946),
+                        label: 'Delete Message',
+                        labelColor: const Color(0xFFE63946),
+                        onTap: () => Navigator.pop(dialogContext, 'delete'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Color(0xFF7C8AA6),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'edit') {
+      _startEditingMessage(msg);
+      return;
+    }
+    if (action == 'delete') {
+      await _deleteMessageFlow(msg);
+    }
   }
 
   @override
@@ -237,6 +556,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       time:
           DateTime.tryParse((data['createdAt'] ?? '').toString()) ??
           DateTime.now(), // 🚀 FIX: Handle null
+      isEdited: data['is_edited'] == true,
+      editedAt: DateTime.tryParse((data['edited_at'] ?? '').toString()),
       isRead: (data['is_read'] == true),
       readAt: DateTime.tryParse((data['read_at'] ?? '').toString()),
     );
@@ -270,6 +591,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         durationSec: (m['media_duration'] as num?)?.toInt() ?? 0,
         isMine: sender == (userId ?? ''),
         time: createdAt ?? DateTime.now(), // 🚀 FIX: Handle null createdAt
+        isEdited: m['is_edited'] == true,
+        editedAt: DateTime.tryParse((m['edited_at'] ?? '').toString()),
         isRead: (m['is_read'] == true),
         readAt: readAt,
       );
@@ -366,6 +689,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   bool _isVoiceMessage(_UiMessage msg) {
     return msg.type == 'audio' || msg.type == 'voice';
+  }
+
+  bool _isVideoMessage(_UiMessage msg) {
+    if (msg.type == 'video') return true;
+    final lower = msg.audioUrl.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.webm');
+  }
+
+  bool _isLocationMessage(_UiMessage msg) {
+    final t = msg.text.toLowerCase();
+    return t.startsWith('location:') || t.contains('maps.google.com/?q=');
   }
 
   Future<void> _toggleVoicePlayback(_UiMessage msg) async {
@@ -577,7 +914,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     if (!mounted) return;
     if (res['success'] == true) {
       final payload = res['message'] as Map<String, dynamic>;
-      _pushSocketMessage(payload, forceMine: true);
+      await _finalizeReplacement(payload);
       return;
     }
 
@@ -609,7 +946,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       if (!mounted) return;
 
       if (response['success'] == true) {
-        await _loadMessages();
+        final payload = response['message'] as Map<String, dynamic>?;
+        if (payload != null) {
+          await _finalizeReplacement(payload);
+        }
         return;
       }
 
@@ -625,6 +965,47 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Image upload failed: $e')));
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isUploadingImage = false;
+      });
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    if (_isUploadingImage) return;
+
+    try {
+      final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      if (picked == null || !mounted) return;
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      final response = await MessageService.sendVideoMessage(
+        partnerId: widget.partnerId,
+        videoFile: File(picked.path),
+      );
+
+      if (!mounted) return;
+
+      if (response['success'] == true) {
+        final payload = response['message'] as Map<String, dynamic>?;
+        if (payload != null) {
+          await _finalizeReplacement(payload);
+        }
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (response['messageText'] ?? 'Unable to send video').toString(),
+          ),
+        ),
+      );
     } finally {
       if (!mounted) return;
       setState(() {
@@ -655,7 +1036,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     if (response['success'] == true) {
       final payload = response['message'] as Map<String, dynamic>;
-      _pushSocketMessage(payload, forceMine: true);
+      await _finalizeReplacement(payload);
       return;
     }
 
@@ -711,6 +1092,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   color: const Color(0xFF22C55E),
                   onTap: () => Navigator.pop(ctx, 'location'),
                 ),
+                _attachmentTile(
+                  icon: Icons.video_collection_rounded,
+                  label: 'Video',
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () => Navigator.pop(ctx, 'video'),
+                ),
               ],
             ),
           ),
@@ -732,6 +1119,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     if (selection == 'location') {
       await _pickAndSendLocation();
+      return;
+    }
+
+    if (selection == 'video') {
+      await _pickVideo();
     }
   }
 
@@ -1020,33 +1412,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     ? CrossAxisAlignment.end
                     : CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 13,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: isMine
-                          ? null
-                          : Border.all(
-                              color: const Color(0xFFD5DDF0),
-                              width: 1,
-                            ),
-                      boxShadow: isMine
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF94A3B8,
-                                ).withOpacity(0.10),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
+                  GestureDetector(
+                    onLongPress: isMine ? () => _openMessageActions(msg) : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: bubbleColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: isMine
+                            ? null
+                            : Border.all(
+                                color: const Color(0xFFD5DDF0),
+                                width: 1,
                               ),
-                            ],
+                        boxShadow: isMine
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF94A3B8,
+                                  ).withOpacity(0.10),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                      ),
+                      child: _buildMessageContent(msg, textColor, cs),
                     ),
-                    child: _buildMessageContent(msg, textColor, cs),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -1060,18 +1455,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (isMine) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          msg.isRead
-                              ? Icons.done_all_rounded
-                              : Icons.done_rounded,
-                          size: 14,
-                          color: msg.isRead
-                              ? const Color(0xFF315CFF)
-                              : cs.onSurfaceVariant.withOpacity(0.7),
+                      if (msg.type == 'text' &&
+                          msg.isEdited &&
+                          msg.editedAt != null)
+                        Text(
+                          '  •  Modified ${_formatClock(msg.editedAt!)}',
+                          style: TextStyle(
+                            color: timeColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      else if (isMine && msg.isRead && msg.readAt != null)
+                        Text(
+                          '  •  Seen ${_formatClock(msg.readAt!)}',
+                          style: const TextStyle(
+                            color: Color(0xFF315CFF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -1138,6 +1541,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isVideoMessage(msg)) {
+      final url = _resolveMediaUrl(msg.audioUrl);
+      return Container(
+        width: 230,
+        height: 170,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.75),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 44,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              url.isEmpty ? 'Video unavailable' : 'Video message',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -1362,127 +1795,194 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   Widget _buildTextComposer(ColorScheme cs) {
     final text = _msgCtrl.text.trim();
     final canSend = text.isNotEmpty;
+    final isEditing = _editingMessageId.isNotEmpty;
+    final isReplacing = _replacingMessageId.isNotEmpty;
 
     // Définissons une taille commune pour les deux boutons d'action
     // pour une meilleure harmonie visuelle.
     const double actionButtonSize = 38.0;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // --- BOUTON AJOUT (GAUCHE) ---
-        Padding(
-          padding: const EdgeInsets.only(right: 8, bottom: 2),
-          child: InkWell(
-            onTap: _openAttachmentSheet,
-            borderRadius: BorderRadius.circular(actionButtonSize / 2),
-            child: Container(
-              width: actionButtonSize,
-              height: actionButtonSize,
-              decoration: BoxDecoration(
-                color: const Color(0xFF90A0BB),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF64748B).withOpacity(0.18),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: _isUploadingImage
-                  ? const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 26,
+        if (isEditing || isReplacing)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF3FA),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD5DEEE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.edit_rounded,
+                  size: 16,
+                  color: Color(0xFF4A5B7A),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('')),
+                Expanded(
+                  child: Text(
+                    isEditing ? 'EDITING MESSAGE' : 'REPLACING MESSAGE',
+                    style: const TextStyle(
+                      color: Color(0xFF4A5B7A),
+                      fontSize: 12,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w700,
                     ),
-            ),
-          ),
-        ),
-
-        // --- CHAMP DE TEXTE (CENTRE) ---
-        Expanded(
-          child: TextField(
-            controller: _msgCtrl,
-            minLines: 1,
-            maxLines: 4,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontSize: 15),
-            decoration: InputDecoration(
-              hintText: 'Type a message...',
-              hintStyle: const TextStyle(
-                color: Color(0xFF6C7C97),
-                fontSize: 15,
-              ),
-
-              // On active le remplissage ici
-              filled: true,
-              fillColor: const Color(0xFFE8EDF5), // La couleur grise unie
-              // On définit les bordures (none) mais avec un border radius
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide.none,
-              ),
-
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
-            ),
-          ),
-        ),
-
-        // --- ESPACEMENT ---
-        const SizedBox(width: 8), // Un peu moins d'espace pour le raffinement
-        // --- BOUTON ACTION (DROITE) ---
-        Padding(
-          // Un petit padding en bas pour qu'il s'aligne visuellement
-          // avec la base du champ de texte
-          padding: const EdgeInsets.only(bottom: 2),
-          child: InkWell(
-            onTap: canSend ? _send : _startRecordingUi,
-            onLongPress: !canSend ? _startRecordingUi : null,
-            borderRadius: BorderRadius.circular(actionButtonSize / 2),
-            child: Container(
-              // CORRECTION : Nous utilisons la même taille commune
-              width: actionButtonSize,
-              height: actionButtonSize,
-              decoration: BoxDecoration(
-                color: const Color(0xFF315CFF),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    // CORRECTION : Ombre plus discrète et plus proche du bouton
-                    color: const Color(0xFF315CFF).withOpacity(0.18),
-                    blurRadius: 10,
-                    offset: const Offset(0, 6),
                   ),
-                ],
-              ),
-              child: Icon(
-                canSend ? Icons.send_rounded : Icons.mic_rounded,
-                color: Colors.white,
-                // CORRECTION : Icône légèrement plus petite pour un bouton plus petit
-                size: 22,
-              ),
+                ),
+                InkWell(
+                  onTap: () {
+                    _cancelEditingMessage();
+                    _cancelReplacingMessage();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: Color(0xFF8291AD),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // --- BOUTON AJOUT (GAUCHE) ---
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 2),
+              child: InkWell(
+                onTap: () {
+                  if (isEditing) {
+                    _cancelEditingMessage();
+                  }
+                  _openAttachmentSheet();
+                },
+                borderRadius: BorderRadius.circular(actionButtonSize / 2),
+                child: Container(
+                  width: actionButtonSize,
+                  height: actionButtonSize,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF90A0BB),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF64748B).withOpacity(0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _isUploadingImage
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                ),
+              ),
+            ),
+
+            // --- CHAMP DE TEXTE (CENTRE) ---
+            Expanded(
+              child: TextField(
+                controller: _msgCtrl,
+                focusNode: _msgFocus,
+                minLines: 1,
+                maxLines: 4,
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: isEditing ? 'Edit message...' : 'Type a message...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF6C7C97),
+                    fontSize: 15,
+                  ),
+
+                  // On active le remplissage ici
+                  filled: true,
+                  fillColor: const Color(0xFFE8EDF5), // La couleur grise unie
+                  // On définit les bordures (none) mais avec un border radius
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ),
+
+            // --- ESPACEMENT ---
+            const SizedBox(
+              width: 8,
+            ), // Un peu moins d'espace pour le raffinement
+            // --- BOUTON ACTION (DROITE) ---
+            Padding(
+              // Un petit padding en bas pour qu'il s'aligne visuellement
+              // avec la base du champ de texte
+              padding: const EdgeInsets.only(bottom: 2),
+              child: InkWell(
+                onTap: canSend
+                    ? (isEditing ? _updateMessage : _send)
+                    : _startRecordingUi,
+                onLongPress: !canSend ? _startRecordingUi : null,
+                borderRadius: BorderRadius.circular(actionButtonSize / 2),
+                child: Container(
+                  // CORRECTION : Nous utilisons la même taille commune
+                  width: actionButtonSize,
+                  height: actionButtonSize,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF315CFF),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        // CORRECTION : Ombre plus discrète et plus proche du bouton
+                        color: const Color(0xFF315CFF).withOpacity(0.18),
+                        blurRadius: 10,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    canSend
+                        ? (isEditing ? Icons.check_rounded : Icons.send_rounded)
+                        : Icons.mic_rounded,
+                    color: Colors.white,
+                    // CORRECTION : Icône légèrement plus petite pour un bouton plus petit
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -1549,6 +2049,8 @@ class _UiMessage {
   final int durationSec;
   final bool isMine; // 🚀 FIX: Make sure this property exists
   final DateTime time;
+  final bool isEdited;
+  final DateTime? editedAt;
   final bool isRead;
   final DateTime? readAt;
 
@@ -1560,7 +2062,92 @@ class _UiMessage {
     required this.durationSec,
     required this.isMine, // 🚀 FIX: Required parameter
     required this.time,
+    this.isEdited = false,
+    this.editedAt,
     required this.isRead,
     this.readAt,
   });
+
+  _UiMessage copyWith({
+    String? text,
+    bool? isEdited,
+    DateTime? editedAt,
+    bool? isRead,
+    DateTime? readAt,
+  }) {
+    return _UiMessage(
+      id: id,
+      text: text ?? this.text,
+      type: type,
+      audioUrl: audioUrl,
+      durationSec: durationSec,
+      isMine: isMine,
+      time: time,
+      isEdited: isEdited ?? this.isEdited,
+      editedAt: editedAt ?? this.editedAt,
+      isRead: isRead ?? this.isRead,
+      readAt: readAt ?? this.readAt,
+    );
+  }
+}
+
+class _MessageOptionRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String label;
+  final Color labelColor;
+  final VoidCallback onTap;
+
+  const _MessageOptionRow({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.label,
+    required this.labelColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF92A4C4).withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

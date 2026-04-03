@@ -17,6 +17,7 @@ const inscriptionRoutes = require("./routes/inscription");
 const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
+const postRoutes = require("./routes/post");
 const Message = require("./models/message");
 const UserService = require("./services/user");
 const authMiddleware = require("./middleware/auth");
@@ -40,7 +41,7 @@ const io = new Server(server, {
 });
 
 // 🚀 NEW: Store io instance globally for logout access
-app.set('io', io);
+app.set("io", io);
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json());
@@ -164,6 +165,7 @@ app.get("/", (req, res) => {
       activites: "/api/v1/activites",
       inscriptions: "/api/v1/inscriptions",
       avis: "/api/v1/avis",
+      posts: "/api/v1/posts",
       messages: "/api/v1/messages",
       lieux: "/api/v1/lieux",
     },
@@ -178,6 +180,7 @@ app.use("/api/v1/organisators", organisatorRoutes);
 app.use("/api/v1/activites", activiteRoutes);
 app.use("/api/v1/inscriptions", inscriptionRoutes);
 app.use("/api/v1/avis", avisRoutes);
+app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/lieux", lieuRoutes);
 
@@ -194,6 +197,7 @@ app.use("/api/organisators", organisatorRoutes);
 app.use("/api/activites", activiteRoutes);
 app.use("/api/inscriptions", inscriptionRoutes);
 app.use("/api/avis", avisRoutes);
+app.use("/api/posts", postRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/lieux", lieuRoutes);
 app.post("/api/auth/refresh", authMiddleware.refreshToken);
@@ -222,10 +226,10 @@ async function emitStatusToPartners(userId, isOnline) {
       ...new Set([...sentTo.map(String), ...receivedFrom.map(String)]),
     ];
     partnerIds.forEach((partnerId) => {
-      io.to(`user_${partnerId}`).emit("user_status", { 
-        userId, 
+      io.to(`user_${partnerId}`).emit("user_status", {
+        userId,
         isOnline,
-        timestamp: Date.now() // Ajouter timestamp pour debugging
+        timestamp: Date.now(), // Ajouter timestamp pour debugging
       });
     });
   } catch (err) {
@@ -236,8 +240,8 @@ async function emitStatusToPartners(userId, isOnline) {
 // 🚀 NEW: Clean up orphaned online users
 async function cleanupOrphanedUsers() {
   try {
-    console.log('🧹 [CLEANUP] Starting orphaned users cleanup...');
-    
+    console.log("🧹 [CLEANUP] Starting orphaned users cleanup...");
+
     // Get all connected sockets
     const connectedSockets = new Set();
     io.sockets.sockets.forEach((socket) => {
@@ -245,27 +249,37 @@ async function cleanupOrphanedUsers() {
         connectedSockets.add(socket.userId.toString());
       }
     });
-    
-    console.log(`📡 [CLEANUP] Currently connected users: ${Array.from(connectedSockets).join(', ')}`);
-    
-    // Find all users marked as online
-    const User = require('./models/user');
-    const onlineUsers = await User.find({ isOnline: true }).select('_id email userType').lean();
-    
-    console.log(`👥 [CLEANUP] Found ${onlineUsers.length} users marked as online`);
-    
-    // Mark as offline anyone not connected
-    const orphanedUsers = onlineUsers.filter(user => 
-      !connectedSockets.has(user._id.toString())
+
+    console.log(
+      `📡 [CLEANUP] Currently connected users: ${Array.from(connectedSockets).join(", ")}`,
     );
-    
+
+    // Find all users marked as online
+    const User = require("./models/user");
+    const onlineUsers = await User.find({ isOnline: true })
+      .select("_id email userType")
+      .lean();
+
+    console.log(
+      `👥 [CLEANUP] Found ${onlineUsers.length} users marked as online`,
+    );
+
+    // Mark as offline anyone not connected
+    const orphanedUsers = onlineUsers.filter(
+      (user) => !connectedSockets.has(user._id.toString()),
+    );
+
     if (orphanedUsers.length > 0) {
-      console.log(`🔴 [CLEANUP] Found ${orphanedUsers.length} orphaned users to mark offline`);
-      
+      console.log(
+        `🔴 [CLEANUP] Found ${orphanedUsers.length} orphaned users to mark offline`,
+      );
+
       for (const user of orphanedUsers) {
         await UserService.updateOnlineStatus(user._id, false);
-        console.log(`✅ [CLEANUP] Marked user ${user._id} (${user.email}) as offline`);
-        
+        console.log(
+          `✅ [CLEANUP] Marked user ${user._id} (${user.email}) as offline`,
+        );
+
         // Notify partners
         emitStatusToPartners(user._id, false);
         console.log(`📡 [CLEANUP] Notified partners for user ${user._id}`);
@@ -273,9 +287,8 @@ async function cleanupOrphanedUsers() {
     } else {
       console.log(`✅ [CLEANUP] No orphaned users found`);
     }
-    
   } catch (err) {
-    console.error('❌ [CLEANUP] Error during cleanup:', err);
+    console.error("❌ [CLEANUP] Error during cleanup:", err);
   }
 }
 
@@ -289,7 +302,7 @@ io.on("connection", (socket) => {
   const userId = socket.userId;
   socket.join(`user_${userId}`);
   console.log(`📡 Socket connected for user: ${userId}`);
-  
+
   // 🚀 SIMPLIFIED: Direct online status update
   UserService.updateOnlineStatus(userId, true)
     .then(() => {
@@ -301,18 +314,18 @@ io.on("connection", (socket) => {
     });
 
   // 🚀 NEW: Force offline status when client explicitly disconnects
-  socket.on('force_logout', async () => {
+  socket.on("force_logout", async () => {
     console.log(`🔴 [FORCE LOGOUT] User ${userId} forcing logout...`);
-    
+
     try {
       // Set offline in database
       await UserService.updateOnlineStatus(userId, false);
       console.log(`✅ [FORCE LOGOUT] User ${userId} marked as offline`);
-      
+
       // Emit to partners
       emitStatusToPartners(userId, false);
       console.log(`📡 [FORCE LOGOUT] Emitted offline status to partners`);
-      
+
       // Disconnect socket
       socket.disconnect();
       console.log(`🔌 [FORCE LOGOUT] Socket disconnected for user ${userId}`);
@@ -354,7 +367,9 @@ io.on("connection", (socket) => {
 
   socket.on("typing_start", ({ receiverId }) => {
     if (receiverId)
-      io.to(`user_${receiverId}`).emit("partner_typing", { partnerId: socket.userId });
+      io.to(`user_${receiverId}`).emit("partner_typing", {
+        partnerId: socket.userId,
+      });
   });
 
   socket.on("typing_stop", ({ receiverId }) => {
@@ -401,7 +416,7 @@ io.on("connection", (socket) => {
   // 🚀 SIMPLIFIED: Direct offline status update
   socket.on("disconnect", () => {
     console.log(`🔌 Socket disconnected for user: ${userId}`);
-    
+
     UserService.updateOnlineStatus(userId, false)
       .then(() => {
         console.log(`✅ User ${userId} marked as offline`);

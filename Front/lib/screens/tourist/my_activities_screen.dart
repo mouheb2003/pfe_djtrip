@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
+import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
-import '../../widgets/review_bottom_sheet.dart';
-import 'tabs/bookings_tab.dart';
+import 'bookings_screen.dart';
 
 class MyActivitiesScreen extends StatefulWidget {
   const MyActivitiesScreen({super.key});
@@ -14,9 +14,10 @@ class MyActivitiesScreen extends StatefulWidget {
 }
 
 class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
-  int _tabIndex = 0;
-  List<InscriptionModel> _all = [];
+  int _tabIndex = 0; // 0 Upcoming, 1 Ongoing, 2 Past
   bool _isLoading = true;
+  String? _errorMessage;
+  List<InscriptionModel> _all = [];
 
   @override
   void initState() {
@@ -31,13 +32,14 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       setState(() {
         _all = list;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-      );
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
     }
   }
 
@@ -46,23 +48,29 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     return DateTime(now.year, now.month, now.day);
   }
 
-  DateTime? _dateFromActivity(
-    InscriptionModel i,
-    String snakeKey,
-    String camelKey,
-  ) {
-    final raw = i.activite?[snakeKey] ?? i.activite?[camelKey];
+  DateTime? _activityStart(InscriptionModel inscription) {
+    final activity = inscription.activite ?? const {};
+    final raw = activity['date_debut'] ?? activity['dateDebut'];
+    if (raw is String) {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) return parsed;
+    }
+    return inscription.dateDemande;
+  }
+
+  DateTime? _activityEnd(InscriptionModel inscription) {
+    final activity = inscription.activite ?? const {};
+    final raw = activity['date_fin'] ?? activity['dateFin'];
     if (raw is String) return DateTime.tryParse(raw);
     return null;
   }
 
-  bool _isInProgress(InscriptionModel i) {
-    if (i.statut != 'approuvee') return false;
-    final start = _dateFromActivity(i, 'date_debut', 'dateDebut');
-    final end = _dateFromActivity(i, 'date_fin', 'dateFin');
+  bool _isInProgress(InscriptionModel inscription) {
+    if (inscription.statut != 'approuvee') return false;
+    final start = _activityStart(inscription);
+    final end = _activityEnd(inscription);
     final today = _today();
 
-    // If dates are missing, treat approved activities as ongoing by default.
     if (start == null && end == null) return true;
 
     final started = start == null || !today.isBefore(start);
@@ -70,147 +78,260 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     return started && notEnded;
   }
 
-  List<InscriptionModel> get _upcoming => _all.where((i) {
-    if (i.statut == 'en_attente') return true;
-    if (i.statut != 'approuvee') return false;
-    if (_isInProgress(i)) return false;
-    final start = _dateFromActivity(i, 'date_debut', 'dateDebut');
-    return start != null && _today().isBefore(start);
-  }).toList();
+  List<InscriptionModel> get _upcoming {
+    return _all.where((item) {
+      if (item.statut == 'en_attente') return true;
+      if (item.statut != 'approuvee') return false;
+      if (_isInProgress(item)) return false;
+      final start = _activityStart(item);
+      return start != null && _today().isBefore(start);
+    }).toList();
+  }
 
-  List<InscriptionModel> get _inProgress =>
-      _all.where((i) => _isInProgress(i)).toList();
+  List<InscriptionModel> get _ongoing {
+    return _all.where(_isInProgress).toList();
+  }
 
-  List<InscriptionModel> get _past => _all.where((i) {
-    if (i.statut != 'approuvee') return false;
-    if (_isInProgress(i)) return false;
-    final end = _dateFromActivity(i, 'date_fin', 'dateFin');
-    return end != null && _today().isAfter(end);
-  }).toList();
+  List<InscriptionModel> get _past {
+    return _all.where((item) {
+      if (item.statut != 'approuvee') return false;
+      if (_isInProgress(item)) return false;
+      final end = _activityEnd(item);
+      return end != null && _today().isAfter(end);
+    }).toList();
+  }
+
+  List<InscriptionModel> get _currentItems {
+    switch (_tabIndex) {
+      case 0:
+        return _upcoming;
+      case 1:
+        return _ongoing;
+      case 2:
+        return _past;
+      default:
+        return _upcoming;
+    }
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return months[(month - 1).clamp(0, 11)];
+  }
+
+  String _dateLabel(DateTime? date) {
+    if (date == null) return '';
+    return '${_monthName(date.month)} ${date.day.toString().padLeft(2, '0')}, ${date.year}';
+  }
+
+  String _timeLabel(DateTime? date) {
+    if (date == null) return '';
+    final hour = date.hour;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final isPm = hour >= 12;
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+    return '${displayHour.toString().padLeft(2, '0')}:$minute ${isPm ? 'PM' : 'AM'}';
+  }
+
+  String _titleFor(InscriptionModel inscription) {
+    final activity = inscription.activite ?? const {};
+    final title = (activity['titre'] as String?)?.trim() ?? '';
+    return title.isNotEmpty ? title : 'Activity';
+  }
+
+  String _imageUrlFor(InscriptionModel inscription) {
+    final activity = inscription.activite ?? const {};
+    final photos = activity['photos'];
+    if (photos is List && photos.isNotEmpty) {
+      final first = photos.first;
+      if (first is String && first.trim().isNotEmpty) return first.trim();
+    }
+    return '';
+  }
+
+  String _typeFor(InscriptionModel inscription) {
+    final activity = inscription.activite ?? const {};
+    final raw =
+        activity['type_activite'] ??
+        activity['typeActivite'] ??
+        activity['categorie'] ??
+        activity['category'] ??
+        activity['type'];
+    final type = raw?.toString().trim() ?? '';
+    if (type.isEmpty) return 'Activity';
+    return type;
+  }
+
+  void _openActivity(InscriptionModel inscription) {
+    final activityId = ((inscription.activite ?? const {})['_id'] ?? '')
+        .toString();
+    if (activityId.isEmpty) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ActivityDetailScreen(activityId: activityId, viewOnly: true),
+      ),
+    );
+  }
+
+  String _buttonLabelForTab() {
+    return _tabIndex == 2 ? 'View Details' : 'Book Now';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final items = _currentItems;
+
     return Scaffold(
-      backgroundColor: cs.surfaceVariant,
-      appBar: AppBar(
-        backgroundColor: cs.surface,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'My Activities',
-          style: TextStyle(
-            color: cs.onSurface,
-            fontWeight: FontWeight.w800,
-            fontSize: 31,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Container(
-              height: 52,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-              ),
-              child: Row(
-                children: [
-                  _SegmentTab(
-                    label: 'Upcoming',
-                    index: 0,
-                    current: _tabIndex,
-                    onTap: (i) => setState(() => _tabIndex = i),
-                  ),
-                  _SegmentTab(
-                    label: 'Ongoing',
-                    index: 1,
-                    current: _tabIndex,
-                    onTap: (i) => setState(() => _tabIndex = i),
-                  ),
-                  _SegmentTab(
-                    label: 'Past',
-                    index: 2,
-                    current: _tabIndex,
-                    onTap: (i) => setState(() => _tabIndex = i),
-                  ),
-                  _SegmentTab(
-                    label: 'Bookings',
-                    index: 3,
-                    current: _tabIndex,
-                    onTap: (i) => setState(() => _tabIndex = i),
-                  ),
-                ],
-              ),
+      backgroundColor: const Color(0xFFF4F3FE),
+      body: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFF7F5FF), Color(0xFFF1F0FD)],
             ),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _isLoading && _tabIndex != 3
-                ? const Center(child: CircularProgressIndicator())
-                : _tabIndex == 0
-                ? _ActivityList(inscriptions: _upcoming, onRefresh: _load)
-                : _tabIndex == 1
-                ? _ActivityList(inscriptions: _inProgress, onRefresh: _load)
-                : _tabIndex == 2
-                ? _ActivityList(inscriptions: _past, onRefresh: _load)
-                : const BookingsTab(),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'YOUR JOURNEY',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.6,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'My Activities',
+                            style: TextStyle(
+                              fontSize: 30,
+                              height: 1,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF1F235F),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _TopActionPill(
+                      label: 'My Bookings',
+                      icon: Icons.confirmation_num_rounded,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BookingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: _ActivitiesSegmentedControl(
+                  currentIndex: _tabIndex,
+                  onChanged: (value) => setState(() => _tabIndex = value),
+                ),
+              ),
+              Expanded(
+                child: _ActivitiesFeed(
+                  isLoading: _isLoading,
+                  errorMessage: _errorMessage,
+                  items: items,
+                  onRefresh: _load,
+                  onTapActivity: _openActivity,
+                  dateLabel: _dateLabel,
+                  timeLabel: _timeLabel,
+                  titleFor: _titleFor,
+                  imageUrlFor: _imageUrlFor,
+                  typeFor: _typeFor,
+                  activityDate: _activityStart,
+                  buttonLabel: _buttonLabelForTab(),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ── List widget ──────────────────────────────────────────────────────────────
-
-class _SegmentTab extends StatelessWidget {
+class _TopActionPill extends StatelessWidget {
   final String label;
-  final int index;
-  final int current;
-  final void Function(int) onTap;
+  final IconData icon;
+  final VoidCallback onTap;
 
-  const _SegmentTab({
+  const _TopActionPill({
     required this.label,
-    required this.index,
-    required this.current,
+    required this.icon,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isActive = index == current;
-    final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(index),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isActive ? cs.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                    ),
-                  ]
-                : [],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isActive ? AppColors.primary : cs.onSurfaceVariant,
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -218,274 +339,529 @@ class _SegmentTab extends StatelessWidget {
   }
 }
 
-class _ActivityList extends StatelessWidget {
-  final List<InscriptionModel> inscriptions;
-  final Future<void> Function() onRefresh;
+class _ActivitiesSegmentedControl extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onChanged;
 
-  const _ActivityList({required this.inscriptions, required this.onRefresh});
+  const _ActivitiesSegmentedControl({
+    required this.currentIndex,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (inscriptions.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECEAFF),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE2DDFF)),
+      ),
+      child: Row(
+        children: List.generate(3, (index) {
+          final label = ['Upcoming', 'Ongoing', 'Past'][index];
+          final active = currentIndex == index;
+          return Expanded(
+            child: InkWell(
+              onTap: () => onChanged(index),
+              borderRadius: BorderRadius.circular(999),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 42,
+                decoration: BoxDecoration(
+                  color: active ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active
+                          ? AppColors.primary
+                          : const Color(0xFF696D8D),
+                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _ActivitiesFeed extends StatelessWidget {
+  final bool isLoading;
+  final String? errorMessage;
+  final List<InscriptionModel> items;
+  final Future<void> Function() onRefresh;
+  final void Function(InscriptionModel) onTapActivity;
+  final String Function(DateTime?) dateLabel;
+  final String Function(DateTime?) timeLabel;
+  final String Function(InscriptionModel) titleFor;
+  final String Function(InscriptionModel) imageUrlFor;
+  final String Function(InscriptionModel) typeFor;
+  final DateTime? Function(InscriptionModel) activityDate;
+  final String buttonLabel;
+
+  const _ActivitiesFeed({
+    required this.isLoading,
+    required this.errorMessage,
+    required this.items,
+    required this.onRefresh,
+    required this.onTapActivity,
+    required this.dateLabel,
+    required this.timeLabel,
+    required this.titleFor,
+    required this.imageUrlFor,
+    required this.typeFor,
+    required this.activityDate,
+    required this.buttonLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF4B4F73)),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onRefresh, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (items.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           children: [
-            Icon(Icons.explore_off, size: 48, color: AppColors.textGrey),
-            SizedBox(height: 12),
-            Text(
-              'No activities yet',
-              style: TextStyle(color: AppColors.textGrey, fontSize: 14),
+            const SizedBox(height: 60),
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.explore_off_rounded,
+                    size: 44,
+                    color: AppColors.textGrey,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No activities yet',
+                    style: TextStyle(
+                      color: AppColors.textGrey,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       );
     }
+
+    final hero = items.first;
+    final rest = items.skip(1).toList();
+
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        itemCount: inscriptions.length,
-        itemBuilder: (_, i) => _ActivityCard(
-          inscription: inscriptions[i],
-          isPast:
-              inscriptions ==
-              (inscriptions.isNotEmpty
-                  ? inscriptions.first.statut == 'past'
-                        ? inscriptions
-                        : []
-                  : []), // This is a bit complex, let's just pass a flag if needed or check statut
-        ),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+        children: [
+          _FeaturedActivityCard(
+            title: titleFor(hero),
+            imageUrl: imageUrlFor(hero),
+            typeLabel: typeFor(hero),
+            dateText: [
+              dateLabel(activityDate(hero)),
+              timeLabel(activityDate(hero)),
+            ].where((e) => e.isNotEmpty).join('  •  '),
+            buttonLabel: buttonLabel,
+            onTap: () => onTapActivity(hero),
+          ),
+          const SizedBox(height: 16),
+          ...rest.map(
+            (inscription) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _ActivityCard(
+                title: titleFor(inscription),
+                imageUrl: imageUrlFor(inscription),
+                typeLabel: typeFor(inscription),
+                dateLabel: dateLabel(activityDate(inscription)),
+                timeLabel: timeLabel(activityDate(inscription)),
+                buttonLabel: buttonLabel,
+                onTap: () => onTapActivity(inscription),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Card ─────────────────────────────────────────────────────────────────────
+class _FeaturedActivityCard extends StatelessWidget {
+  final String title;
+  final String imageUrl;
+  final String typeLabel;
+  final String dateText;
+  final String buttonLabel;
+  final VoidCallback onTap;
 
-class _ActivityCard extends StatelessWidget {
-  final InscriptionModel inscription;
-  final bool isPast;
-  const _ActivityCard({required this.inscription, this.isPast = false});
-
-  void _showReviewSheet(BuildContext context, String activityId, String title) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) =>
-          ReviewBottomSheet(activiteId: activityId, activityTitle: title),
-    );
-  }
+  const _FeaturedActivityCard({
+    required this.title,
+    required this.imageUrl,
+    required this.typeLabel,
+    required this.dateText,
+    required this.buttonLabel,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final act = inscription.activite;
-    final photos = act?['photos'] as List? ?? [];
-    final imageUrl = photos.isNotEmpty ? photos.first as String : '';
-    final title = act?['titre'] as String? ?? 'Activity';
-    final prix = (act?['prix'] as num? ?? 0).toDouble();
-    final rating = (act?['note_moyenne'] as num? ?? 0).toStringAsFixed(1);
-    final activityId = act?['_id'] as String? ?? '';
-    final d = inscription.dateDemande;
-    final date = d != null ? '${_monthName(d.month)} ${d.day}, ${d.year}' : '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: cs.surfaceVariant),
-                  )
-                : Container(
-                    color: cs.surfaceVariant,
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      color: AppColors.primaryLight,
-                      size: 48,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 170,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imageUrl.isNotEmpty)
+                Image.network(imageUrl, fit: BoxFit.cover)
+              else
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
                     ),
                   ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title + rating
-                Row(
+                ),
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xD1000000), Color(0x2E000000)],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF1FF),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                       child: Text(
-                        title,
+                        typeLabel.toUpperCase(),
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          color: Color(0xFF4352B8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const Spacer(),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Icon(
-                          Icons.star,
-                          color: Color(0xFFFBBF24),
-                          size: 14,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 31,
+                                  fontWeight: FontWeight.w900,
+                                  height: 0.86,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0x99000000),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                dateText,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 3),
-                        Text(
-                          rating,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                            fontSize: 13,
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: onTap,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF5D71FF),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 18,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                          ),
+                          child: Text(
+                            buttonLabel,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              height: 1.0,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                if (date.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    date,
-                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                // Price + button
-                Row(
-                  children: [
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text:
-                                '${prix.toStringAsFixed(prix.truncateToDouble() == prix ? 0 : 2)} TND',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          const TextSpan(
-                            text: ' / pers',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textGrey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    if (inscription.statut == 'approuvee' &&
-                        activityId.isNotEmpty)
-                      ElevatedButton(
-                        onPressed: () =>
-                            _showReviewSheet(context, activityId, title),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.surface,
-                          foregroundColor: AppColors.primary,
-                          elevation: 0,
-                          side: const BorderSide(color: AppColors.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                        ),
-                        child: const Text(
-                          'Review',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: activityId.isNotEmpty
-                          ? () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ActivityDetailScreen(
-                                  activityId: activityId,
-                                  viewOnly: true,
-                                ),
-                              ),
-                            )
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                      ),
-                      child: const Text(
-                        'Details',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  String _monthName(int m) {
-    const months = [
-      '',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return months[m];
+class _ActivityCard extends StatelessWidget {
+  final String title;
+  final String imageUrl;
+  final String typeLabel;
+  final String dateLabel;
+  final String timeLabel;
+  final String buttonLabel;
+  final VoidCallback onTap;
+
+  const _ActivityCard({
+    required this.title,
+    required this.imageUrl,
+    required this.typeLabel,
+    required this.dateLabel,
+    required this.timeLabel,
+    required this.buttonLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 170,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imageUrl.isNotEmpty)
+                Image.network(imageUrl, fit: BoxFit.cover)
+              else
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
+                    ),
+                  ),
+                ),
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xD1000000), Color(0x2E000000)],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF1FF),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        typeLabel.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFF4352B8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 31,
+                                  fontWeight: FontWeight.w900,
+                                  height: 0.86,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0x99000000),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                [
+                                  dateLabel.isNotEmpty
+                                      ? dateLabel
+                                      : 'Date not available',
+                                  timeLabel.isNotEmpty ? timeLabel : 'Any time',
+                                ].join('  •  '),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: onTap,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF5D71FF),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 18,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                          ),
+                          child: Text(
+                            buttonLabel,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              height: 1.0,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

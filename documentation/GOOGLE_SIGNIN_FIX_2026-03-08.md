@@ -67,7 +67,7 @@ keytool -list -v -keystore C:\Users\ASUS\.android\debug.keystore -alias androidd
 2. Sélectionnez votre projet **DJTrip**
 3. Cliquez sur ⚙️ **Project Settings** (Paramètres du projet)
 4. Descendez jusqu'à **Your apps**
-5. Sélectionnez votre application Android (package: `com.example.travelo`)
+5. Sélectionnez votre application Android (package: `com.djtrip.app`)
 6. Cliquez sur **Add fingerprint** (Ajouter une empreinte)
 7. **Collez votre SHA-1**
 8. Répétez pour **SHA-256**
@@ -153,7 +153,7 @@ Dans `Front/android/app/build.gradle` :
 
 ```gradle
 defaultConfig {
-    applicationId "com.example.travelo"  // ← Doit matcher Firebase
+  applicationId "com.djtrip.app"  // ← Doit matcher Firebase / Google Cloud
 }
 ```
 

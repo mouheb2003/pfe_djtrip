@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'config/app_routes.dart';
+import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -84,7 +85,7 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFFB84D), Color(0xFFFF6B1A)],
+            colors: [AppColors.primaryDark, AppColors.primaryLight],
           ),
         ),
         child: Center(

@@ -3,14 +3,21 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/lieu_model.dart';
+import '../../services/place_name_resolver_service.dart';
 import '../../theme/app_theme.dart';
 import 'place_detail_screen.dart';
 
 class LieuxMapScreen extends StatefulWidget {
   final List<LieuModel> lieux;
   final String? initialLieuId;
+  final bool selectionMode;
 
-  const LieuxMapScreen({super.key, required this.lieux, this.initialLieuId});
+  const LieuxMapScreen({
+    super.key,
+    required this.lieux,
+    this.initialLieuId,
+    this.selectionMode = false,
+  });
 
   @override
   State<LieuxMapScreen> createState() => _LieuxMapScreenState();
@@ -19,9 +26,13 @@ class LieuxMapScreen extends StatefulWidget {
 class _LieuxMapScreenState extends State<LieuxMapScreen> {
   static const LatLng _fallbackCenter = LatLng(33.8076, 10.8451); // Djerba
   GoogleMapController? _controller;
+  final PlaceNameResolverService _placeNameResolver =
+      PlaceNameResolverService();
   LieuModel? _selectedLieu;
   LatLng? _longPressedPoint;
+  String? _longPressedName;
   String? _pickerLieuId;
+  String? _lastResolverErrorMessage;
 
   List<LieuModel> get _mappableLieux => widget.lieux
       .where((l) => l.latitude != null && l.longitude != null)
@@ -40,6 +51,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
   }
 
   LatLng get _initialCenter {
+    if (widget.selectionMode) return _fallbackCenter;
     if (_mappableLieux.isEmpty) return _fallbackCenter;
     if (widget.initialLieuId != null) {
       final match = _mappableLieux.where((l) => l.id == widget.initialLieuId);
@@ -91,6 +103,8 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
       _pickerLieuId = lieu.id;
       _longPressedPoint = null;
     });
+
+    if (widget.selectionMode) return;
 
     if (!animate || _controller == null) return;
     await _controller!.animateCamera(
@@ -163,6 +177,87 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
     await _selectLieu(l);
   }
 
+  void _confirmSelectedLieu() {
+    final selected = _selectedLieu;
+    if (selected == null) return;
+    Navigator.pop(context, selected);
+  }
+
+  void _confirmLongPressedPoint() {
+    final point = _longPressedPoint;
+    if (point == null) return;
+
+    final fallbackName =
+        '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+    final selectedName = (_longPressedName ?? '').trim();
+
+    final lieu = LieuModel(
+      id: 'manual_${point.latitude}_${point.longitude}',
+      titre: selectedName.isNotEmpty ? selectedName : fallbackName,
+      sousTitre: 'Pinned on map',
+      description: 'Custom location selected from map',
+      imagePortrait: '',
+      images: const <String>[],
+      noteMoyenne: 0,
+      nombreAvis: 0,
+      categorie: 'Other',
+      topDestination: false,
+      prix: 'FREE',
+      latitude: point.latitude,
+      longitude: point.longitude,
+    );
+
+    Navigator.pop(context, lieu);
+  }
+
+  void _maybeShowResolverWarning(PlaceNameError? error) {
+    if (error == null || !mounted) return;
+    if (_lastResolverErrorMessage == error.message) return;
+
+    _lastResolverErrorMessage = error.message;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error.message),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _handleLongPress(LatLng point) async {
+    setState(() {
+      _selectedLieu = null;
+      _pickerLieuId = null;
+      _longPressedPoint = point;
+      _longPressedName = null;
+    });
+
+    final resolved = await _placeNameResolver.resolvePlaceName(
+      latitude: point.latitude,
+      longitude: point.longitude,
+      localFallback: _mappableLieux,
+      language: 'fr',
+    );
+
+    if (!mounted || _longPressedPoint != point) return;
+    _maybeShowResolverWarning(resolved.error);
+
+    setState(() => _longPressedName = resolved.displayName.trim());
+  }
+
+  Future<void> _handleMapTap(LatLng point) async {
+    if (!widget.selectionMode) {
+      setState(() {
+        _selectedLieu = null;
+        _pickerLieuId = null;
+        _longPressedPoint = null;
+        _longPressedName = null;
+      });
+      return;
+    }
+
+    await _handleLongPress(point);
+  }
+
   Widget _buildPickerCard(ColorScheme cs) {
     if (_mappableLieux.isEmpty) return const SizedBox.shrink();
 
@@ -233,7 +328,9 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Carte des lieux')),
+      appBar: AppBar(
+        title: Text(widget.selectionMode ? 'Pick a place' : 'Carte des lieux'),
+      ),
       body: Stack(
         children: [
           GoogleMap(
@@ -250,16 +347,8 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
             tiltGesturesEnabled: true,
             rotateGesturesEnabled: true,
             mapToolbarEnabled: false,
-            onTap: (_) => setState(() {
-              _selectedLieu = null;
-              _pickerLieuId = null;
-              _longPressedPoint = null;
-            }),
-            onLongPress: (point) => setState(() {
-              _selectedLieu = null;
-              _pickerLieuId = null;
-              _longPressedPoint = point;
-            }),
+            onTap: _handleMapTap,
+            onLongPress: _handleLongPress,
             markers: _markers,
           ),
           Positioned(
@@ -355,17 +444,25 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton.icon(
-                          onPressed: _openDirectionsToSelectedLieu,
-                          icon: const Icon(Icons.alt_route, size: 16),
-                          label: const Text('Itinéraire'),
-                        ),
-                        const SizedBox(width: 6),
-                        TextButton.icon(
-                          onPressed: () => _openDetail(_selectedLieu!),
-                          icon: const Icon(Icons.info_outline, size: 16),
-                          label: const Text('Détails'),
-                        ),
+                        if (widget.selectionMode)
+                          FilledButton.icon(
+                            onPressed: _confirmSelectedLieu,
+                            icon: const Icon(Icons.check, size: 16),
+                            label: const Text('OK'),
+                          )
+                        else ...[
+                          TextButton.icon(
+                            onPressed: _openDirectionsToSelectedLieu,
+                            icon: const Icon(Icons.alt_route, size: 16),
+                            label: const Text('Itinéraire'),
+                          ),
+                          const SizedBox(width: 6),
+                          TextButton.icon(
+                            onPressed: () => _openDetail(_selectedLieu!),
+                            icon: const Icon(Icons.info_outline, size: 16),
+                            label: const Text('Détails'),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -403,14 +500,19 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Point: ${_longPressedPoint!.latitude.toStringAsFixed(6)}, ${_longPressedPoint!.longitude.toStringAsFixed(6)}',
+                            _longPressedName != null &&
+                                    _longPressedName!.trim().isNotEmpty
+                                ? _longPressedName!
+                                : 'Point: ${_longPressedPoint!.latitude.toStringAsFixed(6)}, ${_longPressedPoint!.longitude.toStringAsFixed(6)}',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          onPressed: () =>
-                              setState(() => _longPressedPoint = null),
+                          onPressed: () => setState(() {
+                            _longPressedPoint = null;
+                            _longPressedName = null;
+                          }),
                           icon: const Icon(Icons.close, size: 18),
                         ),
                       ],
@@ -418,12 +520,18 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () =>
-                            _openItineraryToLatLng(_longPressedPoint!),
-                        icon: const Icon(Icons.alt_route, size: 16),
-                        label: const Text('Itinéraire'),
-                      ),
+                      child: widget.selectionMode
+                          ? FilledButton.icon(
+                              onPressed: _confirmLongPressedPoint,
+                              icon: const Icon(Icons.check, size: 16),
+                              label: const Text('PICK'),
+                            )
+                          : TextButton.icon(
+                              onPressed: () =>
+                                  _openItineraryToLatLng(_longPressedPoint!),
+                              icon: const Icon(Icons.alt_route, size: 16),
+                              label: const Text('Itinéraire'),
+                            ),
                     ),
                   ],
                 ),

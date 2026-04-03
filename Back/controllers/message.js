@@ -251,6 +251,8 @@ exports.editMessage = async (req, res) => {
     }
 
     message.content = content.trim();
+    message.is_edited = true;
+    message.edited_at = new Date();
     await message.save();
 
     res.status(200).json({ message });

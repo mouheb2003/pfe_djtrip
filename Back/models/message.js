@@ -39,6 +39,14 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    is_edited: {
+      type: Boolean,
+      default: false,
+    },
+    edited_at: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

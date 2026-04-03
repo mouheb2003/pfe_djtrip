@@ -1,97 +1,151 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/post_service.dart';
 
 class ScreenNetwork extends StatefulWidget {
-  const ScreenNetwork({super.key});
+  final bool showBackButton;
+  final String title;
+  final bool showOnlyMyPosts;
+
+  const ScreenNetwork({
+    super.key,
+    this.showBackButton = false,
+    this.title = 'Network',
+    this.showOnlyMyPosts = false,
+  });
 
   @override
   State<ScreenNetwork> createState() => _ScreenNetworkState();
 }
 
 class _ScreenNetworkState extends State<ScreenNetwork> {
-  final List<NetworkPost> _posts = [
-    NetworkPost(
-      id: '1',
-      username: 'Amel Ben Salem',
-      avatar: 'https://via.placeholder.com/50',
-      timeAgo: '2 HOURS AGO',
-      category: 'ART & CULTURE',
-      image:
-          'https://via.placeholder.com/400x300?text=Djerba+Art', // Colorful art
-      likes: 1240,
-      comments: 48,
-      description:
-          'Lost in the colors of #Djerbahood. Every corner tells a story. Highly recommend the sunset walk through the village. 🎨✨',
-    ),
-    NetworkPost(
-      id: '2',
-      username: 'Youssef Trabelsi',
-      avatar: 'https://via.placeholder.com/50',
-      timeAgo: '4 HOURS AGO • FLAMINGO ISLAND',
-      category: 'NATURE',
-      image:
-          'https://via.placeholder.com/400x300?text=Flamingos+Sunset', // Beach sunset
-      likes: 850,
-      comments: 12,
-      description:
-          'Finally made it to see the flamingos! The boat trip from Mount Souk was incredible. The water is actually blue. 💛🌊',
-    ),
-    NetworkPost(
-      id: '3',
-      username: 'Sarah Miller',
-      avatar: 'https://via.placeholder.com/50',
-      timeAgo: '6 HOURS AGO • DJERBA POTTERY',
-      category: 'CRAFTS',
-      image:
-          'https://via.placeholder.com/400x300?text=Pottery+Workshop', // Pottery
-      likes: 2400,
-      comments: 156,
-      description:
-          'Spent the morning in Guellala learning the secrets of Djerbian pottery. 🏺 The craftsmanship is out of this world.',
-    ),
-  ];
+  List<Map<String, dynamic>> _posts = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeed();
+  }
+
+  Future<void> _loadFeed() async {
+    final currentUserId = await AuthService.getUserId();
+    final feedPosts = await PostService.getFeedPosts();
+    final myPosts = await PostService.getMyPosts();
+
+    final posts =
+        (widget.showOnlyMyPosts
+              ? (myPosts.isNotEmpty
+                    ? myPosts
+                    : feedPosts.where((post) {
+                        final author = post['author_id'];
+                        final authorId = author is Map<String, dynamic>
+                            ? (author['_id'] ?? author['id'] ?? '').toString()
+                            : author?.toString() ?? '';
+                        return currentUserId != null &&
+                            currentUserId.isNotEmpty &&
+                            authorId == currentUserId;
+                      }).toList())
+              : feedPosts.where((post) {
+                  final author = post['author_id'];
+                  final authorId = author is Map<String, dynamic>
+                      ? (author['_id'] ?? author['id'] ?? '').toString()
+                      : author?.toString() ?? '';
+                  if (currentUserId == null || currentUserId.isEmpty) {
+                    return true;
+                  }
+                  return authorId != currentUserId;
+                }).toList())
+          ..sort((a, b) {
+            final aDate =
+                DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            final bDate =
+                DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            return bDate.compareTo(aDate);
+          });
+
+    if (!mounted) return;
+    setState(() {
+      _posts = posts;
+      _loading = false;
+    });
+  }
+
+  Future<void> _refreshFeed() async {
+    await _loadFeed();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final w = MediaQuery.of(context).size.width;
+    final titleSize = w >= 420 ? 52.0 : 46.0;
+
     return Scaffold(
-      backgroundColor: cs.surfaceVariant,
-      body: CustomScrollView(
-        slivers: [
-          // Header
-          SliverAppBar(
-            backgroundColor: cs.surface,
-            elevation: 0,
-            pinned: true,
-            automaticallyImplyLeading: false,
-            centerTitle: true,
-            title: Text(
-              'Network',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontWeight: FontWeight.w800,
-                fontSize: 24,
+      backgroundColor: const Color(0xFFF3F2FA),
+      body: RefreshIndicator(
+        onRefresh: _refreshFeed,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            if (widget.showBackButton)
+              SliverAppBar(
+                backgroundColor: const Color(0xFFF3F2FA),
+                elevation: 0,
+                pinned: true,
+                automaticallyImplyLeading: true,
+                iconTheme: const IconThemeData(color: AppColors.primary),
+                centerTitle: false,
+                title: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    color: Color(0xFF1F235F),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                  ),
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.search, color: Color(0xFF6D739B)),
+                    onPressed: () {},
+                  ),
+                ],
+              )
+            else
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
+                  child: Text(
+                    'Network',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: titleSize,
+                      height: 1,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none),
-                onPressed: () {},
+            // Posts Feed
+            if (_loading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_posts.isEmpty)
+              const SliverFillRemaining(
+                child: Center(child: Text('No posts yet.')),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _NetworkPostCard(post: _posts[index]),
+                  childCount: _posts.length,
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.message_outlined),
-                onPressed: () {},
-              ),
-            ],
-          ),
-          // Posts Feed
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _NetworkPostCard(post: _posts[index]),
-              childCount: _posts.length,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -99,34 +153,10 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
 
 // ── Post Model ───────────────────────────────────────────────────────────────
 
-class NetworkPost {
-  final String id;
-  final String username;
-  final String avatar;
-  final String timeAgo;
-  final String category;
-  final String image;
-  final int likes;
-  final int comments;
-  final String description;
-
-  NetworkPost({
-    required this.id,
-    required this.username,
-    required this.avatar,
-    required this.timeAgo,
-    required this.category,
-    required this.image,
-    required this.likes,
-    required this.comments,
-    required this.description,
-  });
-}
-
 // ── Post Card ────────────────────────────────────────────────────────────────
 
 class _NetworkPostCard extends StatefulWidget {
-  final NetworkPost post;
+  final Map<String, dynamic> post;
   const _NetworkPostCard({required this.post});
 
   @override
@@ -142,89 +172,206 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
     _isLiked = false;
   }
 
+  String _timeAgo(DateTime? date) {
+    if (date == null) return 'Recently';
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'Recently';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final compact = screenWidth < 390;
+    final imageHeight = compact ? 320.0 : 380.0;
+
+    final author = widget.post['author_id'] is Map<String, dynamic>
+        ? widget.post['author_id'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final username = (author['fullname'] as String?) ?? 'Traveler';
+    final avatar = (author['avatar'] as String?) ?? '';
+    final imageUrls =
+        (widget.post['image_urls'] as List?)
+            ?.whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    final imageUrl = imageUrls.isNotEmpty
+        ? imageUrls.first
+        : (widget.post['image_url'] as String?) ?? '';
+    final description = (widget.post['content'] as String?) ?? '';
+    final locationLabel = (widget.post['location_label'] as String?) ?? '';
+    final hashtags =
+        (widget.post['hashtags'] as List?)
+            ?.whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    final likes = (widget.post['likes_count'] as num?)?.toInt() ?? 0;
+    final comments = (widget.post['comments_count'] as num?)?.toInt() ?? 0;
+    final shares =
+        (widget.post['shares_count'] as num?)?.toInt() ??
+        (widget.post['share_count'] as num?)?.toInt() ??
+        (widget.post['shares'] as num?)?.toInt() ??
+        0;
+    final created = DateTime.tryParse(
+      widget.post['createdAt']?.toString() ?? '',
+    );
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: cs.surface,
+      margin: EdgeInsets.fromLTRB(compact ? 12 : 16, 10, compact ? 12 : 16, 14),
+      padding: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(compact ? 16 : 22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header: Avatar, Name, Time, Menu
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 6),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 20,
-                  backgroundImage: NetworkImage(widget.post.avatar),
+                  radius: compact ? 16 : 18,
+                  backgroundImage: avatar.isNotEmpty
+                      ? NetworkImage(avatar)
+                      : null,
+                  child: avatar.isEmpty ? const Icon(Icons.person) : null,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.post.username,
+                        username,
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: cs.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: compact ? 14 : 15,
+                          color: const Color(0xFF1F235F),
                         ),
                       ),
                       Text(
-                        widget.post.timeAgo,
-                        style: TextStyle(
+                        _timeAgo(created),
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: cs.onSurfaceVariant,
+                          color: Color(0xFF7A81A8),
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.more_horiz, color: Color(0xFF565D8B)),
+                  onPressed: () {},
+                ),
               ],
             ),
           ),
-          // Category Badge
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                widget.post.category,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
+          if (description.isNotEmpty ||
+              locationLabel.isNotEmpty ||
+              hashtags.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (locationLabel.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF2E3464),
+                              ),
+                              children: [
+                                TextSpan(text: '$username is at '),
+                                TextSpan(
+                                  text: locationLabel,
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (locationLabel.isNotEmpty) const SizedBox(height: 8),
+                  if (description.isNotEmpty)
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: Color(0xFF232B57),
+                      ),
+                    ),
+                  if (hashtags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: hashtags
+                          .map(
+                            (tag) => Text(
+                              tag.startsWith('#') ? tag : '#$tag',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // Image
-          SizedBox(
-            height: 250,
-            width: double.infinity,
-            child: Image.network(
-              widget.post.image,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.grey[300],
-                  child: const Center(child: Icon(Icons.image_not_supported)),
-                );
-              },
+          if (imageUrl.isNotEmpty)
+            SizedBox(
+              height: imageHeight,
+              width: double.infinity,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Center(child: Icon(Icons.image_not_supported)),
+                  );
+                },
+              ),
             ),
-          ),
           // Interaction Bar: Likes, Comments, Shares
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
             child: Row(
               children: [
                 GestureDetector(
@@ -233,46 +380,73 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                     children: [
                       Icon(
                         _isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: _isLiked ? Colors.red : cs.onSurface,
-                        size: 20,
+                        color: AppColors.primary,
+                        size: 22,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       Text(
-                        '${widget.post.likes}',
-                        style: TextStyle(fontSize: 12, color: cs.onSurface),
+                        '$likes',
+                        style: const TextStyle(
+                          fontSize: 19,
+                          color: Color(0xFF2F3566),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 22),
                 Row(
                   children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
+                    const Icon(
+                      Icons.chat_bubble,
                       size: 20,
-                      color: cs.onSurface,
+                      color: Color(0xFF5B5E8A),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
-                      '${widget.post.comments}',
-                      style: TextStyle(fontSize: 12, color: cs.onSurface),
+                      '$comments',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        color: Color(0xFF2F3566),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 22),
+                Row(
+                  children: [
+                    const Icon(Icons.share, size: 20, color: Color(0xFF5B5E8A)),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$shares',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        color: Color(0xFF2F3566),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
                 const Spacer(),
-                Icon(Icons.share_outlined, size: 20, color: cs.onSurface),
+                const Icon(Icons.bookmark, size: 21, color: Color(0xFF5B5E8A)),
               ],
             ),
           ),
-          // Description
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              widget.post.description,
-              style: TextStyle(fontSize: 13, color: cs.onSurface),
+          if (comments > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
+              child: Text(
+                'VIEW ALL $comments COMMENTS',
+                style: const TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 0.6,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6F74A3),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
         ],
       ),
     );

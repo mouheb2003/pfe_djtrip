@@ -114,11 +114,10 @@ class ApiClient {
       final res = await http
           .get(uri, headers: headers)
           .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      return _handleResponse(
-        res,
-        auth,
-        () => get(path, auth: auth, query: query),
-      );
+      if (res.statusCode == 401 && auth) {
+        return _withRefresh(() => get(path, auth: auth, query: query));
+      }
+      return res;
     } catch (e) {
       return _handleError(e);
     }
@@ -135,7 +134,10 @@ class ApiClient {
       final res = await http
           .post(uri, headers: headers, body: jsonEncode(body))
           .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      return _handleResponse(res, auth, () => post(path, body, auth: auth));
+      if (res.statusCode == 401 && auth) {
+        return _withRefresh(() => post(path, body, auth: auth));
+      }
+      return res;
     } catch (e) {
       return _handleError(e);
     }
@@ -152,7 +154,10 @@ class ApiClient {
       final res = await http
           .put(uri, headers: headers, body: jsonEncode(body))
           .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      return _handleResponse(res, auth, () => put(path, body, auth: auth));
+      if (res.statusCode == 401 && auth) {
+        return _withRefresh(() => put(path, body, auth: auth));
+      }
+      return res;
     } catch (e) {
       return _handleError(e);
     }
@@ -169,7 +174,10 @@ class ApiClient {
       final res = await http
           .patch(uri, headers: headers, body: jsonEncode(body))
           .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      return _handleResponse(res, auth, () => patch(path, body, auth: auth));
+      if (res.statusCode == 401 && auth) {
+        return _withRefresh(() => patch(path, body, auth: auth));
+      }
+      return res;
     } catch (e) {
       return _handleError(e);
     }
@@ -182,7 +190,10 @@ class ApiClient {
       final res = await http
           .delete(uri, headers: headers)
           .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      return _handleResponse(res, auth, () => delete(path, auth: auth));
+      if (res.statusCode == 401 && auth) {
+        return _withRefresh(() => delete(path, auth: auth));
+      }
+      return res;
     } catch (e) {
       return _handleError(e);
     }
@@ -191,17 +202,6 @@ class ApiClient {
   // ──────────────────────────────────────────────────────────────
   // Response handlers
   // ──────────────────────────────────────────────────────────────
-
-  static http.Response _handleResponse(
-    http.Response res,
-    bool auth,
-    Future<http.Response> Function() retry,
-  ) {
-    if (res.statusCode == 401 && auth) {
-      _withRefresh(retry);
-    }
-    return res;
-  }
 
   static http.Response _handleError(dynamic error) {
     String message;

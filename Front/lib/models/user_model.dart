@@ -43,7 +43,9 @@ class UserModel {
       centresInteret: List<String>.from(json['centres_interet'] as List? ?? []),
       languePreferee: json['langue_preferee'] as String? ?? 'English',
       noteMoyenne: (json['note_moyenne'] as num? ?? 0).toDouble(),
-      nombreAvis: (json['nombre_avis'] as num? ?? 0).toInt(),
+      nombreAvis:
+          (json['nombre_avis'] as num? ?? json['nombreAvis'] as num? ?? 0)
+              .toInt(),
     );
   }
 

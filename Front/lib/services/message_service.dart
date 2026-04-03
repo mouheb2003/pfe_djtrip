@@ -21,23 +21,34 @@ class MessageService {
   static Future<List<ConversationModel>> getConversations() async {
     final res = await ApiClient.get('/messages/conversations');
     if (res.statusCode == 200) {
-      final list = jsonDecode(res.body) as List;
-      return list
-          .map((c) => ConversationModel.fromJson(c as Map<String, dynamic>))
-          .toList();
-    }
-    // Surface backend/network error instead of silently returning an empty list.
-    try {
-      final body = jsonDecode(res.body);
-      if (body is Map<String, dynamic>) {
-        throw Exception(
-          (body['message'] as String?) ?? 'Unable to load conversations',
-        );
+      final decoded = jsonDecode(res.body);
+      final list = decoded is List
+          ? decoded
+          : decoded is Map<String, dynamic>
+          ? (decoded['conversations'] ?? decoded['data'] ?? const [])
+          : const [];
+
+      if (list is List) {
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(ConversationModel.fromJson)
+            .toList();
       }
-    } catch (_) {
-      // Ignore JSON parse errors and fall through to generic message.
+      return const [];
     }
-    throw Exception('Unable to load conversations');
+    final decoded = (() {
+      try {
+        final body = jsonDecode(res.body);
+        return body is Map<String, dynamic> ? body : null;
+      } catch (_) {
+        return null;
+      }
+    })();
+
+    final message =
+        (decoded?['message'] as String?) ??
+        'Unable to load conversations (HTTP ${res.statusCode})';
+    throw Exception(message);
   }
 
   /// Get total unread message count.

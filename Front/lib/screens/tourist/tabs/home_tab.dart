@@ -1,8 +1,7 @@
 ﻿import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
-import '../../../models/activity_model.dart';
-import '../../../services/activity_service.dart';
-import '../../shared/activity_detail_screen.dart';
+import '../../../models/lieu_model.dart';
+import '../../../services/lieu_service.dart';
+import '../place_detail_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
@@ -19,7 +18,7 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  List<ActivityModel> _activities = [];
+  List<LieuModel> _lieux = [];
   bool _isLoading = true;
   String _selectedCategory = 'All';
 
@@ -62,15 +61,15 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _loadActivities();
+    _loadLieux();
   }
 
-  Future<void> _loadActivities() async {
+  Future<void> _loadLieux() async {
     try {
-      final activities = await ActivityService.getActivities();
+      final lieux = await LieuService.getLieux();
       if (mounted) {
         setState(() {
-          _activities = activities;
+          _lieux = lieux;
           _isLoading = false;
         });
       }
@@ -83,34 +82,60 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  List<ActivityModel> get _filteredActivities {
-    if (_selectedCategory == 'All') return _activities;
+  List<LieuModel> get _filteredLieux {
+    if (_selectedCategory == 'All') return _lieux;
 
-    return _activities.where((activity) {
-      final categoryValue = activity.categorie.isNotEmpty
-          ? activity.categorie
-          : activity.typeActivite;
-      final category = categoryValue.toLowerCase().trim();
-      if (category.isEmpty) return false;
-      return category.contains(_selectedCategory.toLowerCase().trim());
+    final wanted = _selectedCategory.toLowerCase().trim();
+
+    return _lieux.where((lieu) {
+      final category = lieu.categorie.toLowerCase().trim();
+      final title = lieu.titre.toLowerCase().trim();
+      final subtitle = lieu.sousTitre.toLowerCase().trim();
+      return category.contains(wanted) ||
+          title.contains(wanted) ||
+          subtitle.contains(wanted);
     }).toList();
   }
 
-  List<ActivityModel> get _visibleActivities {
-    final items = _filteredActivities;
+  List<LieuModel> get _visibleLieux {
+    final items = _filteredLieux;
     if (items.isNotEmpty) return items;
-    return _activities;
+    return _lieux;
   }
 
-  List<ActivityModel> get _topDestinations =>
-      _visibleActivities.take(6).toList();
+  List<LieuModel> get _topDestinations {
+    final items = [..._visibleLieux];
+    items.sort((a, b) {
+      if (a.topDestination == b.topDestination) return 0;
+      return a.topDestination ? -1 : 1;
+    });
+    return items.take(6).toList();
+  }
+
+  Map<String, dynamic> _toPlaceMap(LieuModel l) {
+    return {
+      '_id': l.id,
+      'title': l.titre,
+      'subtitle': l.sousTitre,
+      'description': l.description,
+      'image': l.displayImage,
+      'images': l.images,
+      'rating': l.noteMoyenne.toStringAsFixed(1),
+      'nombreAvis': l.nombreAvis,
+      'top_destination': l.topDestination,
+      'activity_id': l.activiteLieeId,
+      'coordonnees': {'latitude': l.latitude, 'longitude': l.longitude},
+      'price': l.prix,
+      'categorie': l.categorie,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: RefreshIndicator(
-        onRefresh: _loadActivities,
+        onRefresh: _loadLieux,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
@@ -244,7 +269,7 @@ class _HomeTabState extends State<HomeTab> {
                             child: Center(child: CircularProgressIndicator()),
                           )
                         : _topDestinations.isEmpty
-                        ? _EmptyDestinations(onRetry: _loadActivities)
+                        ? _EmptyDestinations(onRetry: _loadLieux)
                         : SizedBox(
                             height: 280,
                             child: ListView.separated(
@@ -253,14 +278,14 @@ class _HomeTabState extends State<HomeTab> {
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 16),
                               itemBuilder: (context, index) {
-                                final activity = _topDestinations[index];
+                                final lieu = _topDestinations[index];
                                 return _TopDestinationCard(
-                                  activity: activity,
+                                  lieu: lieu,
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ActivityDetailScreen(
-                                        activityId: activity.id,
+                                      builder: (_) => PlaceDetailScreen(
+                                        place: _toPlaceMap(lieu),
                                       ),
                                     ),
                                   ),
@@ -338,7 +363,6 @@ class _HomeHero extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const _HeroAvatar(),
                       const Spacer(),
                       _HeroIcon(
                         icon: Icons.chat_bubble_outline,
@@ -441,31 +465,6 @@ class _HeroIcon extends StatelessWidget {
   }
 }
 
-class _HeroAvatar extends StatelessWidget {
-  const _HeroAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: ClipOval(
-        child: Image.network(
-          'https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&w=220&q=80',
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              const Icon(Icons.person, color: Color(0xFF334155)),
-        ),
-      ),
-    );
-  }
-}
-
 class _CategoryAvatar extends StatelessWidget {
   final String label;
   final String imageUrl;
@@ -533,15 +532,15 @@ class _CategoryAvatar extends StatelessWidget {
 }
 
 class _TopDestinationCard extends StatelessWidget {
-  final ActivityModel activity;
+  final LieuModel lieu;
   final VoidCallback onTap;
 
-  const _TopDestinationCard({required this.activity, required this.onTap});
+  const _TopDestinationCard({required this.lieu, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = activity.thumbnailUrl.isNotEmpty
-        ? activity.thumbnailUrl
+    final imageUrl = lieu.displayImage.isNotEmpty
+        ? lieu.displayImage
         : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80';
 
     return GestureDetector(
@@ -589,7 +588,7 @@ class _TopDestinationCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      activity.titre,
+                      lieu.titre,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -608,7 +607,7 @@ class _TopDestinationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${activity.noteMoyenne.toStringAsFixed(1)} (${activity.nombreAvis})',
+                          '${lieu.noteMoyenne.toStringAsFixed(1)} (${lieu.nombreAvis})',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -732,7 +731,7 @@ class _EmptyDestinations extends StatelessWidget {
             const Icon(Icons.location_off, color: Color(0xFF7A8BA6), size: 34),
             const SizedBox(height: 10),
             const Text(
-              'No destinations yet',
+              'Not yet available',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),

@@ -44,68 +44,142 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    const navBg = Color(0xFFE9ECFB);
+    const navActive = AppColors.primary;
+    const navInactive = Color(0xFF7B82A8);
+
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: Container(
-        height: 85,
-        decoration: BoxDecoration(
-          color: cs.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
-                  label: 'Home',
-                  index: 0,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 88,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 8,
+                child: Container(
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: navBg,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.14),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.home_outlined,
+                          activeIcon: Icons.home,
+                          label: 'Home',
+                          index: 0,
+                          currentIndex: _currentIndex,
+                          onTap: _goToTab,
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.explore_outlined,
+                          activeIcon: Icons.explore,
+                          label: 'Explore',
+                          index: 1,
+                          currentIndex: _currentIndex,
+                          onTap: _goToTab,
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      const SizedBox(width: 56),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.event_note_outlined,
+                          activeIcon: Icons.event_note,
+                          label: 'Activities',
+                          index: 2,
+                          currentIndex: _currentIndex,
+                          onTap: _goToTab,
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.person_outline,
+                          activeIcon: Icons.person,
+                          label: 'Profile',
+                          index: 4,
+                          currentIndex: _currentIndex,
+                          onTap: _goToTab,
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _NavItem(
-                  icon: Icons.explore_outlined,
-                  activeIcon: Icons.explore,
-                  label: 'Explore',
-                  index: 1,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
+              ),
+              Positioned(
+                top: -8,
+                child: GestureDetector(
+                  onTap: () => _goToTab(3),
+                  child: Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      color: navBg,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: _currentIndex == 3
+                              ? AppColors.primaryDark
+                              : AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.public,
+                          color: cs.onPrimary,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                _NavItem(
-                  icon: Icons.event_note_outlined,
-                  activeIcon: Icons.event_note,
-                  label: 'Activities',
-                  index: 2,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
+              ),
+              Positioned(
+                top: 57,
+                child: Text(
+                  'Network',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _currentIndex == 3 ? AppColors.primary : navInactive,
+                  ),
                 ),
-                _NavItem(
-                  icon: Icons.public_outlined,
-                  activeIcon: Icons.public,
-                  label: 'Network',
-                  index: 3,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
-                ),
-                _NavItem(
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
-                  label: 'Profile',
-                  index: 4,
-                  currentIndex: _currentIndex,
-                  onTap: _goToTab,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -120,7 +194,8 @@ class _NavItem extends StatelessWidget {
   final int index;
   final int currentIndex;
   final void Function(int) onTap;
-  final bool showDot;
+  final Color activeColor;
+  final Color inactiveColor;
 
   const _NavItem({
     required this.icon,
@@ -129,51 +204,33 @@ class _NavItem extends StatelessWidget {
     required this.index,
     required this.currentIndex,
     required this.onTap,
-    this.showDot = false,
+    required this.activeColor,
+    required this.inactiveColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final isActive = index == currentIndex;
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  color: isActive ? AppColors.primary : cs.onSurfaceVariant,
-                  size: 24,
-                ),
-                if (showDot && !isActive)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
+            Icon(
+              isActive ? activeIcon : icon,
+              color: isActive ? activeColor : inactiveColor,
+              size: 20,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? AppColors.primary : cs.onSurfaceVariant,
+                fontSize: 9,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                color: isActive ? activeColor : inactiveColor,
               ),
             ),
           ],

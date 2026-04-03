@@ -3,6 +3,7 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
 import 'api_client.dart';
 import '../config/oauth_config.dart';
 
@@ -287,6 +288,14 @@ class AuthService {
   /// Sign in with Google, then authenticate against backend.
   static Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
+      if (!OAuthConfig.isGoogleConfigured) {
+        return {
+          'success': false,
+          'message':
+              'Google sign-in is not configured. Set GOOGLE_SERVER_CLIENT_ID before running the app.',
+        };
+      }
+
       final account = await _googleSignIn.signIn();
       if (account == null) {
         return {'success': false, 'message': 'Google sign-in was cancelled.'};
@@ -333,33 +342,36 @@ class AuthService {
       await _saveTokens(accessToken, refreshToken);
       await saveUser(user);
       return {'success': true, 'user': user};
-    } on PlatformException catch (e) {
-      final details = (e.message ?? e.details?.toString() ?? '').toLowerCase();
-      final code = e.code.toLowerCase();
+    } on PlatformException catch (error) {
+      final details = (error.message ?? error.details?.toString() ?? error.code)
+          .toLowerCase();
+      final code = error.code.toLowerCase();
 
-      // Most common Android OAuth misconfiguration signal.
       if (details.contains('10') ||
           details.contains('developer_error') ||
+          details.contains('apiexception: 10') ||
           code.contains('sign_in_failed') ||
           code.contains('api_exception')) {
         return {
           'success': false,
           'message':
-              'Google login misconfigured (OAuth). Verify package name + SHA-1 in Google Cloud and google-services.json.',
+              'Google sign-in is misconfigured on Android. Check the SHA-1/SHA-256 fingerprints and the OAuth web client ID.',
         };
       }
 
-      if (code.contains('network_error') || details.contains('network')) {
+      if (code.contains('network_error') ||
+          details.contains('network') ||
+          details.contains('socket')) {
         return {
           'success': false,
           'message':
-              'Network error during Google sign-in. Check internet and try again.',
+              'Google sign-in needs an active internet connection. Please try again.',
         };
       }
 
       return {
         'success': false,
-        'message': 'Google sign-in error: ${e.message ?? e.code}',
+        'message': 'Google sign-in error: ${error.message ?? error.code}',
       };
     } catch (_) {
       return {
