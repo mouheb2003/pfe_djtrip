@@ -17,7 +17,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   int _tabIndex = 0; // 0 Upcoming, 1 Ongoing, 2 Past
   bool _isLoading = true;
   String? _errorMessage;
-  List<InscriptionModel> _all = [];
+  Map<String, List<InscriptionModel>> _buckets = {
+    'upcoming': [],
+    'ongoing': [],
+    'past': [],
+  };
 
   @override
   void initState() {
@@ -27,10 +31,10 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   Future<void> _load() async {
     try {
-      final list = await InscriptionService.getMyInscriptions();
+      final result = await InscriptionService.getMyActivities();
       if (!mounted) return;
       setState(() {
-        _all = list;
+        _buckets = result;
         _isLoading = false;
         _errorMessage = null;
       });
@@ -48,10 +52,9 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   DateTime? _activityStart(InscriptionModel inscription) {
     final activity = inscription.activite ?? const {};
     final raw = activity['date_debut'] ?? activity['dateDebut'];
-    if (raw is String) {
-      final parsed = DateTime.tryParse(raw);
-      if (parsed != null) return parsed;
-    }
+    if (raw is String) return DateTime.tryParse(raw);
+    // Mongoose may deserialize dates as DateTime already.
+    if (raw is DateTime) return raw;
     return null;
   }
 
@@ -59,6 +62,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     final activity = inscription.activite ?? const {};
     final raw = activity['date_fin'] ?? activity['dateFin'];
     if (raw is String) return DateTime.tryParse(raw);
+    if (raw is DateTime) return raw;
     return null;
   }
 
@@ -78,46 +82,16 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     return !now.isBefore(start) && now.isBefore(end);
   }
 
-  List<InscriptionModel> get _upcoming {
-    return _all.where((item) {
-      if (item.statut == 'en_attente') return true;
-      if (item.statut != 'approuvee') return false;
-      if (_isInProgress(item)) return false;
-      final start = _activityStart(item);
-      if (start != null) return _now().isBefore(start);
-      final end = _activityEnd(item);
-      if (end != null) return _now().isBefore(end);
-      // If approved but dates are missing, keep it visible in upcoming.
-      return true;
-    }).toList();
-  }
-
-  List<InscriptionModel> get _ongoing {
-    return _all.where(_isInProgress).toList();
-  }
-
-  List<InscriptionModel> get _past {
-    return _all.where((item) {
-      if (item.statut != 'approuvee') return false;
-      if (_isInProgress(item)) return false;
-      final end = _activityEnd(item);
-      if (end != null) return !_now().isBefore(end);
-      final start = _activityStart(item);
-      if (start != null) return !_now().isBefore(start);
-      return false;
-    }).toList();
-  }
-
   List<InscriptionModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
-        return _upcoming;
+        return _buckets['upcoming']!;
       case 1:
-        return _ongoing;
+        return _buckets['ongoing']!;
       case 2:
-        return _past;
+        return _buckets['past']!;
       default:
-        return _upcoming;
+        return _buckets['upcoming']!;
     }
   }
 
@@ -196,8 +170,34 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     );
   }
 
-  String _buttonLabelForTab() {
-    return _tabIndex == 2 ? 'View Details' : 'Book Now';
+  // Always show 'View Details' — the tourist already has a booking for these.
+  String _buttonLabelForTab() => 'View Details';
+
+  // In Activities screen, all items are 'approuvee', so the badge just reflects 
+  // the timeline status. We hide the badge since they are all approved, or 
+  // returning the tab name is cleaner.
+  String _statusBadgeFor(InscriptionModel inscription) {
+    if (inscription.statut != 'approuvee') {
+       return inscription.statusLabel;
+    }
+    switch (_tabIndex) {
+      case 0: return 'Upcoming';
+      case 1: return 'Ongoing';
+      case 2: return 'Completed';
+      default: return 'Approved';
+    }
+  }
+
+  Color _statusColorFor(InscriptionModel inscription) {
+    if (inscription.statut != 'approuvee') {
+       return inscription.statusColor;
+    }
+    switch (_tabIndex) {
+      case 0: return const Color(0xFF5D71FF); // blue for upcoming
+      case 1: return const Color(0xFF22C55E); // green for ongoing
+      case 2: return const Color(0xFF94A3B8); // grey for completed
+      default: return const Color(0xFF22C55E);
+    }
   }
 
   @override
@@ -285,6 +285,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   typeFor: _typeFor,
                   activityDate: _displayActivityDate,
                   buttonLabel: _buttonLabelForTab(),
+                  statusBadgeFor: _statusBadgeFor,
+                  statusColorFor: _statusColorFor,
                 ),
               ),
             ],
@@ -422,6 +424,8 @@ class _ActivitiesFeed extends StatelessWidget {
   final String Function(InscriptionModel) typeFor;
   final DateTime? Function(InscriptionModel) activityDate;
   final String buttonLabel;
+  final String Function(InscriptionModel) statusBadgeFor;
+  final Color Function(InscriptionModel) statusColorFor;
 
   const _ActivitiesFeed({
     required this.isLoading,
@@ -436,6 +440,8 @@ class _ActivitiesFeed extends StatelessWidget {
     required this.typeFor,
     required this.activityDate,
     required this.buttonLabel,
+    required this.statusBadgeFor,
+    required this.statusColorFor,
   });
 
   @override
@@ -522,6 +528,8 @@ class _ActivitiesFeed extends StatelessWidget {
             title: titleFor(hero),
             imageUrl: imageUrlFor(hero),
             typeLabel: typeFor(hero),
+            statusBadge: statusBadgeFor(hero),
+            statusColor: statusColorFor(hero),
             dateText: [
               dateLabel(activityDate(hero)),
               timeLabel(activityDate(hero)),
@@ -537,6 +545,8 @@ class _ActivitiesFeed extends StatelessWidget {
                 title: titleFor(inscription),
                 imageUrl: imageUrlFor(inscription),
                 typeLabel: typeFor(inscription),
+                statusBadge: statusBadgeFor(inscription),
+                statusColor: statusColorFor(inscription),
                 dateLabel: dateLabel(activityDate(inscription)),
                 timeLabel: timeLabel(activityDate(inscription)),
                 buttonLabel: buttonLabel,
@@ -554,6 +564,8 @@ class _FeaturedActivityCard extends StatelessWidget {
   final String title;
   final String imageUrl;
   final String typeLabel;
+  final String statusBadge;
+  final Color statusColor;
   final String dateText;
   final String buttonLabel;
   final VoidCallback onTap;
@@ -562,6 +574,8 @@ class _FeaturedActivityCard extends StatelessWidget {
     required this.title,
     required this.imageUrl,
     required this.typeLabel,
+    required this.statusBadge,
+    required this.statusColor,
     required this.dateText,
     required this.buttonLabel,
     required this.onTap,
@@ -614,24 +628,48 @@ class _FeaturedActivityCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF1FF),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        typeLabel.toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xFF4352B8),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF1FF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            typeLabel.toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFF4352B8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            statusBadge.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const Spacer(),
                     Row(
@@ -712,6 +750,8 @@ class _ActivityCard extends StatelessWidget {
   final String title;
   final String imageUrl;
   final String typeLabel;
+  final String statusBadge;
+  final Color statusColor;
   final String dateLabel;
   final String timeLabel;
   final String buttonLabel;
@@ -721,6 +761,8 @@ class _ActivityCard extends StatelessWidget {
     required this.title,
     required this.imageUrl,
     required this.typeLabel,
+    required this.statusBadge,
+    required this.statusColor,
     required this.dateLabel,
     required this.timeLabel,
     required this.buttonLabel,
@@ -774,24 +816,48 @@ class _ActivityCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF1FF),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        typeLabel.toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xFF4352B8),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF1FF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            typeLabel.toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFF4352B8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            statusBadge.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const Spacer(),
                     Row(

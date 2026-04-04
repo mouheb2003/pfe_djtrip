@@ -5,25 +5,27 @@ import '../models/activity_model.dart';
 
 class InscriptionService {
   static Map<String, dynamic> _decodeObject(dynamic raw) {
-    dynamic value = raw;
+    try {
+      dynamic value = raw;
 
-    for (var i = 0; i < 3; i++) {
+      // If already a Map, return immediately — no JSON roundtrip needed.
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) {
+        return value.map((k, v) => MapEntry(k.toString(), v));
+      }
+
+      // Only JSON-decode if it's a String.
       if (value is String) {
         final trimmed = value.trim();
         if (trimmed.isEmpty) return <String, dynamic>{};
-        try {
-          value = jsonDecode(trimmed);
-          continue;
-        } catch (_) {
-          break;
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map((k, v) => MapEntry(k.toString(), v));
         }
       }
-      break;
-    }
-
-    if (value is Map<String, dynamic>) return value;
-    if (value is Map) {
-      return value.map((k, v) => MapEntry(k.toString(), v));
+    } catch (_) {
+      // Never propagate — always return a safe empty map.
     }
     return <String, dynamic>{};
   }
@@ -145,17 +147,34 @@ class InscriptionService {
     if (res.statusCode == 200) {
       final body = _decodeObject(res.body);
       final list = _extractInscriptions(body);
-      return list.map(InscriptionModel.fromJson).toList();
+      // Map each raw inscription, skipping malformed entries gracefully.
+      final result = <InscriptionModel>[];
+      for (final item in list) {
+        try {
+          result.add(InscriptionModel.fromJson(item));
+        } catch (_) {
+          // Skip malformed inscription entries instead of crashing.
+        }
+      }
+      return result;
     }
-    // Surface the backend/network error instead of returning an empty list silently.
+    // Surface a clean error message — never expose the raw response body.
+    final errorMsg = _extractErrorMessage(res.body);
+    throw Exception(errorMsg);
+  }
+
+  /// Safely extract an error message from a response body string.
+  static String _extractErrorMessage(String body) {
     try {
-      final body = _decodeObject(res.body);
-      throw Exception(
-        (body['message'] as String?) ?? 'Unable to load inscriptions',
-      );
+      final decoded = jsonDecode(body.trim());
+      if (decoded is Map) {
+        final msg = decoded['message']?.toString();
+        if (msg != null && msg.isNotEmpty) return msg;
+      }
     } catch (_) {
-      throw Exception('Unable to load inscriptions');
+      // Body was not valid JSON.
     }
+    return 'Unable to load inscriptions';
   }
 
   /// Tourist: book an activity.
@@ -177,6 +196,69 @@ class InscriptionService {
       return {'success': true, 'inscription': resBody['inscription']};
     }
     return {'success': false, 'message': resBody['message'] ?? 'Booking error'};
+  }
+
+  static Future<Map<String, dynamic>> _get(String path) async {
+    final res = await ApiClient.get(path, cacheFirst: false);
+    return _decodeObject(res.body);
+  }
+
+
+
+  /// Get ONLY approved activities, bucketed by date timeline
+  /// Returns a map with 'upcoming', 'ongoing', 'past'
+  static Future<Map<String, List<InscriptionModel>>> getMyActivities() async {
+    try {
+      final body = await _get('/inscriptions/touriste/my-activities');
+      if (body['success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        
+        List<InscriptionModel> parseList(dynamic listRaw) {
+          if (listRaw is! List) return [];
+          return listRaw.map((e) {
+            try { return InscriptionModel.fromJson(e); } 
+            catch (err) { return null; }
+          }).whereType<InscriptionModel>().toList();
+        }
+
+        return {
+          'upcoming': parseList(data['upcoming']),
+          'ongoing': parseList(data['ongoing']),
+          'past': parseList(data['past']),
+        };
+      }
+      return {'upcoming': [], 'ongoing': [], 'past': []};
+    } catch (e) {
+       throw Exception(_extractErrorMessage(e.toString()));
+    }
+  }
+
+  /// Get ALL bookings for the tourist, bucketed by reservation status
+  /// Returns a map with 'pending', 'confirmed', 'cancelled'
+  static Future<Map<String, List<InscriptionModel>>> getMyBookings() async {
+    try {
+      final body = await _get('/inscriptions/touriste/my-bookings');
+      if (body['success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        
+        List<InscriptionModel> parseList(dynamic listRaw) {
+          if (listRaw is! List) return [];
+          return listRaw.map((e) {
+            try { return InscriptionModel.fromJson(e); } 
+            catch (err) { return null; }
+          }).whereType<InscriptionModel>().toList();
+        }
+
+        return {
+          'pending': parseList(data['pending']),
+          'confirmed': parseList(data['confirmed']),
+          'cancelled': parseList(data['cancelled']),
+        };
+      }
+      return {'pending': [], 'confirmed': [], 'cancelled': []};
+    } catch (e) {
+       throw Exception(_extractErrorMessage(e.toString()));
+    }
   }
 
   /// Tourist: cancel an inscription.

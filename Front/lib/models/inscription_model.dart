@@ -25,27 +25,32 @@ class InscriptionModel {
   });
 
   static Map<String, dynamic>? _safeMap(dynamic raw) {
+    // If raw is already a Map, convert directly — NO JSON roundtrip.
+    // A roundtrip through jsonDecode/jsonEncode crashes on emoji/special chars.
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) {
-      return raw.map((k, v) => MapEntry(k.toString(), v));
+      try {
+        return raw.map((k, v) => MapEntry(k.toString(), v));
+      } catch (_) {
+        return null;
+      }
     }
 
+    // Only attempt JSON decoding if the value is a String (e.g. ObjectId reference).
     if (raw is String) {
-      dynamic decoded = raw;
-      for (var i = 0; i < 3; i++) {
-        if (decoded is! String) break;
-        final text = decoded.trim();
-        if (text.isEmpty) return null;
-        try {
-          decoded = jsonDecode(text);
-        } catch (_) {
-          // Fallback: API sometimes returns only the ObjectId string.
-          return {'_id': text};
+      final text = raw.trim();
+      if (text.isEmpty) return null;
+      // If it doesn't look like JSON, treat it as an ObjectId string.
+      if (!text.startsWith('{')) return {'_id': text};
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map((k, v) => MapEntry(k.toString(), v));
         }
-      }
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) {
-        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      } catch (_) {
+        // Not valid JSON — treat as plain ObjectId string.
+        return {'_id': text};
       }
     }
 

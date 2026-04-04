@@ -16,7 +16,11 @@ class _BookingsTabState extends State<BookingsTab> {
   int _tabIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
-  List<InscriptionModel> _inscriptions = [];
+  Map<String, List<InscriptionModel>> _buckets = {
+    'pending': [],
+    'confirmed': [],
+    'cancelled': [],
+  };
 
   @override
   void initState() {
@@ -26,10 +30,10 @@ class _BookingsTabState extends State<BookingsTab> {
 
   Future<void> _loadInscriptions() async {
     try {
-      final result = await InscriptionService.getMyInscriptions();
+      final result = await InscriptionService.getMyBookings();
       if (!mounted) return;
       setState(() {
-        _inscriptions = result;
+        _buckets = result;
         _isLoading = false;
         _errorMessage = null;
       });
@@ -42,18 +46,16 @@ class _BookingsTabState extends State<BookingsTab> {
     }
   }
 
-  List<InscriptionModel> get _filteredInscriptions {
+  List<InscriptionModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
-        return _inscriptions.where((i) => i.statut == 'en_attente').toList();
+        return _buckets['pending']!;
       case 1:
-        return _inscriptions.where((i) => i.statut == 'approuvee').toList();
+        return _buckets['confirmed']!;
       case 2:
-        return _inscriptions
-            .where((i) => i.statut == 'refusee' || i.statut == 'annulee')
-            .toList();
+        return _buckets['cancelled']!;
       default:
-        return _inscriptions;
+        return _buckets['pending']!;
     }
   }
 
@@ -174,7 +176,7 @@ class _BookingsTabState extends State<BookingsTab> {
                 ),
               ),
             )
-          else if (_filteredInscriptions.isEmpty)
+          else if (_currentItems.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 70),
               child: Center(
@@ -213,7 +215,7 @@ class _BookingsTabState extends State<BookingsTab> {
               ),
             )
           else
-            ..._filteredInscriptions.map(
+            ..._currentItems.map(
               (inscription) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: _BookingCard(
