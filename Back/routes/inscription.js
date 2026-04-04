@@ -31,14 +31,6 @@ router.get(
   inscriptionController.getInscriptionsByTouriste,
 );
 
-// Get my activities for the logged-in tourist (bucketed by date)
-router.get(
-  "/touriste/my-activities",
-  verifyToken,
-  verifyTouriste,
-  cacheGet("inscriptions:touriste:activities", 60),
-  inscriptionController.getMyActivities,
-);
 
 // Get my bookings for the logged-in tourist (bucketed by status)
 router.get(

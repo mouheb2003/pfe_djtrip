@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../models/inscription_model.dart';
-import '../../services/inscription_service.dart';
+import '../../models/activity_model.dart';
+import '../../services/activity_service.dart';
 import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
-import 'bookings_screen.dart';
 
 class MyActivitiesScreen extends StatefulWidget {
   const MyActivitiesScreen({super.key});
@@ -17,7 +16,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   int _tabIndex = 0; // 0 Upcoming, 1 Ongoing, 2 Past
   bool _isLoading = true;
   String? _errorMessage;
-  Map<String, List<InscriptionModel>> _buckets = {
+  Map<String, List<ActivityModel>> _buckets = {
     'upcoming': [],
     'ongoing': [],
     'past': [],
@@ -31,7 +30,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   Future<void> _load() async {
     try {
-      final result = await InscriptionService.getMyActivities();
+      final result = await ActivityService.getActivitiesByTimeline();
       if (!mounted) return;
       setState(() {
         _buckets = result;
@@ -47,42 +46,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     }
   }
 
-  DateTime _now() => DateTime.now();
-
-  DateTime? _activityStart(InscriptionModel inscription) {
-    final activity = inscription.activite ?? const {};
-    final raw = activity['date_debut'] ?? activity['dateDebut'];
-    if (raw is String) return DateTime.tryParse(raw);
-    // Mongoose may deserialize dates as DateTime already.
-    if (raw is DateTime) return raw;
-    return null;
+  DateTime? _displayActivityDate(ActivityModel activity) {
+    return activity.dateDebut ?? DateTime.now();
   }
 
-  DateTime? _activityEnd(InscriptionModel inscription) {
-    final activity = inscription.activite ?? const {};
-    final raw = activity['date_fin'] ?? activity['dateFin'];
-    if (raw is String) return DateTime.tryParse(raw);
-    if (raw is DateTime) return raw;
-    return null;
-  }
-
-  DateTime? _displayActivityDate(InscriptionModel inscription) {
-    return _activityStart(inscription) ?? inscription.dateDemande;
-  }
-
-  bool _isInProgress(InscriptionModel inscription) {
-    if (inscription.statut != 'approuvee') return false;
-    final start = _activityStart(inscription);
-    final end = _activityEnd(inscription);
-    final now = _now();
-
-    if (start == null || end == null) return false;
-
-    // Exact rule: start <= now < end
-    return !now.isBefore(start) && now.isBefore(end);
-  }
-
-  List<InscriptionModel> get _currentItems {
+  List<ActivityModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
         return _buckets['upcoming']!;
@@ -127,45 +95,23 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     return '${displayHour.toString().padLeft(2, '0')}:$minute ${isPm ? 'PM' : 'AM'}';
   }
 
-  String _titleFor(InscriptionModel inscription) {
-    final activity = inscription.activite ?? const {};
-    final title = (activity['titre'] as String?)?.trim() ?? '';
-    return title.isNotEmpty ? title : 'Activity';
+  String _titleFor(ActivityModel activity) {
+    return activity.titre.isNotEmpty ? activity.titre : 'Activity';
   }
 
-  String _imageUrlFor(InscriptionModel inscription) {
-    final activity = inscription.activite ?? const {};
-    final photos = activity['photos'];
-    if (photos is List && photos.isNotEmpty) {
-      final first = photos.first;
-      if (first is String && first.trim().isNotEmpty) return first.trim();
-    }
-    return '';
+  String _imageUrlFor(ActivityModel activity) {
+    return activity.thumbnailUrl;
   }
 
-  String _typeFor(InscriptionModel inscription) {
-    final activity = inscription.activite ?? const {};
-    final raw =
-        activity['type_activite'] ??
-        activity['typeActivite'] ??
-        activity['categorie'] ??
-        activity['category'] ??
-        activity['type'];
-    final type = raw?.toString().trim() ?? '';
-    if (type.isEmpty) return 'Activity';
-    return type;
+  String _typeFor(ActivityModel activity) {
+    return activity.typeActivite.isNotEmpty ? activity.typeActivite : 'Event';
   }
 
-  void _openActivity(InscriptionModel inscription) {
-    final activityId = ((inscription.activite ?? const {})['_id'] ?? '')
-        .toString();
-    if (activityId.isEmpty) return;
-
+  void _openDetails(ActivityModel activity) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            ActivityDetailScreen(activityId: activityId, viewOnly: true),
+        builder: (_) => ActivityDetailScreen(activity: activity.toJson()),
       ),
     );
   }
@@ -173,25 +119,16 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   // Always show 'View Details' — the tourist already has a booking for these.
   String _buttonLabelForTab() => 'View Details';
 
-  // In Activities screen, all items are 'approuvee', so the badge just reflects 
-  // the timeline status. We hide the badge since they are all approved, or 
-  // returning the tab name is cleaner.
-  String _statusBadgeFor(InscriptionModel inscription) {
-    if (inscription.statut != 'approuvee') {
-       return inscription.statusLabel;
-    }
+  String _statusBadgeFor(ActivityModel activity) {
     switch (_tabIndex) {
       case 0: return 'Upcoming';
       case 1: return 'Ongoing';
       case 2: return 'Completed';
-      default: return 'Approved';
+      default: return 'Active';
     }
   }
 
-  Color _statusColorFor(InscriptionModel inscription) {
-    if (inscription.statut != 'approuvee') {
-       return inscription.statusColor;
-    }
+  Color _statusColorFor(ActivityModel activity) {
     switch (_tabIndex) {
       case 0: return const Color(0xFF5D71FF); // blue for upcoming
       case 1: return const Color(0xFF22C55E); // green for ongoing
@@ -277,7 +214,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   errorMessage: _errorMessage,
                   items: items,
                   onRefresh: _load,
-                  onTapActivity: _openActivity,
+                  onTapActivity: _openDetails,
                   dateLabel: _dateLabel,
                   timeLabel: _timeLabel,
                   titleFor: _titleFor,
@@ -414,18 +351,18 @@ class _ActivitiesSegmentedControl extends StatelessWidget {
 class _ActivitiesFeed extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
-  final List<InscriptionModel> items;
+  final List<ActivityModel> items;
   final Future<void> Function() onRefresh;
-  final void Function(InscriptionModel) onTapActivity;
+  final void Function(ActivityModel) onTapActivity;
   final String Function(DateTime?) dateLabel;
   final String Function(DateTime?) timeLabel;
-  final String Function(InscriptionModel) titleFor;
-  final String Function(InscriptionModel) imageUrlFor;
-  final String Function(InscriptionModel) typeFor;
-  final DateTime? Function(InscriptionModel) activityDate;
+  final String Function(ActivityModel) titleFor;
+  final String Function(ActivityModel) imageUrlFor;
+  final String Function(ActivityModel) typeFor;
+  final DateTime? Function(ActivityModel) activityDate;
   final String buttonLabel;
-  final String Function(InscriptionModel) statusBadgeFor;
-  final Color Function(InscriptionModel) statusColorFor;
+  final String Function(ActivityModel) statusBadgeFor;
+  final Color Function(ActivityModel) statusColorFor;
 
   const _ActivitiesFeed({
     required this.isLoading,
@@ -539,18 +476,18 @@ class _ActivitiesFeed extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           ...rest.map(
-            (inscription) => Padding(
+            (activity) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: _ActivityCard(
-                title: titleFor(inscription),
-                imageUrl: imageUrlFor(inscription),
-                typeLabel: typeFor(inscription),
-                statusBadge: statusBadgeFor(inscription),
-                statusColor: statusColorFor(inscription),
-                dateLabel: dateLabel(activityDate(inscription)),
-                timeLabel: timeLabel(activityDate(inscription)),
+                title: titleFor(activity),
+                imageUrl: imageUrlFor(activity),
+                typeLabel: typeFor(activity),
+                statusBadge: statusBadgeFor(activity),
+                statusColor: statusColorFor(activity),
+                dateLabel: dateLabel(activityDate(activity)),
+                timeLabel: timeLabel(activityDate(activity)),
                 buttonLabel: buttonLabel,
-                onTap: () => onTapActivity(inscription),
+                onTap: () => onTapActivity(activity),
               ),
             ),
           ),

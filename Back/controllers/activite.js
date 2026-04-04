@@ -1,4 +1,4 @@
-﻿const Activite = require("../models/activite");
+const Activite = require("../models/activite");
 const Organisator = require("../models/organisator");
 const ActiviteService = require("../services/activite");
 const cloudinary = require("../config/cloudinary");
@@ -743,6 +743,50 @@ exports.getArchivedActivities = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error retrieving archived activities",
+      error: error.message,
+    });
+  }
+};
+
+// Get ALL global activities grouped by timeline (Upcoming, Ongoing, Past)
+exports.getGlobalActivitiesByTimeline = async (req, res) => {
+  try {
+    const activites = await Activite.find({  })
+      .populate("organisateur_id", "fullname email avatar num_tel note_moyenne nombre_avis")
+      .sort({ date_debut: 1 });
+
+    const now = new Date();
+    const upcoming = [];
+    const ongoing = [];
+    const past = [];
+
+    activites.forEach((act) => {
+      const start = act.date_debut || act.dateDebut;
+      const end = act.date_fin || act.dateFin;
+      let dStart = start ? new Date(start) : null;
+      let dEnd = end ? new Date(end) : null;
+
+      if (!dStart && !dEnd) {
+        upcoming.push(act);
+      } else if (dStart && now < dStart) {
+        upcoming.push(act);
+      } else if (dStart && dEnd && now >= dStart && now < dEnd) {
+        ongoing.push(act);
+      } else if (dEnd && now >= dEnd) {
+        past.push(act);
+      } else {
+        // fallback
+        past.push(act);
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { upcoming, ongoing, past },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving global timeline activities",
       error: error.message,
     });
   }

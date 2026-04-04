@@ -205,33 +205,7 @@ class InscriptionService {
 
 
 
-  /// Get ONLY approved activities, bucketed by date timeline
-  /// Returns a map with 'upcoming', 'ongoing', 'past'
-  static Future<Map<String, List<InscriptionModel>>> getMyActivities() async {
-    try {
-      final body = await _get('/inscriptions/touriste/my-activities');
-      if (body['success'] == true && body['data'] != null) {
-        final data = body['data'] as Map<String, dynamic>;
-        
-        List<InscriptionModel> parseList(dynamic listRaw) {
-          if (listRaw is! List) return [];
-          return listRaw.map((e) {
-            try { return InscriptionModel.fromJson(e); } 
-            catch (err) { return null; }
-          }).whereType<InscriptionModel>().toList();
-        }
 
-        return {
-          'upcoming': parseList(data['upcoming']),
-          'ongoing': parseList(data['ongoing']),
-          'past': parseList(data['past']),
-        };
-      }
-      return {'upcoming': [], 'ongoing': [], 'past': []};
-    } catch (e) {
-       throw Exception(_extractErrorMessage(e.toString()));
-    }
-  }
 
   /// Get ALL bookings for the tourist, bucketed by reservation status
   /// Returns a map with 'pending', 'confirmed', 'cancelled'

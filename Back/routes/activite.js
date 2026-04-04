@@ -24,6 +24,14 @@ router.get(
   activiteController.getAllActivites,
 );
 
+// Get ALL global activities grouped by timeline (Upcoming, Ongoing, Past)
+// This is for the central MyActivities global screen
+router.get(
+  "/timeline",
+  cacheGet("activites:timeline", 60),
+  activiteController.getGlobalActivitiesByTimeline,
+);
+
 // Search for activities (legacy endpoint — unified search now via GET / with ?search=)
 router.get(
   "/search",
