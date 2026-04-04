@@ -212,25 +212,49 @@ class InscriptionService {
   static Future<Map<String, List<InscriptionModel>>> getMyBookings() async {
     try {
       final body = await _get('/inscriptions/touriste/my-bookings');
+      
       if (body['success'] == true && body['data'] != null) {
         final data = body['data'] as Map<String, dynamic>;
         
-        List<InscriptionModel> parseList(dynamic listRaw) {
-          if (listRaw is! List) return [];
-          return listRaw.map((e) {
-            try { return InscriptionModel.fromJson(e); } 
-            catch (err) { return null; }
-          }).whereType<InscriptionModel>().toList();
+        List<InscriptionModel> parseList(dynamic listRaw, String listName) {
+          if (listRaw is! List) {
+            print('$listName is not a List: $listRaw');
+            return [];
+          }
+          
+          final result = <InscriptionModel>[];
+          for (int i = 0; i < listRaw.length; i++) {
+            try {
+              final item = listRaw[i];
+              
+              // Ensure item is a Map before parsing
+              if (item is Map<String, dynamic>) {
+                final inscription = InscriptionModel.fromJson(item);
+                result.add(inscription);
+              } else {
+                print('Item $i in $listName is not a Map: $item');
+              }
+            } catch (e) {
+              print('Error parsing item $i in $listName: $e');
+              continue; // Skip problematic items
+            }
+          }
+          
+          return result;
         }
 
-        return {
-          'pending': parseList(data['pending']),
-          'confirmed': parseList(data['confirmed']),
-          'cancelled': parseList(data['cancelled']),
+        final result = {
+          'pending': parseList(data['pending'], 'pending'),
+          'confirmed': parseList(data['confirmed'], 'confirmed'),
+          'cancelled': parseList(data['cancelled'], 'cancelled'),
         };
+        
+        return result;
       }
+      
       return {'pending': [], 'confirmed': [], 'cancelled': []};
     } catch (e) {
+      print('Error in getMyBookings: $e');
        throw Exception(_extractErrorMessage(e.toString()));
     }
   }

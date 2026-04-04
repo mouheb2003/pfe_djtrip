@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../models/activity_model.dart';
+import '../../models/inscription_model.dart';
 import '../../services/activity_service.dart';
+import '../../services/inscription_service.dart';
 import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
 import 'bookings_screen.dart';
@@ -22,6 +24,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     'ongoing': [],
     'past': [],
   };
+  Map<String, String> _bookingStatusByActivityId = {};
 
   @override
   void initState() {
@@ -29,32 +32,187 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     _load();
   }
 
+  List<ActivityModel> _sortMostRecentFirst(List<ActivityModel> items) {
+    final sorted = List<ActivityModel>.from(items);
+    sorted.sort((a, b) {
+      final dateA = _displayActivityDate(a);
+      final dateB = _displayActivityDate(b);
+
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1;
+      if (dateB == null) return -1;
+
+      // Full DateTime compare keeps second/millisecond precision.
+      return dateB.compareTo(dateA);
+    });
+    return sorted;
+  }
+
+  Map<String, List<ActivityModel>> _buildUniqueBuckets(
+    Map<String, List<ActivityModel>> source,
+  ) {
+    final uniqueById = <String, ActivityModel>{};
+
+    for (final activity in [
+      ...?source['upcoming'],
+      ...?source['ongoing'],
+      ...?source['past'],
+    ]) {
+      if (activity.id.isEmpty) continue;
+      uniqueById[activity.id] = activity;
+    }
+
+    final upcoming = <ActivityModel>[];
+    final ongoing = <ActivityModel>[];
+    final past = <ActivityModel>[];
+
+    // Reclassify each unique activity into exactly one bucket.
+    for (final activity in uniqueById.values) {
+      switch (activity.timelineStatus) {
+        case 'UPCOMING':
+          upcoming.add(activity);
+          break;
+        case 'ONGOING':
+          ongoing.add(activity);
+          break;
+        case 'PAST':
+          past.add(activity);
+          break;
+        default:
+          // Keep unknown dates out of timeline tabs.
+          break;
+      }
+    }
+
+    return {
+      'upcoming': _sortMostRecentFirst(upcoming),
+      'ongoing': _sortMostRecentFirst(ongoing),
+      'past': _sortMostRecentFirst(past),
+    };
+  }
+
   Future<void> _load() async {
     try {
       print('DEBUG: Loading activities timeline...');
-      final result = await ActivityService.getActivitiesByTimeline();
+      final results = await Future.wait([
+        ActivityService.getActivitiesByTimeline(),
+        InscriptionService.getMyBookings(),
+      ]);
+
+      final result = results[0] as Map<String, List<ActivityModel>>;
+      final bookings = results[1] as Map<String, List<InscriptionModel>>;
       if (!mounted) return;
-      print('DEBUG: Activity timeline loaded. Counts: '
-            'Upcoming=${result['upcoming']?.length}, '
-            'Ongoing=${result['ongoing']?.length}, '
-            'Past=${result['past']?.length}');
+
+      final filteredResult = _buildUniqueBuckets(result);
+      final bookingStatus = _buildBookingStatusMap(bookings);
+
+      print(
+        'DEBUG: Activity timeline filtered. Counts: '
+        'Upcoming=${filteredResult['upcoming']?.length}, '
+        'Ongoing=${filteredResult['ongoing']?.length}, '
+        'Past=${filteredResult['past']?.length}',
+      );
       setState(() {
-        _buckets = result;
+        _buckets = filteredResult;
+        _bookingStatusByActivityId = bookingStatus;
         _isLoading = false;
         _errorMessage = null;
       });
     } catch (e) {
       print('DEBUG: Error loading activities: $e');
       if (!mounted) return;
+      final rawMessage = e.toString().replaceAll('Exception: ', '').trim();
+      final safeMessage =
+          rawMessage.startsWith('{') || rawMessage.startsWith('[')
+          ? 'Unable to refresh activities. Please try again.'
+          : (rawMessage.isEmpty
+                ? 'Unable to refresh activities. Please try again.'
+                : rawMessage);
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = safeMessage;
       });
     }
   }
 
   DateTime? _displayActivityDate(ActivityModel activity) {
     return activity.dateDebut ?? DateTime.now();
+  }
+
+  Map<String, String> _buildBookingStatusMap(
+    Map<String, List<InscriptionModel>> bookings,
+  ) {
+    final latestByActivityId = <String, InscriptionModel>{};
+
+    void collect(List<InscriptionModel> items) {
+      for (final item in items) {
+        final activityId = (item.activite?['_id'] ?? '').toString();
+        if (activityId.isEmpty) continue;
+
+        final previous = latestByActivityId[activityId];
+        final currentDate = item.dateDemande;
+        final previousDate = previous?.dateDemande;
+
+        if (previous == null) {
+          latestByActivityId[activityId] = item;
+          continue;
+        }
+
+        if (currentDate == null && previousDate != null) continue;
+        if (currentDate != null && previousDate == null) {
+          latestByActivityId[activityId] = item;
+          continue;
+        }
+        if (currentDate != null && previousDate != null) {
+          if (currentDate.isAfter(previousDate)) {
+            latestByActivityId[activityId] = item;
+          }
+        }
+      }
+    }
+
+    collect(bookings['pending'] ?? const <InscriptionModel>[]);
+    collect(bookings['confirmed'] ?? const <InscriptionModel>[]);
+    collect(bookings['cancelled'] ?? const <InscriptionModel>[]);
+
+    return latestByActivityId.map((key, value) => MapEntry(key, value.statut));
+  }
+
+  int _bookingsTabIndexForStatus(String statut) {
+    switch (statut) {
+      case 'en_attente':
+        return 0;
+      case 'approuvee':
+        return 1;
+      case 'refusee':
+      case 'annulee':
+      default:
+        return 2;
+    }
+  }
+
+  String _buttonLabelFor(ActivityModel activity) {
+    if (_tabIndex == 0 && _bookingStatusByActivityId.containsKey(activity.id)) {
+      return 'Check Booking Status';
+    }
+    return _tabIndex == 0 ? 'Book Now' : 'View Details';
+  }
+
+  void _onPrimaryAction(ActivityModel activity) {
+    final status = _bookingStatusByActivityId[activity.id];
+    if (_tabIndex == 0 && status != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingsScreen(
+            initialTabIndex: _bookingsTabIndexForStatus(status),
+          ),
+        ),
+      );
+      return;
+    }
+
+    _openDetails(activity);
   }
 
   List<ActivityModel> get _currentItems {
@@ -126,26 +284,29 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     );
   }
 
-  String _buttonLabelForTab() {
-    if (_tabIndex == 0) return 'Book Now';
-    return 'View Details';
-  }
-
   String _statusBadgeFor(ActivityModel activity) {
     switch (_tabIndex) {
-      case 0: return 'Upcoming';
-      case 1: return 'Ongoing';
-      case 2: return 'Completed';
-      default: return 'Active';
+      case 0:
+        return 'Upcoming';
+      case 1:
+        return 'Ongoing';
+      case 2:
+        return 'Completed';
+      default:
+        return 'Active';
     }
   }
 
   Color _statusColorFor(ActivityModel activity) {
     switch (_tabIndex) {
-      case 0: return const Color(0xFF5D71FF); // blue for upcoming
-      case 1: return const Color(0xFF22C55E); // green for ongoing
-      case 2: return const Color(0xFF94A3B8); // grey for completed
-      default: return const Color(0xFF22C55E);
+      case 0:
+        return const Color(0xFF5D71FF); // blue for upcoming
+      case 1:
+        return const Color(0xFF22C55E); // green for ongoing
+      case 2:
+        return const Color(0xFF94A3B8); // grey for completed
+      default:
+        return const Color(0xFF22C55E);
     }
   }
 
@@ -227,13 +388,14 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   items: items,
                   onRefresh: _load,
                   onTapActivity: _openDetails,
+                  onPrimaryAction: _onPrimaryAction,
                   dateLabel: _dateLabel,
                   timeLabel: _timeLabel,
                   titleFor: _titleFor,
                   imageUrlFor: _imageUrlFor,
                   typeFor: _typeFor,
                   activityDate: _displayActivityDate,
-                  buttonLabel: _buttonLabelForTab(),
+                  buttonLabelFor: _buttonLabelFor,
                   statusBadgeFor: _statusBadgeFor,
                   statusColorFor: _statusColorFor,
                 ),
@@ -366,13 +528,14 @@ class _ActivitiesFeed extends StatelessWidget {
   final List<ActivityModel> items;
   final Future<void> Function() onRefresh;
   final void Function(ActivityModel) onTapActivity;
+  final void Function(ActivityModel) onPrimaryAction;
   final String Function(DateTime?) dateLabel;
   final String Function(DateTime?) timeLabel;
   final String Function(ActivityModel) titleFor;
   final String Function(ActivityModel) imageUrlFor;
   final String Function(ActivityModel) typeFor;
   final DateTime? Function(ActivityModel) activityDate;
-  final String buttonLabel;
+  final String Function(ActivityModel) buttonLabelFor;
   final String Function(ActivityModel) statusBadgeFor;
   final Color Function(ActivityModel) statusColorFor;
 
@@ -382,13 +545,14 @@ class _ActivitiesFeed extends StatelessWidget {
     required this.items,
     required this.onRefresh,
     required this.onTapActivity,
+    required this.onPrimaryAction,
     required this.dateLabel,
     required this.timeLabel,
     required this.titleFor,
     required this.imageUrlFor,
     required this.typeFor,
     required this.activityDate,
-    required this.buttonLabel,
+    required this.buttonLabelFor,
     required this.statusBadgeFor,
     required this.statusColorFor,
   });
@@ -464,8 +628,20 @@ class _ActivitiesFeed extends StatelessWidget {
       );
     }
 
-    final hero = items.first;
-    final rest = items.skip(1).toList();
+    final sortedItems = List<ActivityModel>.from(items)
+      ..sort((a, b) {
+        final dateA = activityDate(a);
+        final dateB = activityDate(b);
+
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+
+        return dateB.compareTo(dateA);
+      });
+
+    final hero = sortedItems.first;
+    final rest = sortedItems.skip(1).toList();
 
     return RefreshIndicator(
       onRefresh: onRefresh,
@@ -483,8 +659,9 @@ class _ActivitiesFeed extends StatelessWidget {
               dateLabel(activityDate(hero)),
               timeLabel(activityDate(hero)),
             ].where((e) => e.isNotEmpty).join('  •  '),
-            buttonLabel: buttonLabel,
+            buttonLabel: buttonLabelFor(hero),
             onTap: () => onTapActivity(hero),
+            onButtonTap: () => onPrimaryAction(hero),
           ),
           const SizedBox(height: 16),
           ...rest.map(
@@ -498,8 +675,9 @@ class _ActivitiesFeed extends StatelessWidget {
                 statusColor: statusColorFor(activity),
                 dateLabel: dateLabel(activityDate(activity)),
                 timeLabel: timeLabel(activityDate(activity)),
-                buttonLabel: buttonLabel,
+                buttonLabel: buttonLabelFor(activity),
                 onTap: () => onTapActivity(activity),
+                onButtonTap: () => onPrimaryAction(activity),
               ),
             ),
           ),
@@ -518,6 +696,7 @@ class _FeaturedActivityCard extends StatelessWidget {
   final String dateText;
   final String buttonLabel;
   final VoidCallback onTap;
+  final VoidCallback onButtonTap;
 
   const _FeaturedActivityCard({
     required this.title,
@@ -528,6 +707,7 @@ class _FeaturedActivityCard extends StatelessWidget {
     required this.dateText,
     required this.buttonLabel,
     required this.onTap,
+    required this.onButtonTap,
   });
 
   @override
@@ -660,7 +840,7 @@ class _FeaturedActivityCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         FilledButton(
-                          onPressed: onTap,
+                          onPressed: onButtonTap,
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF5D71FF),
                             foregroundColor: Colors.white,
@@ -705,6 +885,7 @@ class _ActivityCard extends StatelessWidget {
   final String timeLabel;
   final String buttonLabel;
   final VoidCallback onTap;
+  final VoidCallback onButtonTap;
 
   const _ActivityCard({
     required this.title,
@@ -716,6 +897,7 @@ class _ActivityCard extends StatelessWidget {
     required this.timeLabel,
     required this.buttonLabel,
     required this.onTap,
+    required this.onButtonTap,
   });
 
   @override
@@ -853,7 +1035,7 @@ class _ActivityCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         FilledButton(
-                          onPressed: onTap,
+                          onPressed: onButtonTap,
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF5D71FF),
                             foregroundColor: Colors.white,

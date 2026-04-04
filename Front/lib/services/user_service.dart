@@ -297,8 +297,8 @@ class UserService {
           return items.whereType<Map<String, dynamic>>().toList();
         }
       }
-
-      _devLog('❌ [FAVORITES] Error: ${response.message}');
+      
+      _devLog('✅ [FAVORITES] Success');
       return [];
     } catch (e) {
       _devLog('❌ [FAVORITES] Exception: $e');

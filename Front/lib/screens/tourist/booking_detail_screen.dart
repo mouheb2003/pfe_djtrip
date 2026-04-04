@@ -1,27 +1,129 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
+import '../../services/inscription_service.dart';
 import 'package:intl/intl.dart';
 import '../shared/activity_detail_screen.dart';
 
-class BookingDetailScreen extends StatelessWidget {
+class BookingDetailScreen extends StatefulWidget {
   final InscriptionModel inscription;
 
   const BookingDetailScreen({super.key, required this.inscription});
+
+  @override
+  State<BookingDetailScreen> createState() => _BookingDetailScreenState();
+}
+
+class _BookingDetailScreenState extends State<BookingDetailScreen> {
+  bool _isCancelling = false;
+  late InscriptionModel _inscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _inscription = widget.inscription;
+  }
 
   String _formatDate(DateTime? date) {
     if (date == null) return '';
     return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
 
+  Future<void> _cancelBooking() async {
+    if (!_inscription.canBeCancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This booking cannot be cancelled'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Booking'),
+        content: Text(
+          'Are you sure you want to cancel this booking? This action cannot be undone.\n\n'
+          'Refund policy may apply based on the organizer\'s terms.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep Booking'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Cancel Booking'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isCancelling = true);
+
+    try {
+      final success = await InscriptionService.cancelInscription(_inscription.id);
+      
+      if (success) {
+        setState(() {
+          _inscription = InscriptionModel(
+            id: _inscription.id,
+            statut: 'annulee',
+            nombreParticipants: _inscription.nombreParticipants,
+            prixTotal: _inscription.prixTotal,
+            dateDemande: _inscription.dateDemande,
+            messageTouriste: _inscription.messageTouriste,
+            activite: _inscription.activite,
+            touriste: _inscription.touriste,
+            organisateur: _inscription.organisateur,
+          );
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Booking cancelled successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to cancel booking'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isCancelling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final act = inscription.activite ?? {};
+    final act = _inscription.activite ?? {};
     final photos = act['photos'] as List?;
     final imageUrl = photos != null && photos.isNotEmpty ? photos[0] as String : '';
     final title = act['titre'] as String? ?? 'Activity';
     final lieu = act['lieu'] as String? ?? 'Location';
-    final placeCount = inscription.nombreParticipants;
+    final placeCount = _inscription.nombreParticipants;
     final unitPrice = (act['prix'] as num?)?.toDouble() ?? 0.0;
     final subtotal = unitPrice * placeCount;
     const serviceFee = 4.50; // Mock service fee for the design
@@ -31,6 +133,14 @@ class BookingDetailScreen extends StatelessWidget {
     final orga = act['organisateur'] is Map ? act['organisateur'] as Map : {};
     final orgaName = orga['nom'] as String? ?? 'Organizer Name';
     final orgaPhoto = orga['photoProfil'] as String? ?? '';
+
+    // Get activity dates properly
+    DateTime? activityDate;
+    if (act['date_debut'] != null) {
+      activityDate = DateTime.tryParse(act['date_debut'].toString());
+    } else if (act['dateDebut'] != null) {
+      activityDate = DateTime.tryParse(act['dateDebut'].toString());
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -91,20 +201,59 @@ class BookingDetailScreen extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.confirmation_num_outlined, size: 20),
-                  label: const Text('View Ticket'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                ),
+                child: _inscription.isApproved
+                    ? ElevatedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.confirmation_num_outlined, size: 20),
+                        label: const Text('View Ticket'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                      )
+                    : _inscription.canBeCancelled
+                        ? ElevatedButton.icon(
+                            onPressed: _isCancelling ? null : _cancelBooking,
+                            icon: _isCancelling
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.cancel_outlined, size: 20),
+                            label: Text(_isCancelling ? 'Cancelling...' : 'Cancel Booking'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            label: Text(_inscription.statusLabel),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                          ),
               ),
             ],
           ),
@@ -166,20 +315,20 @@ class BookingDetailScreen extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: inscription.statusColor.withOpacity(0.15),
+                                  color: _inscription.statusColor.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  inscription.statusLabel.toUpperCase(),
+                                  _inscription.statusLabel.toUpperCase(),
                                   style: TextStyle(
-                                    color: inscription.statusColor,
+                                    color: _inscription.statusColor,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
                               Text(
-                                '#DJT-${inscription.id.substring(inscription.id.length - 5).toUpperCase()}',
+                                '#DJT-${_inscription.id.substring(_inscription.id.length - 5).toUpperCase()}',
                                 style: const TextStyle(
                                   color: AppColors.primary,
                                   fontSize: 13,
@@ -203,7 +352,7 @@ class BookingDetailScreen extends StatelessWidget {
                               const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
                               const SizedBox(width: 8),
                               Text(
-                                _formatDate(inscription.dateDemande), // Using request date for now, adapt if you have exact activity date in the inscription
+                                activityDate != null ? _formatDate(activityDate) : _formatDate(_inscription.dateDemande),
                                 style: const TextStyle(fontSize: 13, color: Colors.black54),
                               ),
                             ],

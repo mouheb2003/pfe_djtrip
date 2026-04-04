@@ -10,6 +10,7 @@ import '../../../services/inscription_service.dart';
 import '../../../services/post_service.dart';
 import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/auto_image_carousel.dart';
 import '../../shared/edit_profile_screen.dart';
 import '../../shared/settings_screen.dart';
 import 'create_post_screen.dart';
@@ -596,6 +597,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     final imageUrl = imageUrls.isNotEmpty
         ? imageUrls.first
         : (post['image_url'] as String?)?.trim() ?? '';
+    final galleryUrls = <String>[
+      ...imageUrls,
+      if (imageUrls.isEmpty && imageUrl.isNotEmpty) imageUrl,
+    ];
     final author = post['author_id'] is Map<String, dynamic>
         ? post['author_id'] as Map<String, dynamic>
         : <String, dynamic>{};
@@ -759,21 +764,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             ),
                           ],
                           const SizedBox(height: 14),
-                          if (imageUrl.isNotEmpty)
+                          if (galleryUrls.isNotEmpty)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(18),
-                              child: AspectRatio(
-                                aspectRatio: 0.9,
-                                child: Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Colors.grey[300],
-                                    child: const Center(
-                                      child: Icon(Icons.image_not_supported),
-                                    ),
-                                  ),
-                                ),
+                              child: AutoImageCarousel(
+                                imageUrls: galleryUrls,
+                                height: 340,
+                                showIndicators: galleryUrls.length > 1,
                               ),
                             ),
                           const SizedBox(height: 12),
@@ -1190,7 +1187,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         MaterialPageRoute(
                           builder: (_) => const ScreenNetwork(
                             showBackButton: true,
-                            title: 'Network Posts',
+                            title: 'My Posts',
                             showOnlyMyPosts: true,
                           ),
                         ),

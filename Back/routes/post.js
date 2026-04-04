@@ -31,6 +31,12 @@ router.post(
   invalidateCache(["posts:comments", "posts:feed", "posts:me"]),
   postController.addPostComment,
 );
+router.post(
+  "/:postId/like",
+  verifyToken,
+  invalidateCache(["posts:feed", "posts:me"]),
+  postController.togglePostLike,
+);
 
 // Tourist post management
 router.get(

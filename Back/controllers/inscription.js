@@ -166,23 +166,33 @@ exports.getMyBookings = async (req, res) => {
     const inscriptions = await Inscription.find({ touriste_id: touristeId })
       .populate("activite_id")
       .populate("organisateur_id", "fullname email avatar num_tel")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean(); // Use lean() for better performance and cleaner data
 
     const pending = [];
     const confirmed = [];
     const cancelled = [];
 
     inscriptions.forEach((ins) => {
-      if (ins.statut === "en_attente") pending.push(ins);
-      else if (ins.statut === "approuvee") confirmed.push(ins);
-      else cancelled.push(ins); // annulee, refusee
+      // Validate and clean the inscription object
+      if (ins && typeof ins === 'object' && ins.statut) {
+        // Use the lean object directly - no need for JSON stringify/parse
+        if (ins.statut === "en_attente") pending.push(ins);
+        else if (ins.statut === "approuvee") confirmed.push(ins);
+        else cancelled.push(ins); // annulee, refusee
+      } else {
+        console.warn('Invalid inscription object:', ins);
+      }
     });
+
+    console.log(`Bookings for user ${touristeId}: ${pending.length} pending, ${confirmed.length} confirmed, ${cancelled.length} cancelled`);
 
     res.status(200).json({
       success: true,
       data: { pending, confirmed, cancelled },
     });
   } catch (error) {
+    console.error('Error in getMyBookings:', error);
     res.status(500).json({
       message: "Error retrieving bookings",
       error: error.message,

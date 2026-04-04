@@ -1,5 +1,10 @@
+import 'env_config.dart';
+
 class ApiConfig {
-  static const bool isProd = true;
+  static const String _overrideBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
 
   static const List<String> devUrls = [
     'http://10.0.2.2:3000',
@@ -7,8 +12,15 @@ class ApiConfig {
   ];
 
   static String get serverBaseUrl {
-    if (isProd) return 'https://backdjtrip.onrender.com';
-    return devUrls[0]; // change ici si besoin
+    if (_overrideBaseUrl.isNotEmpty) {
+      return _overrideBaseUrl;
+    }
+
+    if (EnvConfig.isProd || EnvConfig.isStaging) {
+      return 'https://backdjtrip.onrender.com';
+    }
+
+    return devUrls[1]; // change ici si besoin
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

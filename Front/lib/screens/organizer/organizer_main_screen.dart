@@ -2,8 +2,8 @@
 import '../../theme/app_theme.dart';
 import 'tabs/my_activities_tab.dart';
 import 'tabs/archive_tab.dart';
-import 'tabs/requests_tab.dart';
 import 'tabs/organizer_profile_tab.dart';
+import '../tourist/tabs/screen_network.dart';
 import '../shared/messages_screen.dart';
 
 class OrganizerMainScreen extends StatefulWidget {
@@ -19,73 +19,149 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   final _pages = const [
     MyActivitiesTab(),
     ArchiveTab(),
-    RequestsTab(),
+    ScreenNetwork(),
     MessagesScreen(),
     OrganizerProfileTab(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const navBg = Color(0xFFE9ECFB);
+    const navActive = AppColors.primary;
+    const navInactive = Color(0xFF7B82A8);
+
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F0A06) : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-            ),
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _OrgNavItem(
-                  icon: Icons.calendar_today,
-                  activeIcon: Icons.calendar_today,
-                  label: 'Activities',
-                  index: 0,
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 88,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 8,
+                child: Container(
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: navBg,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.14),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.calendar_today_outlined,
+                          activeIcon: Icons.calendar_today,
+                          label: 'Activities',
+                          index: 0,
+                          currentIndex: _currentIndex,
+                          onTap: (i) => setState(() => _currentIndex = i),
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.inventory_2_outlined,
+                          activeIcon: Icons.inventory_2,
+                          label: 'Archive',
+                          index: 1,
+                          currentIndex: _currentIndex,
+                          onTap: (i) => setState(() => _currentIndex = i),
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      const SizedBox(width: 56),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.chat_bubble_outline,
+                          activeIcon: Icons.chat_bubble,
+                          label: 'Messages',
+                          index: 3,
+                          currentIndex: _currentIndex,
+                          onTap: (i) => setState(() => _currentIndex = i),
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavItem(
+                          icon: Icons.person_outline,
+                          activeIcon: Icons.person,
+                          label: 'Profile',
+                          index: 4,
+                          currentIndex: _currentIndex,
+                          onTap: (i) => setState(() => _currentIndex = i),
+                          activeColor: navActive,
+                          inactiveColor: navInactive,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _OrgNavItem(
-                  icon: Icons.inventory_2,
-                  activeIcon: Icons.inventory_2,
-                  label: 'Archive',
-                  index: 1,
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
+              ),
+              Positioned(
+                top: -8,
+                child: GestureDetector(
+                  onTap: () => setState(() => _currentIndex = 2),
+                  child: Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      color: navBg,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.2),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: _currentIndex == 2
+                              ? AppColors.primaryDark
+                              : AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.hub,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                _OrgNavItem(
-                  icon: Icons.assignment_turned_in,
-                  activeIcon: Icons.assignment_turned_in,
-                  label: 'Requests',
-                  index: 2,
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
+              ),
+              Positioned(
+                top: 57,
+                child: Text(
+                  'Network',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _currentIndex == 2 ? AppColors.primary : navInactive,
+                  ),
                 ),
-                _OrgNavItem(
-                  icon: Icons.chat_bubble,
-                  activeIcon: Icons.chat_bubble,
-                  label: 'Messages',
-                  index: 3,
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
-                ),
-                _OrgNavItem(
-                  icon: Icons.person,
-                  activeIcon: Icons.person,
-                  label: 'Profile',
-                  index: 4,
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -93,23 +169,25 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   }
 }
 
-class _OrgNavItem extends StatelessWidget {
+class _NavItem extends StatelessWidget {
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final int index;
   final int currentIndex;
   final void Function(int) onTap;
-  final int badgeCount;
+  final Color activeColor;
+  final Color inactiveColor;
 
-  const _OrgNavItem({
+  const _NavItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
     required this.index,
     required this.currentIndex,
     required this.onTap,
-    this.badgeCount = 0,
+    required this.activeColor,
+    required this.inactiveColor,
   });
 
   @override
@@ -119,51 +197,22 @@ class _OrgNavItem extends StatelessWidget {
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  color: isActive ? AppColors.primary : const Color(0xFF94A3B8),
-                  size: 24,
-                ),
-                if (badgeCount > 0)
-                  Positioned(
-                    top: -4,
-                    right: -6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: Text(
-                        '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+            Icon(
+              isActive ? activeIcon : icon,
+              color: isActive ? activeColor : inactiveColor,
+              size: 20,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? AppColors.primary : const Color(0xFF94A3B8),
+                fontSize: 9,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                color: isActive ? activeColor : inactiveColor,
               ),
             ),
           ],

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
@@ -24,38 +26,65 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
   bool _isFetching = false;
+  String _currentUserId = '';
+  Timer? _autoRefreshTimer;
+  final Map<String, _LocalLikeState> _localLikeStateByPost = {};
+
+  String _extractAuthorId(Map<String, dynamic> post) {
+    final author = post['author_id'];
+    if (author is Map<String, dynamic>) {
+      return (author['_id'] ?? author['id'] ?? '').toString();
+    }
+    return author?.toString() ?? '';
+  }
 
   @override
   void initState() {
     super.initState();
     _loadFeed();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      _loadFeed(showLoader: false);
+    });
   }
 
-  Future<void> _loadFeed() async {
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadFeed({bool showLoader = true}) async {
     if (_isFetching) {
       return;
     }
     _isFetching = true;
 
+    if (showLoader && mounted) {
+      setState(() => _loading = true);
+    }
+
     try {
-      final currentUserId = await AuthService.getUserId();
+      final currentUserId = _currentUserId.isNotEmpty
+          ? _currentUserId
+          : (await AuthService.getUserId() ?? '');
       final feedPosts = await PostService.getFeedPosts();
       final myPosts = await PostService.getMyPosts();
+
+      final onlyOthers = feedPosts.where((post) {
+        if (currentUserId.isEmpty) return true;
+        return _extractAuthorId(post) != currentUserId;
+      }).toList();
 
       final posts =
           (widget.showOnlyMyPosts
                 ? (myPosts.isNotEmpty
                       ? myPosts
                       : feedPosts.where((post) {
-                          final author = post['author_id'];
-                          final authorId = author is Map<String, dynamic>
-                              ? (author['_id'] ?? author['id'] ?? '').toString()
-                              : author?.toString() ?? '';
-                          return currentUserId != null &&
-                              currentUserId.isNotEmpty &&
+                          final authorId = _extractAuthorId(post);
+                          return currentUserId.isNotEmpty &&
                               authorId == currentUserId;
                         }).toList())
-                : feedPosts)
+                : onlyOthers)
             ..sort((a, b) {
               final aDate =
                   DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
@@ -66,11 +95,26 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
               return bDate.compareTo(aDate);
             });
 
+      for (final post in posts) {
+        final postId = (post['_id'] ?? '').toString();
+        if (postId.isEmpty) continue;
+
+        final local = _localLikeStateByPost[postId];
+        if (local == null) continue;
+
+        post['likes_count'] = local.likesCount;
+        post['liked_local'] = local.liked;
+      }
+
       if (!mounted) return;
       setState(() {
+        _currentUserId = currentUserId;
         _posts = posts;
         _loading = false;
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
     } finally {
       _isFetching = false;
     }
@@ -80,11 +124,25 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
     await _loadFeed();
   }
 
+  void _onLikeChanged(String postId, bool liked, int likesCount) {
+    _localLikeStateByPost[postId] = _LocalLikeState(
+      liked: liked,
+      likesCount: likesCount,
+    );
+
+    final index = _posts.indexWhere(
+      (p) => (p['_id'] ?? '').toString() == postId,
+    );
+    if (index == -1 || !mounted) return;
+
+    setState(() {
+      _posts[index]['likes_count'] = likesCount;
+      _posts[index]['liked_local'] = liked;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final titleSize = w >= 420 ? 36.0 : 30.0;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF3F2FA),
       body: RefreshIndicator(
@@ -107,27 +165,6 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
                   fontSize: 22,
                 ),
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Network',
-                        style: TextStyle(
-                          fontSize: titleSize,
-                          height: 1,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF1F235F),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              expandedHeight: 120,
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
             // Posts Feed
@@ -142,7 +179,11 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _NetworkPostCard(post: _posts[index]),
+                  (context, index) => _NetworkPostCard(
+                    post: _posts[index],
+                    currentUserId: _currentUserId,
+                    onLikeChanged: _onLikeChanged,
+                  ),
                   childCount: _posts.length,
                 ),
               ),
@@ -159,7 +200,14 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
 
 class _NetworkPostCard extends StatefulWidget {
   final Map<String, dynamic> post;
-  const _NetworkPostCard({required this.post});
+  final String currentUserId;
+  final void Function(String postId, bool liked, int likesCount) onLikeChanged;
+
+  const _NetworkPostCard({
+    required this.post,
+    required this.currentUserId,
+    required this.onLikeChanged,
+  });
 
   @override
   State<_NetworkPostCard> createState() => _NetworkPostCardState();
@@ -167,11 +215,372 @@ class _NetworkPostCard extends StatefulWidget {
 
 class _NetworkPostCardState extends State<_NetworkPostCard> {
   late bool _isLiked;
+  late int _likesCount;
+  late int _commentsCount;
+  bool _isLikeLoading = false;
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _isLiked = false;
+    _likesCount = (widget.post['likes_count'] as num?)?.toInt() ?? 0;
+    _commentsCount = (widget.post['comments_count'] as num?)?.toInt() ?? 0;
+    _isLiked = _computeIsLiked();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NetworkPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldPostId = (oldWidget.post['_id'] ?? '').toString();
+    final newPostId = (widget.post['_id'] ?? '').toString();
+
+    if (oldPostId != newPostId || oldWidget.post != widget.post) {
+      _likesCount = (widget.post['likes_count'] as num?)?.toInt() ?? 0;
+      _commentsCount = (widget.post['comments_count'] as num?)?.toInt() ?? 0;
+      _isLiked = _computeIsLiked();
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  bool _computeIsLiked() {
+    final local = widget.post['liked_local'];
+    if (local is bool) {
+      return local;
+    }
+
+    final likedBy = widget.post['liked_by'];
+    if (likedBy is! List || widget.currentUserId.isEmpty) {
+      return false;
+    }
+
+    return likedBy.any((entry) {
+      if (entry == null) return false;
+      if (entry is String) return entry == widget.currentUserId;
+      if (entry is Map<String, dynamic>) {
+        return (entry['_id'] ?? entry['id'] ?? '').toString() ==
+            widget.currentUserId;
+      }
+      return entry.toString() == widget.currentUserId;
+    });
+  }
+
+  List<Map<String, dynamic>> _extractEmbeddedComments() {
+    final raw = widget.post['comments'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+
+    final items = raw
+        .whereType<Map<String, dynamic>>()
+        .where((c) {
+          return c['is_active'] != false;
+        })
+        .map((c) {
+          final author = c['author_id'];
+          final authorMap = author is Map<String, dynamic>
+              ? author
+              : <String, dynamic>{'_id': author?.toString() ?? ''};
+
+          return <String, dynamic>{
+            '_id': (c['_id'] ?? '').toString(),
+            'content': (c['content'] ?? '').toString(),
+            'createdAt': c['createdAt']?.toString(),
+            'updatedAt': c['updatedAt']?.toString(),
+            'author_id': authorMap,
+          };
+        })
+        .toList();
+
+    items.sort((a, b) {
+      final aDate =
+          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate =
+          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return aDate.compareTo(bDate);
+    });
+
+    return items;
+  }
+
+  Future<void> _toggleLike() async {
+    if (_isLikeLoading) return;
+
+    final postId = (widget.post['_id'] ?? '').toString();
+    if (postId.isEmpty) return;
+
+    final previousLiked = _isLiked;
+    final previousCount = _likesCount;
+
+    setState(() {
+      _isLikeLoading = true;
+      _isLiked = !_isLiked;
+      _likesCount = (_likesCount + (_isLiked ? 1 : -1)).clamp(0, 1 << 30);
+    });
+    widget.onLikeChanged(postId, _isLiked, _likesCount);
+
+    final result = await PostService.togglePostLike(postId);
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      setState(() {
+        _isLiked = result['liked'] == true;
+        _likesCount = (result['likesCount'] as num?)?.toInt() ?? _likesCount;
+        _isLikeLoading = false;
+      });
+      widget.post['likes_count'] = _likesCount;
+      widget.post['liked_local'] = _isLiked;
+      widget.onLikeChanged(postId, _isLiked, _likesCount);
+      return;
+    }
+
+    final errorMessage = (result['message']?.toString() ?? '').toLowerCase();
+    if (errorMessage.contains('route not found')) {
+      setState(() {
+        _isLikeLoading = false;
+      });
+      widget.post['liked_local'] = _isLiked;
+      widget.onLikeChanged(postId, _isLiked, _likesCount);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Like endpoint is missing on this server. Deploy backend updates.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLiked = previousLiked;
+      _likesCount = previousCount;
+      _isLikeLoading = false;
+    });
+    widget.post['liked_local'] = _isLiked;
+    widget.onLikeChanged(postId, _isLiked, _likesCount);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result['message']?.toString() ?? 'Unable to update like'),
+      ),
+    );
+  }
+
+  Future<void> _openCommentsSheet() async {
+    final postId = (widget.post['_id'] ?? '').toString();
+    if (postId.isEmpty) return;
+
+    final embeddedComments = _extractEmbeddedComments();
+    var workingComments = List<Map<String, dynamic>>.from(embeddedComments);
+    final apiComments = await PostService.getPostComments(postId);
+    if (apiComments.isNotEmpty || workingComments.isEmpty) {
+      workingComments = apiComments;
+    }
+
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        var isSending = false;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> sendComment() async {
+              final text = _commentController.text.trim();
+              if (text.isEmpty || isSending) return;
+
+              setSheetState(() => isSending = true);
+              final result = await PostService.addPostComment(
+                postId: postId,
+                content: text,
+              );
+
+              if (!context.mounted) return;
+
+              if (result['success'] == true) {
+                final serverComments = result['comments'];
+                if (serverComments is List) {
+                  workingComments = serverComments
+                      .whereType<Map<String, dynamic>>()
+                      .toList();
+                } else {
+                  final latest = await PostService.getPostComments(postId);
+                  if (latest.isNotEmpty || workingComments.isEmpty) {
+                    workingComments = latest;
+                  }
+                }
+
+                _commentController.clear();
+                setState(() {
+                  _commentsCount = workingComments.length;
+                  widget.post['comments_count'] = _commentsCount;
+                });
+                setSheetState(() => isSending = false);
+                return;
+              }
+
+              setSheetState(() => isSending = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    result['message']?.toString() ?? 'Unable to add comment',
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Comments',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1F235F),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${workingComments.length}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: workingComments.length,
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 14, thickness: 0.6),
+                        itemBuilder: (context, index) {
+                          final comment = workingComments[index];
+                          final author =
+                              comment['author_id'] is Map<String, dynamic>
+                              ? comment['author_id'] as Map<String, dynamic>
+                              : <String, dynamic>{};
+                          final authorName =
+                              (author['fullname'] as String?)
+                                      ?.trim()
+                                      .isNotEmpty ==
+                                  true
+                              ? (author['fullname'] as String)
+                              : 'Traveler';
+                          final content =
+                              (comment['content'] as String?)?.trim() ?? '';
+
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundImage:
+                                  (author['avatar'] as String?)
+                                          ?.trim()
+                                          .isNotEmpty ==
+                                      true
+                                  ? NetworkImage(author['avatar'] as String)
+                                  : null,
+                              child:
+                                  ((author['avatar'] as String?) ?? '')
+                                      .trim()
+                                      .isEmpty
+                                  ? const Icon(Icons.person, size: 17)
+                                  : null,
+                            ),
+                            title: Text(
+                              authorName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              content,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _commentController,
+                            minLines: 1,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: 'Write a comment...',
+                              filled: true,
+                              fillColor: const Color(0xFFF3F4FB),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 11,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: isSending ? null : sendComment,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isSending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Send'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   String _timeAgo(DateTime? date) {
@@ -213,8 +622,6 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
             .where((e) => e.isNotEmpty)
             .toList() ??
         const <String>[];
-    final likes = (widget.post['likes_count'] as num?)?.toInt() ?? 0;
-    final comments = (widget.post['comments_count'] as num?)?.toInt() ?? 0;
     final shares =
         (widget.post['shares_count'] as num?)?.toInt() ??
         (widget.post['share_count'] as num?)?.toInt() ??
@@ -232,7 +639,7 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
         borderRadius: BorderRadius.circular(compact ? 16 : 22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -368,7 +775,7 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => setState(() => _isLiked = !_isLiked),
+                  onTap: _toggleLike,
                   child: Row(
                     children: [
                       Icon(
@@ -378,7 +785,7 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '$likes',
+                        '$_likesCount',
                         style: const TextStyle(
                           fontSize: 19,
                           color: Color(0xFF2F3566),
@@ -389,23 +796,26 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                   ),
                 ),
                 const SizedBox(width: 22),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.chat_bubble,
-                      size: 20,
-                      color: Color(0xFF5B5E8A),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$comments',
-                      style: const TextStyle(
-                        fontSize: 19,
-                        color: Color(0xFF2F3566),
-                        fontWeight: FontWeight.w600,
+                GestureDetector(
+                  onTap: _openCommentsSheet,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.chat_bubble,
+                        size: 20,
+                        color: Color(0xFF5B5E8A),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Text(
+                        '$_commentsCount',
+                        style: const TextStyle(
+                          fontSize: 19,
+                          color: Color(0xFF2F3566),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 22),
                 Row(
@@ -427,16 +837,28 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
               ],
             ),
           ),
-          if (comments > 0)
+          if (_commentsCount > 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
-              child: Text(
-                'VIEW ALL $comments COMMENTS',
-                style: const TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 0.6,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF6F74A3),
+              child: GestureDetector(
+                onTap: _openCommentsSheet,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8E3F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'VIEW ALL $_commentsCount COMMENTS',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF5E6290),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -444,4 +866,11 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
       ),
     );
   }
+}
+
+class _LocalLikeState {
+  final bool liked;
+  final int likesCount;
+
+  const _LocalLikeState({required this.liked, required this.likesCount});
 }

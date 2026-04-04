@@ -133,4 +133,34 @@ class ActivityModel {
   }
 
   String get languesFormatted => languesDisponibles.join(' / ');
+
+  // Activity timeline status logic
+  String get timelineStatus {
+    final now = DateTime.now();
+    
+    if (dateDebut == null) {
+      return 'UNKNOWN';
+    }
+    
+    if (dateFin == null) {
+      // If only start date, consider it single day activity
+      final startOfDay = DateTime(dateDebut!.year, dateDebut!.month, dateDebut!.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+      
+      if (now.isBefore(startOfDay)) return 'UPCOMING';
+      if (now.isAfter(endOfDay)) return 'PAST';
+      return 'ONGOING';
+    }
+    
+    // Both start and end dates available
+    if (now.isBefore(dateDebut!)) return 'UPCOMING';
+    if (now.isAfter(dateFin!)) return 'PAST';
+    if (now.isAfter(dateDebut!) && now.isBefore(dateFin!)) return 'ONGOING';
+    
+    return 'UNKNOWN';
+  }
+
+  bool get isUpcoming => timelineStatus == 'UPCOMING';
+  bool get isOngoing => timelineStatus == 'ONGOING';
+  bool get isPast => timelineStatus == 'PAST';
 }

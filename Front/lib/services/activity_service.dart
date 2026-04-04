@@ -7,17 +7,78 @@ import '../models/activity_model.dart';
 import 'api_service.dart';
 
 class ActivityService {
-  // ✅ ADDED
-  static Map<String, dynamic> _safeObject(String body) {
-    return ApiService.safeDecodeObject(body);
+  static Map<String, List<ActivityModel>> _emptyTimeline() {
+    return {
+      'upcoming': const <ActivityModel>[],
+      'ongoing': const <ActivityModel>[],
+      'past': const <ActivityModel>[],
+    };
   }
 
-  // ✅ ADDED
+  static dynamic _decodeNestedJson(dynamic raw) {
+    dynamic value = raw;
+    for (var i = 0; i < 3; i++) {
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return <String, dynamic>{};
+        try {
+          value = jsonDecode(trimmed);
+          continue;
+        } catch (_) {
+          break;
+        }
+      }
+      break;
+    }
+    return value;
+  }
+
+  static Map<String, dynamic> _safeObject(dynamic raw) {
+    final decoded = _decodeNestedJson(raw);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) {
+      return decoded.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return <String, dynamic>{};
+  }
+
   static List<Map<String, dynamic>> _safeMapList(dynamic value) {
-    if (value is List) {
-      return value.whereType<Map<String, dynamic>>().toList();
+    final decoded = _decodeNestedJson(value);
+    if (decoded is List) {
+      final out = <Map<String, dynamic>>[];
+      for (final item in decoded) {
+        final obj = _safeObject(item);
+        if (obj.isNotEmpty) out.add(obj);
+      }
+      return out;
     }
     return const <Map<String, dynamic>>[];
+  }
+
+  static Map<String, dynamic> _extractTimelineData(Map<String, dynamic> body) {
+    final directData = _safeObject(body['data']);
+    if (directData.isNotEmpty) return directData;
+
+    final wrapped = _safeObject(body['result']);
+    final wrappedData = _safeObject(wrapped['data']);
+    if (wrappedData.isNotEmpty) return wrappedData;
+
+    // Some responses incorrectly place a full JSON payload into message/error.
+    final messagePayload = _safeObject(body['message']);
+    if (messagePayload.isNotEmpty) {
+      final nestedData = _safeObject(messagePayload['data']);
+      if (nestedData.isNotEmpty) return nestedData;
+      return messagePayload;
+    }
+
+    final errorPayload = _safeObject(body['error']);
+    if (errorPayload.isNotEmpty) {
+      final nestedData = _safeObject(errorPayload['data']);
+      if (nestedData.isNotEmpty) return nestedData;
+      return errorPayload;
+    }
+
+    return <String, dynamic>{};
   }
 
   /// Fetch all activities with optional filters.
@@ -42,34 +103,51 @@ class ActivityService {
   }
 
   /// Fetch all activities grouped by timeline (upcoming, ongoing, past)
-  static Future<Map<String, List<ActivityModel>>> getActivitiesByTimeline() async {
-    final res = await ApiClient.get('/activites/timeline', auth: false);
-    if (res.statusCode == 200) {
-      final body = _safeObject(res.body);
-      if (body['success'] == true && body['data'] != null) {
-        final data = body['data'] as Map<String, dynamic>;
-        
+  static Future<Map<String, List<ActivityModel>>>
+  getActivitiesByTimeline() async {
+    try {
+      // For pull-to-refresh screens, prefer a fresh response over local cache.
+      final res = await ApiClient.get(
+        '/activites/timeline',
+        auth: false,
+        cacheFirst: false,
+      );
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final data = _extractTimelineData(body);
+
         List<ActivityModel> parseList(dynamic listRaw) {
-          if (listRaw is! List) return [];
-          return listRaw.map((e) {
-            try { return ActivityModel.fromJson(e); } 
-            catch (err) { 
-              print('Error parsing ActivityModel: $err');
-              return null; 
-            }
-          }).whereType<ActivityModel>().toList();
+          final items = _safeMapList(listRaw);
+          return items
+              .map((e) {
+                try {
+                  return ActivityModel.fromJson(e);
+                } catch (err) {
+                  print('Error parsing ActivityModel: $err');
+                  return null;
+                }
+              })
+              .whereType<ActivityModel>()
+              .toList();
         }
 
-        return {
-          'upcoming': parseList(data['upcoming']),
-          'ongoing': parseList(data['ongoing']),
-          'past': parseList(data['past']),
-        };
+        final upcoming = parseList(data['upcoming']);
+        final ongoing = parseList(data['ongoing']);
+        final past = parseList(data['past']);
+
+        if (body['success'] == true ||
+            data.isNotEmpty ||
+            upcoming.isNotEmpty ||
+            ongoing.isNotEmpty ||
+            past.isNotEmpty) {
+          return {'upcoming': upcoming, 'ongoing': ongoing, 'past': past};
+        }
       }
+    } catch (e) {
+      print('getActivitiesByTimeline failed safely: $e');
     }
-    
-    // If not 200 or malformed, throw descriptive error
-    throw Exception('Failed to load activity timeline (Status: ${res.statusCode})');
+
+    return _emptyTimeline();
   }
 
   /// Fetch a single activity by id.

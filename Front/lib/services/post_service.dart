@@ -209,4 +209,27 @@ class PostService {
       return {'success': false, 'message': 'Unable to add comment right now.'};
     }
   }
+
+  static Future<Map<String, dynamic>> togglePostLike(String postId) async {
+    try {
+      final res = await ApiClient.post('/posts/$postId/like', const {});
+
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update like',
+        'liked': body['liked'] == true,
+        'likesCount': (body['likesCount'] as num?)?.toInt() ?? 0,
+        'postId': body['postId']?.toString() ?? postId,
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update like right now.'};
+    }
+  }
 }

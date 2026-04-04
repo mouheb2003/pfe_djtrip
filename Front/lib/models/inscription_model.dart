@@ -105,6 +105,15 @@ class InscriptionModel {
 
   bool get isUpcoming => statut == 'approuvee' || statut == 'en_attente';
 
+  bool get isPending => statut == 'en_attente';
+  bool get isApproved => statut == 'approuvee';
+  bool get isRejected => statut == 'refusee';
+  bool get isCancelled => statut == 'annulee';
+
+  bool get canBeCancelled => isPending || isApproved;
+  bool get canBeApproved => isPending;
+  bool get canBeRejected => isPending;
+
   Map<String, dynamic> toJson() {
     return {
       '_id': id,

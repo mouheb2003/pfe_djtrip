@@ -84,6 +84,16 @@ const postSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    liked_by: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          index: true,
+        },
+      ],
+      default: [],
+    },
     comments_count: {
       type: Number,
       default: 0,

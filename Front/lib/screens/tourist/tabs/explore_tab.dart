@@ -23,6 +23,7 @@ class _ExploreTabState extends State<ExploreTab> {
   // Contrôleurs
   GoogleMapController? _mapController;
   final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _originCtrl = TextEditingController(
     text: "Ma position actuelle",
   );
@@ -49,16 +50,23 @@ class _ExploreTabState extends State<ExploreTab> {
   void initState() {
     super.initState();
     _checkPermissions();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(_onSearchChanged);
     _loadLieux();
   }
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
+    _searchFocusNode.dispose();
     _originCtrl.dispose();
     _destinationCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   // --- INITIALISATION ---
@@ -212,6 +220,37 @@ class _ExploreTabState extends State<ExploreTab> {
     }).toList();
   }
 
+  List<LieuModel> get _searchSuggestions {
+    final query = _searchCtrl.text.trim();
+    if (query.isEmpty) return const <LieuModel>[];
+    return _visibleLieux.take(6).toList(growable: false);
+  }
+
+  void _onSearchSubmitted(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty) return;
+
+    final suggestions = _searchSuggestions;
+    if (suggestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No destination found for this search')),
+      );
+      return;
+    }
+
+    _selectLieu(suggestions.first);
+    _searchFocusNode.unfocus();
+  }
+
+  void _onSelectSearchResult(LieuModel lieu) {
+    _searchCtrl.text = lieu.titre;
+    _searchCtrl.selection = TextSelection.collapsed(
+      offset: _searchCtrl.text.length,
+    );
+    _selectLieu(lieu);
+    _searchFocusNode.unfocus();
+  }
+
   Set<Marker> _buildMarkers() {
     final Set<Marker> markers = _visibleLieux
         .where((l) => l.latitude != null && l.longitude != null)
@@ -304,6 +343,10 @@ class _ExploreTabState extends State<ExploreTab> {
                       : _buildSearchBar(),
                   const SizedBox(height: 12),
                   if (!_showItineraryPanel) _buildFilterList(),
+                  if (!_showItineraryPanel && _searchSuggestions.isNotEmpty)
+                    const SizedBox(height: 10),
+                  if (!_showItineraryPanel && _searchSuggestions.isNotEmpty)
+                    _buildSearchSuggestions(),
                 ],
               ),
             ),
@@ -320,15 +363,36 @@ class _ExploreTabState extends State<ExploreTab> {
                 // Bouton Itinerary (S'affiche quand on sélectionne un point)
                 if ((_selectedLieu != null || _customPickedLocation != null) &&
                     !_showItineraryPanel)
-                  FloatingActionButton.extended(
-                    onPressed: () => setState(() => _showItineraryPanel = true),
-                    backgroundColor: const Color(0xFF2158F6),
-                    icon: const Icon(Icons.directions, color: Colors.white),
-                    label: const Text(
-                      "Itinerary",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                  Hero(
+                    tag: 'itinerary_fab',
+                    child: Material(
+                      color: const Color(0xFF2158F6),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(28)),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(28),
+                        onTap: () => setState(() => _showItineraryPanel = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.directions, color: Colors.white),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Itinerary",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -366,11 +430,20 @@ class _ExploreTabState extends State<ExploreTab> {
             Positioned(
               right: 18,
               bottom: 72,
-              child: FloatingActionButton(
-                onPressed: _recenterToDjerba,
-                mini: true,
-                backgroundColor: Colors.white,
-                child: const Icon(Icons.my_location, color: Color(0xFF2158F6)),
+              child: Hero(
+                tag: 'recenter_fab',
+                child: Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28),
+                    onTap: _recenterToDjerba,
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Icon(Icons.my_location, color: Color(0xFF2158F6)),
+                    ),
+                  ),
+                ),
               ),
             ),
         ],
@@ -408,6 +481,9 @@ class _ExploreTabState extends State<ExploreTab> {
               ),
               child: TextField(
                 controller: _searchCtrl,
+                focusNode: _searchFocusNode,
+                textInputAction: TextInputAction.search,
+                onSubmitted: _onSearchSubmitted,
                 decoration: const InputDecoration(
                   hintText: 'Search destinations...',
                   hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
@@ -421,6 +497,48 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchSuggestions() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 240),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: _searchSuggestions.length,
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, color: Colors.grey.shade200),
+        itemBuilder: (context, index) {
+          final lieu = _searchSuggestions[index];
+          return ListTile(
+            dense: true,
+            leading: const Icon(Icons.place, color: Color(0xFF2158F6)),
+            title: Text(
+              lieu.titre,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              lieu.sousTitre.isNotEmpty ? lieu.sousTitre : lieu.categoryLabelEn,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () => _onSelectSearchResult(lieu),
+          );
+        },
       ),
     );
   }

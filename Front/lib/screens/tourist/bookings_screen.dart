@@ -4,7 +4,9 @@ import '../../../theme/app_theme.dart';
 import 'tabs/bookings_tab.dart';
 
 class BookingsScreen extends StatelessWidget {
-  const BookingsScreen({super.key});
+  final int initialTabIndex;
+
+  const BookingsScreen({super.key, this.initialTabIndex = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +44,7 @@ class BookingsScreen extends StatelessWidget {
         ),
         centerTitle: false,
       ),
-      body: const SafeArea(child: BookingsTab()),
+      body: SafeArea(child: BookingsTab(initialTabIndex: initialTabIndex)),
     );
   }
 }

@@ -321,6 +321,50 @@ exports.addPostComment = async (req, res) => {
   }
 };
 
+exports.togglePostLike = async (req, res) => {
+  try {
+    const userId = String(req.user.userId || "");
+    const { postId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const likedBy = Array.isArray(post.liked_by)
+      ? post.liked_by.map((id) => String(id))
+      : [];
+    const alreadyLiked = likedBy.includes(userId);
+
+    if (alreadyLiked) {
+      post.liked_by = (post.liked_by || []).filter(
+        (id) => String(id) !== userId,
+      );
+    } else {
+      post.liked_by = [...(post.liked_by || []), userId];
+    }
+
+    post.likes_count = (post.liked_by || []).length;
+    await post.save();
+
+    return res.status(200).json({
+      message: alreadyLiked ? "Like removed" : "Post liked",
+      liked: !alreadyLiked,
+      likesCount: post.likes_count,
+      postId: String(post._id),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating like",
+      error: error.message,
+    });
+  }
+};
+
 exports.deleteMyPost = async (req, res) => {
   try {
     const userId = req.user.userId;

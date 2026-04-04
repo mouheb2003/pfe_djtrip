@@ -37,7 +37,7 @@ router.get(
   "/touriste/my-bookings",
   verifyToken,
   verifyTouriste,
-  cacheGet("inscriptions:touriste:bookings", 60),
+  // cacheGet("inscriptions:touriste:bookings", 60), // Temporarily disabled cache
   inscriptionController.getMyBookings,
 );
 

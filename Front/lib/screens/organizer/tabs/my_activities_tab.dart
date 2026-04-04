@@ -19,7 +19,6 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   List<ActivityModel> _activeActivities = [];
   List<ActivityModel> _archivedActivities = [];
   bool _isLoading = true;
-  bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -39,10 +38,37 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
     try {
       final active = await ActivityService.getMyActivities();
       final archived = await ActivityService.getArchivedActivities();
+
+      // Apply client-side timeline filtering to ensure correctness
+      final now = DateTime.now();
+      final upcoming = <ActivityModel>[];
+      final ongoing = <ActivityModel>[];
+      final past = <ActivityModel>[];
+
+      // Process active activities (should be upcoming/ongoing)
+      for (final activity in active) {
+        final status = activity.timelineStatus;
+        if (status == 'UPCOMING') {
+          upcoming.add(activity);
+        } else if (status == 'ONGOING') {
+          ongoing.add(activity);
+        } else if (status == 'PAST') {
+          past.add(activity);
+        }
+      }
+
+      // Add archived activities to past
+      past.addAll(archived);
+
+      // Combine upcoming and ongoing as "active" for the organizer
+      final combinedActive = <ActivityModel>[];
+      combinedActive.addAll(upcoming);
+      combinedActive.addAll(ongoing);
+
       if (mounted) {
         setState(() {
-          _activeActivities = active;
-          _archivedActivities = archived;
+          _activeActivities = combinedActive;
+          _archivedActivities = past;
           _isLoading = false;
         });
       }
@@ -59,25 +85,86 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   }
 
   List<ActivityModel> get _currentActivities {
-    List<ActivityModel> activities;
-    // Ne garder que les activités actives
-    activities = _activeActivities.where((a) => a.statut == 'active').toList();
+    List<ActivityModel> activities = _activeActivities;
 
     if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
       activities = activities
           .where(
             (a) =>
-                a.titre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                a.lieu.toLowerCase().contains(_searchQuery.toLowerCase()),
+                a.titre.toLowerCase().contains(q) ||
+                a.lieu.toLowerCase().contains(q) ||
+                a.typeActivite.toLowerCase().contains(q) ||
+                a.categorie.toLowerCase().contains(q),
           )
           .toList();
     }
     return activities;
   }
 
-  List<String> get _tabs => [
-    'Active (${_activeActivities.where((a) => a.statut == 'active').length})',
-  ];
+  List<String> get _tabs => ['Active (${_activeActivities.length})'];
+
+  Widget _buildBottomSearchDock() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.search, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val.trim();
+                });
+              },
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search activity, place, type...',
+                border: InputBorder.none,
+                isDense: true,
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppColors.textGrey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,95 +177,30 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
             Container(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (!_isSearching) ...[
-                    const Spacer(),
-                    const Text(
-                      'My Activities',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Requests button
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RequestsTab(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.assignment_turned_in, size: 18),
-                      label: const Text('Requests'),
-                    ),
-                  ] else
-                    Expanded(
-                      child: Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Search an activity...',
-                            border: InputBorder.none,
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              size: 20,
-                              color: AppColors.textGrey,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: const Icon(
-                                Icons.close,
-                                size: 20,
-                                color: AppColors.textGrey,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isSearching = false;
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                });
-                              },
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                            ),
-                          ),
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  if (!_isSearching)
-                    GestureDetector(
-                      onTap: () => setState(() => _isSearching = true),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.search,
-                          color: AppColors.primary,
-                          size: 22,
-                        ),
-                      ),
-                    ),
+                  const Spacer(),
+                  const Text(
+                    'My Activities',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const RequestsTab()),
+                      );
+                    },
+                    icon: const Icon(Icons.assignment_turned_in, size: 18),
+                    label: const Text('Requests'),
+                  ),
                 ],
               ),
+            ),
+            const SizedBox(height: 8),
+            // Search bar moved here (between title and active tab)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildBottomSearchDock(),
             ),
             const SizedBox(height: 8),
             // Filter tabs
@@ -265,17 +287,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                         (a) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _ActivityCard(
-                            imageUrl: a.thumbnailUrl,
-                            badge: a.statut.toUpperCase(),
-                            badgeColor: a.statut == 'active'
-                                ? const Color(0xFF22C55E)
-                                : a.statut == 'brouillon'
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF6B7280),
-                            title: a.titre,
-                            spots:
-                                '${a.nombreReservations}/${a.capaciteMax} places',
-                            price: a.prixFormatted,
+                            activity: a,
                             onTap: () async {
                               final updated = await Navigator.push<bool>(
                                 context,
@@ -326,7 +338,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           ),
                         ],
                       ),
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 90),
                   ],
                 ),
               ),
@@ -334,40 +346,68 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final created = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateActivityScreen()),
-          );
-          if (created == true) _loadActivities();
-        },
-        backgroundColor: AppColors.primary,
-        elevation: 6,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
+      floatingActionButton: Hero(
+        tag: 'organizer_fab',
+        child: Material(
+          color: AppColors.primary,
+          shape: const CircleBorder(),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(28),
+            onTap: () async {
+              final created = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateActivityScreen()),
+              );
+              if (created == true) _loadActivities();
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _ActivityCard extends StatelessWidget {
-  final String imageUrl;
-  final String badge;
-  final Color badgeColor;
-  final String title;
-  final String spots;
-  final String price;
+  final ActivityModel activity;
   final VoidCallback onTap;
 
-  const _ActivityCard({
-    required this.imageUrl,
-    required this.badge,
-    required this.badgeColor,
-    required this.title,
-    required this.spots,
-    required this.price,
-    required this.onTap,
-  });
+  const _ActivityCard({required this.activity, required this.onTap});
+
+  String _getTimelineBadge() {
+    final status = activity.timelineStatus;
+    switch (status) {
+      case 'UPCOMING':
+        return 'UPCOMING';
+      case 'ONGOING':
+        return 'ONGOING';
+      case 'PAST':
+        return 'COMPLETED';
+      default:
+        return activity.statut.toUpperCase();
+    }
+  }
+
+  Color _getTimelineBadgeColor() {
+    final status = activity.timelineStatus;
+    switch (status) {
+      case 'UPCOMING':
+        return const Color(0xFF5D71FF); // blue
+      case 'ONGOING':
+        return const Color(0xFF22C55E); // green
+      case 'PAST':
+        return const Color(0xFF94A3B8); // grey
+      default:
+        return activity.statut == 'active'
+            ? const Color(0xFF22C55E)
+            : activity.statut == 'brouillon'
+            ? const Color(0xFF94A3B8)
+            : const Color(0xFF6B7280);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -393,14 +433,14 @@ class _ActivityCard extends StatelessWidget {
             Stack(
               children: [
                 Hero(
-                  tag: 'activity_img_$title',
+                  tag: 'activity_img_${activity.id}',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: SizedBox(
                       width: 85,
                       height: 85,
                       child: Image.network(
-                        imageUrl,
+                        activity.thumbnailUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: Colors.grey[100],
@@ -419,11 +459,11 @@ class _ActivityCard extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: badgeColor,
+                      color: _getTimelineBadgeColor(),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      badge,
+                      _getTimelineBadge(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 9,
@@ -440,7 +480,7 @@ class _ActivityCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    activity.titre,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -459,7 +499,7 @@ class _ActivityCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        spots,
+                        '${activity.nombreReservations}/${activity.capaciteMax} places',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textGrey,
@@ -472,7 +512,7 @@ class _ActivityCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        price,
+                        activity.prixFormatted,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,

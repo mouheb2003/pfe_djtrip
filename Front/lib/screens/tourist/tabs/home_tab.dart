@@ -312,11 +312,21 @@ class _HomeTabState extends State<HomeTab> {
       floatingActionButton: SizedBox(
         width: 48,
         height: 48,
-        child: FloatingActionButton(
-          onPressed: () {},
-          backgroundColor: const Color(0xFFFF6B1A),
-          elevation: 8,
-          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+        child: Hero(
+          tag: 'home_fab',
+          child: Material(
+            color: const Color(0xFFFF6B1A),
+            elevation: 8,
+            shape: const CircleBorder(),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {},
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
         ),
       ),
     );

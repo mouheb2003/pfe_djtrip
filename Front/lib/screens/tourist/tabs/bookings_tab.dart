@@ -6,7 +6,9 @@ import '../../../theme/app_theme.dart';
 import '../../tourist/booking_detail_screen.dart';
 
 class BookingsTab extends StatefulWidget {
-  const BookingsTab({super.key});
+  final int initialTabIndex;
+
+  const BookingsTab({super.key, this.initialTabIndex = 0});
 
   @override
   State<BookingsTab> createState() => _BookingsTabState();
@@ -25,13 +27,20 @@ class _BookingsTabState extends State<BookingsTab> {
   @override
   void initState() {
     super.initState();
+    _tabIndex = widget.initialTabIndex.clamp(0, 2);
     _loadInscriptions();
   }
 
   Future<void> _loadInscriptions() async {
     try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
       final result = await InscriptionService.getMyBookings();
       if (!mounted) return;
+
       setState(() {
         _buckets = result;
         _isLoading = false;
@@ -39,9 +48,10 @@ class _BookingsTabState extends State<BookingsTab> {
       });
     } catch (e) {
       if (!mounted) return;
+      print('Error loading inscriptions: $e'); // Debug print
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = 'Unable to load bookings. Please try again.';
       });
     }
   }
@@ -79,8 +89,19 @@ class _BookingsTabState extends State<BookingsTab> {
 
   DateTime? _activityDate(InscriptionModel inscription) {
     final activity = inscription.activite ?? {};
-    final raw = activity['date_debut'] ?? activity['dateDebut'];
-    if (raw is String) return DateTime.tryParse(raw);
+    // Try multiple possible date fields
+    final raw =
+        activity['date_debut'] ??
+        activity['dateDebut'] ??
+        activity['startDate'] ??
+        activity['start_date'];
+
+    if (raw is String) {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) return parsed;
+    }
+
+    // Fallback to request date
     return inscription.dateDemande;
   }
 
@@ -215,21 +236,91 @@ class _BookingsTabState extends State<BookingsTab> {
               ),
             )
           else
-            ..._currentItems.map(
-              (inscription) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _BookingCard(
-                  typeLabel: _typeFor(inscription),
-                  status: inscription.statusLabel,
-                  statusColor: inscription.statusColor,
-                  title: _titleFor(inscription),
-                  date: _formatDate(_activityDate(inscription)),
-                  time: _formatTime(_activityDate(inscription)),
-                  imageUrl: _imageUrlFor(inscription),
-                  primary: inscription.statut == 'approuvee',
-                  onTap: () => _openDetails(inscription),
-                ),
-              ),
+            Builder(
+              builder: (context) {
+                try {
+                  final sortedItems = List<InscriptionModel>.from(
+                    _currentItems,
+                  );
+
+                  // Remove duplicates based on inscription ID and activity ID
+                  final uniqueItems = <String, InscriptionModel>{};
+                  for (final item in sortedItems) {
+                    try {
+                      final id = item.id ?? '';
+                      final activityId =
+                          item.activite?['_id']?.toString() ?? '';
+
+                      // Create a unique key combining inscription ID and activity ID
+                      final uniqueKey = id.isNotEmpty
+                          ? id
+                          : 'activity_$activityId';
+
+                      if (uniqueKey.isNotEmpty) {
+                        uniqueItems[uniqueKey] = item;
+                      }
+                    } catch (e) {
+                      print('Error processing item: $e'); // Debug print
+                      continue; // Skip problematic items
+                    }
+                  }
+
+                  final finalItems = uniqueItems.values.toList();
+
+                  // Sort by most recent first with better date handling
+                  finalItems.sort((a, b) {
+                    try {
+                      final dateA = _activityDate(a);
+                      final dateB = _activityDate(b);
+
+                      // Debug print (remove in production)
+                      print(
+                        'Comparing dates: ${dateA?.toString() ?? 'null'} vs ${dateB?.toString() ?? 'null'}',
+                      );
+
+                      // Handle null dates - put them at the end
+                      if (dateA == null && dateB == null) return 0;
+                      if (dateA == null) return 1;
+                      if (dateB == null) return -1;
+
+                      // Sort by most recent first (descending order)
+                      return dateB!.compareTo(dateA!);
+                    } catch (e) {
+                      print('Error sorting dates: $e'); // Debug print
+                      return 0; // Keep original order if sorting fails
+                    }
+                  });
+
+                  return Column(
+                    children: [
+                      ...finalItems.map(
+                        (inscription) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _BookingCard(
+                            typeLabel: _typeFor(inscription),
+                            status: inscription.statusLabel,
+                            statusColor: inscription.statusColor,
+                            title: _titleFor(inscription),
+                            date: _formatDate(_activityDate(inscription)),
+                            time: _formatTime(_activityDate(inscription)),
+                            imageUrl: _imageUrlFor(inscription),
+                            primary: inscription.statut == 'approuvee',
+                            onTap: () => _openDetails(inscription),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                } catch (e) {
+                  print('Error in Builder: $e'); // Debug print
+                  return Center(
+                    child: Text(
+                      'Error displaying bookings. Please try again.',
+                      style: TextStyle(color: Colors.red[700]),
+                    ),
+                  );
+                }
+              },
             ),
         ],
       ),
