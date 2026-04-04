@@ -62,6 +62,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   // 🚀 SIMPLIFIED: Simple online status tracking
   bool _partnerOnline = false;
 
+  // ✅ ADDED
+  void _disposeSocket() {
+    _socket?.off('connect');
+    _socket?.off('disconnect');
+    _socket?.off('message_sent');
+    _socket?.off('new_message');
+    _socket?.off('user_status');
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -79,23 +91,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   void dispose() {
     print('🔴 [ChatScreen] DISPOSE: Forcing logout...');
 
-    // 🚀 NEW: Force logout before disposing
     _socket?.emit('force_logout');
-
-    // Small delay to ensure the event is sent
-    Future.delayed(const Duration(milliseconds: 100), () {
-      WidgetsBinding.instance.removeObserver(this);
-      _socket?.disconnect();
-      _socket?.dispose();
-      _voicePlayer.stop();
-      _voicePlayer.dispose();
-      _audioRecorder.dispose();
-      _recordTicker?.cancel();
-      _msgCtrl.dispose();
-      _msgFocus.dispose();
-      _scrollCtrl.dispose();
-      super.dispose();
-    });
+    _disposeSocket();
+    WidgetsBinding.instance.removeObserver(this);
+    _voicePlayer.stop();
+    _voicePlayer.dispose();
+    _audioRecorder.dispose();
+    _recordTicker?.cancel();
+    _msgCtrl.dispose();
+    _msgFocus.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
   }
 
   bool _canEditMessage(_UiMessage msg) {
@@ -423,12 +429,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         print('⏸️ Chat going to background, forcing logout...');
         // 🚀 NEW: Force logout on app background
         _socket?.emit('force_logout');
-
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _socket?.disconnect();
-          _socket?.dispose();
-          _socket = null;
-        });
+        _disposeSocket();
         return;
 
       case AppLifecycleState.resumed:
@@ -463,6 +464,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Future<void> _initSocket() async {
+    _disposeSocket();
+
     final token = await AuthService.getAccessToken();
     if (token == null || token.isEmpty) return;
 
@@ -474,10 +477,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
+          .enableReconnection()
+          .setReconnectionAttempts(20)
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(8000)
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
     );
+
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('message_sent');
+    socket.off('new_message');
+    socket.off('user_status');
 
     // 🚀 SIMPLIFIED: Clean socket event handling
     socket.on('connect', (_) {

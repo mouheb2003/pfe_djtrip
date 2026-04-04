@@ -1,0 +1,473 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
+
+import '../config/api_config.dart';
+import 'auth_service.dart';
+import 'connectivity_service.dart';
+
+class ApiResponse<T> {
+  final bool success;
+  final T? data;
+  final String message;
+  final int statusCode;
+  final Map<String, dynamic>? raw;
+
+  const ApiResponse({
+    required this.success,
+    required this.message,
+    required this.statusCode,
+    this.data,
+    this.raw,
+  });
+}
+
+class _CacheItem {
+  final String body;
+  final int statusCode;
+  final DateTime expiresAt;
+  final DateTime updatedAt;
+
+  const _CacheItem({
+    required this.body,
+    required this.statusCode,
+    required this.expiresAt,
+    required this.updatedAt,
+  });
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'body': body,
+      'statusCode': statusCode,
+      'expiresAt': expiresAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  static _CacheItem? fromJson(Map<dynamic, dynamic>? json) {
+    if (json == null) return null;
+    final body = json['body']?.toString() ?? '';
+    final statusCode = (json['statusCode'] as num?)?.toInt() ?? 200;
+    final expiresAtRaw = json['expiresAt']?.toString();
+    final updatedAtRaw = json['updatedAt']?.toString();
+    if (expiresAtRaw == null || updatedAtRaw == null) return null;
+
+    final expiresAt = DateTime.tryParse(expiresAtRaw);
+    final updatedAt = DateTime.tryParse(updatedAtRaw);
+    if (expiresAt == null || updatedAt == null) return null;
+
+    return _CacheItem(
+      body: body,
+      statusCode: statusCode,
+      expiresAt: expiresAt,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
+class ApiService {
+  ApiService._();
+
+  static final ApiService instance = ApiService._();
+  static const Duration _defaultTimeout = Duration(seconds: 15);
+  static const int _maxRetries = 2;
+  static const Duration _cacheTtl = Duration(seconds: 60);
+  static const String _cacheBoxName = 'api_cache_v1';
+
+  final Map<String, _CacheItem> _memoryCache = <String, _CacheItem>{};
+  final http.Client _client = http.Client();
+  Box<dynamic>? _cacheBox;
+  bool _initialized = false;
+
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+
+    try {
+      await Hive.initFlutter();
+      _cacheBox = await Hive.openBox<dynamic>(_cacheBoxName);
+    } catch (_) {
+      _cacheBox = null;
+    }
+  }
+
+  Future<void> warmUp() async {
+    await initialize();
+    await get('/health', auth: false, timeout: const Duration(seconds: 25));
+  }
+
+  Future<Map<String, String>> _buildHeaders({
+    required bool auth,
+    Map<String, String>? headers,
+  }) async {
+    final merged = <String, String>{'Content-Type': 'application/json'};
+
+    if (auth) {
+      final token = await AuthService.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        merged['Authorization'] = 'Bearer $token';
+      }
+    }
+
+    if (headers != null) {
+      merged.addAll(headers);
+    }
+
+    return merged;
+  }
+
+  void _devLog(String message) {
+    if (kDebugMode) {
+      debugPrint('[API] $message');
+    }
+  }
+
+  static String _cacheKey(String method, Uri uri) =>
+      '$method:${uri.toString()}';
+
+  _CacheItem? _readCache(String key) {
+    final memory = _memoryCache[key];
+    if (memory != null && !memory.isExpired) {
+      return memory;
+    }
+
+    final persisted = _CacheItem.fromJson(
+      _cacheBox?.get(key) as Map<dynamic, dynamic>?,
+    );
+    if (persisted == null) return null;
+    if (persisted.isExpired) {
+      _memoryCache.remove(key);
+      _cacheBox?.delete(key);
+      return null;
+    }
+
+    _memoryCache[key] = persisted;
+    return persisted;
+  }
+
+  void _writeCache(String key, http.Response response, Duration ttl) {
+    final item = _CacheItem(
+      body: response.body,
+      statusCode: response.statusCode,
+      expiresAt: DateTime.now().add(ttl),
+      updatedAt: DateTime.now(),
+    );
+
+    _memoryCache[key] = item;
+    _cacheBox?.put(key, item.toJson());
+  }
+
+  Future<void> invalidateByPrefix(String prefix) async {
+    final keys = _memoryCache.keys.where((k) => k.contains(prefix)).toList();
+    for (final key in keys) {
+      _memoryCache.remove(key);
+      await _cacheBox?.delete(key);
+    }
+  }
+
+  Future<http.Response> _offlineResponse() async {
+    return http.Response(
+      jsonEncode({
+        'success': false,
+        'message': 'No internet connection. Please check your network.',
+      }),
+      503,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  http.Response _safeErrorResponse(String message, int statusCode) {
+    return http.Response(
+      jsonEncode({'success': false, 'message': message}),
+      statusCode,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+
+  Future<http.Response> _sendWithRetry({
+    required Future<http.Response> Function() request,
+    required Duration timeout,
+    required bool auth,
+    required Future<http.Response> Function() retryOriginal,
+  }) async {
+    Object? lastError;
+
+    for (var attempt = 0; attempt <= _maxRetries; attempt++) {
+      try {
+        final response = await request().timeout(timeout);
+
+        if (response.statusCode == 401 && auth) {
+          final refreshed = await AuthService.refreshAccessToken();
+          if (refreshed) {
+            return retryOriginal();
+          }
+        }
+
+        if (response.statusCode >= 500 && attempt < _maxRetries) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * (attempt + 1)),
+          );
+          continue;
+        }
+
+        return response;
+      } on TimeoutException {
+        lastError = 'Connection timed out. Please try again.';
+        if (attempt < _maxRetries) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * (attempt + 1)),
+          );
+          continue;
+        }
+      } catch (error) {
+        lastError = error;
+        if (attempt < _maxRetries) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * (attempt + 1)),
+          );
+          continue;
+        }
+      }
+    }
+
+    final msg = lastError is String ? lastError : 'Unable to reach server.';
+    return _safeErrorResponse(msg, 500);
+  }
+
+  Future<http.Response> get(
+    String path, {
+    bool auth = true,
+    Map<String, String>? query,
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+    bool cacheFirst = true,
+    Duration cacheTtl = _cacheTtl,
+  }) async {
+    await initialize();
+
+    final online = await ConnectivityService.isOnline();
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}$path',
+    ).replace(queryParameters: query);
+    final key = _cacheKey('GET', uri);
+
+    if (cacheFirst) {
+      final cached = _readCache(key);
+      if (cached != null) {
+        _devLog('GET HIT $path');
+        unawaited(
+          _refreshGetInBackground(
+            path,
+            auth: auth,
+            query: query,
+            headers: headers,
+            timeout: timeout,
+            cacheTtl: cacheTtl,
+          ),
+        );
+        return http.Response(
+          cached.body,
+          cached.statusCode,
+          headers: {'x-cache': 'HIT'},
+        );
+      }
+    }
+
+    if (!online) {
+      return _offlineResponse();
+    }
+
+    final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
+    _devLog('GET MISS $path');
+
+    final response = await _sendWithRetry(
+      timeout: timeout,
+      auth: auth,
+      request: () => _client.get(uri, headers: requestHeaders),
+      retryOriginal: () => get(
+        path,
+        auth: auth,
+        query: query,
+        headers: headers,
+        timeout: timeout,
+        cacheFirst: false,
+        cacheTtl: cacheTtl,
+      ),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _writeCache(key, response, cacheTtl);
+    }
+
+    return response;
+  }
+
+  Future<void> _refreshGetInBackground(
+    String path, {
+    required bool auth,
+    Map<String, String>? query,
+    Map<String, String>? headers,
+    required Duration timeout,
+    required Duration cacheTtl,
+  }) async {
+    final online = await ConnectivityService.isOnline();
+    if (!online) return;
+
+    await get(
+      path,
+      auth: auth,
+      query: query,
+      headers: headers,
+      timeout: timeout,
+      cacheFirst: false,
+      cacheTtl: cacheTtl,
+    );
+  }
+
+  Future<http.Response> post(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = true,
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+  }) async {
+    await initialize();
+
+    final online = await ConnectivityService.isOnline();
+    if (!online) return _offlineResponse();
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
+
+    final response = await _sendWithRetry(
+      timeout: timeout,
+      auth: auth,
+      request: () =>
+          _client.post(uri, headers: requestHeaders, body: jsonEncode(body)),
+      retryOriginal: () =>
+          post(path, body, auth: auth, headers: headers, timeout: timeout),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await invalidateByPrefix('GET:${ApiConfig.baseUrl}');
+    }
+
+    return response;
+  }
+
+  Future<http.Response> put(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = true,
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+  }) async {
+    await initialize();
+
+    final online = await ConnectivityService.isOnline();
+    if (!online) return _offlineResponse();
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
+
+    final response = await _sendWithRetry(
+      timeout: timeout,
+      auth: auth,
+      request: () =>
+          _client.put(uri, headers: requestHeaders, body: jsonEncode(body)),
+      retryOriginal: () =>
+          put(path, body, auth: auth, headers: headers, timeout: timeout),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await invalidateByPrefix('GET:${ApiConfig.baseUrl}');
+    }
+
+    return response;
+  }
+
+  Future<http.Response> patch(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = true,
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+  }) async {
+    await initialize();
+
+    final online = await ConnectivityService.isOnline();
+    if (!online) return _offlineResponse();
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
+
+    final response = await _sendWithRetry(
+      timeout: timeout,
+      auth: auth,
+      request: () =>
+          _client.patch(uri, headers: requestHeaders, body: jsonEncode(body)),
+      retryOriginal: () =>
+          patch(path, body, auth: auth, headers: headers, timeout: timeout),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await invalidateByPrefix('GET:${ApiConfig.baseUrl}');
+    }
+
+    return response;
+  }
+
+  Future<http.Response> delete(
+    String path, {
+    bool auth = true,
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+  }) async {
+    await initialize();
+
+    final online = await ConnectivityService.isOnline();
+    if (!online) return _offlineResponse();
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
+
+    final response = await _sendWithRetry(
+      timeout: timeout,
+      auth: auth,
+      request: () => _client.delete(uri, headers: requestHeaders),
+      retryOriginal: () =>
+          delete(path, auth: auth, headers: headers, timeout: timeout),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await invalidateByPrefix('GET:${ApiConfig.baseUrl}');
+    }
+
+    return response;
+  }
+
+  static Map<String, dynamic> safeDecodeObject(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  static List<dynamic> safeDecodeList(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is List) return decoded;
+      return const <dynamic>[];
+    } catch (_) {
+      return const <dynamic>[];
+    }
+  }
+}

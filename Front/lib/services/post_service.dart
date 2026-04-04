@@ -1,10 +1,23 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_client.dart';
 import 'auth_service.dart';
+import 'api_service.dart';
 
 class PostService {
+  // ✅ ADDED
+  static Map<String, dynamic> _safeObject(String body) {
+    return ApiService.safeDecodeObject(body);
+  }
+
+  // ✅ ADDED
+  static List<Map<String, dynamic>> _safeMapList(dynamic raw) {
+    if (raw is List) {
+      return raw.whereType<Map<String, dynamic>>().toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
   static Future<String?> uploadPostImage(File imageFile) async {
     try {
       final token = await AuthService.getAccessToken();
@@ -23,11 +36,8 @@ class PostService {
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode != 200) return null;
 
-      final body = jsonDecode(response.body);
-      if (body is Map<String, dynamic>) {
-        return body['imageUrl'] as String?;
-      }
-      return null;
+      final body = _safeObject(response.body);
+      return body['imageUrl'] as String?;
     } catch (_) {
       return null;
     }
@@ -37,12 +47,9 @@ class PostService {
     try {
       final res = await ApiClient.get('/posts/me');
       if (res.statusCode != 200) return [];
-      final body = jsonDecode(res.body);
-      if (body is Map<String, dynamic> && body['posts'] is List) {
-        return List<Map<String, dynamic>>.from(body['posts'] as List);
-      }
-      if (body is List) {
-        return List<Map<String, dynamic>>.from(body);
+      final body = _safeObject(res.body);
+      if (body['posts'] is List) {
+        return _safeMapList(body['posts']);
       }
       return [];
     } catch (_) {
@@ -54,12 +61,9 @@ class PostService {
     try {
       final res = await ApiClient.get('/posts/feed', auth: false);
       if (res.statusCode != 200) return [];
-      final body = jsonDecode(res.body);
-      if (body is Map<String, dynamic> && body['posts'] is List) {
-        return List<Map<String, dynamic>>.from(body['posts'] as List);
-      }
-      if (body is List) {
-        return List<Map<String, dynamic>>.from(body);
+      final body = _safeObject(res.body);
+      if (body['posts'] is List) {
+        return _safeMapList(body['posts']);
       }
       return [];
     } catch (_) {
@@ -90,7 +94,7 @@ class PostService {
 
       Map<String, dynamic> body = {};
       try {
-        body = jsonDecode(res.body) as Map<String, dynamic>;
+        body = _safeObject(res.body);
       } catch (_) {
         body = {};
       }
@@ -122,7 +126,7 @@ class PostService {
 
       Map<String, dynamic> body = {};
       try {
-        body = jsonDecode(res.body) as Map<String, dynamic>;
+        body = _safeObject(res.body);
       } catch (_) {
         body = {};
       }
@@ -142,7 +146,7 @@ class PostService {
       final res = await ApiClient.delete('/posts/$postId');
       Map<String, dynamic> body = {};
       try {
-        body = jsonDecode(res.body) as Map<String, dynamic>;
+        body = _safeObject(res.body);
       } catch (_) {
         body = {};
       }
@@ -162,9 +166,9 @@ class PostService {
     try {
       final res = await ApiClient.get('/posts/$postId/comments');
       if (res.statusCode != 200) return [];
-      final body = jsonDecode(res.body);
-      if (body is Map<String, dynamic> && body['comments'] is List) {
-        return List<Map<String, dynamic>>.from(body['comments'] as List);
+      final body = _safeObject(res.body);
+      if (body['comments'] is List) {
+        return _safeMapList(body['comments']);
       }
       return [];
     } catch (_) {
@@ -186,7 +190,7 @@ class PostService {
 
       Map<String, dynamic> body = {};
       try {
-        body = jsonDecode(res.body) as Map<String, dynamic>;
+        body = _safeObject(res.body);
       } catch (_) {
         body = {};
       }

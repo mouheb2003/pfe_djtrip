@@ -4,75 +4,107 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 import 'auth_service.dart';
 import '../models/activity_model.dart';
+import 'api_service.dart';
 
 class ActivityService {
+  // ✅ ADDED
+  static Map<String, dynamic> _safeObject(String body) {
+    return ApiService.safeDecodeObject(body);
+  }
+
+  // ✅ ADDED
+  static List<Map<String, dynamic>> _safeMapList(dynamic value) {
+    if (value is List) {
+      return value.whereType<Map<String, dynamic>>().toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
   /// Fetch all activities with optional filters.
   static Future<List<ActivityModel>> getActivities({
     Map<String, String>? filters,
   }) async {
-    final res = await ApiClient.get('/activites', auth: false, query: filters);
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = body['activities'] as List? ?? [];
-      return list
-          .map((a) => ActivityModel.fromJson(a as Map<String, dynamic>))
-          .toList();
+    try {
+      final res = await ApiClient.get(
+        '/activites',
+        auth: false,
+        query: filters,
+      );
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activities']);
+        return list.map(ActivityModel.fromJson).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   /// Fetch a single activity by id.
   static Future<ActivityModel?> getActivityById(String id) async {
-    final res = await ApiClient.get('/activites/$id', auth: false);
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final data = body['activite'] as Map<String, dynamic>? ?? body;
-      return ActivityModel.fromJson(data);
+    try {
+      final res = await ApiClient.get('/activites/$id', auth: false);
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final data = (body['activite'] is Map<String, dynamic>)
+            ? body['activite'] as Map<String, dynamic>
+            : body;
+        return ActivityModel.fromJson(data);
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
-    return null;
   }
 
   /// Organizer: fetch their own active activities.
   static Future<List<ActivityModel>> getMyActivities() async {
-    final res = await ApiClient.get('/activites/my-activities');
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = (body['activities'] ?? body['activites']) as List? ?? [];
-      return list
-          .map((a) => ActivityModel.fromJson(a as Map<String, dynamic>))
-          .toList();
+    try {
+      final res = await ApiClient.get('/activites/my-activities');
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activities'] ?? body['activites']);
+        return list.map(ActivityModel.fromJson).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   /// Organizer: fetch archived activities.
   static Future<List<ActivityModel>> getArchivedActivities() async {
-    final res = await ApiClient.get('/activites/archived');
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = (body['activities'] ?? body['activites']) as List? ?? [];
-      return list
-          .map((a) => ActivityModel.fromJson(a as Map<String, dynamic>))
-          .toList();
+    try {
+      final res = await ApiClient.get('/activites/archived');
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activities'] ?? body['activites']);
+        return list.map(ActivityModel.fromJson).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   /// Search activities by keyword.
   static Future<List<ActivityModel>> searchActivities(String q) async {
-    final res = await ApiClient.get(
-      '/activites/search',
-      auth: false,
-      query: {'q': q},
-    );
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = (body['activities'] ?? body['activites']) as List? ?? [];
-      return list
-          .map((a) => ActivityModel.fromJson(a as Map<String, dynamic>))
-          .toList();
+    try {
+      final res = await ApiClient.get(
+        '/activites/search',
+        auth: false,
+        query: {'q': q},
+      );
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activities'] ?? body['activites']);
+        return list.map(ActivityModel.fromJson).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   /// Delete an activity (organizer only).
@@ -141,7 +173,7 @@ class ActivityService {
         const Duration(seconds: 30),
       );
       final res = await http.Response.fromStream(streamed);
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _safeObject(res.body);
 
       if (res.statusCode == 201 || res.statusCode == 200) {
         return {'success': true, 'activite': body['activite'] ?? body};
@@ -216,7 +248,7 @@ class ActivityService {
         const Duration(seconds: 30),
       );
       final res = await http.Response.fromStream(streamed);
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _safeObject(res.body);
 
       if (res.statusCode == 200) {
         return {'success': true, 'activite': body['activite'] ?? body};

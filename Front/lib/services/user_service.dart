@@ -1,42 +1,30 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../api/api_client.dart';
+import 'api_service.dart';
 import 'auth_service.dart';
 
 class UserService {
+  // ✅ ADDED
+  static Map<String, dynamic> _safeObject(String body) {
+    return ApiService.safeDecodeObject(body);
+  }
+
+  // ✅ ADDED
+  static List<Map<String, dynamic>> _safeListOfMap(dynamic raw) {
+    if (raw is List) {
+      return raw.whereType<Map<String, dynamic>>().toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
   static Future<Map<String, dynamic>?> getProfile() async {
     try {
-      final token = await AuthService.getAccessToken();
-      if (token == null) {
-        print('🔒 No access token found');
-        return null;
-      }
-
-      print('🌐 Fetching user profile...');
-      final response = await http
-          .get(
-            Uri.parse('${ApiClient.baseUrl}/users/me'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              print('⏱️ Profile request timed out after 30 seconds');
-              throw Exception('Request timeout');
-            },
-          );
-
-      print('📥 Response status: ${response.statusCode}');
+      final response = await ApiClient.get('/users/me');
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('✅ Profile loaded successfully');
+        final data = _safeObject(response.body);
         return data['user'];
       }
-      print('❌ Failed to load profile: ${response.statusCode}');
       return null;
     } catch (e) {
       print('❌ Error getting profile: $e');
@@ -51,16 +39,8 @@ class UserService {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
 
-      final response = await http.put(
-        Uri.parse('${ApiClient.baseUrl}/users/me'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(data),
-      );
-
-      final responseData = jsonDecode(response.body);
+      final response = await ApiClient.put('/users/me', data);
+      final responseData = _safeObject(response.body);
       return {
         'success': response.statusCode == 200,
         'message': responseData['message'] ?? 'Profile updated successfully',
@@ -87,6 +67,11 @@ class UserService {
       );
 
       final response = await request.send();
+      if (response.statusCode == 200) {
+        await ApiService.instance.invalidateByPrefix(
+          'GET:${ApiClient.baseUrl}/users',
+        );
+      }
       return response.statusCode == 200;
     } catch (e) {
       print('Error updating avatar: $e');
@@ -102,16 +87,8 @@ class UserService {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
 
-      final response = await http.put(
-        Uri.parse('${ApiClient.baseUrl}/users/privacy'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(data),
-      );
-
-      final responseData = jsonDecode(response.body);
+      final response = await ApiClient.put('/users/privacy', data);
+      final responseData = _safeObject(response.body);
       return {
         'success': response.statusCode == 200,
         'message': responseData['message'] ?? 'Privacy settings updated',
@@ -129,16 +106,8 @@ class UserService {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
 
-      final response = await http.put(
-        Uri.parse('${ApiClient.baseUrl}/users/advanced-privacy'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(data),
-      );
-
-      final responseData = jsonDecode(response.body);
+      final response = await ApiClient.put('/users/advanced-privacy', data);
+      final responseData = _safeObject(response.body);
       return {
         'success': response.statusCode == 200,
         'message': responseData['message'] ?? 'Advanced settings updated',
@@ -152,13 +121,10 @@ class UserService {
   /// Get a public user profile by id (no auth required).
   static Future<Map<String, dynamic>?> getUserById(String userId) async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiClient.baseUrl}/users/$userId'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await ApiClient.get('/users/$userId', auth: false);
 
       if (response.statusCode == 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final body = _safeObject(response.body);
         return (body['user'] ?? body) as Map<String, dynamic>;
       }
       return null;
@@ -177,19 +143,10 @@ class UserService {
       final token = await AuthService.getAccessToken();
       if (token == null) return false;
 
-      final uri = Uri.parse(
-        '${ApiClient.baseUrl}/touristes/$touristeId/centres-interet',
+      final response = await ApiClient.patch(
+        '/touristes/$touristeId/centres-interet',
+        {'centres_interet': interests},
       );
-      final response = await http
-          .patch(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode({'centres_interet': interests}),
-          )
-          .timeout(const Duration(seconds: 15));
       return response.statusCode == 200;
     } catch (e) {
       print('Error updating interests: $e');
@@ -203,23 +160,15 @@ class UserService {
       final token = await AuthService.getAccessToken();
       if (token == null) return [];
 
-      final response = await http.get(
-        Uri.parse('${ApiClient.baseUrl}/users/me/favorites'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await ApiClient.get('/users/me/favorites');
 
       if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
+        final body = _safeObject(response.body);
         if (body is List) {
-          return List<Map<String, dynamic>>.from(body);
+          return _safeListOfMap(body);
         }
         final list = body['favorites'] ?? body;
-        if (list is List) {
-          return List<Map<String, dynamic>>.from(list);
-        }
+        return _safeListOfMap(list);
       }
       return [];
     } catch (e) {
@@ -262,7 +211,7 @@ class UserService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': 'Account deleted successfully'};
       }
-      final data = jsonDecode(response.body);
+      final data = _safeObject(response.body);
       return {
         'success': false,
         'message': data['message'] ?? 'Failed to delete account',

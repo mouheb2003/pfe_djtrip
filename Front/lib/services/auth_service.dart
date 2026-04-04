@@ -3,8 +3,8 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/services.dart';
 import 'api_client.dart';
+import 'api_service.dart';
 import '../config/oauth_config.dart';
 
 class AuthService {
@@ -26,6 +26,11 @@ class AuthService {
 
   // ── In-memory cache ──────────────────────────────────────────
   static Map<String, dynamic>? _cachedUser;
+
+  // ✅ ADDED
+  static Map<String, dynamic> _safeObject(String body) {
+    return ApiService.safeDecodeObject(body);
+  }
 
   // ── Token accessors ──────────────────────────────────────────
   static Future<String?> getAccessToken() => _storage.read(key: _keyAccess);
@@ -50,7 +55,13 @@ class AuthService {
   static Future<Map<String, dynamic>?> getUser() async {
     if (_cachedUser != null) return _cachedUser;
     final raw = await _storage.read(key: _keyUser);
-    if (raw != null) _cachedUser = jsonDecode(raw);
+    if (raw != null) {
+      try {
+        _cachedUser = jsonDecode(raw) as Map<String, dynamic>;
+      } catch (_) {
+        _cachedUser = null;
+      }
+    }
     return _cachedUser;
   }
 
@@ -200,11 +211,21 @@ class AuthService {
 
   /// Sends `/forgot-password` with the user's email.
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
-    final res = await ApiClient.post('/users/forgot-password', {
-      'email': email,
-    }, auth: false);
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+    try {
+      final res = await ApiClient.post('/users/forgot-password', {
+        'email': email,
+      }, auth: false);
+      final body = _safeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to send reset code',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to send reset code right now.',
+      };
+    }
   }
 
   /// Tries to refresh the access token. Returns true on success.
@@ -216,7 +237,7 @@ class AuthService {
         'refreshToken': refreshToken,
       }, auth: false);
       if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
+        final body = _safeObject(res.body);
         await _storage.write(key: _keyAccess, value: body['accessToken']);
         return true;
       }
@@ -228,18 +249,35 @@ class AuthService {
 
   /// Verify email with 6-digit code (requires valid access token).
   static Future<Map<String, dynamic>> verifyEmail(String code) async {
-    final res = await ApiClient.post('/auth/verify-email', {'code': code});
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+    try {
+      final res = await ApiClient.post('/auth/verify-email', {'code': code});
+      final body = _safeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to verify email',
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to verify email right now.'};
+    }
   }
 
   /// Resend the email verification code to [email].
   static Future<Map<String, dynamic>> resendVerification(String email) async {
-    final res = await ApiClient.post('/auth/resend-verification', {
-      'email': email,
-    }, auth: false);
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+    try {
+      final res = await ApiClient.post('/auth/resend-verification', {
+        'email': email,
+      }, auth: false);
+      final body = _safeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to resend verification code',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to resend verification code right now.',
+      };
+    }
   }
 
   /// Resets password via forgot-password code (no auth required).
@@ -248,13 +286,23 @@ class AuthService {
     required String code,
     required String newPassword,
   }) async {
-    final res = await ApiClient.post('/users/reset-password', {
-      'email': email,
-      'code': code,
-      'newPassword': newPassword,
-    }, auth: false);
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+    try {
+      final res = await ApiClient.post('/users/reset-password', {
+        'email': email,
+        'code': code,
+        'newPassword': newPassword,
+      }, auth: false);
+      final body = _safeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to reset password',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to reset password right now.',
+      };
+    }
   }
 
   /// Changes the current user's password.
@@ -262,12 +310,22 @@ class AuthService {
     required String currentPassword,
     required String newPassword,
   }) async {
-    final res = await ApiClient.put('/users/me/password', {
-      'currentPassword': currentPassword,
-      'newPassword': newPassword,
-    });
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return {'success': res.statusCode == 200, 'message': body['message'] ?? ''};
+    try {
+      final res = await ApiClient.put('/users/me/password', {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+      final body = _safeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to change password',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to change password right now.',
+      };
+    }
   }
 
   /// Logs out the user: calls the API, clears local storage.

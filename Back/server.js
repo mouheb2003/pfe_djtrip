@@ -7,6 +7,15 @@ const helmet = require("helmet");
 const cors = require("cors");
 const mongoSanitize = require("express-mongo-sanitize");
 const mongoose = require("mongoose");
+const cacheService = require("./services/cache");
+const requestLogger = require("./middleware/requestLogger");
+const requestTimeout = require("./middleware/requestTimeout");
+const sanitizeInput = require("./middleware/sanitizeInput");
+const responseNormalizer = require("./middleware/responseNormalizer");
+const {
+  notFoundHandler,
+  globalErrorHandler,
+} = require("./middleware/errorHandler");
 
 const db = require("./config/db");
 db();
@@ -34,6 +43,7 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   : [];
 
 const app = express();
+app.disable("x-powered-by");
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -46,7 +56,11 @@ const io = new Server(server, {
 app.set("io", io);
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(responseNormalizer);
+app.use(requestLogger);
+app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS || 15000)));
 
 // ─── Security Headers ─────────────────────────────────────────────────────────
 app.use(helmet());
@@ -91,6 +105,7 @@ app.use((req, res, next) => {
   if (req.query) mongoSanitize.sanitize(req.query);
   next();
 });
+app.use(sanitizeInput);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 const { authLimiter, apiLimiter } = require("./middleware/rateLimit");
@@ -128,25 +143,33 @@ app.use((req, res, next) => {
 // ─── Health Check Endpoint ─────────────────────────────────────────────────────
 app.get("/api/health", async (req, res) => {
   try {
-    // Check MongoDB connection
-    const mongoStatus =
-      mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+    const mongoStateMap = {
+      0: "disconnected",
+      1: "connected",
+      2: "connecting",
+      3: "disconnecting",
+    };
+    const dbState = mongoose.connection.readyState;
+    const mongoStatus = mongoStateMap[dbState] || "unknown";
+    const cacheStatus = cacheService.getStatus();
 
     res.status(200).json({
-      success: true,
       status: "healthy",
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
+      uptime: Number(process.uptime().toFixed(2)),
+      memory: process.memoryUsage(),
       services: {
         database: mongoStatus,
+        cache: cacheStatus.mode,
       },
+      cache: cacheStatus,
       version: "1.0.0",
     });
   } catch (error) {
     res.status(503).json({
-      success: false,
       status: "unhealthy",
       timestamp: new Date().toISOString(),
+      message: "Health check failed",
       error: error.message,
     });
   }
@@ -432,23 +455,23 @@ io.on("connection", (socket) => {
 });
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
-});
+app.use(notFoundHandler);
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 // Must be defined AFTER all routes and middleware
-app.use((err, req, res, next) => {
-  console.error("❌ Unhandled error:", err);
-  const status = err.status || err.statusCode || 500;
-  res.status(status).json({
-    success: false,
-    message: err.message || "Internal server error",
-    ...(NODE_ENV === "development" && { stack: err.stack }),
-  });
+app.use(globalErrorHandler);
+
+process.on("unhandledRejection", (reason) => {
+  console.error("❌ Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("❌ Uncaught Exception:", error);
 });
 
 const PORT = process.env.PORT || 3000;
+server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS || 20000);
+server.requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT_MS || 15000);
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} [${NODE_ENV}]`);
 });

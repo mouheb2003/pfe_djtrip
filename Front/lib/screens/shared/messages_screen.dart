@@ -29,6 +29,17 @@ class _MessagesScreenState extends State<MessagesScreen>
   io.Socket? _socket;
   Timer? _presenceReloadTimer;
 
+  // ✅ ADDED
+  void _disposeSocket() {
+    _socket?.off('user_status');
+    _socket?.off('new_message');
+    _socket?.off('connect');
+    _socket?.off('disconnect');
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -40,8 +51,7 @@ class _MessagesScreenState extends State<MessagesScreen>
   @override
   void dispose() {
     _presenceReloadTimer?.cancel();
-    _socket?.disconnect();
-    _socket?.dispose();
+    _disposeSocket();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -51,13 +61,13 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (state == AppLifecycleState.resumed) {
       if (_socket == null) _initSocket();
     } else {
-      _socket?.disconnect();
-      _socket?.dispose();
-      _socket = null;
+      _disposeSocket();
     }
   }
 
   Future<void> _initSocket() async {
+    _disposeSocket();
+
     final token = await AuthService.getAccessToken();
     if (token == null || token.isEmpty) return;
 
@@ -70,10 +80,22 @@ class _MessagesScreenState extends State<MessagesScreen>
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
+          .enableReconnection()
+          .setReconnectionAttempts(20)
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(8000)
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
     );
+
+    socket.off('user_status');
+    socket.off('new_message');
+    socket.off('connect');
+    socket.off('disconnect');
+
+    socket.on('connect', (_) {});
+    socket.on('disconnect', (_) {});
 
     socket.on('user_status', (data) {
       if (!mounted || data is! Map) return;

@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const inscriptionController = require("../controllers/inscription");
+const wrapRouter = require("../middleware/wrapRouter");
+const { cacheGet, invalidateCache } = require("../middleware/cache");
 const {
   verifyToken,
   verifyTouriste,
@@ -16,6 +18,7 @@ router.post(
   "/",
   verifyToken,
   verifyTouriste,
+  invalidateCache(["inscriptions", "activites"]),
   inscriptionController.createInscription,
 );
 
@@ -24,6 +27,7 @@ router.get(
   "/mes-inscriptions",
   verifyToken,
   verifyTouriste,
+  cacheGet("inscriptions:touriste", 60),
   inscriptionController.getInscriptionsByTouriste,
 );
 
@@ -32,6 +36,7 @@ router.put(
   "/:inscriptionId/annuler",
   verifyToken,
   verifyTouriste,
+  invalidateCache(["inscriptions", "activites"]),
   inscriptionController.annulerInscription,
 );
 
@@ -44,6 +49,7 @@ router.get(
   "/organisateur/en-attente",
   verifyToken,
   verifyOrganisator,
+  cacheGet("inscriptions:en-attente", 60),
   inscriptionController.getInscriptionsEnAttente,
 );
 
@@ -52,6 +58,7 @@ router.get(
   "/organisateur/mes-demandes",
   verifyToken,
   verifyOrganisator,
+  cacheGet("inscriptions:organisateur", 60),
   inscriptionController.getInscriptionsByOrganisateur,
 );
 
@@ -60,6 +67,7 @@ router.put(
   "/:inscriptionId/approuver",
   verifyToken,
   verifyOrganisator,
+  invalidateCache(["inscriptions", "activites"]),
   inscriptionController.approuverInscription,
 );
 
@@ -68,6 +76,7 @@ router.put(
   "/:inscriptionId/refuser",
   verifyToken,
   verifyOrganisator,
+  invalidateCache(["inscriptions", "activites"]),
   inscriptionController.refuserInscription,
 );
 
@@ -79,6 +88,7 @@ router.put(
 router.get(
   "/:inscriptionId",
   verifyToken,
+  cacheGet("inscriptions:by-id", 60),
   inscriptionController.getInscriptionById,
 );
 
@@ -87,6 +97,7 @@ router.get(
   "/stats/organizer",
   verifyToken,
   verifyOrganisator,
+  cacheGet("inscriptions:stats:organizer", 60),
   inscriptionController.getOrganizerStats,
 );
 
@@ -95,7 +106,8 @@ router.get(
   "/stats/tourist",
   verifyToken,
   verifyTouriste,
+  cacheGet("inscriptions:stats:tourist", 60),
   inscriptionController.getTouristStats,
 );
 
-module.exports = router;
+module.exports = wrapRouter(router);

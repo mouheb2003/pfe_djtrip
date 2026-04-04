@@ -71,6 +71,11 @@ dependencies:
   # Real-time messaging
   socket_io_client: ^2.0.3+1
 
+  # Connectivity and caching
+  connectivity_plus: ^6.0.5
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
   # Share (activity link, profile)
   share_plus: ^10.0.0
 
@@ -93,6 +98,28 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logos/logo2.png
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/logos/logo2.png
+  web:
+    generate: true
+    image_path: assets/logos/logo2.png
+    background_color: "#FFFFFF"
+    theme_color: "#1976D2"
+  windows:
+    generate: true
+    image_path: assets/logos/logo2.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/logos/logo2.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

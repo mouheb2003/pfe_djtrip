@@ -46,25 +46,35 @@ exports.verifyToken = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "Authentication token is required",
+      });
     }
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ message: "Token expired" });
+      return res.status(401).json({
+        success: false,
+        message: "Authentication token expired",
+      });
     }
-    return res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid authentication token",
+    });
   }
 };
 
 // Middleware to verify Organisator userType
 exports.verifyOrganisator = (req, res, next) => {
   if (req.user.userType !== "Organisator") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. Organisator access required." });
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Organisator access required.",
+    });
   }
   next();
 };
@@ -72,9 +82,10 @@ exports.verifyOrganisator = (req, res, next) => {
 // Middleware to verify Touriste userType
 exports.verifyTouriste = (req, res, next) => {
   if (req.user.userType !== "Touriste") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. Touriste access required." });
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Touriste access required.",
+    });
   }
   next();
 };
@@ -82,9 +93,10 @@ exports.verifyTouriste = (req, res, next) => {
 // Middleware to verify Admin userType
 exports.verifyAdmin = (req, res, next) => {
   if (req.user.userType !== "Admin") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. Admin access required." });
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Admin access required.",
+    });
   }
   next();
 };
@@ -95,7 +107,10 @@ exports.refreshToken = async (req, res) => {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token required" });
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token required",
+      });
     }
 
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
@@ -103,11 +118,15 @@ exports.refreshToken = async (req, res) => {
     // Check tokenVersion against the database to catch revoked tokens (e.g. after logout)
     const user = await User.findById(decoded.userId).select("tokenVersion");
     if (!user) {
-      return res.status(401).json({ message: "User not found" });
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
       return res.status(401).json({
+        success: false,
         message: "Token has been revoked. Please log in again.",
       });
     }
@@ -119,15 +138,20 @@ exports.refreshToken = async (req, res) => {
     );
 
     res.status(200).json({
+      success: true,
       message: "Token refreshed successfully",
       accessToken: newAccessToken,
     });
   } catch (err) {
     if (err.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ message: "Refresh token expired. Please log in again." });
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token expired. Please log in again.",
+      });
     }
-    return res.status(401).json({ message: "Invalid refresh token" });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid refresh token",
+    });
   }
 };

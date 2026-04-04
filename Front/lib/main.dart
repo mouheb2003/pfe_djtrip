@@ -1,18 +1,61 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart'; // 👈 IMPORTANT
 import 'config/app_routes.dart';
 import 'services/theme_service.dart';
+import 'services/api_service.dart';
+import 'providers/user_provider.dart';
 import 'theme/app_theme.dart';
+
+// ✅ ADDED
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+// ✅ ADDED
+void _showGlobalError(String message) {
+  final messenger = rootScaffoldMessengerKey.currentState;
+  if (messenger == null) return;
+
+  messenger
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(content: Text(message)));
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ ADDED
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    if (kDebugMode) {
+      debugPrint('FlutterError: ${details.exceptionAsString()}');
+    }
+    _showGlobalError('Something went wrong. Please try again.');
+  };
+
+  // ✅ ADDED
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (kDebugMode) {
+      debugPrint('PlatformDispatcher error: $error');
+      debugPrintStack(stackTrace: stack);
+    }
+    _showGlobalError('Unexpected error occurred.');
+    return true;
+  };
 
   // 👇 Initialisation des locales (corrige ton erreur)
   await initializeDateFormatting();
 
   // 👇 Ton service de thème
   await ThemeService.init();
+
+  // ✅ ADDED
+  await ApiService.instance.initialize();
+  await ApiService.instance.warmUp();
 
   // Ensure debug paint overlays stay off (prevents yellow baseline lines).
   assert(() {
@@ -55,25 +98,33 @@ class _MyAppState extends State<MyApp> {
 
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeService.themeMode,
-      builder: (_, mode, __) => MaterialApp(
-        title: 'DJTrip',
-        debugShowCheckedModeBanner: false,
-        builder: (context, child) {
-          _disableDebugOverlays();
-          return DefaultTextStyle.merge(
-            style: const TextStyle(
-              decoration: TextDecoration.none,
-              decorationColor: Colors.transparent,
-              decorationThickness: 0,
-            ),
-            child: child ?? const SizedBox.shrink(),
-          );
-        },
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: mode,
-        initialRoute: AppRoutes.splash,
-        onGenerateRoute: AppRoutes.onGenerateRoute,
+      builder: (_, mode, child) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<UserProvider>(
+            create: (_) => UserProvider()..loadUser(),
+          ),
+        ],
+        child: MaterialApp(
+          title: 'DJTrip',
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            _disableDebugOverlays();
+            return DefaultTextStyle.merge(
+              style: const TextStyle(
+                decoration: TextDecoration.none,
+                decorationColor: Colors.transparent,
+                decorationThickness: 0,
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: mode,
+          initialRoute: AppRoutes.splash,
+          onGenerateRoute: AppRoutes.onGenerateRoute,
+        ),
       ),
     );
   }

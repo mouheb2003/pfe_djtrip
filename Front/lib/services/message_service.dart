@@ -1,76 +1,84 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'api_client.dart';
 import 'auth_service.dart';
 import 'package:http/http.dart' as http;
 import '../models/conversation_model.dart';
+import 'api_service.dart';
 
 class MessageService {
   static Map<String, dynamic> _safeDecodeObject(String body) {
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      return {};
-    } catch (_) {
-      return {};
-    }
+    return ApiService.safeDecodeObject(body);
   }
 
   /// Get all conversations for the logged-in user.
   static Future<List<ConversationModel>> getConversations() async {
-    final res = await ApiClient.get('/messages/conversations');
-    if (res.statusCode == 200) {
-      final decoded = jsonDecode(res.body);
-      final list = decoded is List
-          ? decoded
-          : decoded is Map<String, dynamic>
-          ? (decoded['conversations'] ?? decoded['data'] ?? const [])
-          : const [];
-
-      if (list is List) {
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map(ConversationModel.fromJson)
-            .toList();
+    try {
+      final res = await ApiClient.get('/messages/conversations');
+      if (res.statusCode == 200) {
+        final asList = ApiService.safeDecodeList(res.body);
+        if (asList.isNotEmpty) {
+          return asList
+              .whereType<Map<String, dynamic>>()
+              .map(ConversationModel.fromJson)
+              .toList();
+        }
+        final decoded = _safeDecodeObject(res.body);
+        final list = decoded['conversations'] ?? decoded['data'] ?? const [];
+        if (list is List) {
+          return list
+              .whereType<Map<String, dynamic>>()
+              .map(ConversationModel.fromJson)
+              .toList();
+        }
+        return const [];
       }
-      return const [];
+
+      final decoded = _safeDecodeObject(res.body);
+      final message =
+          (decoded['message'] as String?) ??
+          'Unable to load conversations (HTTP ${res.statusCode})';
+      throw Exception(message);
+    } catch (e) {
+      throw Exception(e.toString().replaceFirst('Exception: ', ''));
     }
-    final decoded = (() {
-      try {
-        final body = jsonDecode(res.body);
-        return body is Map<String, dynamic> ? body : null;
-      } catch (_) {
-        return null;
-      }
-    })();
-
-    final message =
-        (decoded?['message'] as String?) ??
-        'Unable to load conversations (HTTP ${res.statusCode})';
-    throw Exception(message);
   }
 
   /// Get total unread message count.
   static Future<int> getUnreadCount() async {
-    final res = await ApiClient.get('/messages/unread-count');
-    if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      return (body['count'] as num? ?? 0).toInt();
+    try {
+      final res = await ApiClient.get('/messages/unread-count');
+      if (res.statusCode == 200) {
+        final body = _safeDecodeObject(res.body);
+        return (body['count'] as num? ?? 0).toInt();
+      }
+      return 0;
+    } catch (_) {
+      return 0;
     }
-    return 0;
   }
 
   /// Get messages exchanged with a specific partner.
   static Future<List<Map<String, dynamic>>> getMessages(
     String partnerId,
   ) async {
-    final res = await ApiClient.get('/messages/with/$partnerId');
-    if (res.statusCode == 200) {
-      final list = jsonDecode(res.body) as List;
-      return list.cast<Map<String, dynamic>>();
+    try {
+      final res = await ApiClient.get('/messages/with/$partnerId');
+      if (res.statusCode == 200) {
+        final rawList = ApiService.safeDecodeList(res.body);
+        if (rawList.isNotEmpty) {
+          return rawList.whereType<Map<String, dynamic>>().toList();
+        }
+        final body = _safeDecodeObject(res.body);
+        final list = body['messages'] ?? body['data'] ?? const <dynamic>[];
+        if (list is List) {
+          return list.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
   /// Send message to partner through REST API.
@@ -82,7 +90,7 @@ class MessageService {
       final res = await ApiClient.post('/messages/with/$partnerId', {
         'content': content,
       });
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _safeDecodeObject(res.body);
       if (res.statusCode == 201 || res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
         if (msg != null) return {'success': true, 'message': msg};
@@ -248,7 +256,7 @@ class MessageService {
       final res = await ApiClient.put('/messages/$messageId', {
         'content': content,
       });
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _safeDecodeObject(res.body);
       if (res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
         if (msg != null) return {'success': true, 'message': msg};

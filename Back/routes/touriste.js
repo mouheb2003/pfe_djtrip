@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const touristeController = require("../controllers/touriste");
+const wrapRouter = require("../middleware/wrapRouter");
+const { cacheGet, invalidateCache } = require("../middleware/cache");
 const { verifyToken } = require("../middleware/auth");
 
 // Tourist routes
@@ -10,20 +12,39 @@ const { verifyToken } = require("../middleware/auth");
 router.put(
   "/complete-profile",
   verifyToken,
+  invalidateCache(["touristes", "users"]),
   touristeController.completeProfileTouriste,
 );
 
 // Get all tourists
-router.get("/", touristeController.getAllTouristes);
+router.get(
+  "/",
+  cacheGet("touristes:all", 60),
+  touristeController.getAllTouristes,
+);
 
 // Get a tourist by ID
-router.get("/:id", touristeController.getTouristeById);
+router.get(
+  "/:id",
+  cacheGet("touristes:by-id", 60),
+  touristeController.getTouristeById,
+);
 
 // Update a tourist (protected)
-router.put("/:id", verifyToken, touristeController.updateTouriste);
+router.put(
+  "/:id",
+  verifyToken,
+  invalidateCache(["touristes", "users"]),
+  touristeController.updateTouriste,
+);
 
 // Delete a tourist (protected)
-router.delete("/:id", verifyToken, touristeController.deleteTouriste);
+router.delete(
+  "/:id",
+  verifyToken,
+  invalidateCache(["touristes", "users"]),
+  touristeController.deleteTouriste,
+);
 
 // Tourist-specific attribute routes
 
@@ -31,6 +52,7 @@ router.delete("/:id", verifyToken, touristeController.deleteTouriste);
 router.patch(
   "/:id/centres-interet",
   verifyToken,
+  invalidateCache(["touristes", "users"]),
   touristeController.updateCentresInteret,
 );
 
@@ -38,6 +60,7 @@ router.patch(
 router.put(
   "/:id/centres-interet",
   verifyToken,
+  invalidateCache(["touristes", "users"]),
   touristeController.updateCentresInteret,
 );
 
@@ -45,7 +68,8 @@ router.put(
 router.patch(
   "/:id/langue-preferee",
   verifyToken,
+  invalidateCache(["touristes", "users"]),
   touristeController.updateLanguePreferee,
 );
 
-module.exports = router;
+module.exports = wrapRouter(router);

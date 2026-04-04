@@ -1,15 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const avisController = require("../controllers/avis");
+const wrapRouter = require("../middleware/wrapRouter");
+const { cacheGet, invalidateCache } = require("../middleware/cache");
 const { verifyToken, verifyTouriste } = require("../middleware/auth");
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 // Get all reviews for an activity
-router.get("/activite/:activiteId", avisController.getActivityReviews);
+router.get(
+  "/activite/:activiteId",
+  cacheGet("avis:activite", 60),
+  avisController.getActivityReviews,
+);
 
 // Get all ratings for an organizer
 router.get(
   "/organisateur/:organisateurId",
+  cacheGet("avis:organisateur", 60),
   avisController.getOrganisateurRatings,
 );
 
@@ -19,6 +26,7 @@ router.get(
   "/my-review/activite/:activiteId",
   verifyToken,
   verifyTouriste,
+  cacheGet("avis:my-review", 60),
   avisController.getMyActivityReview,
 );
 
@@ -27,6 +35,7 @@ router.get(
   "/my-rating/organisateur/:organisateurId",
   verifyToken,
   verifyTouriste,
+  cacheGet("avis:my-rating", 60),
   avisController.getMyOrganisateurRating,
 );
 
@@ -35,6 +44,7 @@ router.post(
   "/activite/:activiteId",
   verifyToken,
   verifyTouriste,
+  invalidateCache(["avis", "activites", "organisators"]),
   avisController.submitActivityReview,
 );
 
@@ -43,6 +53,7 @@ router.post(
   "/organisateur/:organisateurId",
   verifyToken,
   verifyTouriste,
+  invalidateCache(["avis", "activites", "organisators"]),
   avisController.submitOrganisateurRating,
 );
 
@@ -51,7 +62,8 @@ router.delete(
   "/:avisId",
   verifyToken,
   verifyTouriste,
+  invalidateCache(["avis", "activites", "organisators"]),
   avisController.deleteAvis,
 );
 
-module.exports = router;
+module.exports = wrapRouter(router);

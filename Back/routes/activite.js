@@ -1,7 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const activiteController = require("../controllers/activite");
-const { verifyToken, verifyOrganisator, verifyAdmin } = require("../middleware/auth");
+const wrapRouter = require("../middleware/wrapRouter");
+const { cacheGet, invalidateCache } = require("../middleware/cache");
+const {
+  verifyToken,
+  verifyOrganisator,
+  verifyAdmin,
+} = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const validate = require("../middleware/validate");
 const {
@@ -12,10 +18,18 @@ const {
 // ─── Public routes ────────────────────────────────────────────────────────────
 
 // Get all activities (optional filters: search, sort, prix_min, prix_max, type_activite, niveau_difficulte, temporalite)
-router.get("/", activiteController.getAllActivites);
+router.get(
+  "/",
+  cacheGet("activites:all", 60),
+  activiteController.getAllActivites,
+);
 
 // Search for activities (legacy endpoint — unified search now via GET / with ?search=)
-router.get("/search", activiteController.searchActivites);
+router.get(
+  "/search",
+  cacheGet("activites:search", 60),
+  activiteController.searchActivites,
+);
 
 // ─── Protected Organizer routes ───────────────────────────────────────────────
 
@@ -24,6 +38,7 @@ router.get(
   "/my-activities",
   verifyToken,
   verifyOrganisator,
+  cacheGet("activites:mine", 60),
   activiteController.getMyActivities,
 );
 
@@ -32,18 +47,44 @@ router.get(
   "/archived",
   verifyToken,
   verifyOrganisator,
+  cacheGet("activites:archived", 60),
   activiteController.getArchivedActivities,
 );
 
 // Admin activity management
-router.get("/admin", verifyToken, verifyAdmin, activiteController.getAdminActivites);
-router.post("/admin", verifyToken, verifyAdmin, activiteController.createAdminActivite);
-router.put("/admin/:id", verifyToken, verifyAdmin, activiteController.updateAdminActivite);
-router.delete("/admin/:id", verifyToken, verifyAdmin, activiteController.deleteAdminActivite);
+router.get(
+  "/admin",
+  verifyToken,
+  verifyAdmin,
+  cacheGet("activites:admin", 60),
+  activiteController.getAdminActivites,
+);
+router.post(
+  "/admin",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["activites"]),
+  activiteController.createAdminActivite,
+);
+router.put(
+  "/admin/:id",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["activites"]),
+  activiteController.updateAdminActivite,
+);
+router.delete(
+  "/admin/:id",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["activites"]),
+  activiteController.deleteAdminActivite,
+);
 
 // Get activities for a specific organizer
 router.get(
   "/organisateur/:organisateurId",
+  cacheGet("activites:organisateur", 60),
   activiteController.getActivitesByOrganisateur,
 );
 
@@ -51,7 +92,11 @@ router.get(
 
 // ⚠️  These MUST come after named routes above to avoid route conflicts
 // Get an activity by ID
-router.get("/:id", activiteController.getActiviteById);
+router.get(
+  "/:id",
+  cacheGet("activites:by-id", 60),
+  activiteController.getActiviteById,
+);
 
 // ─── Protected write routes ───────────────────────────────────────────────────
 
@@ -62,6 +107,7 @@ router.post(
   verifyOrganisator,
   upload.array("photos", 10),
   validate(createActiviteSchema),
+  invalidateCache(["activites"]),
   activiteController.createActivite,
 );
 
@@ -72,6 +118,7 @@ router.put(
   verifyOrganisator,
   upload.array("photos", 10),
   validate(updateActiviteSchema),
+  invalidateCache(["activites"]),
   activiteController.updateActivite,
 );
 
@@ -80,7 +127,8 @@ router.delete(
   "/:id",
   verifyToken,
   verifyOrganisator,
+  invalidateCache(["activites"]),
   activiteController.deleteActivite,
 );
 
-module.exports = router;
+module.exports = wrapRouter(router);

@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'auth_service.dart';
 import '../config/api_config.dart';
+import 'api_service.dart';
 
 /// Standardized API result wrapper
 class ApiResult<T> {
@@ -64,37 +63,10 @@ class PaginatedInfo {
 
 class ApiClient {
   static String get baseUrl => ApiConfig.baseUrl;
+  static final ApiService _api = ApiService.instance;
 
   /// Timeout for every request. Adjust in ApiConfig if needed.
   static const Duration _kTimeout = Duration(seconds: 15);
-
-  /// Returned when back-end doesn't respond in time.
-  static http.Response get _timeoutResponse => http.Response(
-    '{"message":"Connection timed out. Please check your network."}',
-    408,
-  );
-
-  // ──────────────────────────────────────────────────────────────
-  // Internal helpers
-  // ──────────────────────────────────────────────────────────────
-
-  static Future<Map<String, String>> _headers({bool auth = true}) async {
-    final h = <String, String>{'Content-Type': 'application/json'};
-    if (auth) {
-      final token = await AuthService.getAccessToken();
-      if (token != null) h['Authorization'] = 'Bearer $token';
-    }
-    return h;
-  }
-
-  /// Silently try to refresh the access token and repeat [retry].
-  static Future<http.Response> _withRefresh(
-    Future<http.Response> Function() retry,
-  ) async {
-    final refreshed = await AuthService.refreshAccessToken();
-    if (refreshed) return retry();
-    throw Exception('Session expired. Please sign in again.');
-  }
 
   // ──────────────────────────────────────────────────────────────
   // Public HTTP methods
@@ -105,22 +77,7 @@ class ApiClient {
     bool auth = true,
     Map<String, String>? query,
   }) async {
-    var uri = Uri.parse('$baseUrl$path');
-    if (query != null && query.isNotEmpty) {
-      uri = uri.replace(queryParameters: query);
-    }
-    final headers = await _headers(auth: auth);
-    try {
-      final res = await http
-          .get(uri, headers: headers)
-          .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      if (res.statusCode == 401 && auth) {
-        return _withRefresh(() => get(path, auth: auth, query: query));
-      }
-      return res;
-    } catch (e) {
-      return _handleError(e);
-    }
+    return _api.get(path, auth: auth, query: query, timeout: _kTimeout);
   }
 
   static Future<http.Response> post(
@@ -128,19 +85,7 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = await _headers(auth: auth);
-    try {
-      final res = await http
-          .post(uri, headers: headers, body: jsonEncode(body))
-          .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      if (res.statusCode == 401 && auth) {
-        return _withRefresh(() => post(path, body, auth: auth));
-      }
-      return res;
-    } catch (e) {
-      return _handleError(e);
-    }
+    return _api.post(path, body, auth: auth, timeout: _kTimeout);
   }
 
   static Future<http.Response> put(
@@ -148,19 +93,7 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = await _headers(auth: auth);
-    try {
-      final res = await http
-          .put(uri, headers: headers, body: jsonEncode(body))
-          .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      if (res.statusCode == 401 && auth) {
-        return _withRefresh(() => put(path, body, auth: auth));
-      }
-      return res;
-    } catch (e) {
-      return _handleError(e);
-    }
+    return _api.put(path, body, auth: auth, timeout: _kTimeout);
   }
 
   static Future<http.Response> patch(
@@ -168,50 +101,10 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = await _headers(auth: auth);
-    try {
-      final res = await http
-          .patch(uri, headers: headers, body: jsonEncode(body))
-          .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      if (res.statusCode == 401 && auth) {
-        return _withRefresh(() => patch(path, body, auth: auth));
-      }
-      return res;
-    } catch (e) {
-      return _handleError(e);
-    }
+    return _api.patch(path, body, auth: auth, timeout: _kTimeout);
   }
 
   static Future<http.Response> delete(String path, {bool auth = true}) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = await _headers(auth: auth);
-    try {
-      final res = await http
-          .delete(uri, headers: headers)
-          .timeout(_kTimeout, onTimeout: () => _timeoutResponse);
-      if (res.statusCode == 401 && auth) {
-        return _withRefresh(() => delete(path, auth: auth));
-      }
-      return res;
-    } catch (e) {
-      return _handleError(e);
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────────
-  // Response handlers
-  // ──────────────────────────────────────────────────────────────
-
-  static http.Response _handleError(dynamic error) {
-    String message;
-    if (error.toString().contains('SocketException')) {
-      message = 'No internet connection. Please check your network.';
-    } else if (error.toString().contains('TimeoutException')) {
-      message = 'Connection timed out. Please try again.';
-    } else {
-      message = 'An unexpected error occurred.';
-    }
-    return http.Response('{"success": false, "message": "$message"}', 500);
+    return _api.delete(path, auth: auth, timeout: _kTimeout);
   }
 }
