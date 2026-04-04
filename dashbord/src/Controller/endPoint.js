@@ -1,11 +1,18 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 
 export const END_POINT = {
-  lieux: '/lieux',
-  lieuById: (id) => `/lieux/${id}`,
-  uploadLieuImages: '/lieux/upload-images',
+  lieux: '/api/lieux',
+  lieuById: (id) => `/api/lieux/${id}`,
+  uploadLieuImages: '/api/lieux/upload-images',
   urgences: '/api/urgences',
   users: '/api/users',
   userById: (id) => `/api/users/${id}`,
-  toggleUserRole: (id) => `/api/users/${id}/toggle-organisateur`,
+  updateUserStatus: (id) => `/api/users/${id}/status`,
+  toggleUserRole: (id) => `/api/users/${id}/status`,
+  posts: '/api/posts/admin',
+  postById: (id) => `/api/posts/admin/${id}`,
+  activites: '/api/activites/admin',
+  activiteById: (id) => `/api/activites/admin/${id}`,
+  messageConversations: '/api/messages/conversations',
+  messageWith: (partnerId) => `/api/messages/with/${partnerId}`,
 };

@@ -69,8 +69,13 @@ export const navData = [
       },
       {
         title: 'Activités',
-        path: paths.dashboard.two,
+        path: paths.dashboard.activites,
         icon: ICONS.job,
+      },
+      {
+        title: 'Publications',
+        path: paths.dashboard.publications,
+        icon: ICONS.blog,
       },
     ],
   },
@@ -90,6 +95,18 @@ export const navData = [
         path: paths.dashboard.group.root,
         icon: ICONS.mail,
         info: <Label color="error">3</Label>,
+      },
+    ],
+  },
+  /**
+   * MESSAGERIE
+   */
+  {
+    items: [
+      {
+        title: 'Messagerie',
+        path: paths.dashboard.messages,
+        icon: ICONS.chat,
       },
     ],
   },

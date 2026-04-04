@@ -1,9 +1,23 @@
 import axios from 'axios';
 
 import { API_BASE_URL } from './endPoint';
+import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 const apiClient = axios.create({
 	baseURL: API_BASE_URL,
+});
+
+apiClient.interceptors.request.use((config) => {
+	const token = sessionStorage.getItem(JWT_STORAGE_KEY);
+
+	if (token) {
+		config.headers = {
+			...config.headers,
+			Authorization: `Bearer ${token}`,
+		};
+	}
+
+	return config;
 });
 
 export async function Get(endpoint, config = {}) {

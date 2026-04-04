@@ -165,9 +165,16 @@ exports.signIn = async (req, res) => {
 
     // Check account status
     if (user.accountStatus === "suspended") {
-      return res
-        .status(403)
-        .json({ message: "Account is suspended. Please contact support." });
+      if (user.suspendedUntil && user.suspendedUntil <= new Date()) {
+        user.accountStatus = "active";
+        user.suspendedUntil = undefined;
+        await user.save();
+      } else {
+        return res.status(403).json({
+          message: "Account is suspended. Please contact support.",
+          suspendedUntil: user.suspendedUntil || null,
+        });
+      }
     }
 
     if (user.accountStatus === "banned") {
@@ -781,7 +788,7 @@ exports.updateAccountStatusBasedOnActivity = async (userId) => {
 exports.updateAccountStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { accountStatus } = req.body;
+    const { accountStatus, suspendedUntil, suspendDays } = req.body;
 
     // Validate accountStatus
     if (
@@ -793,10 +800,43 @@ exports.updateAccountStatus = async (req, res) => {
       });
     }
 
+    const updatePayload = { accountStatus };
+
+    if (accountStatus === "suspended") {
+      if (typeof suspendDays !== "undefined") {
+        const days = Number.parseInt(suspendDays, 10);
+
+        if (!Number.isInteger(days) || days <= 0) {
+          return res.status(400).json({
+            message: "suspendDays must be a positive integer",
+          });
+        }
+
+        updatePayload.suspendedUntil = new Date(
+          Date.now() + days * 24 * 60 * 60 * 1000,
+        );
+      } else if (suspendedUntil) {
+        const parsedDate = new Date(suspendedUntil);
+
+        if (Number.isNaN(parsedDate.getTime()) || parsedDate <= new Date()) {
+          return res.status(400).json({
+            message: "suspendedUntil must be a valid future date",
+          });
+        }
+
+        updatePayload.suspendedUntil = parsedDate;
+      } else {
+        // No end date means suspension stays active until manual reactivation.
+        updatePayload.suspendedUntil = null;
+      }
+    } else {
+      updatePayload.suspendedUntil = null;
+    }
+
     // Update user account status
     const user = await User.findByIdAndUpdate(
       id,
-      { accountStatus: accountStatus },
+      updatePayload,
       { new: true },
     ).select("-mot_de_passe");
 

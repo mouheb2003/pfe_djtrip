@@ -342,3 +342,168 @@ exports.deleteMyPost = async (req, res) => {
     });
   }
 };
+
+exports.getAdminPosts = async (_req, res) => {
+  try {
+    const posts = await Post.find({ is_active: true })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate(basePopulate)
+      .lean();
+
+    return res.status(200).json({ posts });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error loading admin posts",
+      error: error.message,
+    });
+  }
+};
+
+exports.createAdminPost = async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+    const {
+      content = "",
+      imageUrls = [],
+      postType = "post",
+      audience = "public",
+      locationLabel = "",
+      tripLink = "",
+      hashtags = [],
+    } = req.body || {};
+
+    const trimmedContent = String(content || "").trim();
+    const normalizedImageUrls = Array.isArray(imageUrls)
+      ? imageUrls.map((u) => String(u || "").trim()).filter((u) => u.length > 0)
+      : [];
+
+    if (!trimmedContent && normalizedImageUrls.length === 0) {
+      return res.status(400).json({
+        message: "Content or image is required",
+      });
+    }
+
+    const safeType = postType === "activity" ? "activity" : "post";
+    const safeAudience = audience === "followers" ? "followers" : "public";
+    const safeHashtags = Array.isArray(hashtags)
+      ? hashtags
+          .map((h) => String(h || "").trim())
+          .filter((h) => h.length > 0)
+          .slice(0, 10)
+      : [];
+
+    const post = await Post.create({
+      author_id: adminId,
+      content: trimmedContent,
+      image_url: normalizedImageUrls[0] || "",
+      image_urls: normalizedImageUrls,
+      post_type: safeType,
+      audience: safeAudience,
+      location_label: String(locationLabel || "").trim(),
+      trip_link: String(tripLink || "").trim(),
+      hashtags: safeHashtags,
+    });
+
+    const populated = await Post.findById(post._id)
+      .populate(basePopulate)
+      .lean();
+
+    return res.status(201).json({
+      message: "Post created successfully",
+      post: populated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error creating admin post",
+      error: error.message,
+    });
+  }
+};
+
+exports.updatePostByAdmin = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const post = await Post.findOne({ _id: postId, is_active: true });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const body = req.body || {};
+
+    if (Object.prototype.hasOwnProperty.call(body, "content")) {
+      post.content = String(body.content || "").trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "locationLabel")) {
+      post.location_label = String(body.locationLabel || "").trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "postType")) {
+      post.post_type = body.postType === "activity" ? "activity" : "post";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "audience")) {
+      post.audience = body.audience === "followers" ? "followers" : "public";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "hashtags")) {
+      post.hashtags = Array.isArray(body.hashtags)
+        ? body.hashtags
+            .map((h) => String(h || "").trim())
+            .filter((h) => h.length > 0)
+            .slice(0, 10)
+        : [];
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "imageUrls")) {
+      const normalizedImageUrls = Array.isArray(body.imageUrls)
+        ? body.imageUrls
+            .map((u) => String(u || "").trim())
+            .filter((u) => u.length > 0)
+        : [];
+
+      post.image_urls = normalizedImageUrls;
+      post.image_url = normalizedImageUrls[0] || "";
+    }
+
+    post.updatedAt = new Date();
+    await post.save();
+
+    const populated = await Post.findById(post._id)
+      .populate(basePopulate)
+      .lean();
+
+    return res.status(200).json({
+      message: "Post updated successfully",
+      post: populated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating post as admin",
+      error: error.message,
+    });
+  }
+};
+
+exports.deletePostByAdmin = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    post.is_active = false;
+    await post.save();
+
+    return res.status(200).json({ message: "Post deleted" });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error deleting post as admin",
+      error: error.message,
+    });
+  }
+};

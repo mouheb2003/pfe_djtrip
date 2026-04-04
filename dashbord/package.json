@@ -59,6 +59,7 @@
     "lowlight": "^3.3.0",
     "minimal-shared": "^1.0.3",
     "mui-one-time-password-input": "^5.0.0",
+    "nodemon": "^3.1.14",
     "nprogress": "^0.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

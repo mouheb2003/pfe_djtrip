@@ -128,8 +128,16 @@ export function HomeFeedView({ sx }) {
     const totalUsers = users.length;
     const totalLieux = lieux.length;
     const totalUrgences = urgences.length;
-    const totalOrganisateurs = users.filter((user) => user?.role === 'organisateur').length;
-    const totalAdmins = users.filter((user) => user?.role === 'admin').length;
+    const totalOrganisateurs = users.filter(
+      (user) =>
+        String(user?.role ?? '').toLowerCase() === 'organisateur' ||
+        String(user?.userType ?? '').toLowerCase() === 'organisator'
+    ).length;
+    const totalAdmins = users.filter(
+      (user) =>
+        String(user?.role ?? '').toLowerCase() === 'admin' ||
+        String(user?.userType ?? '').toLowerCase() === 'admin'
+    ).length;
     const demandesEnAttente = users.filter(
       (user) => user?.statut_organisateur === 'en_attente'
     ).length;

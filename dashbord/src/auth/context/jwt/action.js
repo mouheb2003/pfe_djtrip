@@ -11,11 +11,19 @@ import { JWT_STORAGE_KEY } from './constant';
 
 export const signInWithPassword = async ({ email, password }) => {
   try {
-    const params = { email, password };
+    const params = { email, mot_de_passe: password };
 
     const res = await axios.post(endpoints.auth.signIn, params);
 
-    const { accessToken } = res.data;
+    const { accessToken, user } = res.data;
+
+    const normalizedRole = String(user?.role ?? '').toLowerCase();
+    const normalizedUserType = String(user?.userType ?? '').toLowerCase();
+    const isAdmin = normalizedRole === 'admin' || normalizedUserType === 'admin';
+
+    if (!isAdmin) {
+      throw new Error('Acces reserve a l administrateur.');
+    }
 
     if (!accessToken) {
       throw new Error('Access token not found in response');

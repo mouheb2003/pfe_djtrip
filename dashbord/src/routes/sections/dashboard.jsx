@@ -13,6 +13,9 @@ import { AuthGuard } from 'src/auth/guard';
 const HomePage = lazy(() => import('src/pages/dashboard/Home'));
 const IndexPage = lazy(() => import('src/pages/dashboard/Page1'));
 const LieuxDetailsPage = lazy(() => import('src/pages/dashboard/LieuxDetails'));
+const ActivitiesPage = lazy(() => import('src/pages/dashboard/Activities'));
+const PublicationsPage = lazy(() => import('src/pages/dashboard/Publications'));
+const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
 
 // ----------------------------------------------------------------------
@@ -33,6 +36,10 @@ export const dashboardRoutes = [
       { element: <HomePage />, index: true },
       { path: 'lieux', element: <IndexPage /> },
       { path: 'lieux/:id', element: <LieuxDetailsPage /> },
+      { path: 'activites', element: <ActivitiesPage /> },
+      { path: 'two', element: <ActivitiesPage /> },
+      { path: 'publications', element: <PublicationsPage /> },
+      { path: 'messages', element: <MessagesPage /> },
       { path: 'three', element: <UsersPage /> },
       {
         path: 'group',

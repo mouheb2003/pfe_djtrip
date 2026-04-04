@@ -25,7 +25,13 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { getUsers, deleteUser, getUserById, toggleUserRole } from 'src/Controller/actions';
+import {
+  getUsers,
+  deleteUser,
+  getUserById,
+  toggleUserRole,
+  updateUserStatus,
+} from 'src/Controller/actions';
 
 import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
@@ -65,15 +71,39 @@ function statusColor(status) {
   return 'default';
 }
 
+function normalizeAccountStatus(accountStatus) {
+  const normalized = String(accountStatus ?? '').toLowerCase();
+
+  if (normalized === 'active') return 'actif';
+  if (normalized === 'suspended') return 'suspendu';
+  if (normalized === 'inactive') return 'inactif';
+  if (normalized === 'banned') return 'banni';
+
+  return '-';
+}
+
 function normalizeUser(user) {
+  const normalizedUserType = String(user?.userType ?? '').toLowerCase();
+
+  const computedRole =
+    user?.role ??
+    (normalizedUserType === 'admin'
+      ? 'admin'
+      : normalizedUserType === 'organisator'
+        ? 'organisateur'
+        : normalizedUserType === 'touriste'
+          ? 'touriste'
+          : '-');
+
   return {
     id: user?._id ?? user?.id,
     fullname: user?.fullname ?? '-',
     email: user?.email ?? '-',
-    role: user?.role ?? '-',
-    status: user?.status ?? '-',
+    role: computedRole,
+    status: normalizeAccountStatus(user?.accountStatus ?? user?.status),
     statutOrganisateur: user?.statut_organisateur ?? '-',
     dateInscription: user?.date_inscription ?? user?.createdAt ?? null,
+    suspendedUntil: user?.suspendedUntil ?? null,
     numTel: user?.num_tel ?? '-',
     age: user?.age ?? '-',
     bio: user?.bio ?? '-',
@@ -118,7 +148,10 @@ export function UsersView({ sx }) {
   const [users, setUsers] = useState([]);
   const [busyUserId, setBusyUserId] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [suspendTargetUser, setSuspendTargetUser] = useState(null);
+  const [customSuspendDays, setCustomSuspendDays] = useState('');
 
   const filters = useSetState({
     query: '',
@@ -218,6 +251,117 @@ export function UsersView({ sx }) {
     },
     [fetchUsers, selectedUser?.id]
   );
+
+  const closeSuspendDialog = useCallback(() => {
+    setSuspendDialogOpen(false);
+    setSuspendTargetUser(null);
+    setCustomSuspendDays('');
+  }, []);
+
+  const handleOpenSuspendDialog = useCallback(
+    (user) => {
+      if (!user?.id) return;
+
+      if (user.role === 'admin') {
+        toast.error('Le compte admin ne peut pas être suspendu');
+        return;
+      }
+
+      setSuspendDialogOpen(true);
+      setSuspendTargetUser(user);
+      setCustomSuspendDays('');
+    },
+    []
+  );
+
+  const applyStatusUpdate = useCallback(
+    async (user, statusPayload, successMessage) => {
+      try {
+        setBusyUserId(user.id);
+        await updateUserStatus(user.id, statusPayload);
+        toast.success(successMessage);
+        await fetchUsers();
+
+        if (selectedUser?.id === user.id) {
+          const refreshed = await getUserById(user.id);
+          setSelectedUser(normalizeUser(refreshed));
+        }
+      } catch {
+        toast.error('Échec de la mise à jour du statut');
+      } finally {
+        setBusyUserId('');
+      }
+    },
+    [fetchUsers, selectedUser?.id]
+  );
+
+  const handleSuspendPreset = useCallback(
+    async (preset) => {
+      if (!suspendTargetUser?.id) return;
+
+      const baseDate = new Date();
+      let payload = { accountStatus: 'suspended' };
+      let successMessage = 'Utilisateur suspendu';
+
+      if (preset === 'reactivate') {
+        payload = { accountStatus: 'active' };
+        successMessage = 'Utilisateur réactivé avec succès';
+      }
+
+      if (preset === 'until-reactivate') {
+        payload = { accountStatus: 'suspended' };
+        successMessage = 'Utilisateur suspendu jusqu a reactivation';
+      }
+
+      if (preset === '30m') {
+        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 30 * 60 * 1000).toISOString() };
+        successMessage = 'Utilisateur suspendu pour 30 minutes';
+      }
+
+      if (preset === '1h') {
+        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 60 * 60 * 1000).toISOString() };
+        successMessage = 'Utilisateur suspendu pour 1 heure';
+      }
+
+      if (preset === '12h') {
+        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 12 * 60 * 60 * 1000).toISOString() };
+        successMessage = 'Utilisateur suspendu pour 12 heures';
+      }
+
+      if (preset === '1j') {
+        payload = { accountStatus: 'suspended', suspendDays: 1 };
+        successMessage = 'Utilisateur suspendu pour 1 jour';
+      }
+
+      if (preset === '1mois') {
+        const oneMonthLater = new Date(baseDate);
+        oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
+        payload = { accountStatus: 'suspended', suspendedUntil: oneMonthLater.toISOString() };
+        successMessage = 'Utilisateur suspendu pour 1 mois';
+      }
+
+      closeSuspendDialog();
+      await applyStatusUpdate(suspendTargetUser, payload, successMessage);
+    },
+    [applyStatusUpdate, closeSuspendDialog, suspendTargetUser]
+  );
+
+  const handleApplyCustomSuspendDays = useCallback(async () => {
+    if (!suspendTargetUser?.id) return;
+
+    const days = Number.parseInt(customSuspendDays, 10);
+    if (!Number.isInteger(days) || days <= 0) {
+      toast.error('Veuillez saisir un nombre de jours valide');
+      return;
+    }
+
+    closeSuspendDialog();
+    await applyStatusUpdate(
+      suspendTargetUser,
+      { accountStatus: 'suspended', suspendDays: days },
+      `Utilisateur suspendu pour ${days} jour(s)`
+    );
+  }, [applyStatusUpdate, closeSuspendDialog, customSuspendDays, suspendTargetUser]);
 
   const dataFiltered = useMemo(
     () =>
@@ -464,6 +608,28 @@ export function UsersView({ sx }) {
                               </IconButton>
                             </Tooltip>
 
+                            <Tooltip
+                              title={
+                                user.status === 'suspendu'
+                                  ? 'Réactiver le compte'
+                                  : 'Suspendre le compte'
+                              }
+                            >
+                              <IconButton
+                                color={user.status === 'suspendu' ? 'success' : 'inherit'}
+                                onClick={() => handleOpenSuspendDialog(user)}
+                                disabled={busyUserId === user.id || user.role === 'admin'}
+                              >
+                                <Iconify
+                                  icon={
+                                    user.status === 'suspendu'
+                                      ? 'solar:shield-check-bold'
+                                      : 'solar:forbidden-circle-bold'
+                                  }
+                                />
+                              </IconButton>
+                            </Tooltip>
+
                             <Tooltip title="Supprimer">
                               <IconButton
                                 color="error"
@@ -524,6 +690,12 @@ export function UsersView({ sx }) {
                 <strong>Statut compte:</strong> {selectedUser?.status ?? '-'}
               </Typography>
               <Typography variant="body2">
+                <strong>Suspendu jusqu au:</strong>{' '}
+                {selectedUser?.suspendedUntil
+                  ? new Date(selectedUser.suspendedUntil).toLocaleString('fr-FR')
+                  : '-'}
+              </Typography>
+              <Typography variant="body2">
                 <strong>Statut organisateur:</strong> {selectedUser?.statutOrganisateur ?? '-'}
               </Typography>
               <Typography variant="body2">
@@ -542,6 +714,13 @@ export function UsersView({ sx }) {
               Fermer
             </Button>
             <Button
+              color="inherit"
+              onClick={() => handleOpenSuspendDialog(selectedUser)}
+              disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
+            >
+              Suspension
+            </Button>
+            <Button
               color="warning"
               onClick={() => handleToggleRole(selectedUser)}
               disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
@@ -554,6 +733,57 @@ export function UsersView({ sx }) {
               disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
             >
               Supprimer
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={suspendDialogOpen}
+          onClose={closeSuspendDialog}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>Suspension utilisateur</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1.25}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Utilisateur: <strong>{suspendTargetUser?.fullname ?? '-'}</strong>
+              </Typography>
+
+              {suspendTargetUser?.status === 'suspendu' ? (
+                <Button variant="contained" color="success" onClick={() => handleSuspendPreset('reactivate')}>
+                  Réactiver maintenant
+                </Button>
+              ) : null}
+
+              <Button variant="outlined" onClick={() => handleSuspendPreset('30m')}>30m</Button>
+              <Button variant="outlined" onClick={() => handleSuspendPreset('1h')}>1h</Button>
+              <Button variant="outlined" onClick={() => handleSuspendPreset('12h')}>12h</Button>
+              <Button variant="outlined" onClick={() => handleSuspendPreset('1j')}>1j</Button>
+              <Button variant="outlined" onClick={() => handleSuspendPreset('1mois')}>1mois</Button>
+              <Button variant="outlined" color="warning" onClick={() => handleSuspendPreset('until-reactivate')}>
+                Jusqu a reactive
+              </Button>
+
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Nombre de jours"
+                  value={customSuspendDays}
+                  onChange={(event) => setCustomSuspendDays(event.target.value)}
+                  inputProps={{ min: 1 }}
+                  fullWidth
+                />
+                <Button variant="contained" onClick={handleApplyCustomSuspendDays}>
+                  OK
+                </Button>
+              </Stack>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeSuspendDialog} color="inherit">
+              Fermer
             </Button>
           </DialogActions>
         </Dialog>

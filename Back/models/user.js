@@ -53,6 +53,7 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "suspended", "banned", "inactive"],
       default: "active",
     },
+    suspendedUntil: Date,
     derniere_connexion: Date,
     notifications_email: { type: Boolean, default: true },
     notifications_sms: { type: Boolean, default: false },

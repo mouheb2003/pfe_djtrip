@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const postController = require("../controllers/post");
-const { verifyToken, verifyTouriste } = require("../middleware/auth");
+const { verifyToken, verifyTouriste, verifyAdmin } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
 // Public feed
@@ -31,5 +31,11 @@ router.delete(
   verifyTouriste,
   postController.deleteMyPost,
 );
+
+// Admin publication management
+router.get("/admin", verifyToken, verifyAdmin, postController.getAdminPosts);
+router.post("/admin", verifyToken, verifyAdmin, postController.createAdminPost);
+router.put("/admin/:postId", verifyToken, verifyAdmin, postController.updatePostByAdmin);
+router.delete("/admin/:postId", verifyToken, verifyAdmin, postController.deletePostByAdmin);
 
 module.exports = router;

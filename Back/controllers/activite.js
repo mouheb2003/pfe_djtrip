@@ -481,6 +481,170 @@ exports.deleteActivite = async (req, res) => {
   }
 };
 
+exports.getAdminActivites = async (_req, res) => {
+  try {
+    const activites = await Activite.find({})
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate("organisateur_id", "fullname email avatar")
+      .lean();
+
+    return res.status(200).json({ activites });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error retrieving activities for admin",
+      error: error.message,
+    });
+  }
+};
+
+exports.createAdminActivite = async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const activite = await Activite.create({
+      titre: String(body.titre || "").trim(),
+      description: String(body.description || "").trim(),
+      type_activite: body.type_activite || "Other",
+      categorie: String(body.categorie || "Other").trim(),
+      organisateur_id: body.organisateur_id,
+      lieu: String(body.lieu || "").trim(),
+      coordonnees: {
+        latitude: body?.coordonnees?.latitude,
+        longitude: body?.coordonnees?.longitude,
+      },
+      duree: Number(body.duree),
+      prix: Number(body.prix),
+      capacite_max: Number(body.capacite_max),
+      langues_disponibles: Array.isArray(body.langues_disponibles)
+        ? body.langues_disponibles
+        : ["English"],
+      photos: Array.isArray(body.photos) ? body.photos : [],
+      niveau_difficulte: body.niveau_difficulte || "Easy",
+      equipements_inclus: Array.isArray(body.equipements_inclus)
+        ? body.equipements_inclus
+        : [],
+      a_apporter: Array.isArray(body.a_apporter) ? body.a_apporter : [],
+      dates_disponibles: Array.isArray(body.dates_disponibles)
+        ? body.dates_disponibles
+        : [],
+      date_debut: body.date_debut,
+      date_fin: body.date_fin,
+      statut: body.statut || "active",
+    });
+
+    const populated = await Activite.findById(activite._id).populate(
+      "organisateur_id",
+      "fullname email avatar",
+    );
+
+    return res.status(201).json({
+      message: "Activity created successfully",
+      activite: populated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error creating activity as admin",
+      error: error.message,
+    });
+  }
+};
+
+exports.updateAdminActivite = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const updateData = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, "titre"))
+      updateData.titre = String(body.titre || "").trim();
+    if (Object.prototype.hasOwnProperty.call(body, "description"))
+      updateData.description = String(body.description || "").trim();
+    if (Object.prototype.hasOwnProperty.call(body, "type_activite"))
+      updateData.type_activite = body.type_activite;
+    if (Object.prototype.hasOwnProperty.call(body, "categorie"))
+      updateData.categorie = String(body.categorie || "").trim();
+    if (Object.prototype.hasOwnProperty.call(body, "organisateur_id"))
+      updateData.organisateur_id = body.organisateur_id;
+    if (Object.prototype.hasOwnProperty.call(body, "lieu"))
+      updateData.lieu = String(body.lieu || "").trim();
+    if (Object.prototype.hasOwnProperty.call(body, "coordonnees"))
+      updateData.coordonnees = body.coordonnees;
+    if (Object.prototype.hasOwnProperty.call(body, "duree"))
+      updateData.duree = Number(body.duree);
+    if (Object.prototype.hasOwnProperty.call(body, "prix"))
+      updateData.prix = Number(body.prix);
+    if (Object.prototype.hasOwnProperty.call(body, "capacite_max"))
+      updateData.capacite_max = Number(body.capacite_max);
+    if (Object.prototype.hasOwnProperty.call(body, "langues_disponibles"))
+      updateData.langues_disponibles = Array.isArray(body.langues_disponibles)
+        ? body.langues_disponibles
+        : [];
+    if (Object.prototype.hasOwnProperty.call(body, "photos"))
+      updateData.photos = Array.isArray(body.photos) ? body.photos : [];
+    if (Object.prototype.hasOwnProperty.call(body, "niveau_difficulte"))
+      updateData.niveau_difficulte = body.niveau_difficulte;
+    if (Object.prototype.hasOwnProperty.call(body, "equipements_inclus"))
+      updateData.equipements_inclus = Array.isArray(body.equipements_inclus)
+        ? body.equipements_inclus
+        : [];
+    if (Object.prototype.hasOwnProperty.call(body, "a_apporter"))
+      updateData.a_apporter = Array.isArray(body.a_apporter)
+        ? body.a_apporter
+        : [];
+    if (Object.prototype.hasOwnProperty.call(body, "dates_disponibles"))
+      updateData.dates_disponibles = Array.isArray(body.dates_disponibles)
+        ? body.dates_disponibles
+        : [];
+    if (Object.prototype.hasOwnProperty.call(body, "date_debut"))
+      updateData.date_debut = body.date_debut;
+    if (Object.prototype.hasOwnProperty.call(body, "date_fin"))
+      updateData.date_fin = body.date_fin;
+    if (Object.prototype.hasOwnProperty.call(body, "statut"))
+      updateData.statut = body.statut;
+
+    const activite = await Activite.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("organisateur_id", "fullname email avatar");
+
+    if (!activite) {
+      return res.status(404).json({ message: "Activity not found" });
+    }
+
+    return res.status(200).json({
+      message: "Activity updated successfully",
+      activite,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating activity as admin",
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteAdminActivite = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const activite = await Activite.findByIdAndDelete(id);
+    if (!activite) {
+      return res.status(404).json({ message: "Activity not found" });
+    }
+
+    return res.status(200).json({
+      message: "Activity deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error deleting activity as admin",
+      error: error.message,
+    });
+  }
+};
+
 // Search for activities (text search)
 exports.searchActivites = async (req, res) => {
   try {

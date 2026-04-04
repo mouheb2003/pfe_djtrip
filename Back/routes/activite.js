@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const activiteController = require("../controllers/activite");
-const { verifyToken, verifyOrganisator } = require("../middleware/auth");
+const { verifyToken, verifyOrganisator, verifyAdmin } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const validate = require("../middleware/validate");
 const {
@@ -35,17 +35,23 @@ router.get(
   activiteController.getArchivedActivities,
 );
 
-// ─── Parameterized public routes ──────────────────────────────────────────────
-
-// ⚠️  These MUST come after named routes above to avoid route conflicts
-// Get an activity by ID
-router.get("/:id", activiteController.getActiviteById);
+// Admin activity management
+router.get("/admin", verifyToken, verifyAdmin, activiteController.getAdminActivites);
+router.post("/admin", verifyToken, verifyAdmin, activiteController.createAdminActivite);
+router.put("/admin/:id", verifyToken, verifyAdmin, activiteController.updateAdminActivite);
+router.delete("/admin/:id", verifyToken, verifyAdmin, activiteController.deleteAdminActivite);
 
 // Get activities for a specific organizer
 router.get(
   "/organisateur/:organisateurId",
   activiteController.getActivitesByOrganisateur,
 );
+
+// ─── Parameterized public routes ──────────────────────────────────────────────
+
+// ⚠️  These MUST come after named routes above to avoid route conflicts
+// Get an activity by ID
+router.get("/:id", activiteController.getActiviteById);
 
 // ─── Protected write routes ───────────────────────────────────────────────────
 
