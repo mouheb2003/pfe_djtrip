@@ -4,6 +4,7 @@ import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
+import 'bookings_screen.dart';
 
 class MyActivitiesScreen extends StatefulWidget {
   const MyActivitiesScreen({super.key});
@@ -111,7 +112,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ActivityDetailScreen(activity: activity.toJson()),
+        builder: (_) => ActivityDetailScreen(activityId: activity.id, viewOnly: true),
       ),
     );
   }
