@@ -2,20 +2,20 @@ const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
 
-// Auto-expire pending requests for activities already ended.
-// Business rule: if organizer did not respond before activity end date,
+// Auto-expire pending requests for activities whose start date has passed.
+// Business rule: if organizer did not respond before activity start date,
 // request is automatically cancelled for the tourist.
 async function expirePendingInscriptionsForEndedActivities() {
   const now = new Date();
-  const endedActivityIds = await Activite.find({
-    date_fin: { $lt: now },
+  const startedActivityIds = await Activite.find({
+    date_debut: { $lt: now },
   }).distinct("_id");
 
-  if (!endedActivityIds.length) return 0;
+  if (!startedActivityIds.length) return 0;
 
   const result = await Inscription.updateMany(
     {
-      activite_id: { $in: endedActivityIds },
+      activite_id: { $in: startedActivityIds },
       statut: "en_attente",
     },
     {
@@ -23,7 +23,7 @@ async function expirePendingInscriptionsForEndedActivities() {
         statut: "annulee",
         date_reponse: now,
         message_organisateur:
-          "Automatically cancelled because the activity has ended without organizer response.",
+          "Automatically cancelled because the activity start date has passed without organizer response.",
       },
     },
   );
