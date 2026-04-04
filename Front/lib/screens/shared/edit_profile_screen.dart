@@ -1055,8 +1055,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               onChanged: (v) {
                                 setState(() {
                                   _country = v!;
-                                  _formatPhoneNumber();
-                                  _validatePhone();
+                                  // Clear phone field when country changes to reformat for new country
+                                  _phoneCtrl.clear();
+                                  _isPhoneValid = false;
                                 });
                               },
                             ),

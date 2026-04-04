@@ -98,6 +98,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     return 'Just now';
   }
 
+  bool get _isOrganizer {
+    return _user?.isOrganisator ?? false;
+  }
+
   Future<void> _openCreatePostDialog() async {
     final created = await Navigator.push<bool>(
       context,
@@ -872,11 +876,37 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       bottom: -16,
                       left: 0,
                       right: 0,
-                      child: Center(
-                        child: SizedBox(
-                          width: 74,
-                          height: 32,
-                        ),
+                      child: Column(
+                        children: [
+                          // Empty box for spacing
+                          const SizedBox(width: 74, height: 12),
+                          // Badge with user type
+                          if (user != null)
+                            Container(
+                              width: 74,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8EDFF),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _isOrganizer ? 'ORGANIZER' : 'TOURIST',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Positioned(

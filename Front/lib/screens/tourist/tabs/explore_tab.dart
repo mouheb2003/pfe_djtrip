@@ -518,7 +518,10 @@ class _ExploreTabState extends State<ExploreTab> {
                 hintText: hint,
                 border: InputBorder.none,
                 isDense: true,
-                hintStyle: const TextStyle(color: Color(0xFF8A93A8), fontSize: 12),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF8A93A8),
+                  fontSize: 12,
+                ),
               ),
             ),
           ),

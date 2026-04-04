@@ -91,49 +91,54 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            if (widget.showBackButton)
-              SliverAppBar(
-                backgroundColor: const Color(0xFFF3F2FA),
-                elevation: 0,
-                pinned: true,
-                automaticallyImplyLeading: true,
-                iconTheme: const IconThemeData(color: AppColors.primary),
-                centerTitle: false,
-                title: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    color: Color(0xFF1F235F),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                  ),
+            SliverAppBar(
+              backgroundColor: const Color(0xFFF3F2FA),
+              elevation: 0,
+              pinned: true,
+              automaticallyImplyLeading: widget.showBackButton,
+              iconTheme: const IconThemeData(color: AppColors.primary),
+              centerTitle: false,
+              title: Text(
+                widget.title,
+                style: const TextStyle(
+                  color: Color(0xFF1F235F),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
                 ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.search, color: Color(0xFF6D739B)),
-                    onPressed: () {},
-                  ),
-                ],
-              )
-            else
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Text(
-                      'Network',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: titleSize * 1.4,
-                        height: 1,
+              ),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        'DISCOVER',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                          color: AppColors.primary,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Network',
+                        style: TextStyle(
+                          fontSize: titleSize,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF1F235F),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              expandedHeight: 120,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
             // Posts Feed
             if (_loading)
               const SliverFillRemaining(
