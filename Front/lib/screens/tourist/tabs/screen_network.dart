@@ -12,7 +12,7 @@ class ScreenNetwork extends StatefulWidget {
   const ScreenNetwork({
     super.key,
     this.showBackButton = false,
-    this.title = 'Network',
+    this.title = 'DISCOVER Network',
     this.showOnlyMyPosts = false,
   });
 

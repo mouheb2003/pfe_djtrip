@@ -17,8 +17,8 @@ const {
   globalErrorHandler,
 } = require("./middleware/errorHandler");
 
-const db = require("./config/db");
-db();
+const connectDB = require("./config/db");
+connectDB();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");

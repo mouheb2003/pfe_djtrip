@@ -29,8 +29,6 @@ const connectWithRetry = () => {
     });
 };
 
-connectWithRetry();
-
 mongoose.connection.on("disconnected", () => {
   console.warn("⚠️ MongoDB disconnected. Attempting to reconnect...");
   if (retryCount < MAX_RETRIES) {
@@ -38,4 +36,5 @@ mongoose.connection.on("disconnected", () => {
   }
 });
 
-module.exports = mongoose;
+// ✅ EXPORT LA FONCTION (IMPORTANT)
+module.exports = connectWithRetry;

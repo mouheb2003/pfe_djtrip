@@ -20,7 +20,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _phoneCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _interests = <String>[];
-  String _country = 'FR'; // 🚀 FIX: Default country key instead of name
+  String _country = 'FR'; // 🚀 Country code for phone number
+  String _originCountry = 'FR'; // 🚀 FIX: Separate country of origin (completely independent)
   String _language = 'English'; // 🚀 FIX: Default language (not French)
   String? _avatarUrl;
   bool _isSaving = false;
@@ -131,13 +132,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _userType =
             user['userType'] ?? ''; // 🚀 NEW: Charger le type d'utilisateur
 
-        // 🚀 FIX: Handle country with proper field names
+        // 🚀 FIX: Handle phone country separately from origin country
         final phoneCountryRaw =
-            (user['pays_telephone'] ?? user['pays_origine'] ?? '').toString();
+            (user['pays_telephone'] ?? '').toString();
         if (phoneCountryRaw.trim().isNotEmpty) {
           final countryKey = _normalizeCountryKey(phoneCountryRaw);
           if (_countries.contains(countryKey)) {
             _country = countryKey;
+          }
+        }
+
+        // 🚀 FIX: Handle origin country separately (completely independent)
+        final originCountryRaw =
+            (user['pays_origine'] ?? '').toString();
+        if (originCountryRaw.trim().isNotEmpty) {
+          final countryKey = _normalizeCountryKey(originCountryRaw);
+          if (_countries.contains(countryKey)) {
+            _originCountry = countryKey;
           }
         }
 
@@ -208,9 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final result = await UserService.updateProfile({
           'num_tel': fullPhoneNumber,
           'numTel': fullPhoneNumber,
-          'pays_telephone': _getCountryName(
-            _country,
-          ), // 🚀 NEW: Save country name, not key
+          'pays_telephone': _getCountryName(_country), // 🚀 FIX: Save only phone country
         });
 
         if (result['success'] == true) {
@@ -276,10 +285,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'num_tel': fullPhoneNumber,
       'numTel': fullPhoneNumber,
       'centres_interet': _interests,
-      'pays_telephone': _getCountryName(_country),
-      'pays_origine': _getCountryName(
-        _country,
-      ), // 🚀 FIX: Save country name, not key
+      'pays_telephone': _getCountryName(_country), // 🚀 FIX: Phone country
+      'pays_origine': _getCountryName(_originCountry), // 🚀 FIX: Origin country - SEPARATE
       'langue_preferee': _language, // 🚀 FIX: Correct field name
     };
     final result = await UserService.updateProfile(data);
@@ -476,32 +483,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // Minimum digits based on country
-    int minDigits = 8;
-    switch (_country) {
-      case 'FR':
-        minDigits = 9;
-        break;
-      case 'TN':
-        minDigits = 8;
-        break;
-      case 'DZ':
-        minDigits = 9;
-        break;
-      case 'LY':
-        minDigits = 8;
-        break;
-      case 'MA':
-        minDigits = 9;
-        break;
-      default:
-        minDigits = 8;
-    }
+    // 🚀 NEW: Get min digits for this country
+    int minDigits = _getMinDigits(_country);
 
-    final isValid = digits.length >= minDigits;
+    // 🚀 FIX: Phone is valid only if:
+    // - digits count is EXACTLY maxDigits (perfect) 
+    // OR - digits count is within [minDigits, maxDigits] range
+    // BUT prefer exact maxDigits for the green checkmark
+    final isValid = digits.length >= minDigits && digits.length <= maxDigits;
+    
     if (isValid != _isPhoneValid) {
       setState(() => _isPhoneValid = isValid);
     }
+  }
+
+  // 🚀 NEW: Get minimum digits for each country
+  int _getMinDigits(String countryKey) {
+    const minDigits = {
+      'FR': 9,
+      'TN': 8,
+      'DZ': 9,
+      'LY': 8,
+      'MA': 9,
+      'IT': 10,
+      'DE': 11,
+      'GB': 10,
+      'ES': 9,
+      'BE': 9,
+      'CH': 9,
+      'CA': 10,
+      'EG': 10,
+      'RU': 11,
+      'SA': 9,
+      'AE': 9,
+    };
+    return minDigits[countryKey] ?? 8;
   }
 
   Future<void> _pickAndUploadAvatar() async {
@@ -1202,7 +1218,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _country,
+                  value: _originCountry, // 🚀 FIX: Use _originCountry, NOT _country
                   isExpanded: true,
                   icon: const Icon(
                     Icons.keyboard_arrow_down,
@@ -1211,7 +1227,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   items: _countries
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (v) => setState(() => _country = v!),
+                  onChanged: (v) => setState(() => _originCountry = v!), // 🚀 FIX: Update _originCountry only
                 ),
               ),
             ),
