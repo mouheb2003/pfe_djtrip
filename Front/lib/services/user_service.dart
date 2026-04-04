@@ -14,16 +14,21 @@ class UserService {
       }
 
       print('🌐 Fetching user profile...');
-      final response = await http.get(
-        Uri.parse('${ApiClient.baseUrl}/users/me'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 30), onTimeout: () {
-        print('⏱️ Profile request timed out after 30 seconds');
-        throw Exception('Request timeout');
-      });
+      final response = await http
+          .get(
+            Uri.parse('${ApiClient.baseUrl}/users/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              print('⏱️ Profile request timed out after 30 seconds');
+              throw Exception('Request timeout');
+            },
+          );
 
       print('📥 Response status: ${response.statusCode}');
       if (response.statusCode == 200) {
@@ -39,7 +44,9 @@ class UserService {
     }
   }
 
-  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updateProfile(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
@@ -61,10 +68,7 @@ class UserService {
       };
     } catch (e) {
       print('Error updating profile: $e');
-      return {
-        'success': false,
-        'message': 'Error updating profile',
-      };
+      return {'success': false, 'message': 'Error updating profile'};
     }
   }
 
@@ -74,8 +78,8 @@ class UserService {
       if (token == null) throw Exception('Not authenticated');
 
       final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${ApiClient.baseUrl}/users/avatar'),
+        'PUT',
+        Uri.parse('${ApiClient.baseUrl}/users/me/avatar'),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.files.add(
@@ -91,7 +95,9 @@ class UserService {
   }
 
   // 🚀 NEW: Privacy settings methods
-  static Future<Map<String, dynamic>> updatePrivacySettings(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updatePrivacySettings(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
@@ -112,14 +118,13 @@ class UserService {
       };
     } catch (e) {
       print('Error updating privacy settings: $e');
-      return {
-        'success': false,
-        'message': 'Error updating privacy settings',
-      };
+      return {'success': false, 'message': 'Error updating privacy settings'};
     }
   }
 
-  static Future<Map<String, dynamic>> updateAdvancedSettings(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updateAdvancedSettings(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final token = await AuthService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
@@ -140,10 +145,7 @@ class UserService {
       };
     } catch (e) {
       print('Error updating advanced settings: $e');
-      return {
-        'success': false,
-        'message': 'Error updating advanced settings',
-      };
+      return {'success': false, 'message': 'Error updating advanced settings'};
     }
   }
 
@@ -152,9 +154,7 @@ class UserService {
     try {
       final response = await http.get(
         Uri.parse('${ApiClient.baseUrl}/users/$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
@@ -176,7 +176,7 @@ class UserService {
     try {
       final token = await AuthService.getAccessToken();
       if (token == null) return false;
-      
+
       final uri = Uri.parse(
         '${ApiClient.baseUrl}/touristes/$touristeId/centres-interet',
       );
@@ -202,7 +202,7 @@ class UserService {
     try {
       final token = await AuthService.getAccessToken();
       if (token == null) return [];
-      
+
       final response = await http.get(
         Uri.parse('${ApiClient.baseUrl}/users/me/favorites'),
         headers: {
@@ -231,7 +231,10 @@ class UserService {
   /// Add an activity to favourites. Returns updated list or null on fail.
   static Future<bool> addFavorite(String activityId) async {
     try {
-      final response = await ApiClient.post('/users/me/favorites/$activityId', {});
+      final response = await ApiClient.post(
+        '/users/me/favorites/$activityId',
+        {},
+      );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('Error adding favorite: $e');
@@ -242,7 +245,9 @@ class UserService {
   /// Remove an activity from favourites.
   static Future<bool> removeFavorite(String activityId) async {
     try {
-      final response = await ApiClient.delete('/users/me/favorites/$activityId');
+      final response = await ApiClient.delete(
+        '/users/me/favorites/$activityId',
+      );
       return response.statusCode == 200;
     } catch (e) {
       print('Error removing favorite: $e');
@@ -258,7 +263,10 @@ class UserService {
         return {'success': true, 'message': 'Account deleted successfully'};
       }
       final data = jsonDecode(response.body);
-      return {'success': false, 'message': data['message'] ?? 'Failed to delete account'};
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to delete account',
+      };
     } catch (e) {
       print('Error deleting account: $e');
       return {'success': false, 'message': 'Error deleting account: $e'};

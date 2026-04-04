@@ -873,28 +873,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       left: 0,
                       right: 0,
                       child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(minWidth: 74),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.16),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Text(
-                            'TOURIST',
-                            maxLines: 1,
-                            softWrap: false,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 9,
-                              letterSpacing: 0.3,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
-                            ),
-                          ),
+                        child: SizedBox(
+                          width: 74,
+                          height: 32,
                         ),
                       ),
                     ),

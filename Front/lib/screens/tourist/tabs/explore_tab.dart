@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -32,6 +33,7 @@ class _ExploreTabState extends State<ExploreTab> {
   String _activeFilter = 'All';
   LieuModel? _selectedLieu;
   LatLng? _customPickedLocation;
+  LatLng? _currentUserLocation;
   bool _showItineraryPanel = false;
 
   // Filtres disponibles
@@ -63,6 +65,41 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Future<void> _checkPermissions() async {
     await Permission.location.request();
+    await _refreshCurrentPosition();
+  }
+
+  String _formatCoords(LatLng point) {
+    return '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}';
+  }
+
+  Future<void> _refreshCurrentPosition({bool centerMap = false}) async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    final point = LatLng(pos.latitude, pos.longitude);
+
+    if (!mounted) return;
+    setState(() {
+      _currentUserLocation = point;
+      _originCtrl.text = _formatCoords(point);
+    });
+
+    if (centerMap) {
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(point, 15));
+    }
   }
 
   Future<void> _loadLieux() async {
@@ -119,7 +156,7 @@ class _ExploreTabState extends State<ExploreTab> {
     setState(() {
       _customPickedLocation = position;
       _selectedLieu = null;
-      _destinationCtrl.text = "Position sélectionnée";
+      _destinationCtrl.text = _formatCoords(position);
       _showItineraryPanel =
           true; // On affiche directement le panneau au clic long
     });
@@ -127,22 +164,23 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   void _selectLieu(LieuModel lieu) {
+    final point = LatLng(lieu.latitude!, lieu.longitude!);
     setState(() {
       _selectedLieu = lieu;
       _customPickedLocation = null;
-      _destinationCtrl.text = lieu.titre;
+      _destinationCtrl.text = _formatCoords(point);
       // On n'affiche pas le panneau tout de suite, on laisse l'utilisateur cliquer sur le bouton bleu
     });
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(LatLng(lieu.latitude!, lieu.longitude!)),
-    );
+    _mapController?.animateCamera(CameraUpdate.newLatLng(point));
   }
 
   Future<void> _recenterToDjerba() async {
+    if (_currentUserLocation == null) {
+      await _refreshCurrentPosition(centerMap: true);
+      return;
+    }
     _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        const CameraPosition(target: _djerbaCenter, zoom: 12),
-      ),
+      CameraUpdate.newLatLngZoom(_currentUserLocation!, 15),
     );
   }
 
@@ -327,7 +365,7 @@ class _ExploreTabState extends State<ExploreTab> {
           if (!_showItineraryPanel)
             Positioned(
               right: 18,
-              bottom: 110,
+              bottom: 72,
               child: FloatingActionButton(
                 onPressed: _recenterToDjerba,
                 mini: true,
@@ -469,18 +507,18 @@ class _ExploreTabState extends State<ExploreTab> {
           Expanded(
             child: TextField(
               controller: ctrl,
-              enabled: false,
-              readOnly: true,
+              enabled: true,
+              readOnly: false,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF8A93A8),
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF2D3B5F),
               ),
               decoration: InputDecoration(
                 hintText: hint,
                 border: InputBorder.none,
                 isDense: true,
-                hintStyle: const TextStyle(color: Color(0xFF8A93A8)),
+                hintStyle: const TextStyle(color: Color(0xFF8A93A8), fontSize: 12),
               ),
             ),
           ),

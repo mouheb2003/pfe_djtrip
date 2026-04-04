@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/post_service.dart';
+import '../../../widgets/auto_image_carousel.dart';
 
 class ScreenNetwork extends StatefulWidget {
   final bool showBackButton;
@@ -81,7 +82,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final titleSize = w >= 420 ? 52.0 : 46.0;
+    final titleSize = w >= 420 ? 36.0 : 30.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F2FA),
@@ -114,20 +115,25 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
                 ],
               )
             else
-              SliverToBoxAdapter(
+              SliverFillRemaining(
+                hasScrollBody: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
-                  child: Text(
-                    'Network',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: titleSize,
-                      height: 1,
+                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Text(
+                      'Network',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: titleSize * 1.4,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
             // Posts Feed
             if (_loading)
               const SliverFillRemaining(
@@ -355,19 +361,10 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
           const SizedBox(height: 6),
           // Image
           if (imageUrl.isNotEmpty)
-            SizedBox(
+            AutoImageCarousel(
               height: imageHeight,
-              width: double.infinity,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Center(child: Icon(Icons.image_not_supported)),
-                  );
-                },
-              ),
+              imageUrls: imageUrls,
+              showIndicators: imageUrls.length > 1,
             ),
           // Interaction Bar: Likes, Comments, Shares
           Padding(
