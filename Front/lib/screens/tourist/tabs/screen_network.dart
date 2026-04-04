@@ -12,7 +12,7 @@ class ScreenNetwork extends StatefulWidget {
   const ScreenNetwork({
     super.key,
     this.showBackButton = false,
-    this.title = 'DISCOVER Network',
+    this.title = 'Network',
     this.showOnlyMyPosts = false,
   });
 
@@ -113,16 +113,6 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Text(
-                        'DISCOVER',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.6,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       Text(
                         'Network',
                         style: TextStyle(

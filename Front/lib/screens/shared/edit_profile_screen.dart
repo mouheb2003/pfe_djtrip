@@ -21,7 +21,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioCtrl = TextEditingController();
   final _interests = <String>[];
   String _country = 'FR'; // 🚀 Country code for phone number
-  String _originCountry = 'FR'; // 🚀 FIX: Separate country of origin (completely independent)
+  String _originCountry =
+      'FR'; // 🚀 FIX: Separate country of origin (completely independent)
   String _language = 'English'; // 🚀 FIX: Default language (not French)
   String? _avatarUrl;
   bool _isSaving = false;
@@ -133,8 +134,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             user['userType'] ?? ''; // 🚀 NEW: Charger le type d'utilisateur
 
         // 🚀 FIX: Handle phone country separately from origin country
-        final phoneCountryRaw =
-            (user['pays_telephone'] ?? '').toString();
+        final phoneCountryRaw = (user['pays_telephone'] ?? '').toString();
         if (phoneCountryRaw.trim().isNotEmpty) {
           final countryKey = _normalizeCountryKey(phoneCountryRaw);
           if (_countries.contains(countryKey)) {
@@ -143,8 +143,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
 
         // 🚀 FIX: Handle origin country separately (completely independent)
-        final originCountryRaw =
-            (user['pays_origine'] ?? '').toString();
+        final originCountryRaw = (user['pays_origine'] ?? '').toString();
         if (originCountryRaw.trim().isNotEmpty) {
           final countryKey = _normalizeCountryKey(originCountryRaw);
           if (_countries.contains(countryKey)) {
@@ -219,7 +218,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final result = await UserService.updateProfile({
           'num_tel': fullPhoneNumber,
           'numTel': fullPhoneNumber,
-          'pays_telephone': _getCountryName(_country), // 🚀 FIX: Save only phone country
+          'pays_telephone': _getCountryName(
+            _country,
+          ), // 🚀 FIX: Save only phone country
         });
 
         if (result['success'] == true) {
@@ -286,7 +287,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'numTel': fullPhoneNumber,
       'centres_interet': _interests,
       'pays_telephone': _getCountryName(_country), // 🚀 FIX: Phone country
-      'pays_origine': _getCountryName(_originCountry), // 🚀 FIX: Origin country - SEPARATE
+      'pays_origine': _getCountryName(
+        _originCountry,
+      ), // 🚀 FIX: Origin country - SEPARATE
       'langue_preferee': _language, // 🚀 FIX: Correct field name
     };
     final result = await UserService.updateProfile(data);
@@ -487,11 +490,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     int minDigits = _getMinDigits(_country);
 
     // 🚀 FIX: Phone is valid only if:
-    // - digits count is EXACTLY maxDigits (perfect) 
+    // - digits count is EXACTLY maxDigits (perfect)
     // OR - digits count is within [minDigits, maxDigits] range
     // BUT prefer exact maxDigits for the green checkmark
     final isValid = digits.length >= minDigits && digits.length <= maxDigits;
-    
+
     if (isValid != _isPhoneValid) {
       setState(() => _isPhoneValid = isValid);
     }
@@ -1218,7 +1221,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _originCountry, // 🚀 FIX: Use _originCountry, NOT _country
+                  value:
+                      _originCountry, // 🚀 FIX: Use _originCountry, NOT _country
                   isExpanded: true,
                   icon: const Icon(
                     Icons.keyboard_arrow_down,
@@ -1227,7 +1231,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   items: _countries
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (v) => setState(() => _originCountry = v!), // 🚀 FIX: Update _originCountry only
+                  onChanged: (v) => setState(
+                    () => _originCountry = v!,
+                  ), // 🚀 FIX: Update _originCountry only
                 ),
               ),
             ),
