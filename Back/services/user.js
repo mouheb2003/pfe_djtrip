@@ -87,346 +87,434 @@ class UserService {
 
     // 🚀 NEW: Auto-normalize data before saving
     const normalizedData = { ...updateData };
-    
+
     // Auto-normalize language preference
     if (normalizedData.langue_preferee) {
-      normalizedData.langue_preferee = this._normalizeLanguage(normalizedData.langue_preferee);
+      normalizedData.langue_preferee = this._normalizeLanguage(
+        normalizedData.langue_preferee,
+      );
     }
-    
+
     // Auto-normalize country
     if (normalizedData.pays_origine) {
-      normalizedData.pays_origine = this._normalizeCountry(normalizedData.pays_origine);
+      normalizedData.pays_origine = this._normalizeCountry(
+        normalizedData.pays_origine,
+      );
     }
-    
+
     // 🚀 NEW: Validate and format phone number
     if (normalizedData.num_tel) {
-      const phoneValidation = this._validateAndFormatPhone(
-        normalizedData.num_tel, 
-        normalizedData.pays_telephone || normalizedData.pays_origine || 'France'
+      normalizedData.num_tel = this._normalizePhoneInput(
+        normalizedData.num_tel,
+        normalizedData.pays_telephone ||
+          normalizedData.pays_origine ||
+          "France",
       );
-      
+
+      const phoneValidation = this._validateAndFormatPhone(
+        normalizedData.num_tel,
+        normalizedData.pays_telephone ||
+          normalizedData.pays_origine ||
+          "France",
+      );
+
       if (!phoneValidation.valid) {
         throw new Error(phoneValidation.error);
       }
-      
+
       normalizedData.num_tel = phoneValidation.phone;
       normalizedData.pays_telephone = phoneValidation.country;
-      console.log(`📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`);
+      console.log(
+        `📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`,
+      );
     }
-    
+
     // Auto-validate interests array
-    if (normalizedData.centres_interet && Array.isArray(normalizedData.centres_interet)) {
-      normalizedData.centres_interet = normalizedData.centres_interet
-        .filter(interest => interest && interest.trim().length > 0)
-        .map(interest => interest.trim())
+    if (typeof normalizedData.centres_interet !== "undefined") {
+      normalizedData.centres_interet = this._coerceStringArray(
+        normalizedData.centres_interet,
+      )
+        .filter((interest) => interest && interest.trim().length > 0)
+        .map((interest) => interest.trim())
         .filter((interest, index, arr) => arr.indexOf(interest) === index); // Remove duplicates
     }
 
     // 🚀 NEW: Auto-validate specialties array
-    if (normalizedData.specialites_activites && Array.isArray(normalizedData.specialites_activites)) {
-      normalizedData.specialites_activites = normalizedData.specialites_activites
-        .filter(specialty => specialty && specialty.trim().length > 0)
-        .map(specialty => specialty.trim())
+    if (typeof normalizedData.specialites_activites !== "undefined") {
+      normalizedData.specialites_activites = this._coerceStringArray(
+        normalizedData.specialites_activites,
+      )
+        .filter((specialty) => specialty && specialty.trim().length > 0)
+        .map((specialty) => specialty.trim())
         .filter((specialty, index, arr) => arr.indexOf(specialty) === index); // Remove duplicates
-      console.log(`🎯 Specialties validated: ${normalizedData.specialites_activites.length} items`);
+      console.log(
+        `🎯 Specialties validated: ${normalizedData.specialites_activites.length} items`,
+      );
     }
 
     // Remove restricted fields from update data
     const sanitizedData = { ...normalizedData };
     restrictedFields.forEach((field) => delete sanitizedData[field]);
 
-    // Find and update user
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $set: sanitizedData },
-      { new: true, runValidators: true },
-    ).select("-mot_de_passe");
+    // Find and update the actual document instance so discriminator validation stays intact
+    const user = await User.findById(userId);
 
     if (!user) {
       throw new Error("User not found");
     }
 
+    Object.assign(user, sanitizedData);
+    await user.save();
+
+    const savedUser = await User.findById(userId).select("-mot_de_passe");
+
+    if (!savedUser) {
+      throw new Error("User not found");
+    }
+
     console.log("✅ User profile updated:", userId);
-    return user;
+    return savedUser;
   }
 
   // 🚀 NEW: Helper methods for normalization
   static _normalizeLanguage(raw) {
     const v = raw.trim().toLowerCase();
-    if (v === 'français' || v === 'francais' || v === 'french' || v === 'fr') {
-      return 'French';
+    if (v === "français" || v === "francais" || v === "french" || v === "fr") {
+      return "French";
     }
-    if (v === 'english' || v === 'en' || v === 'anglais') return 'English';
-    if (v === 'arabic' || v === 'ar' || v === 'العربية') return 'العربية';
-    if (v === 'german' || v === 'deutsch' || v === 'de' || v === 'allemand') {
-      return 'Deutsch';
+    if (v === "english" || v === "en" || v === "anglais") return "English";
+    if (v === "arabic" || v === "ar" || v === "العربية") return "العربية";
+    if (v === "german" || v === "deutsch" || v === "de" || v === "allemand") {
+      return "Deutsch";
     }
     return raw;
   }
 
   static _normalizeCountry(raw) {
     const v = raw.trim().toLowerCase();
-    if (v === 'tunisia' || v === 'tunisie') return 'Tunisie';
-    if (v === 'morocco' || v === 'maroc') return 'Maroc';
-    if (v === 'germany' || v === 'allemagne') return 'Allemagne';
-    if (v === 'united kingdom' || v === 'uk' || v === 'royaume-uni') {
-      return 'Royaume-Uni';
+    if (v === "tunisia" || v === "tunisie") return "Tunisie";
+    if (v === "morocco" || v === "maroc") return "Maroc";
+    if (v === "germany" || v === "allemagne") return "Allemagne";
+    if (v === "united kingdom" || v === "uk" || v === "royaume-uni") {
+      return "Royaume-Uni";
     }
-    if (v === 'france') return 'France';
+    if (v === "france") return "France";
     return raw;
   }
 
   // 🚀 NEW: Phone number validation and formatting by country - Top 15 countries visiting Tunisia
   static _validateAndFormatPhone(phone, country) {
     if (!phone || !phone.trim()) {
-      return { valid: false, error: 'Phone number is required' };
+      return { valid: false, error: "Phone number is required" };
     }
 
-    const cleanPhone = phone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-    
+    const cleanPhone = phone.replace(/\s+/g, "").replace(/[^\d+]/g, "");
+
     const countryPhoneFormats = {
-      'France': {
-        code: '+33',
+      France: {
+        code: "+33",
         pattern: /^(\+33|0)[1-9](\d{2}){4}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('33')) {
-            return '+33' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("33")) {
+            return "+33" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+33' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+33" + digits.substring(1);
           }
-          return '+33' + digits;
-        }
+          return "+33" + digits;
+        },
       },
-      'Tunisie': {
-        code: '+216',
+      Tunisie: {
+        code: "+216",
         pattern: /^(\+216|0)[2-9]\d{7}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('216')) {
-            return '+216' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("216")) {
+            return "+216" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+216' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+216" + digits.substring(1);
           }
-          return '+216' + digits;
-        }
+          return "+216" + digits;
+        },
       },
-      'Algérie': {
-        code: '+213',
+      Algérie: {
+        code: "+213",
         pattern: /^(\+213|0)[5-9]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('213')) {
-            return '+213' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("213")) {
+            return "+213" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+213' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+213" + digits.substring(1);
           }
-          return '+213' + digits;
-        }
+          return "+213" + digits;
+        },
       },
-      'Libye': {
-        code: '+218',
+      Libye: {
+        code: "+218",
         pattern: /^(\+218|0)[2-9]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('218')) {
-            return '+218' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("218")) {
+            return "+218" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+218' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+218" + digits.substring(1);
           }
-          return '+218' + digits;
-        }
+          return "+218" + digits;
+        },
       },
-      'Maroc': {
-        code: '+212',
+      Maroc: {
+        code: "+212",
         pattern: /^(\+212|0)[5-9]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('212')) {
-            return '+212' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("212")) {
+            return "+212" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+212' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+212" + digits.substring(1);
           }
-          return '+212' + digits;
-        }
+          return "+212" + digits;
+        },
       },
-      'Italie': {
-        code: '+39',
+      Italie: {
+        code: "+39",
         pattern: /^(\+39|0)[3]\d{8,9}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('39')) {
-            return '+39' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("39")) {
+            return "+39" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+39' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+39" + digits.substring(1);
           }
-          return '+39' + digits;
-        }
+          return "+39" + digits;
+        },
       },
-      'Allemagne': {
-        code: '+49',
+      Allemagne: {
+        code: "+49",
         pattern: /^(\+49|0)[1-9]\d{1,14}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('49')) {
-            return '+49' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("49")) {
+            return "+49" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+49' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+49" + digits.substring(1);
           }
-          return '+49' + digits;
-        }
+          return "+49" + digits;
+        },
       },
-      'Royaume-Uni': {
-        code: '+44',
+      "Royaume-Uni": {
+        code: "+44",
         pattern: /^(\+44|0)[1-9]\d{9,10}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('44')) {
-            return '+44' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("44")) {
+            return "+44" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+44' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+44" + digits.substring(1);
           }
-          return '+44' + digits;
-        }
+          return "+44" + digits;
+        },
       },
-      'Espagne': {
-        code: '+34',
+      Espagne: {
+        code: "+34",
         pattern: /^(\+34|0)[6-9]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('34')) {
-            return '+34' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("34")) {
+            return "+34" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+34' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+34" + digits.substring(1);
           }
-          return '+34' + digits;
-        }
+          return "+34" + digits;
+        },
       },
-      'Belgique': {
-        code: '+32',
+      Belgique: {
+        code: "+32",
         pattern: /^(\+32|0)[4-9]\d{7,8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('32')) {
-            return '+32' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("32")) {
+            return "+32" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+32' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+32" + digits.substring(1);
           }
-          return '+32' + digits;
-        }
+          return "+32" + digits;
+        },
       },
-      'Suisse': {
-        code: '+41',
+      Suisse: {
+        code: "+41",
         pattern: /^(\+41|0)[7-9]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('41')) {
-            return '+41' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("41")) {
+            return "+41" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+41' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+41" + digits.substring(1);
           }
-          return '+41' + digits;
-        }
+          return "+41" + digits;
+        },
       },
-      'Canada': {
-        code: '+1',
+      Canada: {
+        code: "+1",
         pattern: /^(\+1)[2-9]\d{2}[2-9]\d{6}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('1')) {
-            return '+1' + digits.substring(1);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("1")) {
+            return "+1" + digits.substring(1);
           }
-          return '+1' + digits;
-        }
+          return "+1" + digits;
+        },
       },
-      'Égypte': {
-        code: '+20',
+      Égypte: {
+        code: "+20",
         pattern: /^(\+20|0)[1-9]\d{8,9}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('20')) {
-            return '+20' + digits.substring(2);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("20")) {
+            return "+20" + digits.substring(2);
           }
-          if (digits.startsWith('0')) {
-            return '+20' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+20" + digits.substring(1);
           }
-          return '+20' + digits;
-        }
+          return "+20" + digits;
+        },
       },
-      'Russie': {
-        code: '+7',
+      Russie: {
+        code: "+7",
         pattern: /^(\+7|8)[9]\d{9}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('7')) {
-            return '+7' + digits.substring(1);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("7")) {
+            return "+7" + digits.substring(1);
           }
-          if (digits.startsWith('8')) {
-            return '+7' + digits.substring(1);
+          if (digits.startsWith("8")) {
+            return "+7" + digits.substring(1);
           }
-          return '+7' + digits;
-        }
+          return "+7" + digits;
+        },
       },
-      'Arabie Saoudite': {
-        code: '+966',
+      "Arabie Saoudite": {
+        code: "+966",
         pattern: /^(\+966|0)[5]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('966')) {
-            return '+966' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("966")) {
+            return "+966" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+966' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+966" + digits.substring(1);
           }
-          return '+966' + digits;
-        }
+          return "+966" + digits;
+        },
       },
-      'Émirats Arabes Unis': {
-        code: '+971',
+      "Émirats Arabes Unis": {
+        code: "+971",
         pattern: /^(\+971|0)[5]\d{8}$/,
         format: (phone) => {
-          const digits = phone.replace(/\D/g, '');
-          if (digits.startsWith('971')) {
-            return '+971' + digits.substring(3);
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("971")) {
+            return "+971" + digits.substring(3);
           }
-          if (digits.startsWith('0')) {
-            return '+971' + digits.substring(1);
+          if (digits.startsWith("0")) {
+            return "+971" + digits.substring(1);
           }
-          return '+971' + digits;
-        }
-      }
+          return "+971" + digits;
+        },
+      },
     };
 
     const format = countryPhoneFormats[country];
     if (!format) {
-      return { valid: false, error: 'Unsupported country' };
+      return { valid: false, error: "Unsupported country" };
     }
 
     if (!format.pattern.test(cleanPhone)) {
-      return { 
-        valid: false, 
-        error: `Invalid ${country} phone number format. Expected format: ${format.code} followed by valid number` 
+      return {
+        valid: false,
+        error: `Invalid ${country} phone number format. Expected format: ${format.code} followed by valid number`,
       };
     }
 
     const formattedPhone = format.format(cleanPhone);
-    return { 
-      valid: true, 
+    return {
+      valid: true,
       phone: formattedPhone,
       country: country,
-      code: format.code
+      code: format.code,
     };
+  }
+
+  static _normalizePhoneInput(phone, country) {
+    const cleaned = String(phone || "")
+      .replace(/\s+/g, "")
+      .replace(/[^\d+]/g, "");
+
+    const countryCodes = {
+      France: "+33",
+      Tunisie: "+216",
+      Algérie: "+213",
+      Libye: "+218",
+      Maroc: "+212",
+      Italie: "+39",
+      Allemagne: "+49",
+      "Royaume-Uni": "+44",
+      Espagne: "+34",
+      Belgique: "+32",
+      Suisse: "+41",
+      Canada: "+1",
+      Égypte: "+20",
+      Russie: "+7",
+      "Arabie Saoudite": "+966",
+      "Émirats Arabes Unis": "+971",
+    };
+
+    const code = countryCodes[country];
+    if (code && cleaned.startsWith(code) && cleaned[code.length] === "0") {
+      return `${code}${cleaned.slice(code.length + 1)}`;
+    }
+
+    return cleaned;
+  }
+
+  static _coerceStringArray(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item));
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return [];
+      }
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item));
+        }
+      } catch (err) {
+        // Fall through to a single-item array.
+      }
+
+      return [trimmed];
+    }
+
+    if (value == null) {
+      return [];
+    }
+
+    return [String(value)];
   }
 
   /**

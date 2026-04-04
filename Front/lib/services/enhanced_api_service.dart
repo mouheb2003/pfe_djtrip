@@ -87,7 +87,8 @@ class EnhancedApiService {
     Duration? cacheTtl,
   }) async {
     // Try cache first
-    final cacheKey = 'GET:$endpoint${query != null ? '?' + query.toString() : ''}';
+    final cacheKey =
+        'GET:$endpoint${query != null ? '?' + query.toString() : ''}';
     final cached = _cache.get<Map<String, dynamic>>(cacheKey);
 
     if (cached != null) {
@@ -104,7 +105,9 @@ class EnhancedApiService {
     );
 
     if (response.success) {
-      _devLog('[API SUCCESS] GET $endpoint (attempt ${response.attemptNumber})');
+      _devLog(
+        '[API SUCCESS] GET $endpoint (attempt ${response.attemptNumber})',
+      );
       // Cache successful response
       await _cache.set(
         cacheKey,
@@ -136,7 +139,9 @@ class EnhancedApiService {
     );
 
     if (response.success) {
-      _devLog('[API SUCCESS] POST $endpoint (attempt ${response.attemptNumber})');
+      _devLog(
+        '[API SUCCESS] POST $endpoint (attempt ${response.attemptNumber})',
+      );
 
       // Invalidate related caches
       await _invalidateCacheForEndpoint(endpoint);
@@ -166,7 +171,9 @@ class EnhancedApiService {
     );
 
     if (response.success) {
-      _devLog('[API SUCCESS] PUT $endpoint (attempt ${response.attemptNumber})');
+      _devLog(
+        '[API SUCCESS] PUT $endpoint (attempt ${response.attemptNumber})',
+      );
 
       // Invalidate related caches
       await _invalidateCacheForEndpoint(endpoint);
@@ -196,7 +203,9 @@ class EnhancedApiService {
     );
 
     if (response.success) {
-      _devLog('[API SUCCESS] PATCH $endpoint (attempt ${response.attemptNumber})');
+      _devLog(
+        '[API SUCCESS] PATCH $endpoint (attempt ${response.attemptNumber})',
+      );
 
       // Invalidate related caches
       await _invalidateCacheForEndpoint(endpoint);
@@ -225,7 +234,9 @@ class EnhancedApiService {
     );
 
     if (response.success) {
-      _devLog('[API SUCCESS] DELETE $endpoint (attempt ${response.attemptNumber})');
+      _devLog(
+        '[API SUCCESS] DELETE $endpoint (attempt ${response.attemptNumber})',
+      );
 
       // Invalidate related caches
       await _invalidateCacheForEndpoint(endpoint);
@@ -249,7 +260,9 @@ class EnhancedApiService {
   }) async {
     final headers = await _buildHeaders(auth: auth);
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final uriWithQuery = query != null ? uri.replace(queryParameters: query) : uri;
+    final uriWithQuery = query != null
+        ? uri.replace(queryParameters: query)
+        : uri;
 
     return _client.get(uriWithQuery, headers: headers);
   }
@@ -262,11 +275,7 @@ class EnhancedApiService {
     final headers = await _buildHeaders(auth: auth);
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
 
-    return _client.post(
-      uri,
-      headers: headers,
-      body: jsonEncode(body),
-    );
+    return _client.post(uri, headers: headers, body: jsonEncode(body));
   }
 
   Future<http.Response> _buildPut(
@@ -277,11 +286,7 @@ class EnhancedApiService {
     final headers = await _buildHeaders(auth: auth);
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
 
-    return _client.put(
-      uri,
-      headers: headers,
-      body: jsonEncode(body),
-    );
+    return _client.put(uri, headers: headers, body: jsonEncode(body));
   }
 
   Future<http.Response> _buildPatch(
@@ -292,11 +297,7 @@ class EnhancedApiService {
     final headers = await _buildHeaders(auth: auth);
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
 
-    return _client.patch(
-      uri,
-      headers: headers,
-      body: jsonEncode(body),
-    );
+    return _client.patch(uri, headers: headers, body: jsonEncode(body));
   }
 
   Future<http.Response> _buildDelete(
@@ -315,7 +316,7 @@ class EnhancedApiService {
     if (auth) {
       final token = await AuthService.getAccessToken();
       if (token != null && token.isNotEmpty) {
-        headers[$_headerAuth] = 'Bearer $token';
+        headers[_headerAuth] = 'Bearer $token';
       }
     }
 

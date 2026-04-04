@@ -31,7 +31,11 @@ class NetworkResult<T> {
     );
   }
 
-  factory NetworkResult.failure(String error, int statusCode, {int attempt = 1}) {
+  factory NetworkResult.failure(
+    String error,
+    int statusCode, {
+    int attempt = 1,
+  }) {
     return NetworkResult(
       error: error,
       success: false,
@@ -71,7 +75,7 @@ class NetworkHelper {
     for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
       try {
         _devLog(
-          '[RETRY] START attempt $attempt/${ maxRetries + 1} - ${endpoint ?? 'request'}',
+          '[RETRY] START attempt $attempt/${maxRetries + 1} - ${endpoint ?? 'request'}',
         );
 
         // Execute request with timeout
@@ -155,7 +159,8 @@ class NetworkHelper {
     }
 
     // All retries exhausted
-    final errorMsg = 'Request failed after ${maxRetries + 1} attempts: $lastError';
+    final errorMsg =
+        'Request failed after ${maxRetries + 1} attempts: $lastError';
     _devLog('[RETRY] FAILED - $errorMsg');
 
     return NetworkResult.failure(

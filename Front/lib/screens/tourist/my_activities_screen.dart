@@ -43,10 +43,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     }
   }
 
-  DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
+  DateTime _now() => DateTime.now();
 
   DateTime? _activityStart(InscriptionModel inscription) {
     final activity = inscription.activite ?? const {};
@@ -55,7 +52,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       final parsed = DateTime.tryParse(raw);
       if (parsed != null) return parsed;
     }
-    return inscription.dateDemande;
+    return null;
   }
 
   DateTime? _activityEnd(InscriptionModel inscription) {
@@ -65,17 +62,20 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     return null;
   }
 
+  DateTime? _displayActivityDate(InscriptionModel inscription) {
+    return _activityStart(inscription) ?? inscription.dateDemande;
+  }
+
   bool _isInProgress(InscriptionModel inscription) {
     if (inscription.statut != 'approuvee') return false;
     final start = _activityStart(inscription);
     final end = _activityEnd(inscription);
-    final today = _today();
+    final now = _now();
 
-    if (start == null && end == null) return true;
+    if (start == null || end == null) return false;
 
-    final started = start == null || !today.isBefore(start);
-    final notEnded = end == null || !today.isAfter(end);
-    return started && notEnded;
+    // Exact rule: start <= now < end
+    return !now.isBefore(start) && now.isBefore(end);
   }
 
   List<InscriptionModel> get _upcoming {
@@ -84,7 +84,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       if (item.statut != 'approuvee') return false;
       if (_isInProgress(item)) return false;
       final start = _activityStart(item);
-      return start != null && _today().isBefore(start);
+      if (start != null) return _now().isBefore(start);
+      final end = _activityEnd(item);
+      if (end != null) return _now().isBefore(end);
+      // If approved but dates are missing, keep it visible in upcoming.
+      return true;
     }).toList();
   }
 
@@ -97,7 +101,10 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       if (item.statut != 'approuvee') return false;
       if (_isInProgress(item)) return false;
       final end = _activityEnd(item);
-      return end != null && _today().isAfter(end);
+      if (end != null) return !_now().isBefore(end);
+      final start = _activityStart(item);
+      if (start != null) return !_now().isBefore(start);
+      return false;
     }).toList();
   }
 
@@ -276,7 +283,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   titleFor: _titleFor,
                   imageUrlFor: _imageUrlFor,
                   typeFor: _typeFor,
-                  activityDate: _activityStart,
+                  activityDate: _displayActivityDate,
                   buttonLabel: _buttonLabelForTab(),
                 ),
               ),

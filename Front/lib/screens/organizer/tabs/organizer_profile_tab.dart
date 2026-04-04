@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../models/activity_model.dart';
+import '../../../services/activity_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/user_model.dart';
+import '../../../services/review_service.dart';
 import '../../../services/user_service.dart';
 import '../../../services/inscription_service.dart';
 import '../../shared/edit_profile_screen.dart';
@@ -20,7 +23,11 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   int _activitiesCount = 0;
   int _totalBookings = 0;
   double _totalRevenue = 0.0;
+  double _avgRating = 0.0;
+  int _reviewsCount = 0;
   List<String> _specialties = []; // 🚀 NEW: Stocker les spécialités d'activités
+  List<Map<String, dynamic>> _reviews = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -29,27 +36,93 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   }
 
   Future<void> _loadAll() async {
-    final results = await Future.wait([
-      UserService.getProfile(),
-      InscriptionService.getOrganizerStats(),
-    ]);
     if (!mounted) return;
-    
-    final userData = results[0] as Map<String, dynamic>?;
-    final user = userData != null ? UserModel.fromJson(userData) : null;
-    
-    setState(() {
-      _user = user;
-      final stats = results[1] as Map<String, dynamic>;
-      _activitiesCount = (stats['activitiesCount'] as num?)?.toInt() ?? 0;
-      _totalBookings = (stats['totalBookings'] as num?)?.toInt() ?? 0;
-      _totalRevenue = (stats['totalRevenue'] as num?)?.toDouble() ?? 0.0;
-      
-      // 🚀 NEW: Charger les spécialités d'activités
-      if (userData != null && userData['specialites_activites'] != null) {
-        _specialties = List<String>.from(userData['specialites_activites'] ?? []);
-      }
-    });
+    setState(() => _isLoading = true);
+
+    try {
+      final userData = await UserService.getProfile(forceRefresh: true);
+      final user = userData != null ? UserModel.fromJson(userData) : null;
+      final targetId = (userData?['_id'] ?? '').toString();
+
+      final results = await Future.wait([
+        InscriptionService.getOrganizerStats(),
+        ActivityService.getMyActivities(),
+        ActivityService.getArchivedActivities(),
+        ReviewService.getOrganizerReviews(targetId),
+      ]);
+
+      if (!mounted) return;
+
+      final stats = results[0] as Map<String, dynamic>;
+      final activeActivities = results[1] as List<ActivityModel>;
+      final archivedActivities = results[2] as List<ActivityModel>;
+      final reviews = results[3] as List<Map<String, dynamic>>;
+      final activities = <ActivityModel>[
+        ...activeActivities,
+        ...archivedActivities,
+      ];
+
+      final mine = activities.where((activity) {
+        final rawId =
+            (activity.organisateur?['_id'] ??
+                    activity.organisateur?['id'] ??
+                    '')
+                .toString();
+        return targetId.isNotEmpty && rawId == targetId;
+      }).toList();
+
+      final organizerAvgFromProfile = (user?.noteMoyenne ?? 0.0).clamp(
+        0.0,
+        5.0,
+      );
+      final organizerReviewsFromProfile = user?.nombreAvis ?? 0;
+
+      // Prefer organizer-level fields from DB, fallback to activity/review aggregation.
+      final computedAverage = organizerAvgFromProfile > 0
+          ? organizerAvgFromProfile
+          : (mine.isNotEmpty
+                ? mine.fold<double>(
+                        0,
+                        (sum, activity) => sum + activity.noteMoyenne,
+                      ) /
+                      mine.length
+                : 0.0);
+      final computedReviews = organizerReviewsFromProfile > 0
+          ? organizerReviewsFromProfile
+          : (reviews.isNotEmpty
+                ? reviews.length
+                : mine.fold<int>(
+                    0,
+                    (sum, activity) => sum + activity.nombreAvis,
+                  ));
+
+      setState(() {
+        _user = user;
+        _activitiesCount =
+            (stats['activitiesCount'] as num?)?.toInt() ?? mine.length;
+        _totalBookings = (stats['totalBookings'] as num?)?.toInt() ?? 0;
+        _totalRevenue = (stats['totalRevenue'] as num?)?.toDouble() ?? 0.0;
+        _avgRating = computedAverage;
+        _reviewsCount = computedReviews;
+        _reviews = reviews;
+
+        if (userData != null && userData['specialites_activites'] != null) {
+          _specialties = List<String>.from(
+            userData['specialites_activites'] ?? [],
+          );
+        } else {
+          _specialties = mine
+              .map((a) => a.typeActivite.trim())
+              .where((v) => v.isNotEmpty)
+              .take(6)
+              .toList();
+        }
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -57,7 +130,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     return RefreshIndicator(
       onRefresh: _loadAll,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
+        physics:
+            const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh
         child: Column(
           children: [
             // Cover + profile header
@@ -94,8 +168,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                             _CoverButton(
                               icon: Icons.share,
                               onTap: () => Share.share(
-                                  'Check out organizer ${_user?.fullname ?? 'DJTrip'} on DJTrip.',
-                                ),
+                                'Check out organizer ${_user?.fullname ?? 'DJTrip'} on DJTrip.',
+                              ),
                             ),
                             const SizedBox(width: 8),
                             _CoverButton(
@@ -220,14 +294,16 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       children: [
                         Expanded(
                           child: _StatItem(
-                            value: _user?.noteMoyenne.toStringAsFixed(1) ?? '—',
+                            value: _avgRating > 0
+                                ? _avgRating.toStringAsFixed(1)
+                                : '—',
                             label: 'Avg Rating',
                           ),
                         ),
                         const _Divider(),
                         Expanded(
                           child: _StatItem(
-                            value: _user?.nombreAvis.toString() ?? '0',
+                            value: _reviewsCount.toString(),
                             label: 'Reviews',
                           ),
                         ),

@@ -211,26 +211,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
 
       try {
-        // 🚀 NEW: Include country code in the saved phone number
-        final fullPhoneNumber = currentPhone.isEmpty
-            ? ''
-            : '${_getCountryCode(_country)} $currentPhone';
+        // Keep the raw national number and let the backend normalize it.
+        final phoneToSave = currentPhone;
         final result = await UserService.updateProfile({
-          'num_tel': fullPhoneNumber,
-          'numTel': fullPhoneNumber,
+          'num_tel': phoneToSave,
+          'numTel': phoneToSave,
           'pays_telephone': _getCountryName(
             _country,
           ), // 🚀 FIX: Save only phone country
         });
 
         if (result['success'] == true) {
-          print('✅ Phone number updated: $fullPhoneNumber');
+          print('✅ Phone number updated: $phoneToSave');
           // 🚀 NEW: Update last saved phone
           _lastSavedPhone = currentPhone;
           // Update local data
           if (_userData != null) {
-            _userData!['num_tel'] = fullPhoneNumber;
-            _userData!['numTel'] = fullPhoneNumber;
+            _userData!['num_tel'] = phoneToSave;
+            _userData!['numTel'] = phoneToSave;
           }
         }
       } catch (e) {
@@ -277,14 +275,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
     final phone = _phoneCtrl.text.trim();
-    final fullPhoneNumber = phone.isEmpty
-        ? ''
-        : '${_getCountryCode(_country)} $phone';
     final data = {
       'fullname': _nameCtrl.text.trim(),
       'bio': _bioCtrl.text.trim(),
-      'num_tel': fullPhoneNumber,
-      'numTel': fullPhoneNumber,
+      'num_tel': phone,
+      'numTel': phone,
       'centres_interet': _interests,
       'pays_telephone': _getCountryName(_country), // 🚀 FIX: Phone country
       'pays_origine': _getCountryName(

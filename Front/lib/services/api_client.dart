@@ -76,8 +76,17 @@ class ApiClient {
     String path, {
     bool auth = true,
     Map<String, String>? query,
+    bool cacheFirst = true,
+    Duration? cacheTtl,
   }) async {
-    return _api.get(path, auth: auth, query: query, timeout: _kTimeout);
+    return _api.get(
+      path,
+      auth: auth,
+      query: query,
+      timeout: _kTimeout,
+      cacheFirst: cacheFirst,
+      cacheTtl: cacheTtl ?? const Duration(seconds: 60),
+    );
   }
 
   static Future<http.Response> post(

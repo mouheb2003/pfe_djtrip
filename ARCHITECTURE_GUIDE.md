@@ -9,9 +9,11 @@ This guide documents the complete refactoring of the DJTrip Flutter app to elimi
 ## 📦 New Architecture Components
 
 ### 1. **CacheManager** (`cache_manager.dart`)
+
 **Purpose**: Advanced memory + persistent Hive cache with smart TTL management
 
 **Key Features**:
+
 - ✅ Memory cache for fast access (< 1ms)
 - ✅ Persistent Hive storage for offline support
 - ✅ Smart TTL (Time To Live) with auto-expiration
@@ -20,6 +22,7 @@ This guide documents the complete refactoring of the DJTrip Flutter app to elimi
 - ✅ Access counting for analytics
 
 **Usage**:
+
 ```dart
 // Get cached data
 final data = CacheManager.instance.get<List>('posts');
@@ -39,9 +42,11 @@ await CacheManager.instance.removeByPattern('GET:/posts/*');
 ---
 
 ### 2. **NetworkHelper** (`network_helper.dart`)
+
 **Purpose**: Automatic retry logic with exponential backoff
 
 **Key Features**:
+
 - ✅ Automatic retry on server errors (500+)
 - ✅ Exponential backoff: 500ms → 1s → 2s
 - ✅ Timeout protection (15s default)
@@ -49,6 +54,7 @@ await CacheManager.instance.removeByPattern('GET:/posts/*');
 - ✅ Detailed attempt logging
 
 **Usage**:
+
 ```dart
 final result = await NetworkHelper.executeWithRetry(
   () => http.get(uri),
@@ -68,9 +74,11 @@ if (result.success) {
 ---
 
 ### 3. **EnhancedApiService** (`enhanced_api_service.dart`)
+
 **Purpose**: Unified API service with cache-first strategy and automatic invalidation
 
 **Key Features**:
+
 - ✅ Cache-first approach for GET requests
 - ✅ Smart cache invalidation for POST/PUT/PATCH/DELETE
 - ✅ Integrated retry logic
@@ -78,6 +86,7 @@ if (result.success) {
 - ✅ Unified response wrapper
 
 **Usage**:
+
 ```dart
 // GET with caching
 final response = await EnhancedApiService.instance.getCached(
@@ -100,9 +109,11 @@ final response = await EnhancedApiService.instance.post(
 ---
 
 ### 4. **BaseDataScreen** (`base_data_screen.dart`)
+
 **Purpose**: Foundation class for all data-loading screens with standard patterns
 
 **Key Features**:
+
 - ✅ Prevents multiple simultaneous API calls via `_isFetching` flag
 - ✅ Automatic loading/error/empty state handling
 - ✅ Pull-to-refresh support
@@ -110,6 +121,7 @@ final response = await EnhancedApiService.instance.post(
 - ✅ Standard UI patterns
 
 **Usage**:
+
 ```dart
 class PostsListScreen extends BaseDataScreen<List<Post>> {
   @override
@@ -132,6 +144,7 @@ class PostsListScreen extends BaseDataScreen<List<Post>> {
 ## 🔧 Migration Guide
 
 ### Before (❌ BAD):
+
 ```dart
 class OldScreen extends StatefulWidget {
   @override
@@ -157,6 +170,7 @@ class _OldScreenState extends State<OldScreen> {
 ```
 
 **Problems**:
+
 - 🔴 Future recreated on every rebuild
 - 🔴 Possible multiple simultaneous API calls
 - 🔴 No caching layer
@@ -166,6 +180,7 @@ class _OldScreenState extends State<OldScreen> {
 ---
 
 ### After (✅ GOOD):
+
 ```dart
 class NewScreen extends BaseDataScreen<List> {
   @override
@@ -183,6 +198,7 @@ class NewScreen extends BaseDataScreen<List> {
 ```
 
 **Improvements**:
+
 - ✅ Data loads only once (in initState)
 - ✅ Automatic caching with 5min TTL
 - ✅ Automatic retry (2 attempts)
@@ -195,6 +211,7 @@ class NewScreen extends BaseDataScreen<List> {
 ## 📋 Checklist for Refactoring Existing Screens
 
 ### For GET endpoints (load data):
+
 - [ ] Extend `BaseDataScreen<T>`
 - [ ] Implement `loadData()` - call `EnhancedApiService.getCached()`
 - [ ] Implement `buildDataWidget()`
@@ -203,6 +220,7 @@ class NewScreen extends BaseDataScreen<List> {
 - [ ] Remove manual error handling
 
 ### For POST/PUT/PATCH/DELETE endpoints (mutate data):
+
 - [ ] Use `EnhancedApiService.post()` instead of `ApiClient.post()`
 - [ ] ✅ Cache is automatically invalidated
 - [ ] Show loading indicator during mutation
@@ -210,6 +228,7 @@ class NewScreen extends BaseDataScreen<List> {
 - [ ] Refresh dependent data after successful mutation
 
 ### For complex screens with multiple data sources:
+
 - [ ] Keep separate state per data source
 - [ ] Use different cache keys
 - [ ] Coordinate refresh operations
@@ -220,6 +239,7 @@ class NewScreen extends BaseDataScreen<List> {
 ## 🛡️ Cache Strategy
 
 ### GET Requests:
+
 ```
 1. Check memory cache
 2. If found & not expired → return immediately
@@ -229,6 +249,7 @@ class NewScreen extends BaseDataScreen<List> {
 ```
 
 ### POST/PUT/PATCH/DELETE:
+
 ```
 1. Execute mutation
 2. On success → automatically invalidate related GET caches
@@ -236,6 +257,7 @@ class NewScreen extends BaseDataScreen<List> {
 ```
 
 ### Cache Invalidation Rules:
+
 ```
 - GET requests: DO NOT invalidate (read-only)
 - POST: Invalidates /collection/* cache
@@ -267,6 +289,7 @@ All services log important events prefixed by type:
 ## 🚀 Quick Start
 
 1. **Initialize services in main.dart or app.dart**:
+
 ```dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -277,6 +300,7 @@ void main() async {
 ```
 
 2. **Refactor a simple screen** (e.g., PostsListScreen):
+
 ```dart
 class PostsListScreen extends BaseDataScreen<List> {
   @override
@@ -305,12 +329,14 @@ class PostsListScreen extends BaseDataScreen<List> {
 ## ✅ Expected Results
 
 ### Before Refactoring:
+
 - ❌ Multiple API calls for same data
 - ❌ Flickering UI (empty → loaded → empty cycles)
 - ❌ No recovery on network errors
 - ❌ Slow first load (no cache)
 
 ### After Refactoring:
+
 - ✅ Zero duplicate API calls
 - ✅ Stable UI with cached data on revisit
 - ✅ Automatic retry on server errors
@@ -322,14 +348,14 @@ class PostsListScreen extends BaseDataScreen<List> {
 
 ## 🎯 Summary
 
-| Metric | Before | After |
-|--------|--------|-------|
-| API calls on screen visit #2 | 1-3× | 0 (cached) |
-| Rebuild cycles | 3-5 | 1 |
-| First load time | Slow | Fast |
-| Network error recovery | None | Auto-retry 2× |
-| Offline support | None | Shows cache |
-| Maintenance | Complex | Simple (BaseDataScreen) |
+| Metric                       | Before  | After                   |
+| ---------------------------- | ------- | ----------------------- |
+| API calls on screen visit #2 | 1-3×    | 0 (cached)              |
+| Rebuild cycles               | 3-5     | 1                       |
+| First load time              | Slow    | Fast                    |
+| Network error recovery       | None    | Auto-retry 2×           |
+| Offline support              | None    | Shows cache             |
+| Maintenance                  | Complex | Simple (BaseDataScreen) |
 
 ---
 

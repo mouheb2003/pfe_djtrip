@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -29,6 +30,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
   int _bookingsCount = 0;
   int _postsCount = 0;
   int _reviewsCount = 0;
+  bool _isLoadingAll = false;
 
   List<Map<String, dynamic>> _myPosts = [];
 
@@ -38,55 +40,101 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     _loadAll();
   }
 
+  List<Map<String, dynamic>> _toMapList(dynamic value) {
+    if (value is List<Map<String, dynamic>>) return value;
+    if (value is List) {
+      return value.whereType<Map<String, dynamic>>().toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic> _toMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return <String, dynamic>{};
+  }
+
   Future<void> _loadAll() async {
-    final results = await Future.wait([
-      UserService.getProfile(),
-      InscriptionService.getTouristStats(),
-      PostService.getMyPosts(),
-      AuthService.getUser(),
-      PostService.getFeedPosts(),
-    ]);
+    if (_isLoadingAll) {
+      if (kDebugMode) {
+        debugPrint(
+          '[REBUILD] TouristProfileTab skip _loadAll (already loading)',
+        );
+      }
+      return;
+    }
 
-    if (!mounted) return;
+    _isLoadingAll = true;
+    try {
+      if (kDebugMode) {
+        debugPrint('[API CALL] TouristProfileTab _loadAll');
+      }
 
-    final apiUserData = results[0] as Map<String, dynamic>?;
-    final cachedUserData = results[3] as Map<String, dynamic>?;
-    final userData = apiUserData ?? cachedUserData;
-    final user = userData != null ? UserModel.fromJson(userData) : null;
-    final stats = results[1] as Map<String, dynamic>;
-    final myPostsFromApi = (results[2] as List<Map<String, dynamic>>);
-    final feedPosts = (results[4] as List<Map<String, dynamic>>);
-    final currentUserId = (userData?['_id'] ?? '').toString();
+      final results = await Future.wait([
+        UserService.getProfile(),
+        InscriptionService.getTouristStats(),
+        PostService.getMyPosts(),
+        AuthService.getUser(),
+        PostService.getFeedPosts(),
+      ]);
 
-    final myPosts =
-        (myPostsFromApi.isNotEmpty
-                ? myPostsFromApi
-                : feedPosts.where((p) {
-                    final author = p['author_id'];
-                    final authorId = author is Map<String, dynamic>
-                        ? (author['_id'] ?? author['id'] ?? '').toString()
-                        : author?.toString() ?? '';
-                    return currentUserId.isNotEmpty &&
-                        authorId == currentUserId;
-                  }).toList())
-            .take(12)
-            .toList();
-    final reviewsFromStats = (stats['totalReviews'] as num?)?.toInt();
-    final reviewsFromSnake = (userData?['nombre_avis'] as num?)?.toInt();
-    final reviewsFromCamel = (userData?['nombreAvis'] as num?)?.toInt();
+      if (!mounted) return;
 
-    setState(() {
-      _user = user;
-      _bookingsCount = (stats['totalBookings'] as num?)?.toInt() ?? 0;
-      _postsCount = myPosts.length;
-      _reviewsCount =
-          reviewsFromStats ??
-          reviewsFromSnake ??
-          reviewsFromCamel ??
-          user?.nombreAvis ??
-          0;
-      _myPosts = myPosts;
-    });
+      final apiUserData = results[0] as Map<String, dynamic>?;
+      final cachedUserData = results[3] as Map<String, dynamic>?;
+      final userData = apiUserData ?? cachedUserData;
+      final user = userData != null ? UserModel.fromJson(userData) : null;
+      final stats = _toMap(results[1]);
+      final myPostsFromApi = _toMapList(results[2]);
+      final feedPosts = _toMapList(results[4]);
+      final currentUserId = (userData?['_id'] ?? '').toString();
+
+      final myPosts =
+          (myPostsFromApi.isNotEmpty
+                  ? myPostsFromApi
+                  : feedPosts.where((p) {
+                      final author = p['author_id'];
+                      final authorId = author is Map<String, dynamic>
+                          ? (author['_id'] ?? author['id'] ?? '').toString()
+                          : author?.toString() ?? '';
+                      return currentUserId.isNotEmpty &&
+                          authorId == currentUserId;
+                    }).toList())
+              .take(12)
+              .toList();
+      final reviewsFromStats = (stats['totalReviews'] as num?)?.toInt();
+      final reviewsFromSnake = (userData?['nombre_avis'] as num?)?.toInt();
+      final reviewsFromCamel = (userData?['nombreAvis'] as num?)?.toInt();
+
+      setState(() {
+        _user = user;
+        _bookingsCount = (stats['totalBookings'] as num?)?.toInt() ?? 0;
+        _postsCount = myPosts.length;
+        _reviewsCount =
+            reviewsFromStats ??
+            reviewsFromSnake ??
+            reviewsFromCamel ??
+            user?.nombreAvis ??
+            0;
+        _myPosts = myPosts;
+      });
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[TouristProfileTab] load failed: $e');
+        debugPrintStack(stackTrace: st);
+      }
+      if (!mounted) return;
+      setState(() {
+        _bookingsCount = 0;
+        _postsCount = 0;
+        _reviewsCount = 0;
+        _myPosts = <Map<String, dynamic>>[];
+      });
+    } finally {
+      _isLoadingAll = false;
+    }
   }
 
   String _timeAgo(DateTime? date) {
@@ -800,6 +848,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (kDebugMode) {
+      debugPrint('[REBUILD] TouristProfileTab build');
+    }
+
     final user = _user;
     final interests = user?.centresInteret ?? const <String>[];
 

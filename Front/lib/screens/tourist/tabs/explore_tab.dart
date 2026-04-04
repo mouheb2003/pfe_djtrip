@@ -439,51 +439,67 @@ class _ExploreTabState extends State<ExploreTab> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Colonne des icônes de chemin (Design de l'image)
-          Column(
+          Row(
             children: [
-              const Icon(Icons.circle, size: 12, color: Color(0xFF2D2D44)),
-              Container(height: 35, width: 1.5, color: Colors.grey.shade300),
-              const Icon(Icons.location_on, size: 20, color: Colors.redAccent),
+              const SizedBox(width: 6),
+              Container(
+                width: 12,
+                height: 12,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2878FF),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Votre position',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF245CF7),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _showItineraryPanel = false),
+                child: const Icon(Icons.more_vert, color: Color(0xFF222B45)),
+              ),
             ],
           ),
-          const SizedBox(width: 15),
-          // Champs de saisie
-          Expanded(
-            child: Column(
-              children: [
-                _buildRouteInput(
+          const SizedBox(height: 14),
+          Divider(color: Colors.grey.shade300, height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(Icons.location_on, color: Colors.redAccent, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildRouteInput(
                   _originCtrl,
                   Icons.my_location,
-                  "Point de départ",
+                  'Ma position actuelle',
                 ),
-                const SizedBox(height: 10),
-                _buildRouteInput(
-                  _destinationCtrl,
-                  Icons.location_on,
-                  "Destination",
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: _refreshCurrentPosition,
+                child: const Icon(
+                  Icons.swap_vert,
+                  color: Color(0xFF222B45),
+                  size: 28,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          // Bouton pour fermer/revenir
-          GestureDetector(
-            onTap: () => setState(() => _showItineraryPanel = false),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8EEF5),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close,
-                color: Color(0xFF2158F6),
-                size: 20,
-              ),
-            ),
+          const SizedBox(height: 12),
+          _buildRouteInput(
+            _destinationCtrl,
+            Icons.place,
+            'Destination',
+            isDisabled: true,
           ),
         ],
       ),
@@ -493,8 +509,9 @@ class _ExploreTabState extends State<ExploreTab> {
   Widget _buildRouteInput(
     TextEditingController ctrl,
     IconData icon,
-    String hint,
-  ) {
+    String hint, {
+    bool isDisabled = false,
+  }) {
     return Container(
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -507,8 +524,8 @@ class _ExploreTabState extends State<ExploreTab> {
           Expanded(
             child: TextField(
               controller: ctrl,
-              enabled: true,
-              readOnly: false,
+              enabled: !isDisabled,
+              readOnly: true,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w400,

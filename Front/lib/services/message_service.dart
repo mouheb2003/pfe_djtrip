@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'api_client.dart';
 import 'auth_service.dart';
 import 'package:http/http.dart' as http;
@@ -7,8 +8,55 @@ import '../models/conversation_model.dart';
 import 'api_service.dart';
 
 class MessageService {
+  static dynamic _decodeFlexible(String body) {
+    try {
+      var decoded = jsonDecode(body);
+      for (var i = 0; i < 2; i++) {
+        if (decoded is String && decoded.trim().startsWith('{')) {
+          decoded = jsonDecode(decoded);
+          continue;
+        }
+        if (decoded is String && decoded.trim().startsWith('[')) {
+          decoded = jsonDecode(decoded);
+          continue;
+        }
+        break;
+      }
+      return decoded;
+    } catch (_) {
+      return body;
+    }
+  }
+
   static Map<String, dynamic> _safeDecodeObject(String body) {
     return ApiService.safeDecodeObject(body);
+  }
+
+  static List<Map<String, dynamic>> _extractMapList(dynamic payload) {
+    if (payload is List) {
+      return payload.whereType<Map<String, dynamic>>().toList();
+    }
+    if (payload is Map<String, dynamic>) {
+      final candidates = [
+        payload['data'],
+        payload['conversations'],
+        payload['messages'],
+        payload['items'],
+        payload['results'],
+      ];
+      for (final candidate in candidates) {
+        if (candidate is List) {
+          return candidate.whereType<Map<String, dynamic>>().toList();
+        }
+        if (candidate is String) {
+          final decoded = _decodeFlexible(candidate);
+          if (decoded is List) {
+            return decoded.whereType<Map<String, dynamic>>().toList();
+          }
+        }
+      }
+    }
+    return const <Map<String, dynamic>>[];
   }
 
   /// Get all conversations for the logged-in user.
@@ -16,20 +64,10 @@ class MessageService {
     try {
       final res = await ApiClient.get('/messages/conversations');
       if (res.statusCode == 200) {
-        final asList = ApiService.safeDecodeList(res.body);
-        if (asList.isNotEmpty) {
-          return asList
-              .whereType<Map<String, dynamic>>()
-              .map(ConversationModel.fromJson)
-              .toList();
-        }
-        final decoded = _safeDecodeObject(res.body);
-        final list = decoded['conversations'] ?? decoded['data'] ?? const [];
-        if (list is List) {
-          return list
-              .whereType<Map<String, dynamic>>()
-              .map(ConversationModel.fromJson)
-              .toList();
+        final decoded = _decodeFlexible(res.body);
+        final list = _extractMapList(decoded);
+        if (list.isNotEmpty) {
+          return list.map(ConversationModel.fromJson).toList();
         }
         return const [];
       }
@@ -65,15 +103,9 @@ class MessageService {
     try {
       final res = await ApiClient.get('/messages/with/$partnerId');
       if (res.statusCode == 200) {
-        final rawList = ApiService.safeDecodeList(res.body);
-        if (rawList.isNotEmpty) {
-          return rawList.whereType<Map<String, dynamic>>().toList();
-        }
-        final body = _safeDecodeObject(res.body);
-        final list = body['messages'] ?? body['data'] ?? const <dynamic>[];
-        if (list is List) {
-          return list.whereType<Map<String, dynamic>>().toList();
-        }
+        final decoded = _decodeFlexible(res.body);
+        final list = _extractMapList(decoded);
+        if (list.isNotEmpty) return list;
       }
       return [];
     } catch (_) {
@@ -90,7 +122,10 @@ class MessageService {
       final res = await ApiClient.post('/messages/with/$partnerId', {
         'content': content,
       });
-      final body = _safeDecodeObject(res.body);
+      final decoded = _decodeFlexible(res.body);
+      final body = decoded is Map<String, dynamic>
+          ? decoded
+          : _safeDecodeObject(res.body);
       if (res.statusCode == 201 || res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
         if (msg != null) return {'success': true, 'message': msg};
@@ -129,7 +164,10 @@ class MessageService {
         const Duration(seconds: 60),
       );
       final res = await http.Response.fromStream(streamed);
-      final body = _safeDecodeObject(res.body);
+      final decoded = _decodeFlexible(res.body);
+      final body = decoded is Map<String, dynamic>
+          ? decoded
+          : _safeDecodeObject(res.body);
 
       if (res.statusCode == 201 || res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
@@ -175,7 +213,10 @@ class MessageService {
         const Duration(seconds: 30),
       );
       final res = await http.Response.fromStream(streamed);
-      final body = _safeDecodeObject(res.body);
+      final decoded = _decodeFlexible(res.body);
+      final body = decoded is Map<String, dynamic>
+          ? decoded
+          : _safeDecodeObject(res.body);
 
       if (res.statusCode == 201 || res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
@@ -222,7 +263,10 @@ class MessageService {
         const Duration(seconds: 60),
       );
       final res = await http.Response.fromStream(streamed);
-      final body = _safeDecodeObject(res.body);
+      final decoded = _decodeFlexible(res.body);
+      final body = decoded is Map<String, dynamic>
+          ? decoded
+          : _safeDecodeObject(res.body);
 
       if (res.statusCode == 201 || res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
@@ -256,7 +300,10 @@ class MessageService {
       final res = await ApiClient.put('/messages/$messageId', {
         'content': content,
       });
-      final body = _safeDecodeObject(res.body);
+      final decoded = _decodeFlexible(res.body);
+      final body = decoded is Map<String, dynamic>
+          ? decoded
+          : _safeDecodeObject(res.body);
       if (res.statusCode == 200) {
         final msg = body['message'] as Map<String, dynamic>?;
         if (msg != null) return {'success': true, 'message': msg};

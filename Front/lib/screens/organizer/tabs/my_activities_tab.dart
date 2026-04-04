@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
+import 'requests_tab.dart';
 
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
@@ -101,6 +102,18 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                       ),
                     ),
                     const Spacer(),
+                    // Requests button
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const RequestsTab(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.assignment_turned_in, size: 18),
+                      label: const Text('Requests'),
+                    ),
                   ] else
                     Expanded(
                       child: Container(

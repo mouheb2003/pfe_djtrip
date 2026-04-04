@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ConversationModel {
   final String partnerId;
   final String partnerName;
@@ -19,19 +21,47 @@ class ConversationModel {
     this.unreadCount = 0,
   });
 
+  static Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    if (value is String && value.trim().startsWith('{')) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map((key, val) => MapEntry(key.toString(), val));
+        }
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
+  }
+
+  static String _safeUrl(dynamic raw) {
+    final value = (raw ?? '').toString().trim();
+    if (value.isEmpty) return '';
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) return value;
+    return '';
+  }
+
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
-    final partner = json['partner'] as Map<String, dynamic>? ?? {};
-    final lastMsg = json['lastMessage'] as Map<String, dynamic>? ?? {};
+    final partner = _asMap(json['partner']);
+    final lastMsg = _asMap(json['lastMessage']);
 
     return ConversationModel(
-      partnerId: partner['_id'] as String? ?? '',
-      partnerName: partner['fullname'] as String? ?? 'Unknown',
-      partnerAvatar: partner['avatar'] as String?,
-      partnerType: partner['userType'] as String? ?? '',
+      partnerId: (partner['_id'] ?? partner['id'] ?? '').toString(),
+      partnerName: (partner['fullname'] ?? partner['name'] ?? 'Unknown')
+          .toString(),
+      partnerAvatar: _safeUrl(partner['avatar']),
+      partnerType: (partner['userType'] ?? '').toString(),
       partnerOnline: partner['isOnline'] == true,
-      lastMessageContent: lastMsg['content'] as String? ?? '',
+      lastMessageContent: (lastMsg['content'] ?? '').toString(),
       lastMessageTime: lastMsg['createdAt'] != null
-          ? DateTime.tryParse(lastMsg['createdAt'])
+          ? DateTime.tryParse(lastMsg['createdAt'].toString())
           : null,
       unreadCount: (json['unreadCount'] as num? ?? 0).toInt(),
     );

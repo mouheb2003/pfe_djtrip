@@ -1,8 +1,137 @@
 import 'dart:convert';
 import 'api_client.dart';
 import '../models/inscription_model.dart';
+import '../models/activity_model.dart';
 
 class InscriptionService {
+  static Map<String, dynamic> _decodeObject(dynamic raw) {
+    dynamic value = raw;
+
+    for (var i = 0; i < 3; i++) {
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return <String, dynamic>{};
+        try {
+          value = jsonDecode(trimmed);
+          continue;
+        } catch (_) {
+          break;
+        }
+      }
+      break;
+    }
+
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return <String, dynamic>{};
+  }
+
+  static List<Map<String, dynamic>> _decodeObjectList(dynamic rawList) {
+    dynamic value = rawList;
+
+    for (var i = 0; i < 3; i++) {
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) return const <Map<String, dynamic>>[];
+        try {
+          value = jsonDecode(trimmed);
+          continue;
+        } catch (_) {
+          return const <Map<String, dynamic>>[];
+        }
+      }
+      break;
+    }
+
+    if (value is! List) return const <Map<String, dynamic>>[];
+    return value.map(_decodeObject).where((e) => e.isNotEmpty).toList();
+  }
+
+  static List<Map<String, dynamic>> _extractInscriptions(
+    Map<String, dynamic> body,
+  ) {
+    final direct = _decodeObjectList(body['inscriptions']);
+    if (direct.isNotEmpty) return direct;
+
+    final dataObj = _decodeObject(body['data']);
+    final fromData = _decodeObjectList(dataObj['inscriptions']);
+    if (fromData.isNotEmpty) return fromData;
+
+    final resultObj = _decodeObject(body['result']);
+    return _decodeObjectList(resultObj['inscriptions']);
+  }
+
+  static List<Map<String, dynamic>> _extractActivities(
+    Map<String, dynamic> body,
+  ) {
+    final direct = _decodeObjectList(body['activities'] ?? body['activites']);
+    if (direct.isNotEmpty) return direct;
+
+    final dataObj = _decodeObject(body['data']);
+    final fromData = _decodeObjectList(
+      dataObj['activities'] ?? dataObj['activites'],
+    );
+    if (fromData.isNotEmpty) return fromData;
+
+    final resultObj = _decodeObject(body['result']);
+    return _decodeObjectList(resultObj['activities'] ?? resultObj['activites']);
+  }
+
+  /// Tourist: get only activities that are not already joined/requested.
+  /// Excludes activities with existing inscriptions in statuses:
+  /// - en_attente (join requested)
+  /// - approuvee (already joined)
+  static Future<List<ActivityModel>> getJoinableActivities({
+    Map<String, String>? filters,
+  }) async {
+    try {
+      final mergedFilters = <String, String>{...?filters};
+      mergedFilters.putIfAbsent('statut', () => 'active');
+
+      final results = await Future.wait([
+        ApiClient.get(
+          '/activites',
+          auth: false,
+          query: mergedFilters.isEmpty ? null : mergedFilters,
+          cacheFirst: false,
+        ),
+        getMyInscriptions(),
+      ]);
+
+      final activitiesRes = results[0] as dynamic;
+      final inscriptions = results[1] as List<InscriptionModel>;
+
+      if (activitiesRes.statusCode != 200) {
+        return const <ActivityModel>[];
+      }
+
+      final body = _decodeObject(activitiesRes.body);
+      final rawActivities = _extractActivities(body);
+      final allActivities = rawActivities.map(ActivityModel.fromJson).toList();
+
+      final blockedStatuses = {'en_attente', 'approuvee'};
+      final blockedIds = inscriptions
+          .where((i) => blockedStatuses.contains(i.statut))
+          .map((i) => (i.activite?['_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final now = DateTime.now();
+      return allActivities.where((activity) {
+        if (blockedIds.contains(activity.id)) return false;
+        if (activity.statut != 'active') return false;
+        if (activity.dateFin != null && !activity.dateFin!.isAfter(now)) {
+          return false;
+        }
+        return true;
+      }).toList();
+    } catch (_) {
+      return const <ActivityModel>[];
+    }
+  }
+
   /// Tourist: get all my inscriptions (optionally filtered by status).
   static Future<List<InscriptionModel>> getMyInscriptions({
     String? statut,
@@ -11,17 +140,16 @@ class InscriptionService {
     final res = await ApiClient.get(
       '/inscriptions/mes-inscriptions',
       query: query,
+      cacheFirst: false,
     );
     if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = body['inscriptions'] as List? ?? [];
-      return list
-          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
-          .toList();
+      final body = _decodeObject(res.body);
+      final list = _extractInscriptions(body);
+      return list.map(InscriptionModel.fromJson).toList();
     }
     // Surface the backend/network error instead of returning an empty list silently.
     try {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _decodeObject(res.body);
       throw Exception(
         (body['message'] as String?) ?? 'Unable to load inscriptions',
       );
@@ -44,7 +172,7 @@ class InscriptionService {
       body['message_touriste'] = message;
     }
     final res = await ApiClient.post('/inscriptions', body);
-    final resBody = jsonDecode(res.body) as Map<String, dynamic>;
+    final resBody = _decodeObject(res.body);
     if (res.statusCode == 201) {
       return {'success': true, 'inscription': resBody['inscription']};
     }
@@ -61,14 +189,12 @@ class InscriptionService {
   static Future<List<InscriptionModel>> getOrganizerPendingRequests() async {
     final res = await ApiClient.get('/inscriptions/organisateur/en-attente');
     if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = body['inscriptions'] as List? ?? [];
-      return list
-          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
-          .toList();
+      final body = _decodeObject(res.body);
+      final list = _extractInscriptions(body);
+      return list.map(InscriptionModel.fromJson).toList();
     }
     try {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _decodeObject(res.body);
       throw Exception(
         (body['message'] as String?) ?? 'Unable to load pending requests',
       );
@@ -81,14 +207,12 @@ class InscriptionService {
   static Future<List<InscriptionModel>> getOrganizerAllRequests() async {
     final res = await ApiClient.get('/inscriptions/organisateur/mes-demandes');
     if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = body['inscriptions'] as List? ?? [];
-      return list
-          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
-          .toList();
+      final body = _decodeObject(res.body);
+      final list = _extractInscriptions(body);
+      return list.map(InscriptionModel.fromJson).toList();
     }
     try {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _decodeObject(res.body);
       throw Exception(
         (body['message'] as String?) ?? 'Unable to load organizer requests',
       );
@@ -113,14 +237,12 @@ class InscriptionService {
       query: query.isEmpty ? null : query,
     );
     if (res.statusCode == 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = body['inscriptions'] as List? ?? [];
-      return list
-          .map((i) => InscriptionModel.fromJson(i as Map<String, dynamic>))
-          .toList();
+      final body = _decodeObject(res.body);
+      final list = _extractInscriptions(body);
+      return list.map(InscriptionModel.fromJson).toList();
     }
     try {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final body = _decodeObject(res.body);
       throw Exception(
         (body['message'] as String?) ?? 'Unable to load organizer inscriptions',
       );
@@ -161,16 +283,19 @@ class InscriptionService {
   static Future<Map<String, dynamic>> getOrganizerStats() async {
     final res = await ApiClient.get('/inscriptions/stats/organizer');
     if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return _decodeObject(res.body);
     }
     return {'activitiesCount': 0, 'totalBookings': 0, 'totalRevenue': 0.0};
   }
 
   /// Tourist stats: totalBookings.
   static Future<Map<String, dynamic>> getTouristStats() async {
-    final res = await ApiClient.get('/inscriptions/stats/tourist');
+    final res = await ApiClient.get(
+      '/inscriptions/stats/tourist',
+      cacheFirst: false,
+    );
     if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return _decodeObject(res.body);
     }
     return {'totalBookings': 0};
   }

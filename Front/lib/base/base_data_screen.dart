@@ -6,7 +6,7 @@ abstract class BaseDataScreen<T> extends StatefulWidget {
   const BaseDataScreen({super.key});
 
   @override
-  State<BaseDataScreen<T>> createState() => _BaseDataScreenState<T>();
+  BaseDataScreenState<BaseDataScreen<T>, T> createState();
 }
 
 abstract class BaseDataScreenState<W extends BaseDataScreen<T>, T>
@@ -32,10 +32,7 @@ abstract class BaseDataScreenState<W extends BaseDataScreen<T>, T>
           const SizedBox(height: 16),
           Text(error, textAlign: TextAlign.center),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _retry,
-            child: const Text('Retry'),
-          ),
+          ElevatedButton(onPressed: _retry, child: const Text('Retry')),
         ],
       ),
     );

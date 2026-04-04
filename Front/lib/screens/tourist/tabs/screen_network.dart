@@ -23,6 +23,7 @@ class ScreenNetwork extends StatefulWidget {
 class _ScreenNetworkState extends State<ScreenNetwork> {
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
+  bool _isFetching = false;
 
   @override
   void initState() {
@@ -31,48 +32,48 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   }
 
   Future<void> _loadFeed() async {
-    final currentUserId = await AuthService.getUserId();
-    final feedPosts = await PostService.getFeedPosts();
-    final myPosts = await PostService.getMyPosts();
+    if (_isFetching) {
+      return;
+    }
+    _isFetching = true;
 
-    final posts =
-        (widget.showOnlyMyPosts
-              ? (myPosts.isNotEmpty
-                    ? myPosts
-                    : feedPosts.where((post) {
-                        final author = post['author_id'];
-                        final authorId = author is Map<String, dynamic>
-                            ? (author['_id'] ?? author['id'] ?? '').toString()
-                            : author?.toString() ?? '';
-                        return currentUserId != null &&
-                            currentUserId.isNotEmpty &&
-                            authorId == currentUserId;
-                      }).toList())
-              : feedPosts.where((post) {
-                  final author = post['author_id'];
-                  final authorId = author is Map<String, dynamic>
-                      ? (author['_id'] ?? author['id'] ?? '').toString()
-                      : author?.toString() ?? '';
-                  if (currentUserId == null || currentUserId.isEmpty) {
-                    return true;
-                  }
-                  return authorId != currentUserId;
-                }).toList())
-          ..sort((a, b) {
-            final aDate =
-                DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-            final bDate =
-                DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-            return bDate.compareTo(aDate);
-          });
+    try {
+      final currentUserId = await AuthService.getUserId();
+      final feedPosts = await PostService.getFeedPosts();
+      final myPosts = await PostService.getMyPosts();
 
-    if (!mounted) return;
-    setState(() {
-      _posts = posts;
-      _loading = false;
-    });
+      final posts =
+          (widget.showOnlyMyPosts
+                ? (myPosts.isNotEmpty
+                      ? myPosts
+                      : feedPosts.where((post) {
+                          final author = post['author_id'];
+                          final authorId = author is Map<String, dynamic>
+                              ? (author['_id'] ?? author['id'] ?? '').toString()
+                              : author?.toString() ?? '';
+                          return currentUserId != null &&
+                              currentUserId.isNotEmpty &&
+                              authorId == currentUserId;
+                        }).toList())
+                : feedPosts)
+            ..sort((a, b) {
+              final aDate =
+                  DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate =
+                  DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            });
+
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _loading = false;
+      });
+    } finally {
+      _isFetching = false;
+    }
   }
 
   Future<void> _refreshFeed() async {

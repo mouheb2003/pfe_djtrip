@@ -47,7 +47,9 @@ class CacheEntry<T> {
       'createdAt': DateTime.tryParse(json['createdAt']?.toString() ?? ''),
       'expiresAt': DateTime.tryParse(json['expiresAt']?.toString() ?? ''),
       'accessCount': (json['accessCount'] ?? 0) as int,
-      'lastAccessedAt': DateTime.tryParse(json['lastAccessedAt']?.toString() ?? ''),
+      'lastAccessedAt': DateTime.tryParse(
+        json['lastAccessedAt']?.toString() ?? '',
+      ),
     };
   }
 }
@@ -78,10 +80,7 @@ class CacheManager {
   }
 
   /// Get cached data (memory first, then persistent)
-  T? get<T>(
-    String key, {
-    bool recordAccess = true,
-  }) {
+  T? get<T>(String key, {bool recordAccess = true}) {
     // Check memory cache
     if (_memoryCache.containsKey(key)) {
       final entry = _memoryCache[key];
@@ -158,10 +157,7 @@ class CacheManager {
     // Store in persistent cache
     if (_isInitialized) {
       try {
-        await _hiveBox?.put(key, {
-          ...entry.toJson(),
-          'data': data,
-        });
+        await _hiveBox?.put(key, {...entry.toJson(), 'data': data});
         _devLog('💾 [CACHE SAVED] $key (TTL: ${ttl.inSeconds}s)');
       } catch (e) {
         _devLog('❌ [CACHE SAVE ERROR] $key: $e');
@@ -193,10 +189,7 @@ class CacheManager {
 
   /// Remove cache by pattern (e.g., '/posts/*')
   Future<void> removeByPattern(String pattern) async {
-    final regex = RegExp(
-      pattern.replaceAll('*', '.*'),
-      caseSensitive: false,
-    );
+    final regex = RegExp(pattern.replaceAll('*', '.*'), caseSensitive: false);
 
     final keysToRemove = _memoryCache.keys
         .where((k) => regex.hasMatch(k))
@@ -211,7 +204,9 @@ class CacheManager {
         for (final key in keysToRemove) {
           await _hiveBox?.delete(key);
         }
-        _devLog('🗑️ [CACHE REMOVED PATTERN] $pattern (${keysToRemove.length} entries)');
+        _devLog(
+          '🗑️ [CACHE REMOVED PATTERN] $pattern (${keysToRemove.length} entries)',
+        );
       } catch (_) {}
     }
   }

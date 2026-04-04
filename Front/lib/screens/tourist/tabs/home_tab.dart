@@ -20,6 +20,7 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   List<LieuModel> _lieux = [];
   bool _isLoading = true;
+  bool _isFetching = false;
   String _selectedCategory = 'All';
 
   static const List<_CategoryItem> _categories = [
@@ -65,6 +66,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadLieux() async {
+    if (_isFetching) return;
+    _isFetching = true;
+
     try {
       final lieux = await LieuService.getLieux();
       if (mounted) {
@@ -79,6 +83,8 @@ class _HomeTabState extends State<HomeTab> {
           _isLoading = false;
         });
       }
+    } finally {
+      _isFetching = false;
     }
   }
 

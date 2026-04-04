@@ -29,6 +29,13 @@ class UserModel {
     this.nombreAvis = 0,
   });
 
+  static List<String> _safeStringList(dynamic raw) {
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList();
+    }
+    return const <String>[];
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['_id'] ?? '',
@@ -40,7 +47,7 @@ class UserModel {
       numTel: json['num_tel'] as String?,
       paysOrigine: json['pays_origine'] as String?,
       isOnline: json['isOnline'] == true,
-      centresInteret: List<String>.from(json['centres_interet'] as List? ?? []),
+      centresInteret: _safeStringList(json['centres_interet']),
       languePreferee: json['langue_preferee'] as String? ?? 'English',
       noteMoyenne: (json['note_moyenne'] as num? ?? 0).toDouble(),
       nombreAvis:

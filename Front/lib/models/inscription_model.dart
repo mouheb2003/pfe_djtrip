@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 
 class InscriptionModel {
   final String id;
@@ -23,6 +24,34 @@ class InscriptionModel {
     this.organisateur,
   });
 
+  static Map<String, dynamic>? _safeMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((k, v) => MapEntry(k.toString(), v));
+    }
+
+    if (raw is String) {
+      dynamic decoded = raw;
+      for (var i = 0; i < 3; i++) {
+        if (decoded is! String) break;
+        final text = decoded.trim();
+        if (text.isEmpty) return null;
+        try {
+          decoded = jsonDecode(text);
+        } catch (_) {
+          // Fallback: API sometimes returns only the ObjectId string.
+          return {'_id': text};
+        }
+      }
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+    }
+
+    return null;
+  }
+
   factory InscriptionModel.fromJson(Map<String, dynamic> json) {
     return InscriptionModel(
       id: json['_id'] as String? ?? '',
@@ -33,15 +62,9 @@ class InscriptionModel {
           ? DateTime.tryParse(json['date_demande'])
           : null,
       messageTouriste: json['message_touriste'] as String?,
-      activite: json['activite_id'] is Map<String, dynamic>
-          ? json['activite_id'] as Map<String, dynamic>
-          : null,
-      touriste: json['touriste_id'] is Map<String, dynamic>
-          ? json['touriste_id'] as Map<String, dynamic>
-          : null,
-      organisateur: json['organisateur_id'] is Map<String, dynamic>
-          ? json['organisateur_id'] as Map<String, dynamic>
-          : null,
+      activite: _safeMap(json['activite_id']),
+      touriste: _safeMap(json['touriste_id']),
+      organisateur: _safeMap(json['organisateur_id']),
     );
   }
 

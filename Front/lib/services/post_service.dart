@@ -45,7 +45,7 @@ class PostService {
 
   static Future<List<Map<String, dynamic>>> getMyPosts() async {
     try {
-      final res = await ApiClient.get('/posts/me');
+      final res = await ApiClient.get('/posts/me', cacheFirst: false);
       if (res.statusCode != 200) return [];
       final body = _safeObject(res.body);
       if (body['posts'] is List) {
@@ -59,7 +59,11 @@ class PostService {
 
   static Future<List<Map<String, dynamic>>> getFeedPosts() async {
     try {
-      final res = await ApiClient.get('/posts/feed', auth: false);
+      final res = await ApiClient.get(
+        '/posts/feed',
+        auth: false,
+        cacheFirst: false,
+      );
       if (res.statusCode != 200) return [];
       final body = _safeObject(res.body);
       if (body['posts'] is List) {
