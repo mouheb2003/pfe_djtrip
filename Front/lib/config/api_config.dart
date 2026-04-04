@@ -1,24 +1,17 @@
 class ApiConfig {
-  // Base URL for the API.
-  // Set at build/run time with: --dart-define=API_URL=http://your-server:3000/api/v1
-  //
-  // Common values:
-  //   Android emulator  → http://10.0.2.2:3000/api/v1
-  //   Physical device   → http://<your-local-ip>:3000/api/v1
-  //   iOS simulator     → http://localhost:3000/api/v1
-  //   Production        → https://api.djtrip.com/api/v1
-  static const String _rawBaseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://10.0.2.2:3000/api/v1',
-  );
+  static const bool isProd = true;
 
-  // Backward compatible normalization:
-  // if someone passes .../api, we automatically append /v1.
-  static String get baseUrl {
-    if (_rawBaseUrl.endsWith('/api')) return '${_rawBaseUrl}/v1';
-    if (_rawBaseUrl.endsWith('/api/')) return '${_rawBaseUrl}v1';
-    return _rawBaseUrl;
+  static const List<String> devUrls = [
+    'http://192.168.1.196:3000',
+    'http://192.168.1.10:3000',
+  ];
+
+  static String get serverBaseUrl {
+    if (isProd) return 'https://backdjtrip.onrender.com';
+    return devUrls[0]; // change ici si besoin
   }
+
+  static String get baseUrl => '$serverBaseUrl/api/v1';
 
   // ── Endpoints ────────────────────────────────────────────────────────────
   static String get signUp => '$baseUrl/users/signup';

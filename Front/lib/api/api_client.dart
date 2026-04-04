@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../services/auth_service.dart';
+import '../config/api_config.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://192.168.51.99:3000/api';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<Map<String, String>> _getAuthHeaders(bool auth) async {
     final headers = <String, String>{'Content-Type': 'application/json'};

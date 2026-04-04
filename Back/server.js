@@ -7,7 +7,9 @@ const helmet = require("helmet");
 const cors = require("cors");
 const mongoSanitize = require("express-mongo-sanitize");
 const mongoose = require("mongoose");
+
 const db = require("./config/db");
+db();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");
