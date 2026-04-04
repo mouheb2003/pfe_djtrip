@@ -59,23 +59,27 @@ class ActivityModel {
       prix: (json['prix'] as num? ?? 0).toDouble(),
       capaciteMax: (json['capacite_max'] as num? ?? 0).toInt(),
       nombreReservations: (json['nombre_reservations'] as num? ?? 0).toInt(),
-      photos: List<String>.from(json['photos'] as List? ?? []),
-      languesDisponibles: List<String>.from(
-        json['langues_disponibles'] as List? ?? ['French'],
-      ),
-      equipementsInclus: List<String>.from(
-        json['equipements_inclus'] as List? ?? [],
-      ),
-      aApporter: List<String>.from(json['a_apporter'] as List? ?? []),
-      niveauDifficulte: json['niveau_difficulte'] as String? ?? 'Easy',
+      photos: (json['photos'] is List) 
+          ? List<String>.from(json['photos'] as List) 
+          : [],
+      languesDisponibles: (json['langues_disponibles'] is List)
+          ? List<String>.from(json['langues_disponibles'] as List)
+          : const ['French'],
+      equipementsInclus: (json['equipements_inclus'] is List)
+          ? List<String>.from(json['equipements_inclus'] as List)
+          : const [],
+      aApporter: (json['a_apporter'] is List)
+          ? List<String>.from(json['a_apporter'] as List)
+          : const [],
+      niveauDifficulte: json['niveau_difficulte']?.toString() ?? 'Easy',
       noteMoyenne: (json['note_moyenne'] as num? ?? 0).toDouble(),
       nombreAvis: (json['nombre_avis'] as num? ?? 0).toInt(),
-      statut: json['statut'] as String? ?? 'active',
+      statut: json['statut']?.toString() ?? 'active',
       dateDebut: json['date_debut'] != null
-          ? DateTime.tryParse(json['date_debut'])
+          ? DateTime.tryParse(json['date_debut'].toString())
           : null,
       dateFin: json['date_fin'] != null
-          ? DateTime.tryParse(json['date_fin'])
+          ? DateTime.tryParse(json['date_fin'].toString())
           : null,
       organisateur: json['organisateur_id'] is Map<String, dynamic>
           ? json['organisateur_id'] as Map<String, dynamic>

@@ -76,7 +76,7 @@ class InscriptionModel {
   String get statusLabel {
     switch (statut) {
       case 'approuvee':
-        return 'Confirmed';
+        return 'Approved';
       case 'en_attente':
         return 'Pending';
       case 'refusee':

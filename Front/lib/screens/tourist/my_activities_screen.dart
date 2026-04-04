@@ -31,14 +31,20 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   Future<void> _load() async {
     try {
+      print('DEBUG: Loading activities timeline...');
       final result = await ActivityService.getActivitiesByTimeline();
       if (!mounted) return;
+      print('DEBUG: Activity timeline loaded. Counts: '
+            'Upcoming=${result['upcoming']?.length}, '
+            'Ongoing=${result['ongoing']?.length}, '
+            'Past=${result['past']?.length}');
       setState(() {
         _buckets = result;
         _isLoading = false;
         _errorMessage = null;
       });
     } catch (e) {
+      print('DEBUG: Error loading activities: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -112,13 +118,18 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ActivityDetailScreen(activityId: activity.id, viewOnly: true),
+        builder: (_) => ActivityDetailScreen(
+          activityId: activity.id,
+          viewOnly: _tabIndex != 0, // Only Upcoming shows Book button
+        ),
       ),
     );
   }
 
-  // Always show 'View Details' — the tourist already has a booking for these.
-  String _buttonLabelForTab() => 'View Details';
+  String _buttonLabelForTab() {
+    if (_tabIndex == 0) return 'Book Now';
+    return 'View Details';
+  }
 
   String _statusBadgeFor(ActivityModel activity) {
     switch (_tabIndex) {

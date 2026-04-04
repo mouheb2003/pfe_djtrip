@@ -43,32 +43,33 @@ class ActivityService {
 
   /// Fetch all activities grouped by timeline (upcoming, ongoing, past)
   static Future<Map<String, List<ActivityModel>>> getActivitiesByTimeline() async {
-    try {
-      final res = await ApiClient.get('/activites/timeline', auth: false);
-      if (res.statusCode == 200) {
-        final body = _safeObject(res.body);
-        if (body['success'] == true && body['data'] != null) {
-          final data = body['data'] as Map<String, dynamic>;
-          
-          List<ActivityModel> parseList(dynamic listRaw) {
-            if (listRaw is! List) return [];
-            return listRaw.map((e) {
-              try { return ActivityModel.fromJson(e); } 
-              catch (err) { return null; }
-            }).whereType<ActivityModel>().toList();
-          }
-
-          return {
-            'upcoming': parseList(data['upcoming']),
-            'ongoing': parseList(data['ongoing']),
-            'past': parseList(data['past']),
-          };
+    final res = await ApiClient.get('/activites/timeline', auth: false);
+    if (res.statusCode == 200) {
+      final body = _safeObject(res.body);
+      if (body['success'] == true && body['data'] != null) {
+        final data = body['data'] as Map<String, dynamic>;
+        
+        List<ActivityModel> parseList(dynamic listRaw) {
+          if (listRaw is! List) return [];
+          return listRaw.map((e) {
+            try { return ActivityModel.fromJson(e); } 
+            catch (err) { 
+              print('Error parsing ActivityModel: $err');
+              return null; 
+            }
+          }).whereType<ActivityModel>().toList();
         }
+
+        return {
+          'upcoming': parseList(data['upcoming']),
+          'ongoing': parseList(data['ongoing']),
+          'past': parseList(data['past']),
+        };
       }
-      return {'upcoming': [], 'ongoing': [], 'past': []};
-    } catch (_) {
-      return {'upcoming': [], 'ongoing': [], 'past': []};
     }
+    
+    // If not 200 or malformed, throw descriptive error
+    throw Exception('Failed to load activity timeline (Status: ${res.statusCode})');
   }
 
   /// Fetch a single activity by id.
