@@ -22,13 +22,31 @@ router.post(
   inscriptionController.createInscription,
 );
 
-// Get all registrations for the logged-in tourist
+// Get all registrations for the logged-in tourist (Legacy, keeping for backwards compatibility)
 router.get(
   "/mes-inscriptions",
   verifyToken,
   verifyTouriste,
   cacheGet("inscriptions:touriste", 60),
   inscriptionController.getInscriptionsByTouriste,
+);
+
+// Get my activities for the logged-in tourist (bucketed by date)
+router.get(
+  "/touriste/my-activities",
+  verifyToken,
+  verifyTouriste,
+  cacheGet("inscriptions:touriste:activities", 60),
+  inscriptionController.getMyActivities,
+);
+
+// Get my bookings for the logged-in tourist (bucketed by status)
+router.get(
+  "/touriste/my-bookings",
+  verifyToken,
+  verifyTouriste,
+  cacheGet("inscriptions:touriste:bookings", 60),
+  inscriptionController.getMyBookings,
 );
 
 // Cancel a registration (Tourist only)

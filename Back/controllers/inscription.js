@@ -156,6 +156,97 @@ exports.getInscriptionsByTouriste = async (req, res) => {
   }
 };
 
+// Get my activities for Tourist (only approved, bucketed by date)
+exports.getMyActivities = async (req, res) => {
+  try {
+    await expirePendingInscriptionsForEndedActivities();
+
+    const touristeId = req.user.userId;
+    // Only approved activities
+    const inscriptions = await Inscription.find({
+      touriste_id: touristeId,
+      statut: "approuvee",
+    })
+      .populate("activite_id")
+      .populate("organisateur_id", "fullname email avatar num_tel")
+      .sort({ createdAt: -1 });
+
+    const now = new Date();
+    const upcoming = [];
+    const ongoing = [];
+    const past = [];
+
+    inscriptions.forEach((ins) => {
+      const act = ins.activite_id;
+      if (!act) {
+        upcoming.push(ins);
+        return;
+      }
+      
+      const start = act.date_debut || act.dateDebut;
+      const end = act.date_fin || act.dateFin;
+      let dStart = start ? new Date(start) : null;
+      let dEnd = end ? new Date(end) : null;
+
+      if (!dStart && !dEnd) {
+        upcoming.push(ins);
+      } else if (dStart && now < dStart) {
+        upcoming.push(ins);
+      } else if (dStart && dEnd && now >= dStart && now < dEnd) {
+        ongoing.push(ins);
+      } else if (dEnd && now >= dEnd) {
+        past.push(ins);
+      } else {
+        // fallback (e.g. only start exists, and we're past it)
+        past.push(ins);
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { upcoming, ongoing, past },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving activities",
+      error: error.message,
+    });
+  }
+};
+
+// Get my bookings for Tourist (all requests, bucketed by status)
+exports.getMyBookings = async (req, res) => {
+  try {
+    await expirePendingInscriptionsForEndedActivities();
+
+    const touristeId = req.user.userId;
+    const inscriptions = await Inscription.find({ touriste_id: touristeId })
+      .populate("activite_id")
+      .populate("organisateur_id", "fullname email avatar num_tel")
+      .sort({ createdAt: -1 });
+
+    const pending = [];
+    const confirmed = [];
+    const cancelled = [];
+
+    inscriptions.forEach((ins) => {
+      if (ins.statut === "en_attente") pending.push(ins);
+      else if (ins.statut === "approuvee") confirmed.push(ins);
+      else cancelled.push(ins); // annulee, refusee
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { pending, confirmed, cancelled },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error retrieving bookings",
+      error: error.message,
+    });
+  }
+};
+
 // Get registrations for an organizer (all requests)
 exports.getInscriptionsByOrganisateur = async (req, res) => {
   try {
