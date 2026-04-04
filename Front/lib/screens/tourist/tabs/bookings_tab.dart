@@ -257,7 +257,7 @@ class _BookingsSegmentedControl extends StatelessWidget {
       ),
       child: Row(
         children: List.generate(3, (index) {
-          final label = ['Pending', 'Confirmed', 'Cancelled'][index];
+          final label = ['Pending', 'Approved', 'Cancelled'][index];
           final active = currentIndex == index;
           return Expanded(
             child: InkWell(

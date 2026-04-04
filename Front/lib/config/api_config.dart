@@ -2,8 +2,8 @@ class ApiConfig {
   static const bool isProd = true;
 
   static const List<String> devUrls = [
-    'http://192.168.1.196:3000',
-    'http://192.168.1.10:3000',
+    'http://10.0.2.2:3000',
+    'http://192.168.51.99:3000',
   ];
 
   static String get serverBaseUrl {
