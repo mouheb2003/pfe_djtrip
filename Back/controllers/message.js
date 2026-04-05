@@ -21,6 +21,12 @@ const uploadMediaBuffer = (buffer, folder, resourceType = "video") =>
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const currentUser = await User.findById(userId).select(
+      "archivedConversationPartners",
+    );
+    const archivedPartners = new Set(
+      (currentUser?.archivedConversationPartners || []).map(String),
+    );
 
     // All messages involving this user, newest first
     const messages = await Message.find({
@@ -58,11 +64,68 @@ exports.getConversations = async (req, res) => {
         if (payload.message_type === "video" && !payload.content) {
           payload.content = "🎬 Video message";
         }
-        return { partner, lastMessage: payload, unreadCount };
+        return {
+          partner,
+          lastMessage: payload,
+          unreadCount,
+          archived: archivedPartners.has(partnerId),
+        };
       }),
     );
 
     res.json(conversations);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.archiveConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { partnerId } = req.params;
+
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { archivedConversationPartners: partnerId },
+    });
+
+    res.status(200).json({ success: true, archived: true, partnerId });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.unarchiveConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { partnerId } = req.params;
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { archivedConversationPartners: partnerId },
+    });
+
+    res.status(200).json({ success: true, archived: false, partnerId });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteConversation = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { partnerId } = req.params;
+
+    await Message.deleteMany({
+      $or: [
+        { sender_id: userId, receiver_id: partnerId },
+        { sender_id: partnerId, receiver_id: userId },
+      ],
+    });
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { archivedConversationPartners: partnerId },
+    });
+
+    res.status(200).json({ success: true, partnerId });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

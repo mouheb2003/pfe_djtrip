@@ -84,12 +84,14 @@ class ActivityService {
   /// Fetch all activities with optional filters.
   static Future<List<ActivityModel>> getActivities({
     Map<String, String>? filters,
+    bool refresh = false,
   }) async {
     try {
       final res = await ApiClient.get(
         '/activites',
         auth: false,
         query: filters,
+        cacheFirst: !refresh,
       );
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
@@ -168,24 +170,40 @@ class ActivityService {
   }
 
   /// Organizer: fetch their own active activities.
-  static Future<List<ActivityModel>> getMyActivities() async {
+  static Future<List<ActivityModel>> getMyActivities({bool refresh = false}) async {
     try {
-      final res = await ApiClient.get('/activites/my-activities');
+      final res = await ApiClient.get(
+        '/activites/my-activities',
+        cacheFirst: !refresh,
+      );
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
         final list = _safeMapList(body['activities'] ?? body['activites']);
-        return list.map(ActivityModel.fromJson).toList();
+        
+        // Map safely to avoid one bad activity crashing the whole list
+        return list.map((item) {
+          try {
+            return ActivityModel.fromJson(item);
+          } catch (e) {
+            print('❌ Skipping corrupted activity in list: $e');
+            return null;
+          }
+        }).whereType<ActivityModel>().toList();
       }
       return [];
-    } catch (_) {
+    } catch (e) {
+      print('❌ getMyActivities failed: $e');
       return [];
     }
   }
 
   /// Organizer: fetch archived activities.
-  static Future<List<ActivityModel>> getArchivedActivities() async {
+  static Future<List<ActivityModel>> getArchivedActivities({bool refresh = false}) async {
     try {
-      final res = await ApiClient.get('/activites/archived');
+      final res = await ApiClient.get(
+        '/activites/archived',
+        cacheFirst: !refresh,
+      );
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
         final list = _safeMapList(body['activities'] ?? body['activites']);
@@ -236,6 +254,10 @@ class ActivityService {
     DateTime? dateFin,
     List<File> photos = const [],
     List<String> equipementsInclus = const [],
+    List<String> aApporter = const [],
+    List<String> languesDisponibles = const [],
+    String? niveauDifficulte,
+    String? statut,
     Map<String, dynamic>? coordonnees,
   }) async {
     try {
@@ -268,6 +290,22 @@ class ActivityService {
         request.fields['equipements_inclus'] = jsonEncode(equipementsInclus);
       }
 
+      if (aApporter.isNotEmpty) {
+        request.fields['a_apporter'] = jsonEncode(aApporter);
+      }
+
+      if (languesDisponibles.isNotEmpty) {
+        request.fields['langues_disponibles'] = jsonEncode(languesDisponibles);
+      }
+
+      if (niveauDifficulte != null && niveauDifficulte.isNotEmpty) {
+        request.fields['niveau_difficulte'] = niveauDifficulte;
+      }
+
+      if (statut != null && statut.isNotEmpty) {
+        request.fields['statut'] = statut;
+      }
+
       if (coordonnees != null) {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
       }
@@ -285,6 +323,8 @@ class ActivityService {
       final body = _safeObject(res.body);
 
       if (res.statusCode == 201 || res.statusCode == 200) {
+        // Invalidate cache for my-activities and all activities
+        await ApiService.instance.invalidateByPrefix('GET:${ApiClient.baseUrl}/activites');
         return {'success': true, 'activite': body['activite'] ?? body};
       }
       return {
@@ -311,6 +351,10 @@ class ActivityService {
     DateTime? dateFin,
     List<File> newPhotos = const [],
     List<String> equipementsInclus = const [],
+    List<String> aApporter = const [],
+    List<String> languesDisponibles = const [],
+    String? niveauDifficulte,
+    String? statut,
     Map<String, dynamic>? coordonnees,
   }) async {
     try {
@@ -343,6 +387,22 @@ class ActivityService {
         request.fields['equipements_inclus'] = jsonEncode(equipementsInclus);
       }
 
+      if (aApporter.isNotEmpty) {
+        request.fields['a_apporter'] = jsonEncode(aApporter);
+      }
+
+      if (languesDisponibles.isNotEmpty) {
+        request.fields['langues_disponibles'] = jsonEncode(languesDisponibles);
+      }
+
+      if (niveauDifficulte != null && niveauDifficulte.isNotEmpty) {
+        request.fields['niveau_difficulte'] = niveauDifficulte;
+      }
+
+      if (statut != null && statut.isNotEmpty) {
+        request.fields['statut'] = statut;
+      }
+
       if (coordonnees != null) {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
       }
@@ -360,6 +420,8 @@ class ActivityService {
       final body = _safeObject(res.body);
 
       if (res.statusCode == 200) {
+        // Invalidate cache for my-activities and all activities
+        await ApiService.instance.invalidateByPrefix('GET:${ApiClient.baseUrl}/activites');
         return {'success': true, 'activite': body['activite'] ?? body};
       }
       return {

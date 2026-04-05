@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
+import '../../../widgets/auto_image_carousel.dart';
 import 'requests_tab.dart';
 
 import '../create_activity_screen.dart';
@@ -15,9 +16,7 @@ class MyActivitiesTab extends StatefulWidget {
 }
 
 class _MyActivitiesTabState extends State<MyActivitiesTab> {
-  int _tabIndex = 0;
   List<ActivityModel> _activeActivities = [];
-  List<ActivityModel> _archivedActivities = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -34,45 +33,19 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
     super.dispose();
   }
 
-  Future<void> _loadActivities() async {
+  Future<void> _loadActivities({bool refresh = false}) async {
     try {
-      final active = await ActivityService.getMyActivities();
-      final archived = await ActivityService.getArchivedActivities();
-
-      // Apply client-side timeline filtering to ensure correctness
-      final now = DateTime.now();
-      final upcoming = <ActivityModel>[];
-      final ongoing = <ActivityModel>[];
-      final past = <ActivityModel>[];
-
-      // Process active activities (should be upcoming/ongoing)
-      for (final activity in active) {
-        final status = activity.timelineStatus;
-        if (status == 'UPCOMING') {
-          upcoming.add(activity);
-        } else if (status == 'ONGOING') {
-          ongoing.add(activity);
-        } else if (status == 'PAST') {
-          past.add(activity);
-        }
-      }
-
-      // Add archived activities to past
-      past.addAll(archived);
-
-      // Combine upcoming and ongoing as "active" for the organizer
-      final combinedActive = <ActivityModel>[];
-      combinedActive.addAll(upcoming);
-      combinedActive.addAll(ongoing);
+      final active = await ActivityService.getMyActivities(refresh: refresh);
+      debugPrint('Loaded ${active.length} my activities (refresh: $refresh)');
 
       if (mounted) {
         setState(() {
-          _activeActivities = combinedActive;
-          _archivedActivities = past;
+          _activeActivities = active;
           _isLoading = false;
         });
       }
     } catch (e) {
+      debugPrint('Error loading activities: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -83,8 +56,13 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       }
     }
   }
+  List<String> get _tabs => ['Active (${_activeActivities.length})'];
 
   List<ActivityModel> get _currentActivities {
+    return _activeActivitiesFiltered;
+  }
+
+  List<ActivityModel> get _activeActivitiesFiltered {
     List<ActivityModel> activities = _activeActivities;
 
     if (_searchQuery.isNotEmpty) {
@@ -102,14 +80,52 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
     return activities;
   }
 
-  List<String> get _tabs => ['Active (${_activeActivities.length})'];
+  Future<void> _deleteActivity(ActivityModel activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Activity?'),
+        content: Text('Are you sure you want to delete "${activity.titre}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    final success = await ActivityService.deleteActivity(activity.id);
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Activity deleted successfully.')),
+        );
+        _loadActivities(refresh: true);
+      } else {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete activity.')),
+        );
+      }
+    }
+  }
 
   Widget _buildBottomSearchDock() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -121,15 +137,15 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.search, color: AppColors.primary, size: 20),
+            child: const Icon(Icons.search, color: AppColors.primary, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _searchController,
@@ -138,11 +154,12 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                   _searchQuery = val.trim();
                 });
               },
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Search activity, place, type...',
                 border: InputBorder.none,
                 isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 suffixIcon: _searchQuery.isEmpty
                     ? null
                     : IconButton(
@@ -211,9 +228,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                 scrollDirection: Axis.horizontal,
                 itemCount: _tabs.length,
                 itemBuilder: (ctx, i) {
-                  final active = i == _tabIndex;
+                  const active = true;
                   return GestureDetector(
-                    onTap: () => setState(() => _tabIndex = i),
+                    onTap: () {}, // Single tab, no action needed
                     child: Padding(
                       padding: const EdgeInsets.only(right: 32),
                       child: Column(
@@ -250,7 +267,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
             // Activity list
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _loadActivities,
+                onRefresh: () => _loadActivities(refresh: true),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
@@ -288,7 +305,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _ActivityCard(
                             activity: a,
-                            onTap: () async {
+                            onEditTap: () async {
                               final updated = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
@@ -296,8 +313,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                       EditActivityScreen(activity: a),
                                 ),
                               );
-                              if (updated == true) _loadActivities();
+                              if (updated == true) _loadActivities(refresh: true);
                             },
+                            onDeleteTap: () => _deleteActivity(a),
                           ),
                         ),
                       ),
@@ -358,7 +376,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                 context,
                 MaterialPageRoute(builder: (_) => const CreateActivityScreen()),
               );
-              if (created == true) _loadActivities();
+              if (created == true) _loadActivities(refresh: true);
             },
             child: const Padding(
               padding: EdgeInsets.all(12),
@@ -373,9 +391,14 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
 
 class _ActivityCard extends StatelessWidget {
   final ActivityModel activity;
-  final VoidCallback onTap;
+  final VoidCallback onEditTap;
+  final VoidCallback onDeleteTap;
 
-  const _ActivityCard({required this.activity, required this.onTap});
+  const _ActivityCard({
+    required this.activity,
+    required this.onEditTap,
+    required this.onDeleteTap,
+  });
 
   String _getTimelineBadge() {
     final status = activity.timelineStatus;
@@ -411,133 +434,194 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withOpacity(0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Thumbnail with badge
-            Stack(
+    final numReservations = activity.nombreReservations;
+    final capacity = activity.capaciteMax;
+    final statusColor = _getTimelineBadgeColor();
+    final durationHours = activity.duree ~/ 60;
+    final durationMinutes = activity.duree % 60;
+    final durationText = durationHours > 0
+        ? '${durationHours}h ${durationMinutes}m'
+        : '${durationMinutes}m';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Image header
+          AutoImageCarousel(
+            imageUrls: activity.photos,
+            aspectRatio: 16 / 9,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            fit: BoxFit.cover,
+            showIndicators: activity.photos.length > 1,
+            interval: const Duration(seconds: 3),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Hero(
-                  tag: 'activity_img_${activity.id}',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 85,
-                      height: 85,
-                      child: Image.network(
-                        activity.thumbnailUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey[100],
-                          child: const Icon(Icons.image, color: Colors.grey),
-                        ),
-                      ),
+                // Title
+                Text(
+                  activity.titre,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E293B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                // Status label
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _getTimelineBadge().toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ),
-                Positioned(
-                  top: 4,
-                  left: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
+                const SizedBox(height: 12),
+                // Booking status
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Booking Status',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$numReservations/$capacity places booked',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Duration and price row
+                Row(
+                  children: [
+                    // Duration
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          durationText,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ],
                     ),
-                    decoration: BoxDecoration(
-                      color: _getTimelineBadgeColor(),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _getTimelineBadge(),
+                    const SizedBox(width: 20),
+                    // Price
+                    Text(
+                      activity.prixFormatted,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
                       ),
                     ),
-                  ),
+                    const Spacer(),
+                    // Actions: Edit and Delete
+                    Row(
+                      children: [
+                        // Delete button
+                        InkWell(
+                          onTap: onDeleteTap,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              size: 20,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Modify button
+                        InkWell(
+                          onTap: activity.timelineStatus == 'ONGOING'
+                              ? null
+                              : onEditTap,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: activity.timelineStatus == 'ONGOING'
+                                  ? Colors.grey.withOpacity(0.1)
+                                  : AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.edit_outlined,
+                              size: 20,
+                              color: activity.timelineStatus == 'ONGOING'
+                                  ? Colors.grey.shade400
+                                  : AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.titre,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.group_outlined,
-                        size: 14,
-                        color: AppColors.textGrey,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${activity.nombreReservations}/${activity.capaciteMax} places',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        activity.prixFormatted,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

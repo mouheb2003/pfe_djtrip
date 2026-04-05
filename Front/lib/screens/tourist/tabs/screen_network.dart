@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,163 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   bool _isFetching = false;
   String _currentUserId = '';
   Timer? _autoRefreshTimer;
+  late final ScrollController _scrollController;
+  bool _isScrolled = false;
   final Map<String, _LocalLikeState> _localLikeStateByPost = {};
+  _FeedFilter _activeFilter = _FeedFilter.all;
+
+  List<Map<String, dynamic>> get _visiblePosts {
+    switch (_activeFilter) {
+      case _FeedFilter.all:
+        return _posts;
+      case _FeedFilter.recent24h:
+        final threshold = DateTime.now().subtract(const Duration(hours: 24));
+        return _posts.where((post) {
+          final created = DateTime.tryParse(
+            post['createdAt']?.toString() ?? '',
+          );
+          return created != null && created.isAfter(threshold);
+        }).toList();
+      case _FeedFilter.withPhotos:
+        return _posts.where(_hasPhotos).toList();
+      case _FeedFilter.withLocation:
+        return _posts.where((post) {
+          final location = (post['location_label'] as String?)?.trim() ?? '';
+          return location.isNotEmpty;
+        }).toList();
+      case _FeedFilter.withHashtags:
+        return _posts.where((post) {
+          final hashtags =
+              (post['hashtags'] as List?)?.whereType<String>().toList() ??
+              const <String>[];
+          return hashtags.any((tag) => tag.trim().isNotEmpty);
+        }).toList();
+    }
+  }
+
+  bool _hasPhotos(Map<String, dynamic> post) {
+    final imageUrls =
+        (post['image_urls'] as List?)
+            ?.whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList() ??
+        const <String>[];
+    if (imageUrls.isNotEmpty) return true;
+    final imageUrl = (post['image_url'] as String?)?.trim() ?? '';
+    return imageUrl.isNotEmpty;
+  }
+
+  String get _activeFilterLabel {
+    switch (_activeFilter) {
+      case _FeedFilter.all:
+        return 'All publications';
+      case _FeedFilter.recent24h:
+        return 'Last 24 hours';
+      case _FeedFilter.withPhotos:
+        return 'With photos';
+      case _FeedFilter.withLocation:
+        return 'With location';
+      case _FeedFilter.withHashtags:
+        return 'With hashtags';
+    }
+  }
+
+  Future<void> _openFilterSheet() async {
+    final selected = await showModalBottomSheet<_FeedFilter>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        var localFilter = _activeFilter;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Filter publications',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1F235F),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Filters apply to real posts loaded from the database.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF7A81A8)),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._FeedFilter.values.map((filter) {
+                      return RadioListTile<_FeedFilter>(
+                        dense: true,
+                        activeColor: AppColors.primary,
+                        title: Text(_feedFilterLabel(filter)),
+                        value: filter,
+                        groupValue: localFilter,
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setSheetState(() => localFilter = value);
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context, localFilter),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply filter',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selected != null && mounted) {
+      setState(() => _activeFilter = selected);
+    }
+  }
+
+  String _feedFilterLabel(_FeedFilter filter) {
+    switch (filter) {
+      case _FeedFilter.all:
+        return 'All publications';
+      case _FeedFilter.recent24h:
+        return 'Last 24 hours';
+      case _FeedFilter.withPhotos:
+        return 'With photos';
+      case _FeedFilter.withLocation:
+        return 'With location';
+      case _FeedFilter.withHashtags:
+        return 'With hashtags';
+    }
+  }
 
   String _extractAuthorId(Map<String, dynamic> post) {
     final author = post['author_id'];
@@ -41,6 +198,8 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleScroll);
     _loadFeed();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       _loadFeed(showLoader: false);
@@ -50,7 +209,17 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    final scrolled =
+        _scrollController.hasClients && _scrollController.offset > 8;
+    if (scrolled != _isScrolled && mounted) {
+      setState(() => _isScrolled = scrolled);
+    }
   }
 
   Future<void> _loadFeed({bool showLoader = true}) async {
@@ -148,21 +317,125 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
       body: RefreshIndicator(
         onRefresh: _refreshFeed,
         child: CustomScrollView(
+          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverAppBar(
-              backgroundColor: const Color(0xFFF3F2FA),
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
               elevation: 0,
               pinned: true,
               automaticallyImplyLeading: widget.showBackButton,
               iconTheme: const IconThemeData(color: AppColors.primary),
               centerTitle: false,
+              toolbarHeight: 62,
+              forceElevated: _isScrolled,
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: _isScrolled ? 18 : 10,
+                    sigmaY: _isScrolled ? 18 : 10,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    decoration: BoxDecoration(
+                      color: _isScrolled
+                          ? Colors.white.withValues(alpha: 0.68)
+                          : Colors.white.withValues(alpha: 0.44),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          width: 1,
+                        ),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: _isScrolled ? 18 : 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               title: Text(
                 widget.title,
                 style: const TextStyle(
                   color: Color(0xFF1F235F),
                   fontWeight: FontWeight.w900,
                   fontSize: 22,
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _openFilterSheet,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(
+                            color: const Color(
+                              0xFFD62976,
+                            ).withValues(alpha: 0.28),
+                            width: 1.4,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFFD62976,
+                              ).withValues(alpha: 0.12),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const Icon(
+                              Icons.filter_alt_outlined,
+                              color: Color(0xFF1F235F),
+                              size: 19,
+                            ),
+                            if (_activeFilter != _FeedFilter.all)
+                              const Positioned(
+                                top: 7,
+                                right: 7,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: SizedBox(width: 7, height: 7),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: Text(
+                  _activeFilterLabel,
+                  style: const TextStyle(
+                    color: Color(0xFF6F76A0),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -172,19 +445,25 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (_posts.isEmpty)
-              const SliverFillRemaining(
-                child: Center(child: Text('No posts yet.')),
+            else if (_visiblePosts.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Text(
+                    _activeFilter == _FeedFilter.all
+                        ? 'No posts yet.'
+                        : 'No posts match this filter.',
+                  ),
+                ),
               )
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _NetworkPostCard(
-                    post: _posts[index],
+                    post: _visiblePosts[index],
                     currentUserId: _currentUserId,
                     onLikeChanged: _onLikeChanged,
                   ),
-                  childCount: _posts.length,
+                  childCount: _visiblePosts.length,
                 ),
               ),
           ],
@@ -632,11 +911,11 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
     );
 
     return Container(
-      margin: EdgeInsets.fromLTRB(compact ? 12 : 16, 10, compact ? 12 : 16, 14),
+      margin: const EdgeInsets.fromLTRB(0, 6, 0, 8),
       padding: const EdgeInsets.only(bottom: 2),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(compact ? 16 : 22),
+        borderRadius: BorderRadius.zero,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -779,15 +1058,19 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                   child: Row(
                     children: [
                       Icon(
-                        _isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: AppColors.primary,
-                        size: 22,
+                        _isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: _isLiked
+                            ? const Color(0xFF1F235F)
+                            : const Color(0xFF4E567E),
+                        size: 23,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Text(
                         '$_likesCount',
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 18,
                           color: Color(0xFF2F3566),
                           fontWeight: FontWeight.w600,
                         ),
@@ -801,15 +1084,15 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                   child: Row(
                     children: [
                       const Icon(
-                        Icons.chat_bubble,
-                        size: 20,
-                        color: Color(0xFF5B5E8A),
+                        Icons.mode_comment_rounded,
+                        size: 22,
+                        color: Color(0xFF4E567E),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 5),
                       Text(
                         '$_commentsCount',
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 18,
                           color: Color(0xFF2F3566),
                           fontWeight: FontWeight.w600,
                         ),
@@ -820,12 +1103,16 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                 const SizedBox(width: 22),
                 Row(
                   children: [
-                    const Icon(Icons.share, size: 20, color: Color(0xFF5B5E8A)),
-                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.send_rounded,
+                      size: 22,
+                      color: Color(0xFF4E567E),
+                    ),
+                    const SizedBox(width: 5),
                     Text(
                       '$shares',
                       style: const TextStyle(
-                        fontSize: 19,
+                        fontSize: 18,
                         color: Color(0xFF2F3566),
                         fontWeight: FontWeight.w600,
                       ),
@@ -833,7 +1120,11 @@ class _NetworkPostCardState extends State<_NetworkPostCard> {
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.bookmark, size: 21, color: Color(0xFF5B5E8A)),
+                const Icon(
+                  Icons.bookmark_rounded,
+                  size: 23,
+                  color: Color(0xFF4E567E),
+                ),
               ],
             ),
           ),
@@ -874,3 +1165,5 @@ class _LocalLikeState {
 
   const _LocalLikeState({required this.liked, required this.likesCount});
 }
+
+enum _FeedFilter { all, recent24h, withPhotos, withLocation, withHashtags }

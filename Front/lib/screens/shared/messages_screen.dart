@@ -149,11 +149,15 @@ class _MessagesScreenState extends State<MessagesScreen>
     var list = _conversations;
 
     if (_tabIndex == 1) {
-      list = list.where((c) => c.unreadCount > 0).toList();
+      list = list.where((c) => c.unreadCount > 0 && !c.isArchived).toList();
     } else if (_tabIndex == 2) {
-      list = list.where((c) => c.partnerType.toLowerCase() == 'group').toList();
+      list = list
+          .where((c) => c.partnerType.toLowerCase() == 'group' && !c.isArchived)
+          .toList();
     } else if (_tabIndex == 3) {
-      list = [];
+      list = list.where((c) => c.isArchived).toList();
+    } else {
+      list = list.where((c) => !c.isArchived).toList();
     }
 
     final q = _query.toLowerCase();
@@ -228,22 +232,79 @@ class _MessagesScreenState extends State<MessagesScreen>
                       itemBuilder: (_, i) {
                         final c = _filteredConversations[i];
 
-                        return _MessageTile(
-                          conversation: c,
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatConversationScreen(
-                                  partnerId: c.partnerId,
-                                  partnerName: c.partnerName,
-                                  partnerAvatar: c.partnerAvatar,
-                                  partnerOnline: c.partnerOnline,
+                        return Dismissible(
+                          key: ValueKey('conversation-${c.partnerId}'),
+                          direction: DismissDirection.horizontal,
+                          background: _SwipeActionBackground(
+                            color: c.isArchived
+                                ? const Color(0xFF4F6BFF)
+                                : const Color(0xFF2FBF71),
+                            icon: c.isArchived
+                                ? Icons.unarchive_rounded
+                                : Icons.archive_rounded,
+                            label: c.isArchived ? 'Restore' : 'Archive',
+                            alignment: Alignment.centerLeft,
+                          ),
+                          secondaryBackground: const _SwipeActionBackground(
+                            color: Color(0xFFE53935),
+                            icon: Icons.delete_forever_rounded,
+                            label: 'Delete',
+                            alignment: Alignment.centerRight,
+                          ),
+                          onDismissed: (direction) async {
+                            if (direction == DismissDirection.startToEnd) {
+                              final result = c.isArchived
+                                  ? await MessageService.unarchiveConversation(
+                                      c.partnerId,
+                                    )
+                                  : await MessageService.archiveConversation(
+                                      c.partnerId,
+                                    );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message']?.toString() ??
+                                        (c.isArchived
+                                            ? 'Conversation restored'
+                                            : 'Conversation archived'),
+                                  ),
                                 ),
-                              ),
-                            );
-                            _loadConversations();
+                              );
+                            } else {
+                              final result =
+                                  await MessageService.deleteConversation(
+                                    c.partnerId,
+                                  );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message']?.toString() ??
+                                        'Conversation deleted',
+                                  ),
+                                ),
+                              );
+                            }
+                            await _loadConversations();
                           },
+                          child: _MessageTile(
+                            conversation: c,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatConversationScreen(
+                                    partnerId: c.partnerId,
+                                    partnerName: c.partnerName,
+                                    partnerAvatar: c.partnerAvatar,
+                                    partnerOnline: c.partnerOnline,
+                                  ),
+                                ),
+                              );
+                              _loadConversations();
+                            },
+                          ),
                         );
                       },
                     ),
@@ -427,6 +488,50 @@ class _MessageTile extends StatelessWidget {
                 ),
               )
             : null,
+      ),
+    );
+  }
+}
+
+class _SwipeActionBackground extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String label;
+  final Alignment alignment;
+
+  const _SwipeActionBackground({
+    required this.color,
+    required this.icon,
+    required this.label,
+    required this.alignment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      alignment: alignment,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: alignment == Alignment.centerLeft
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
+        children: [
+          Icon(icon, color: Colors.white, size: 28),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }

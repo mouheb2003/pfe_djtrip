@@ -19,8 +19,11 @@ class ActivityModel {
   final String statut;
   final DateTime? dateDebut;
   final DateTime? dateFin;
+  final List<DateTime> datesDisponibles;
   final Map<String, dynamic>? organisateur;
   final Map<String, dynamic>? coordonnees;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const ActivityModel({
     required this.id,
@@ -43,24 +46,40 @@ class ActivityModel {
     this.statut = 'active',
     this.dateDebut,
     this.dateFin,
+    this.datesDisponibles = const [],
     this.organisateur,
     this.coordonnees,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
+    // Helper to safely parse numbers
+    double toDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? 0.0;
+      return 0.0;
+    }
+
+    int nToInt(dynamic v) {
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? 0;
+      return 0;
+    }
+
     return ActivityModel(
-      id: json['_id'] as String? ?? '',
-      titre: json['titre'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      typeActivite: json['type_activite'] as String? ?? '',
-      categorie: json['categorie'] as String? ?? '',
-      lieu: json['lieu'] as String? ?? '',
-      duree: (json['duree'] as num? ?? 0).toDouble(),
-      prix: (json['prix'] as num? ?? 0).toDouble(),
-      capaciteMax: (json['capacite_max'] as num? ?? 0).toInt(),
-      nombreReservations: (json['nombre_reservations'] as num? ?? 0).toInt(),
-      photos: (json['photos'] is List) 
-          ? List<String>.from(json['photos'] as List) 
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      titre: json['titre']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      typeActivite: json['type_activite']?.toString() ?? '',
+      categorie: json['categorie']?.toString() ?? 'Other',
+      lieu: json['lieu']?.toString() ?? '',
+      duree: toDouble(json['duree']),
+      prix: toDouble(json['prix']),
+      capaciteMax: nToInt(json['capacite_max']),
+      nombreReservations: nToInt(json['nombre_reservations']),
+      photos: (json['photos'] is List)
+          ? List<String>.from(json['photos'] as List)
           : [],
       languesDisponibles: (json['langues_disponibles'] is List)
           ? List<String>.from(json['langues_disponibles'] as List)
@@ -71,9 +90,9 @@ class ActivityModel {
       aApporter: (json['a_apporter'] is List)
           ? List<String>.from(json['a_apporter'] as List)
           : const [],
-      niveauDifficulte: json['niveau_difficulte']?.toString() ?? 'Easy',
-      noteMoyenne: (json['note_moyenne'] as num? ?? 0).toDouble(),
-      nombreAvis: (json['nombre_avis'] as num? ?? 0).toInt(),
+      niveauDifficulte: json['niveau_difficulte']?.toString() ?? 'Moderate',
+      noteMoyenne: toDouble(json['note_moyenne']),
+      nombreAvis: nToInt(json['nombre_avis']),
       statut: json['statut']?.toString() ?? 'active',
       dateDebut: json['date_debut'] != null
           ? DateTime.tryParse(json['date_debut'].toString())
@@ -81,11 +100,23 @@ class ActivityModel {
       dateFin: json['date_fin'] != null
           ? DateTime.tryParse(json['date_fin'].toString())
           : null,
+      datesDisponibles: (json['dates_disponibles'] is List)
+          ? (json['dates_disponibles'] as List)
+                .map((e) => DateTime.tryParse(e.toString()))
+                .whereType<DateTime>()
+                .toList()
+          : const [],
       organisateur: json['organisateur_id'] is Map<String, dynamic>
           ? json['organisateur_id'] as Map<String, dynamic>
           : null,
       coordonnees: json['coordonnees'] is Map<String, dynamic>
           ? json['coordonnees'] as Map<String, dynamic>
+          : null,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
     );
   }
@@ -110,10 +141,15 @@ class ActivityModel {
       'note_moyenne': noteMoyenne,
       'nombre_avis': nombreAvis,
       'statut': statut,
+      'dates_disponibles': datesDisponibles
+          .map((d) => d.toIso8601String())
+          .toList(),
       'date_debut': dateDebut?.toIso8601String(),
       'date_fin': dateFin?.toIso8601String(),
       'organisateur_id': organisateur,
       'coordonnees': coordonnees,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 
@@ -137,26 +173,32 @@ class ActivityModel {
   // Activity timeline status logic
   String get timelineStatus {
     final now = DateTime.now();
-    
+
     if (dateDebut == null) {
       return 'UNKNOWN';
     }
-    
+
     if (dateFin == null) {
       // If only start date, consider it single day activity
-      final startOfDay = DateTime(dateDebut!.year, dateDebut!.month, dateDebut!.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
-      
+      final startOfDay = DateTime(
+        dateDebut!.year,
+        dateDebut!.month,
+        dateDebut!.day,
+      );
+      final endOfDay = startOfDay
+          .add(const Duration(days: 1))
+          .subtract(const Duration(milliseconds: 1));
+
       if (now.isBefore(startOfDay)) return 'UPCOMING';
       if (now.isAfter(endOfDay)) return 'PAST';
       return 'ONGOING';
     }
-    
+
     // Both start and end dates available
     if (now.isBefore(dateDebut!)) return 'UPCOMING';
     if (now.isAfter(dateFin!)) return 'PAST';
     if (now.isAfter(dateDebut!) && now.isBefore(dateFin!)) return 'ONGOING';
-    
+
     return 'UNKNOWN';
   }
 

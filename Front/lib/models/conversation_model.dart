@@ -9,6 +9,7 @@ class ConversationModel {
   final String lastMessageContent;
   final DateTime? lastMessageTime;
   final int unreadCount;
+  final bool isArchived;
 
   const ConversationModel({
     required this.partnerId,
@@ -19,6 +20,7 @@ class ConversationModel {
     required this.lastMessageContent,
     this.lastMessageTime,
     this.unreadCount = 0,
+    this.isArchived = false,
   });
 
   static Map<String, dynamic> _asMap(dynamic value) {
@@ -64,6 +66,7 @@ class ConversationModel {
           ? DateTime.tryParse(lastMsg['createdAt'].toString())
           : null,
       unreadCount: (json['unreadCount'] as num? ?? 0).toInt(),
+      isArchived: json['archived'] == true,
     );
   }
 
@@ -83,6 +86,7 @@ class ConversationModel {
     String? lastMessageContent,
     DateTime? lastMessageTime,
     int? unreadCount,
+    bool? isArchived,
   }) {
     return ConversationModel(
       partnerId: partnerId,
@@ -93,6 +97,7 @@ class ConversationModel {
       lastMessageContent: lastMessageContent ?? this.lastMessageContent,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 
@@ -106,6 +111,7 @@ class ConversationModel {
       'lastMessageContent': lastMessageContent,
       'lastMessageTime': lastMessageTime?.toIso8601String(),
       'unreadCount': unreadCount,
+      'archived': isArchived,
     };
   }
 }

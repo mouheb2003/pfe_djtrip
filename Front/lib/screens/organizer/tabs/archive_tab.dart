@@ -78,7 +78,17 @@ class _ArchiveTabState extends State<ArchiveTab> {
                 activity.lieu.toLowerCase().contains(q);
           }).toList();
 
-    if (q.isEmpty) return list;
+    list.sort((a, b) {
+      final dateA =
+          a.activity.dateDebut ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final dateB =
+          b.activity.dateDebut ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return dateB.compareTo(dateA);
+    });
+
+    if (q.isEmpty) {
+      return list.take(10).toList();
+    }
 
     list.sort((a, b) {
       final scoreA = _searchScore(a.activity, q);
@@ -157,6 +167,47 @@ class _ArchiveTabState extends State<ArchiveTab> {
       return '${compact}k';
     }
     return value.toString();
+  }
+
+  Future<void> _deleteActivity(ActivityModel activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Activity?'),
+        content: Text(
+          'Are you sure you want to delete "${activity.titre}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    final success = await ActivityService.deleteActivity(activity.id);
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Activity deleted successfully.')),
+        );
+        _fetchArchives();
+      } else {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete activity.')),
+        );
+      }
+    }
   }
 
   Future<void> _showParticipantsSheet(
@@ -406,6 +457,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
                       formatMoney: _formatMoney,
                       onParticipantsTap: () =>
                           _showParticipantsSheet(entry.value.participants),
+                      onDeleteTap: () => _deleteActivity(entry.value.activity),
                       onDetailTap: () {
                         Navigator.push(
                           context,
@@ -759,6 +811,7 @@ class _ArchiveActivityCard extends StatelessWidget {
   final String Function(double) formatMoney;
   final VoidCallback onParticipantsTap;
   final VoidCallback onDetailTap;
+  final VoidCallback onDeleteTap;
 
   const _ArchiveActivityCard({
     required this.activity,
@@ -767,6 +820,7 @@ class _ArchiveActivityCard extends StatelessWidget {
     required this.formatMoney,
     required this.onParticipantsTap,
     required this.onDetailTap,
+    required this.onDeleteTap,
   });
 
   @override
@@ -922,21 +976,45 @@ class _ArchiveActivityCard extends StatelessWidget {
                   const SizedBox(height: 18),
                   Align(
                     alignment: Alignment.bottomRight,
-                    child: GestureDetector(
-                      onTap: onDetailTap,
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE8E5FF),
-                          shape: BoxShape.circle,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Delete Button
+                        GestureDetector(
+                          onTap: onDeleteTap,
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.redAccent,
+                              size: 22,
+                            ),
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.manage_search_rounded,
-                          color: Color(0xFF4B63FF),
-                          size: 22,
+                        const SizedBox(width: 8),
+                        // Detail Button
+                        GestureDetector(
+                          onTap: onDetailTap,
+                          child: Container(
+                            width: 42,
+                            height: 42,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE8E5FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.manage_search_rounded,
+                              color: Color(0xFF4B63FF),
+                              size: 22,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],

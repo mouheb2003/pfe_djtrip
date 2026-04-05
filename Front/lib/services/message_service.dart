@@ -82,6 +82,65 @@ class MessageService {
     }
   }
 
+  static Future<Map<String, dynamic>> archiveConversation(
+    String partnerId,
+  ) async {
+    try {
+      final res = await ApiClient.post(
+        '/messages/conversations/$partnerId/archive',
+        const {},
+      );
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Conversation archived',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to archive conversation right now.',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> unarchiveConversation(
+    String partnerId,
+  ) async {
+    try {
+      final res = await ApiClient.delete(
+        '/messages/conversations/$partnerId/archive',
+      );
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Conversation restored',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to restore conversation right now.',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteConversation(
+    String partnerId,
+  ) async {
+    try {
+      final res = await ApiClient.delete('/messages/conversations/$partnerId');
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Conversation deleted',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to delete conversation right now.',
+      };
+    }
+  }
+
   /// Get total unread message count.
   static Future<int> getUnreadCount() async {
     try {

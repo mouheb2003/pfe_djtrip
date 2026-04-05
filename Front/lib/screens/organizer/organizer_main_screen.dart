@@ -7,14 +7,15 @@ import '../tourist/tabs/screen_network.dart';
 import '../shared/messages_screen.dart';
 
 class OrganizerMainScreen extends StatefulWidget {
-  const OrganizerMainScreen({super.key});
+  final int initialIndex;
+  const OrganizerMainScreen({super.key, this.initialIndex = 0});
 
   @override
   State<OrganizerMainScreen> createState() => _OrganizerMainScreenState();
 }
 
 class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
   final _pages = const [
     MyActivitiesTab(),
@@ -23,6 +24,12 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
     MessagesScreen(),
     OrganizerProfileTab(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex.clamp(0, _pages.length - 1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +148,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.hub,
+                          Icons.public,
                           color: Colors.white,
                           size: 18,
                         ),

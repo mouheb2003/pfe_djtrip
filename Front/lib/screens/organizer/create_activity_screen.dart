@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -9,9 +9,6 @@ import '../../services/activity_service.dart';
 import 'activity_preview_screen.dart';
 import 'map_picker_screen.dart';
 
-//
-// Duration option model
-//
 class _DurOption {
   final String label;
   final double hours;
@@ -19,18 +16,12 @@ class _DurOption {
 }
 
 const _kDurOptions = [
-  _DurOption('30 min', 0.5),
-  _DurOption('1 hour', 1.0),
-  _DurOption('1-2 hours', 1.5),
-  _DurOption('2-3 hours', 2.5),
-  _DurOption('3-4 hours', 3.5),
-  _DurOption('Half day (4h)', 4.0),
-  _DurOption('Full day (8h)', 8.0),
+  _DurOption('2 HOURS', 2.0),
+  _DurOption('4 HOURS', 4.0),
+  _DurOption('HALF DAY', 4.0),
+  _DurOption('FULL DAY', 8.0),
 ];
 
-//
-// Screen
-//
 class CreateActivityScreen extends StatefulWidget {
   const CreateActivityScreen({super.key});
 
@@ -41,38 +32,44 @@ class CreateActivityScreen extends StatefulWidget {
 class _CreateActivityScreenState extends State<CreateActivityScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Basic Info
+  // Core Identity
   final _titleCtrl = TextEditingController();
-  String? _category;
   final _descCtrl = TextEditingController();
+  String? _category;
+  String _difficultyLevel = 'Moderate';
 
-  // Requirements & Equipment
-  final List<String> _requirements = [];
-  final _reqCtrl = TextEditingController();
+  // Logistics
+  final _priceCtrl = TextEditingController(text: '0.00');
+  late final FocusNode _priceFocus = FocusNode();
+  final _capacityCtrl = TextEditingController();
+
+  final List<String> _languages = ['English'];
+  final _langCtrl = TextEditingController();
 
   // Media
   final List<XFile> _photos = [];
 
-  // Pricing
-  final _priceCtrl = TextEditingController(text: '0.00');
-  late final FocusNode _priceFocus = FocusNode();
-  final _capacityCtrl = TextEditingController();
+  // Preparation
+  final List<String> _includedEquipment = [];
+  final _incCtrl = TextEditingController();
+
+  final List<String> _itemsToBring = [];
+  final _bringCtrl = TextEditingController();
 
   // Location
   final _locationCtrl = TextEditingController();
   LatLng? _pickedLatLng;
 
-  // Date & Time
+  // Availability
   DateTime? _startDateTime;
   DateTime? _endDateTime;
-
-  // Duration
   _DurOption? _selectedDuration;
   int _customHours = 0;
   int _customMinutes = 30;
-  bool _isCustom = false;
+  bool _isCustomDuration = false;
 
   bool _isLoading = false;
+  final bool _isPublish = true;
 
   static const _categories = [
     'Guided Tour',
@@ -103,25 +100,64 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     _descCtrl.dispose();
     _priceCtrl.dispose();
     _capacityCtrl.dispose();
+    _langCtrl.dispose();
+    _incCtrl.dispose();
+    _bringCtrl.dispose();
     _locationCtrl.dispose();
-    _reqCtrl.dispose();
     _priceFocus.dispose();
     super.dispose();
   }
 
-  //  Actions
-
-  void _addRequirement() {
-    final val = _reqCtrl.text.trim();
-    if (val.isEmpty) return;
+  void _addLanguage(String l) {
+    if (l.isEmpty || _languages.contains(l)) return;
     setState(() {
-      _requirements.add(val);
-      _reqCtrl.clear();
+      _languages.add(l);
+      _langCtrl.clear();
     });
   }
 
-  void _removeRequirement(int index) {
-    setState(() => _requirements.removeAt(index));
+  Future<void> _showAddLanguagePrompt() async {
+    final ctrl = TextEditingController();
+    final lang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Language'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'e.g. Spanish'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (lang != null && lang.isNotEmpty) {
+      _addLanguage(lang);
+    }
+  }
+
+  void _addEquipment(String eq) {
+    if (eq.isEmpty) return;
+    setState(() {
+      _includedEquipment.add(eq);
+      _incCtrl.clear();
+    });
+  }
+
+  void _addItemToBring(String item) {
+    if (item.isEmpty) return;
+    setState(() {
+      _itemsToBring.add(item);
+      _bringCtrl.clear();
+    });
   }
 
   Future<void> _pickImages() async {
@@ -132,112 +168,46 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     }
   }
 
-  Future<void> _pickDateTime() async {
+  void _recalcEndDate() {
+    if (_startDateTime != null) {
+      final h = _isCustomDuration
+          ? (_customHours + _customMinutes / 60.0)
+          : (_selectedDuration?.hours ?? 3.0);
+      _endDateTime = _startDateTime!.add(Duration(minutes: (h * 60).round()));
+    }
+  }
+
+  Future<void> _pickStartDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        ),
-        child: child!,
-      ),
+      initialDate:
+          _startDateTime ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        ),
-        child: child!,
-      ),
-    );
-    if (time == null) return;
-    setState(() {
-      _startDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
+    if (date != null && mounted) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: _startDateTime != null
+            ? TimeOfDay.fromDateTime(_startDateTime!)
+            : TimeOfDay.now(),
       );
-      // Auto-calculate end date if duration is selected
-      if (_selectedDuration != null) {
-        _endDateTime = _startDateTime!.add(
-          Duration(minutes: (_selectedDuration!.hours * 60).round()),
-        );
+      if (time != null) {
+        setState(() {
+          _startDateTime = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
+          );
+          _recalcEndDate();
+        });
       }
-    });
-  }
-
-  Future<void> _publish() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDuration == null && !_isCustom) {
-      _showError('Please select a duration.');
-      return;
-    }
-    if (_startDateTime == null) {
-      _showError('Please choose a start date and time.');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    final double durationHours = _isCustom
-        ? _customHours + (_customMinutes / 60.0)
-        : _selectedDuration!.hours;
-
-    final endDateTime =
-        _endDateTime ??
-        _startDateTime!.add(Duration(minutes: (durationHours * 60).round()));
-
-    final result = await ActivityService.createActivity(
-      titre: _titleCtrl.text.trim(),
-      typeActivite: _category!,
-      description: _descCtrl.text.trim(),
-      prix: double.tryParse(_priceCtrl.text) ?? 0,
-      capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
-      lieu: _locationCtrl.text.trim(),
-      duree: durationHours,
-      dateDebut: _startDateTime!,
-      dateFin: endDateTime,
-      photos: _photos.map((x) => File(x.path)).toList(),
-      equipementsInclus: List.from(_requirements),
-      coordonnees: _pickedLatLng != null
-          ? {
-              'latitude': _pickedLatLng!.latitude,
-              'longitude': _pickedLatLng!.longitude,
-            }
-          : null,
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Activity published successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showError(result['message'] ?? 'Error publishing activity.');
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
-  }
-
-  void _showCustomDurationPicker() {
+  void _openCustomDuration() {
     int tempH = _customHours;
     int tempM = _customMinutes;
 
@@ -254,45 +224,42 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36,
+                width: 40,
                 height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               const Text(
                 'Custom Duration',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B2352),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Select hours and minutes',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 32),
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           'Hours',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
+                            color: Colors.grey,
                           ),
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 160,
+                          height: 140,
                           child: ListWheelScrollView.useDelegate(
                             itemExtent: 44,
-                            perspective: 0.004,
-                            diameterRatio: 1.6,
+                            perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
                             controller: FixedExtentScrollController(
                               initialItem: tempH,
@@ -300,17 +267,17 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                             onSelectedItemChanged: (i) =>
                                 setModal(() => tempH = i),
                             childDelegate: ListWheelChildBuilderDelegate(
-                              childCount: 13,
+                              childCount: 24,
                               builder: (ctx, i) => Center(
                                 child: Text(
                                   '$i h',
                                   style: TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 22,
                                     fontWeight: tempH == i
                                         ? FontWeight.bold
-                                        : FontWeight.w400,
+                                        : FontWeight.w500,
                                     color: tempH == i
-                                        ? AppColors.primary
+                                        ? const Color(0xFF4A65E6)
                                         : Colors.grey[500],
                                   ),
                                 ),
@@ -321,36 +288,31 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 20),
-                    child: Text(
-                      ':',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[400],
-                      ),
+                  const Text(
+                    ':',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
                     ),
                   ),
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           'Minutes',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
+                            color: Colors.grey,
                           ),
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 160,
+                          height: 140,
                           child: ListWheelScrollView.useDelegate(
                             itemExtent: 44,
-                            perspective: 0.004,
-                            diameterRatio: 1.6,
+                            perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
                             controller: FixedExtentScrollController(
                               initialItem: tempM ~/ 5,
@@ -365,12 +327,12 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                                   child: Text(
                                     '${mins.toString().padLeft(2, '0')} min',
                                     style: TextStyle(
-                                      fontSize: 20,
+                                      fontSize: 22,
                                       fontWeight: tempM == mins
                                           ? FontWeight.bold
-                                          : FontWeight.w400,
+                                          : FontWeight.w500,
                                       color: tempM == mins
-                                          ? AppColors.primary
+                                          ? const Color(0xFF4A65E6)
                                           : Colors.grey[500],
                                     ),
                                   ),
@@ -384,30 +346,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  tempH == 0 && tempM == 0
-                      ? 'Invalid duration (min. 5 min)'
-                      : '${tempH}h ${tempM}m',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: () {
                     if (tempH == 0 && tempM == 0) return;
@@ -415,28 +357,24 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                     setState(() {
                       _customHours = tempH;
                       _customMinutes = tempM;
-                      _isCustom = true;
+                      _isCustomDuration = true;
                       _selectedDuration = null;
-                      // Auto-calculate end date
-                      if (_startDateTime != null) {
-                        final totalMinutes = (tempH * 60 + tempM).toDouble();
-                        _endDateTime = _startDateTime!.add(
-                          Duration(minutes: totalMinutes.round()),
-                        );
-                      }
+                      _recalcEndDate();
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: const Color(0xFF4A65E6),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: const Text(
                     'Confirm',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -447,593 +385,1078 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     );
   }
 
-  //  Build
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_startDateTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Season Start Date is required'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final double durationHours = _isCustomDuration
+        ? _customHours + (_customMinutes / 60.0)
+        : (_selectedDuration?.hours ?? 3.0);
+
+    final endDateTime =
+        _endDateTime ?? _startDateTime!.add(const Duration(hours: 3));
+
+    final result = await ActivityService.createActivity(
+      titre: _titleCtrl.text.trim(),
+      typeActivite: _category ?? 'Other',
+      description: _descCtrl.text.trim(),
+      prix: double.tryParse(_priceCtrl.text) ?? 0,
+      capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
+      lieu: _locationCtrl.text.trim(),
+      duree: durationHours,
+      dateDebut: _startDateTime!,
+      dateFin: endDateTime,
+      photos: _photos.map((x) => File(x.path)).toList(),
+      equipementsInclus: List.from(_includedEquipment),
+      aApporter: List.from(_itemsToBring),
+      languesDisponibles: List.from(_languages),
+      niveauDifficulte: _difficultyLevel,
+      statut: _isPublish ? 'active' : 'inactive',
+      coordonnees: _pickedLatLng != null
+          ? {
+              'latitude': _pickedLatLng!.latitude,
+              'longitude': _pickedLatLng!.longitude,
+            }
+          : null,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity saved!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Create New Activity',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textDark,
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.borderLight),
+      backgroundColor: const Color(0xFFF8F9FE),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _buildAppBar(),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
+                  children: [
+                    _buildTopHeader(),
+                    const SizedBox(height: 30),
+                    _buildCoreIdentity(),
+                    const SizedBox(height: 30),
+                    _buildMediaGallery(),
+                    const SizedBox(height: 30),
+                    _buildLogistics(),
+                    const SizedBox(height: 30),
+                    _buildLocation(),
+                    const SizedBox(height: 30),
+                    _buildPreparation(),
+                    const SizedBox(height: 30),
+                    _buildAvailability(),
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-          children: [
-            //  Basic Info
-            _SectionTitle(icon: Icons.info, label: 'Basic Info'),
-            const SizedBox(height: 14),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: _buildBottomBar(),
+    );
+  }
 
-            _FieldLabel('Activity Title'),
-            _inputField(
-              controller: _titleCtrl,
-              hint: 'e.g. Desert Safari in Douz',
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required field' : null,
+  Widget _buildAppBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Color(0xFF2E3192),
+              size: 18,
             ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Category'),
-            _dropdownField(),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Description'),
-            TextFormField(
-              controller: _descCtrl,
-              minLines: 4,
-              maxLines: 6,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required field' : null,
-              decoration: _inputDecoration(
-                'Tell participants what makes this activity special...',
+            label: const Text(
+              'Activity Details',
+              style: TextStyle(
+                color: Color(0xFF2E3192),
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 28),
-
-            //  Requirements & Equipment
-            _SectionTitle(
-              icon: Icons.build_circle,
-              label: 'Requirements & Equipment',
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('What to bring / Equipment provided'),
-            _requirementsSection(),
-            const SizedBox(height: 28),
-
-            //  Media
-            _SectionTitle(icon: Icons.image, label: 'Media'),
-            const SizedBox(height: 14),
-            _mediaSection(),
-            const SizedBox(height: 28),
-
-            //  Pricing & Capacity
-            _SectionTitle(
-              icon: Icons.receipt_long,
-              label: 'Pricing & Capacity',
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Price per person'),
-            TextFormField(
-              controller: _priceCtrl,
-              focusNode: _priceFocus,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-              ],
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-              decoration: _inputDecoration('0.00').copyWith(
-                suffixText: 'TND',
-                suffixStyle: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Max Participants'),
-            _inputField(
-              controller: _capacityCtrl,
-              hint: 'e.g. 15',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-            ),
-            const SizedBox(height: 28),
-
-            //  Location
-            _SectionTitle(icon: Icons.location_on, label: 'Location'),
-            const SizedBox(height: 14),
-            _inputField(
-              controller: _locationCtrl,
-              hint: 'Enter activity address',
-              prefixIcon: Icons.search,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required field' : null,
-            ),
-            const SizedBox(height: 10),
-            _mapPickerButton(),
-            if (_pickedLatLng != null) ...[
-              const SizedBox(height: 12),
-              _mapPreview(),
-            ],
-            const SizedBox(height: 28),
-
-            //  Date & Time
-            _SectionTitle(icon: Icons.calendar_month, label: 'Date & Time'),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Start Date & Time'),
-            GestureDetector(
-              onTap: _pickDateTime,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderLight, width: 1.2),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _startDateTime == null
-                            ? 'mm/dd/yyyy, --:-- --'
-                            : DateFormat(
-                                'MM/dd/yyyy, hh:mm a',
-                              ).format(_startDateTime!),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: _startDateTime == null
-                              ? Colors.grey[400]
-                              : AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.calendar_today,
-                      size: 18,
-                      color: AppColors.textGrey,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Duration'),
-            Row(
-              children: [
-                Expanded(child: _durationDropdown()),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _showCustomDurationPicker,
-                  child: Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: _isCustom ? AppColors.primary : Colors.white,
-                      border: Border.all(
-                        color: _isCustom
-                            ? AppColors.primary
-                            : AppColors.borderLight,
-                        width: 1.2,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.tune,
-                      color: _isCustom ? Colors.white : AppColors.textGrey,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_selectedDuration != null || _isCustom) ...[
-              const SizedBox(height: 14),
-              _FieldLabel('End Date & Time'),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderLight, width: 1.2),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _endDateTime != null
-                            ? DateFormat(
-                                'MM/dd/yyyy, hh:mm a',
-                              ).format(_endDateTime!)
-                            : 'Auto-calculated',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.lock, size: 18, color: Colors.grey[400]),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 40),
-
-            //  Preview + Publish
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 54,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ActivityPreviewScreen(
-                              title: _titleCtrl.text.trim(),
-                              category: _category ?? '',
-                              description: _descCtrl.text.trim(),
-                              price: double.tryParse(_priceCtrl.text) ?? 0,
-                              capacity: int.tryParse(_capacityCtrl.text) ?? 0,
-                              location: _locationCtrl.text.trim(),
-                              duration: _selectedDuration?.hours ?? 0,
-                              durationLabel: _selectedDuration?.label ?? '',
-                              startDateTime: _startDateTime,
-                              photos: List.from(_photos),
-                              requirements: List.from(_requirements),
-                              pickedLatLng: _pickedLatLng,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.remove_red_eye,
-                        color: AppColors.primary,
-                      ),
-                      label: const Text(
-                        'Preview',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: AppColors.primary,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _publish,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.rocket_launch_rounded,
-                              color: Colors.white,
-                            ),
-                      label: Text(
-                        _isLoading ? 'Publishing...' : 'Publish Activity',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        elevation: 4,
-                        shadowColor: AppColors.primary.withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Color(0xFF2E3192)),
+            onPressed: () {},
+          ),
+        ],
       ),
     );
   }
 
-  //  Section widgets
-
-  Widget _requirementsSection() {
+  Widget _buildTopHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_requirements.isNotEmpty) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(
-              _requirements.length,
-              (i) => Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _requirements[i],
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () => _removeRequirement(i),
-                      child: const Icon(
-                        Icons.close,
-                        size: 15,
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
         Row(
           children: [
-            Expanded(
-              child: TextFormField(
-                controller: _reqCtrl,
-                decoration: _inputDecoration('Add requirement or equipment...'),
-                onFieldSubmitted: (_) => _addRequirement(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E9FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'ORGANIZER PORTAL',
+                style: TextStyle(
+                  color: Color(0xFF4A65E6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: _addRequirement,
-              child: Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE4EE),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'NEW ACTIVITY',
+                style: TextStyle(
+                  color: Color(0xFFE04987),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
                 ),
-                child: const Icon(Icons.add, color: Colors.white, size: 22),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        const Text(
+          'Create New Activity',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF1B2352),
+          ),
+        ),
         const SizedBox(height: 8),
-        Text(
-          'Add items like gear, clothing, or safety requirements.',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        const Text(
+          'Define your Mediterranean experience. Fields marked with an asterisk are required to publish.',
+          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildMetric('BOOKINGS', '0'),
+              Container(width: 1, height: 30, color: Colors.grey[200]),
+              _buildMetric(
+                'CREATED',
+                DateFormat('MMM dd, yyyy').format(DateTime.now()),
+              ),
+              Container(width: 1, height: 30, color: Colors.grey[200]),
+              _buildMetric('STATUS', 'Draft', isDraft: true),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _mediaSection() {
+  Widget _buildMetric(String label, String val, {bool isDraft = false}) {
     return Column(
       children: [
-        GestureDetector(
-          onTap: _pickImages,
-          child: CustomPaint(
-            painter: _DashedBorderPainter(
-              color: AppColors.primary.withOpacity(0.5),
-              radius: 14,
-            ),
-            child: Container(
-              height: 130,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(14),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            if (isDraft)
+              Container(
+                margin: const EdgeInsets.only(right: 4),
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue,
+                ),
               ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Stack(
+            Text(
+              val,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1B2352),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1B2352),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildCoreIdentity() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(
+          'Core Identity',
+          "The fundamental details that define your activity's brand.",
+        ),
+        _buildTextField(
+          'TITLE (EN/FR) *',
+          'e.g. Sunset Kayaking in Blue Grotto',
+          _titleCtrl,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          'DESCRIPTION *',
+          'Describe the magical experience users will have...',
+          _descCtrl,
+          maxLines: 5,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'ACTIVITY TYPE',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _category,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF3F4FE),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          hint: const Text(
+            'Select category',
+            style: TextStyle(color: Colors.grey),
+          ),
+          items: _categories
+              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+              .toList(),
+          onChanged: (v) => setState(() => _category = v),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'DIFFICULTY LEVEL',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: ['Easy', 'Moderate', 'Difficult', 'Expert']
+              .map(
+                (lvl) => Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _difficultyLevel = lvl),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _difficultyLevel == lvl
+                            ? Colors.white
+                            : const Color(0xFFF3F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                        border: _difficultyLevel == lvl
+                            ? Border.all(
+                                color: const Color(0xFF4A65E6),
+                                width: 1.5,
+                              )
+                            : null,
+                        boxShadow: _difficultyLevel == lvl
+                            ? [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF4A65E6,
+                                  ).withOpacity(0.1),
+                                  blurRadius: 4,
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Text(
+                        lvl,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _difficultyLevel == lvl
+                              ? const Color(0xFF4A65E6)
+                              : Colors.grey[500],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMediaGallery() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(
+          'Media Gallery',
+          'Upload high-quality images to capture the Mediterranean essence.',
+        ),
+        SizedBox(
+          height: 150,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              ..._photos.map(
+                (p) => Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  width: 140,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    image: DecorationImage(
+                      image: FileImage(File(p.path)),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => setState(() => _photos.remove(p)),
+                    ),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _pickImages,
+                child: Container(
+                  width: 140,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FE),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.blue.withOpacity(0.3),
+                      width: 1.5,
+                      style: BorderStyle.none,
+                    ),
+                  ), // Placeholder for dotted
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.camera_alt_outlined,
+                        color: Colors.blue,
+                        size: 30,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'UPLOAD PHOTO',
+                        style: TextStyle(
+                          color: Colors.blue[300],
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogistics() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle(
+            'Logistics',
+            'Setting the price, duration, and guest capacity.',
+          ),
+          _buildTextField(
+            'PRICE PER PERSON (TND)',
+            '0.00',
+            _priceCtrl,
+            icon: const Padding(
+              padding: EdgeInsets.only(top: 15, left: 15),
+              child: Text(
+                'TND',
+                style: TextStyle(
+                  color: Color(0xFF5E6582),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            focus: _priceFocus,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            'MAX CAPACITY',
+            'e.g. 12',
+            _capacityCtrl,
+            suffixIcon: const Icon(
+              Icons.people_outline,
+              color: Color(0xFF5E6582),
+              size: 18,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'LANGUAGES',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ..._languages.map(
+                (l) => Chip(
+                  label: Text(
+                    l,
+                    style: const TextStyle(
+                      color: Color(0xFF4A65E6),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  backgroundColor: const Color(0xFFE2E9FF),
+                  side: BorderSide.none,
+                  onDeleted: () => setState(() => _languages.remove(l)),
+                  deleteIconColor: const Color(0xFF4A65E6),
+                ),
+              ),
+              ActionChip(
+                label: const Text(
+                  '+ ADD',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: const Color(0xFFF3F4FE),
+                side: BorderSide.none,
+                onPressed: _showAddLanguagePrompt,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocation() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(
+          'Location',
+          'Where the magic happens. Use the map to pin exact coordinates.',
+        ),
+        _buildTextField('', 'Search address/lieu...', _locationCtrl),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () async {
+            final result = await Navigator.push<MapPickerResult>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MapPickerScreen(initialPosition: _pickedLatLng),
+              ),
+            );
+            if (result != null)
+              setState(() {
+                _locationCtrl.text = result.address;
+                _pickedLatLng = result.latLng;
+              });
+          },
+          child: Container(
+            height: 160,
+            decoration: BoxDecoration(
+              color: const Color(0xFF131E32),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                if (_pickedLatLng != null)
+                  GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _pickedLatLng!,
+                      zoom: 14,
+                    ),
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('m'),
+                        position: _pickedLatLng!,
+                      ),
+                    },
+                    zoomControlsEnabled: false,
+                    scrollGesturesEnabled: false,
+                    mapType: MapType.normal,
+                  ),
+                Positioned(
+                  bottom: 10,
+                  left: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.photo_camera,
-                            color: AppColors.primary,
-                            size: 28,
+                        Expanded(
+                          child: Text(
+                            _pickedLatLng == null
+                                ? 'Pin location on map'
+                                : '${_pickedLatLng!.latitude.toStringAsFixed(4)}, ${_pickedLatLng!.longitude.toStringAsFixed(4)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: Colors.white,
-                              size: 13,
-                            ),
+                        const Text(
+                          'PIN CHECK',
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Add high-quality photos',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'PNG, JPG up to 10MB',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
-        if (_photos.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 80,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _photos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => Stack(
+      ],
+    );
+  }
+
+  Widget _buildPreparation() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(
+          'Preparation',
+          'What you provide vs. what the guest needs to bring.',
+        ),
+        _buildPrepList(
+          'INCLUDED EQUIPMENT',
+          _includedEquipment,
+          (v) => _addEquipment(v),
+          (v) => setState(() => _includedEquipment.remove(v)),
+          _incCtrl,
+        ),
+        const SizedBox(height: 12),
+        _buildPrepList(
+          'ITEMS TO BRING (A APPORTER)',
+          _itemsToBring,
+          (v) => _addItemToBring(v),
+          (v) => setState(() => _itemsToBring.remove(v)),
+          _bringCtrl,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrepList(
+    String title,
+    List<String> items,
+    Function(String) onAdd,
+    Function(String) onRemove,
+    TextEditingController ctrl,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4FE),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...items.map(
+            (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(_photos[i].path),
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
+                  const Icon(Icons.circle, size: 6, color: Color(0xFF4A65E6)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      i,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _photos.removeAt(i)),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
+                  GestureDetector(
+                    onTap: () => onRemove(i),
+                    child: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Colors.grey,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+          Row(
+            children: [
+              const Icon(
+                Icons.add_circle_outline,
+                size: 16,
+                color: Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: ctrl,
+                  decoration: const InputDecoration(
+                    hintText: 'Add item...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                  onSubmitted: onAdd,
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvailability() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(
+          'Availability',
+          'When is this activity available? Choose the season start and duration.',
+        ),
+        _buildLabel('START DATE'),
+        GestureDetector(
+          onTap: _pickStartDate,
+          child: _dateContainer(
+            _startDateTime != null
+                ? DateFormat('dd/MM/yyyy HH:mm').format(_startDateTime!)
+                : 'Select Start Date...',
+            _startDateTime != null,
+            icon: Icons.calendar_month,
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildLabel('END DATE (AUTO-CALCULATED)'),
+        _dateContainer(
+          _startDateTime != null && _endDateTime != null
+              ? DateFormat('dd/MM/yyyy HH:mm').format(_endDateTime!)
+              : 'Auto calculated after start date...',
+          _startDateTime != null,
+          disabled: true,
+          icon: Icons.lock_outline_rounded,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'DURATION (HOURS)',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4FE),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Text(
+                _isCustomDuration
+                    ? '$_customHours h ${_customMinutes > 0 ? '$_customMinutes min' : ''}'
+                          .trim()
+                    : (_selectedDuration?.label ?? 'Select'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B2352),
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.timer, color: Color(0xFF5E6582), size: 18),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              _kDurOptions
+                  .map(
+                    (opt) => GestureDetector(
+                      onTap: () => setState(() {
+                        _selectedDuration = opt;
+                        _isCustomDuration = false;
+                        _recalcEndDate();
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _selectedDuration == opt
+                              ? const Color(0xFFE2E9FF)
+                              : Colors.white,
+                          border: Border.all(
+                            color: const Color(0xFFF3F4FE),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          opt.label,
+                          style: TextStyle(
+                            color: _selectedDuration == opt
+                                ? const Color(0xFF4A65E6)
+                                : Colors.grey,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList()
+                ..add(
+                  GestureDetector(
+                    onTap: _openCustomDuration,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isCustomDuration
+                            ? const Color(0xFFE2E9FF)
+                            : Colors.white,
+                        border: Border.all(
+                          color: const Color(0xFFF3F4FE),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'CUSTOM',
+                        style: TextStyle(
+                          color: _isCustomDuration
+                              ? const Color(0xFF4A65E6)
+                              : Colors.grey,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
       ],
     );
   }
 
-  Widget _mapPickerButton() {
-    return GestureDetector(
-      onTap: () async {
-        final result = await Navigator.push<MapPickerResult>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MapPickerScreen(initialPosition: _pickedLatLng),
+  Widget _buildTextField(
+    String label,
+    String hint,
+    TextEditingController? ctrl, {
+    int maxLines = 1,
+    Widget? icon,
+    Widget? suffixIcon,
+    FocusNode? focus,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label.isNotEmpty) ...[
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1,
+            ),
           ),
-        );
-        if (result != null) {
-          setState(() {
-            _locationCtrl.text = result.address;
-            _pickedLatLng = result.latLng;
-          });
-        }
-      },
+          const SizedBox(height: 8),
+        ],
+        TextFormField(
+          controller: ctrl,
+          maxLines: maxLines,
+          focusNode: focus,
+          readOnly: readOnly,
+          onTap: onTap,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B2352),
+          ),
+          validator: (v) =>
+              label.contains('*') && (v == null || v.trim().isEmpty)
+              ? 'Required'
+              : null,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontWeight: FontWeight.normal,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF3F4FE),
+            prefixIcon: icon,
+            suffixIcon: suffixIcon,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(color: Color(0xFFF8F9FE)),
       child: Container(
-        height: 50,
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15),
+          ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.map_rounded,
-                color: Colors.white,
-                size: 16,
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ActivityPreviewScreen(
+                          title: _titleCtrl.text.trim(),
+                          category: _category ?? 'Other',
+                          description: _descCtrl.text.trim(),
+                          price: double.tryParse(_priceCtrl.text) ?? 0,
+                          capacity: int.tryParse(_capacityCtrl.text) ?? 0,
+                          location: _locationCtrl.text.trim(),
+                          duration: _isCustomDuration
+                              ? (_customHours + _customMinutes / 60.0)
+                              : (_selectedDuration?.hours ?? 3.0),
+                          durationLabel: _selectedDuration?.label ?? 'Custom',
+                          startDateTime: _startDateTime,
+                          endDateTime: _endDateTime,
+                          photos: List.from(_photos),
+                          requirements: List.from(_includedEquipment),
+                          optional: List.from(_itemsToBring),
+                          pickedLatLng: _pickedLatLng,
+                          difficulty: _difficultyLevel,
+                          languages: List.from(_languages),
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.remove_red_eye_rounded,
+                    color: Color(0xFF4A65E6),
+                    size: 18,
+                  ),
+                  label: const Text(
+                    'Preview',
+                    style: TextStyle(
+                      color: Color(0xFF4A65E6),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFF3F4FE),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              'Pick on Map',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _submit,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.check, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Publish',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F1535),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -1042,230 +1465,60 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     );
   }
 
-  Widget _mapPreview() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: SizedBox(
-        height: 160,
-        child: GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: _pickedLatLng!,
-            zoom: 14,
-          ),
-          markers: {
-            Marker(
-              markerId: const MarkerId('activity'),
-              position: _pickedLatLng!,
-            ),
-          },
-          zoomControlsEnabled: false,
-          scrollGesturesEnabled: false,
-          tiltGesturesEnabled: false,
-          rotateGesturesEnabled: false,
-          myLocationButtonEnabled: false,
-          liteModeEnabled: true,
-        ),
-      ),
-    );
-  }
-
-  Widget _durationDropdown() {
-    return DropdownButtonFormField<_DurOption>(
-      value: _selectedDuration,
-      decoration: _inputDecoration('Select duration').copyWith(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 13,
-        ),
-      ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      validator: (v) =>
-          v == null && !_isCustom ? 'Please select a duration' : null,
-      items: _kDurOptions
-          .map(
-            (opt) => DropdownMenuItem<_DurOption>(
-              value: opt,
-              child: Text(opt.label),
-            ),
-          )
-          .toList(),
-      onChanged: (v) {
-        setState(() {
-          _selectedDuration = v;
-          _isCustom = false;
-          // Auto-calculate end date if start date is set
-          if (_startDateTime != null && v != null) {
-            _endDateTime = _startDateTime!.add(
-              Duration(minutes: (v.hours * 60).round()),
-            );
-          } else {
-            _endDateTime = null;
-          }
-        });
-      },
-    );
-  }
-
-  Widget _dropdownField() {
-    return DropdownButtonFormField<String>(
-      value: _category,
-      decoration: _inputDecoration('Select category'),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      validator: (v) => v == null ? 'Required field' : null,
-      items: _categories
-          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-          .toList(),
-      onChanged: (v) => setState(() => _category = v),
-    );
-  }
-
-  Widget _inputField({
-    required TextEditingController controller,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters,
-    String? Function(String?)? validator,
-    IconData? prefixIcon,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      decoration: _inputDecoration(hint).copyWith(
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, size: 20, color: Colors.grey[400])
-            : null,
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.borderLight),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.borderLight),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red, width: 1.8),
-      ),
-    );
-  }
-}
-
-//  Small helpers
-
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _SectionTitle({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
         style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textDark,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey,
+          letterSpacing: 1,
         ),
       ),
     );
   }
-}
 
-//  Dashed border painter
-
-class _DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  final double dashWidth;
-  final double dashSpace;
-  final double strokeWidth;
-
-  const _DashedBorderPainter({
-    required this.color,
-    this.radius = 12,
-    this.dashWidth = 6,
-    this.dashSpace = 4,
-    this.strokeWidth = 1.6,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
-
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height),
-          Radius.circular(radius),
+  Widget _dateContainer(
+    String text,
+    bool hasValue, {
+    bool disabled = false,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: disabled ? const Color(0xFFF1F5F9) : const Color(0xFFF3F4FE),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasValue && !disabled
+              ? const Color(0xFF4A65E6).withOpacity(0.5)
+              : Colors.transparent,
+          width: 2,
         ),
-      );
-
-    for (final metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        final end = (distance + dashWidth).clamp(0.0, metric.length);
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance += dashWidth + dashSpace;
-      }
-    }
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                color: hasValue ? const Color(0xFF1B2352) : Colors.grey[400],
+              ),
+            ),
+          ),
+          Icon(
+            icon ?? Icons.calendar_today_outlined,
+            size: 18,
+            color: hasValue && !disabled
+                ? const Color(0xFF4A65E6)
+                : Colors.grey[400],
+          ),
+        ],
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(_DashedBorderPainter old) =>
-      old.color != color ||
-      old.radius != radius ||
-      old.dashWidth != dashWidth ||
-      old.dashSpace != dashSpace;
 }

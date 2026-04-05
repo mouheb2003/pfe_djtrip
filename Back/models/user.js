@@ -83,6 +83,10 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     // Favorites (activities)
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Activite" }],
+    // Archived chat partners for the current user
+    archivedConversationPartners: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    ],
     // 🚀 NEW: Activity specialties for organizers
     specialites_activites: [{ type: String }],
   },

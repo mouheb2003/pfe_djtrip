@@ -11,8 +11,9 @@ class MapPickerResult {
 
 class MapPickerScreen extends StatefulWidget {
   final LatLng? initialPosition;
+  final LatLng? initialPoint;
 
-  const MapPickerScreen({super.key, this.initialPosition});
+  const MapPickerScreen({super.key, this.initialPosition, this.initialPoint});
 
   @override
   State<MapPickerScreen> createState() => _MapPickerScreenState();
@@ -29,7 +30,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   @override
   void initState() {
     super.initState();
-    _pickedLatLng = widget.initialPosition ?? _defaultCenter;
+    _pickedLatLng =
+        widget.initialPosition ?? widget.initialPoint ?? _defaultCenter;
     _reverseGeocode(_pickedLatLng);
   }
 

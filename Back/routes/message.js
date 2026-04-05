@@ -53,6 +53,21 @@ router.get(
   cacheGet("messages:conversations", 30),
   messageController.getConversations,
 );
+router.post(
+  "/conversations/:partnerId/archive",
+  invalidateCache(["messages"]),
+  messageController.archiveConversation,
+);
+router.delete(
+  "/conversations/:partnerId/archive",
+  invalidateCache(["messages"]),
+  messageController.unarchiveConversation,
+);
+router.delete(
+  "/conversations/:partnerId",
+  invalidateCache(["messages"]),
+  messageController.deleteConversation,
+);
 router.get(
   "/with/:partnerId",
   cacheGet("messages:thread", 30),

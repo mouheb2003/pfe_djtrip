@@ -1,34 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import 'map_picker_screen.dart';
+import 'activity_debug_screen.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Duration preset model
-// ─────────────────────────────────────────────────────────────────────────────
-class _DurPreset {
-  final String label;
-  final double hours;
-  const _DurPreset(this.label, this.hours);
-}
-
-const _kEditPresets = [
-  _DurPreset('30 min', 0.5),
-  _DurPreset('1h', 1),
-  _DurPreset('1h 30', 1.5),
-  _DurPreset('2h', 2),
-  _DurPreset('3h', 3),
-  _DurPreset('4h', 4),
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────────────────────────────────────
 class EditActivityScreen extends StatefulWidget {
   final ActivityModel activity;
 
@@ -45,23 +27,21 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   late String? _category;
   late final TextEditingController _descCtrl;
   late final TextEditingController _priceCtrl;
-  late final FocusNode _priceFocus = FocusNode();
   late final TextEditingController _capacityCtrl;
   late final TextEditingController _locationCtrl;
 
   DateTime? _startDateTime;
   DateTime? _endDateTime;
-
   double? _selectedDuration;
   int _customHours = 0;
   int _customMinutes = 30;
+  LatLng? _pickedLatLng;
 
-  // Existing remote photo URLs (shown as network images)
   late List<String> _existingPhotoUrls;
-  // Newly picked local files
   final List<XFile> _newPhotos = [];
 
   bool _isLoading = false;
+  bool _isDurationTooLong = false;
 
   static const _categories = [
     'Guided Tour',
@@ -74,13 +54,20 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     'Other',
   ];
 
+  static const _difficultyLevels = ['Easy', 'Moderate', 'Difficult', 'Expert'];
+
+  final List<String> _languages = [];
+  final List<String> _includedEquipment = [];
+  final List<String> _itemsToBring = [];
+  String _difficultyLevel = 'Intermediate';
+
   @override
   void initState() {
     super.initState();
     final a = widget.activity;
 
     _titleCtrl = TextEditingController(text: a.titre);
-    _category = _categories.contains(a.typeActivite) ? a.typeActivite : null;
+    _category = _categories.contains(a.typeActivite) ? a.typeActivite : 'Other';
     _descCtrl = TextEditingController(text: a.description);
     _priceCtrl = TextEditingController(text: a.prix.toString());
     _capacityCtrl = TextEditingController(text: a.capaciteMax.toString());
@@ -90,28 +77,61 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     _endDateTime = a.dateFin;
     _existingPhotoUrls = List<String>.from(a.photos);
 
-    // Map duration to preset or custom
-    final matchedPreset = _kEditPresets
-        .where((p) => (p.hours - a.duree).abs() < 0.01)
-        .firstOrNull;
-    if (matchedPreset != null) {
-      _selectedDuration = matchedPreset.hours;
-    } else if (a.duree > 0) {
-      _selectedDuration = -1;
-      _customHours = a.duree.floor();
-      _customMinutes = ((a.duree - _customHours) * 60).round();
-      // snap minutes to nearest 5
-      _customMinutes = (_customMinutes / 5).round() * 5;
+    final point = a.coordonnees;
+    if (point != null) {
+      final lat = point['latitude'] ?? point['lat'];
+      final lng = point['longitude'] ?? point['lng'];
+      if (lat is num && lng is num) {
+        _pickedLatLng = LatLng(lat.toDouble(), lng.toDouble());
+      }
     }
 
-    // Setup price field focus listener
-    _priceFocus.addListener(() {
-      if (_priceFocus.hasFocus && _priceCtrl.text == '0.00') {
-        _priceCtrl.clear();
-      } else if (!_priceFocus.hasFocus && _priceCtrl.text.isEmpty) {
-        _priceCtrl.text = '0.00';
+    // Clean up stringified JSON for lists
+    void cleanList(List<String> source, List<String> target) {
+      for (var l in source) {
+        if (l.startsWith('[') && l.endsWith(']')) {
+          final clean = l
+              .replaceAll('[', '')
+              .replaceAll(']', '')
+              .replaceAll('"', '')
+              .trim();
+          if (clean.isNotEmpty) {
+            target.addAll(clean.split(',').map((s) => s.trim()));
+          }
+        } else {
+          target.add(l);
+        }
       }
-    });
+    }
+
+    cleanList(a.languesDisponibles, _languages);
+    cleanList(a.equipementsInclus, _includedEquipment);
+    cleanList(a.aApporter, _itemsToBring);
+
+    _difficultyLevel = _difficultyLevels.contains(a.niveauDifficulte)
+        ? a.niveauDifficulte
+        : 'Moderate';
+
+    // Map duration to selection
+    if (a.duree > 0) {
+      final preset = [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        3.0,
+        4.0,
+      ].firstWhere((p) => (p - a.duree).abs() < 0.01, orElse: () => -1.0);
+      if (preset != -1.0) {
+        _selectedDuration = preset;
+      } else {
+        _selectedDuration = -1.0; // Custom
+        _customHours = a.duree.floor();
+        _customMinutes = ((a.duree - _customHours) * 60).round();
+      }
+    }
+
+    _recalcEndDate();
   }
 
   @override
@@ -121,28 +141,33 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     _priceCtrl.dispose();
     _capacityCtrl.dispose();
     _locationCtrl.dispose();
-    _priceFocus.dispose();
     super.dispose();
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  String _fmtDate(DateTime? d) =>
+      d == null ? 'Not set' : DateFormat('MMM dd, yyyy').format(d);
+  String _fmtTime(DateTime? d) =>
+      d == null ? '--:--' : DateFormat('HH:mm').format(d);
+  String _fmtFullDate(DateTime? d) =>
+      d == null ? 'Not set' : DateFormat('dd/MM/yyyy HH:mm').format(d);
 
-  double get _effectiveDuration {
-    if (_selectedDuration == -1) return _customHours + _customMinutes / 60.0;
-    return _selectedDuration ?? 0;
+  double _currentDurationHours() {
+    if (_selectedDuration == -1.0) {
+      return _customHours + _customMinutes / 60.0;
+    }
+    return _selectedDuration ?? 1.0;
   }
 
-  String _formatDuration(double h) {
-    if (h <= 0) return '—';
-    final totalMin = (h * 60).round();
-    final hrs = totalMin ~/ 60;
-    final mins = totalMin % 60;
-    if (hrs == 0) return '${mins} min';
-    if (mins == 0) return '${hrs}h';
-    return '${hrs}h ${mins}min';
+  void _recalcEndDate() {
+    if (_startDateTime == null) return;
+    final durationHours = _currentDurationHours();
+    _endDateTime = _startDateTime!.add(
+      Duration(minutes: (durationHours * 60).round()),
+    );
+    // Validation: Start Time (Hour + Fraction) + Duration cannot exceed 24h of the same day
+    final startOffset = _startDateTime!.hour + (_startDateTime!.minute / 60.0);
+    _isDurationTooLong = (startOffset + durationHours) > 24.0001; // Tiny tolerance for floating point
   }
-
-  // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _pickImages() async {
     final picker = ImagePicker();
@@ -153,29 +178,14 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
       context: context,
-      initialDate:
-          _startDateTime ?? DateTime.now().add(const Duration(days: 1)),
+      initialDate: _startDateTime ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        ),
-        child: child!,
-      ),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: _startDateTime != null
-          ? TimeOfDay.fromDateTime(_startDateTime!)
-          : TimeOfDay.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-        ),
-        child: child!,
-      ),
+      initialTime: TimeOfDay.fromDateTime(_startDateTime ?? DateTime.now()),
     );
     if (time == null) return;
     setState(() {
@@ -186,124 +196,1049 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
         time.hour,
         time.minute,
       );
+      _recalcEndDate();
     });
   }
 
-  Future<void> _pickEndDateTime() async {
-    final minDate = _startDateTime ?? DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _endDateTime ?? minDate.add(const Duration(hours: 1)),
-      firstDate: minDate,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    final duree = _currentDurationHours();
+    final endDateTime =
+        _endDateTime ??
+        _startDateTime?.add(const Duration(hours: 1)) ??
+        DateTime.now().add(const Duration(hours: 1));
+
+    final result = await ActivityService.updateActivity(
+      id: widget.activity.id,
+      titre: _titleCtrl.text.trim(),
+      typeActivite: _category ?? 'Other',
+      description: _descCtrl.text.trim(),
+      prix: double.tryParse(_priceCtrl.text) ?? 0,
+      capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
+      lieu: _locationCtrl.text.trim(),
+      duree: duree,
+      dateDebut: _startDateTime ?? DateTime.now(),
+      dateFin: endDateTime,
+      newPhotos: _newPhotos.map((x) => File(x.path)).toList(),
+      languesDisponibles: _languages,
+      equipementsInclus: _includedEquipment,
+      aApporter: _itemsToBring,
+      niveauDifficulte: _difficultyLevel,
+      statut: widget.activity.statut,
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Activity updated!')));
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Error')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFF),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // ── Custom Header ──────────────────────────────────────
+              _buildHeader(),
+              // ── Main Content ────────────────────────────────────────
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  children: [
+                    _buildTopInfo(),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Core Identity',
+                      'The fundamental details that define your activity brand.',
+                    ),
+                    _buildCard([
+                      _buildLabel('TITLE ENTREE *'),
+                      _buildTextField(
+                        _titleCtrl,
+                        'Sunset Camel Trek in Djerba',
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLabel('DESCRIPTION *'),
+                      _buildTextField(
+                        _descCtrl,
+                        'Describe the magic...',
+                        maxLines: 5,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLabel('ACTIVITY TYPE'),
+                      _buildDropdown(),
+                      const SizedBox(height: 20),
+                      _buildLabel('DIFFICULTY LEVEL'),
+                      _buildDifficultySegment(),
+                    ]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Media Gallery',
+                      'Upload high-quality images to capture the Mediterranean essence.',
+                    ),
+                    _buildCard([_buildGallery()]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Logistics',
+                      'Define the price, duration, and guest capacity.',
+                    ),
+                    _buildCard([
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('PRICE PER PERSON (TND)'),
+                                _buildTextField(
+                                  _priceCtrl,
+                                  '45',
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('MAX CAPACITY'),
+                                _buildTextField(
+                                  _capacityCtrl,
+                                  '12',
+                                  keyboardType: TextInputType.number,
+                                  suffixIcon: Icons.people_outline,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLabel('LANGUAGES SUPPORTED'),
+                      _buildLanguageChips(),
+                    ]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Location',
+                      'Where the magic happens. Use the map to pin exact coordinates.',
+                    ),
+                    _buildCard([
+                      _buildTextField(
+                        _locationCtrl,
+                        'Ranch Yassmina, Houmt Souk, Djerba',
+                        prefixIcon: Icons.location_on,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildMapPreview(),
+                    ]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Preparation',
+                      'What you provide vs. what the guest needs to bring.',
+                    ),
+                    _buildCard([
+                      _buildLabel('INCLUDED EQUIPMENT'),
+                      _buildAddableList(
+                        _includedEquipment,
+                        'Add item...',
+                        Icons.verified_rounded,
+                      ),
+                      const SizedBox(height: 24),
+                      _buildLabel('ITEMS TO BRING'),
+                      _buildAddableList(
+                        _itemsToBring,
+                        'Add item...',
+                        Icons.list_alt_rounded,
+                      ),
+                    ]),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Availability',
+                      'When is this activity available? Control the season start and end.',
+                    ),
+                    _buildCard([
+                      _buildLabel('SEASON START DATE'),
+                      _buildDatePicker(
+                        _fmtFullDate(_startDateTime),
+                        _pickDateTime,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLabel('SEASON END DATE (AUTO-CALCULATED)'),
+                      _buildDatePicker(
+                        _fmtFullDate(_endDateTime),
+                        null,
+                        isDisabled: true,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildLabel('DURATION (HOURS)'),
+                      _buildDurationChips(),
+                      _buildDurationWarning(),
+                    ]),
+                    const SizedBox(height: 40),
+                    _buildSaveButton(),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        child: child!,
+      ),
+      floatingActionButton: _buildPreviewFab(),
+    );
+  }
+
+  // ── Header Dashboard ───────────────────────────────────────────────────────
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1B2452)),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          const Text(
+            'Edit Activity',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+              color: Color(0xFF1B2452),
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.check_circle,
+              color: _isDurationTooLong
+                  ? Colors.grey[300]
+                  : const Color(0xFF4F67E8),
+            ),
+            onPressed: _isDurationTooLong ? null : _save,
+          ),
+        ],
       ),
     );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _endDateTime != null
-          ? TimeOfDay.fromDateTime(_endDateTime!)
-          : TimeOfDay.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+  }
+
+  Widget _buildTopInfo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _buildBadge(
+              'ORGANIZER PORTAL',
+              const Color(0xFFE0E7FF),
+              const Color(0xFF3858C8),
+            ),
+            const SizedBox(width: 8),
+            _buildBadge(
+              'ACTIVE EXPERIENCE',
+              const Color(0xFFFCE7F3),
+              const Color(0xFFBE185D),
+            ),
+          ],
         ),
-        child: child!,
+        const SizedBox(height: 16),
+        const Text(
+          'Edit Activity',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF1B2452),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Update your Mediterranean experience details. All changes will be updated instantly for future bookings.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF717BBC), height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStat('BOOKINGS', '${widget.activity.nombreReservations}'),
+              _buildStat('LAST UPDATE', _fmtDate(widget.activity.updatedAt)),
+              _buildStat(
+                'STATUS',
+                widget.activity.timelineStatus,
+                isStatus: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStat(String label, String value, {bool isStatus = false}) {
+    Color valColor = const Color(0xFF1B2452);
+    if (isStatus) {
+      final s = value.toLowerCase();
+      if (s.contains('live') ||
+          s.contains('available') ||
+          s.contains('ongoing')) {
+        valColor = const Color(0xFF10B981);
+      } else if (s.contains('upcoming')) {
+        valColor = const Color(0xFFF59E0B);
+      } else if (s.contains('past') ||
+          s.contains('completed') ||
+          s.contains('archive')) {
+        valColor = const Color(0xFF94A3B8);
+      } else {
+        valColor = const Color(0xFF717BBC);
+      }
+    }
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            letterSpacing: 0.5,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF9EACCB),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isStatus)
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: valColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            if (isStatus) const SizedBox(width: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: valColor,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Form Components ────────────────────────────────────────────────────────
+
+  Widget _buildSectionTitle(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1B2452),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF717BBC)),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
       ),
     );
-    if (time == null) return;
-    setState(() {
-      _endDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
+  }
+
+  Widget _buildLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF9EACCB),
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController ctrl,
+    String hint, {
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    IconData? suffixIcon,
+    IconData? prefixIcon,
+    bool readOnly = false,
+  }) {
+    return TextFormField(
+      controller: ctrl,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      readOnly: readOnly,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0xFF9EACCB), fontSize: 14),
+        filled: true,
+        fillColor: const Color(0xFFF3F3FF),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        suffixIcon: suffixIcon != null
+            ? Icon(suffixIcon, size: 18, color: const Color(0xFF717BBC))
+            : null,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, size: 18, color: const Color(0xFF3858C8))
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F3FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _category,
+          isExpanded: true,
+          items: _categories
+              .map(
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(c, style: const TextStyle(fontSize: 14)),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => _category = v),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDifficultySegment() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F3FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: _difficultyLevels.map((lvl) {
+          final isSel = _difficultyLevel == lvl;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _difficultyLevel = lvl),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSel ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSel
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    lvl,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                      color: isSel
+                          ? const Color(0xFF3858C8)
+                          : const Color(0xFF717BBC),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Gallery ───────────────────────────────────────────────────────────────
+
+  Widget _buildGallery() {
+    final allImagesCount = _existingPhotoUrls.length + _newPhotos.length;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: allImagesCount + 1,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1,
+      ),
+      itemBuilder: (context, i) {
+        if (i == allImagesCount) {
+          return _buildUploadCard();
+        }
+        final isRemote = i < _existingPhotoUrls.length;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: isRemote
+                  ? Image.network(_existingPhotoUrls[i], fit: BoxFit.cover)
+                  : Image.file(
+                      File(_newPhotos[i - _existingPhotoUrls.length].path),
+                      fit: BoxFit.cover,
+                    ),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  if (isRemote)
+                    _existingPhotoUrls.removeAt(i);
+                  else
+                    _newPhotos.removeAt(i - _existingPhotoUrls.length);
+                }),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 14, color: Colors.red),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUploadCard() {
+    return GestureDetector(
+      onTap: _pickImages,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F3FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFE0E7FF),
+            style: BorderStyle.solid,
+            width: 1,
+          ),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_a_photo_outlined,
+              color: Color(0xFF4F67E8),
+              size: 24,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'UPLOAD PHOTO',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF4F67E8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Languages ──────────────────────────────────────────────────────────────
+
+  Widget _buildLanguageChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ..._languages.map(
+          (l) =>
+              _buildChip(l, true, () => setState(() => _languages.remove(l))),
+        ),
+        _buildChip('+ Add', false, _showAddLanguage),
+      ],
+    );
+  }
+
+  Widget _buildChip(String label, bool isSel, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSel ? const Color(0xFFE0E7FF) : const Color(0xFFF3F3FF),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSel
+                    ? const Color(0xFF3858C8)
+                    : const Color(0xFF717BBC),
+              ),
+            ),
+            if (isSel) const SizedBox(width: 4),
+            if (isSel)
+              const Icon(Icons.close, size: 14, color: Color(0xFF3858C8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddLanguage() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add Language'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'e.g. English'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final l = ctrl.text.trim();
+              if (l.isNotEmpty && !_languages.contains(l)) {
+                setState(() => _languages.add(l));
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Preparation ────────────────────────────────────────────────────────────
+
+  Widget _buildAddableList(List<String> list, String hint, IconData icon) {
+    final ctrl = TextEditingController();
+    return Column(
+      children: [
+        ...list.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: const Color(0xFF3858C8)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1B2452),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => list.remove(item)),
+                  child: const Icon(
+                    Icons.remove_circle_outline,
+                    size: 18,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Icon(
+              Icons.add_circle_outline,
+              size: 16,
+              color: const Color(0xFF3858C8),
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Add Item'),
+                    content: TextField(
+                      controller: ctrl,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Water bottle',
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          if (ctrl.text.trim().isNotEmpty)
+                            setState(() => list.add(ctrl.text.trim()));
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Text(
+                'Add item',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF3858C8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Map Preview ────────────────────────────────────────────────────────────
+
+  Widget _buildMapPreview() {
+    final latLng = _pickedLatLng;
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            height: 180,
+            width: double.infinity,
+            color: const Color(0xFFF3F3FF),
+            child: latLng != null
+                ? Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: latLng,
+                          zoom: 14,
+                        ),
+                        markers: {
+                          Marker(
+                            markerId: const MarkerId('m'),
+                            position: latLng,
+                          ),
+                        },
+                        liteModeEnabled: true,
+                        zoomControlsEnabled: false,
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${latLng.latitude.toStringAsFixed(4)}, ${latLng.longitude.toStringAsFixed(4)}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF717BBC),
+                                ),
+                              ),
+                              const Text(
+                                'Preview',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF4F67E8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : const Center(
+                    child: Icon(
+                      Icons.map_outlined,
+                      color: Color(0xFF9EACCB),
+                      size: 32,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () async {
+            final dynamic result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MapPickerScreen(initialPosition: latLng),
+              ),
+            );
+
+            if (result is MapPickerResult && mounted) {
+              setState(() {
+                _locationCtrl.text = result.address;
+                _pickedLatLng = result.latLng;
+              });
+            }
+          },
+          icon: const Icon(Icons.map, size: 18),
+          label: const Text(
+            'Change Location on Map',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Date & Duration ───────────────────────────────────────────────────────
+
+  Widget _buildDatePicker(
+    String text,
+    VoidCallback? onTap, {
+    bool isDisabled = false,
+  }) {
+    return GestureDetector(
+      onTap: isDisabled ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDisabled ? const Color(0xFFF9FAFF) : const Color(0xFFF3F3FF),
+          borderRadius: BorderRadius.circular(16),
+          border: isDisabled
+              ? Border.all(color: const Color(0xFFE2E9FF))
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDisabled
+                    ? const Color(0xFF9EACCB)
+                    : const Color(0xFF1B2452),
+              ),
+            ),
+            Icon(
+              isDisabled
+                  ? Icons.lock_outline_rounded
+                  : Icons.calendar_today_outlined,
+              size: 18,
+              color: const Color(0xFF717BBC),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDurationChips() {
+    final presets = [
+      {'label': '2h', 'val': 2.0},
+      {'label': 'Half Day', 'val': 4.0},
+      {'label': 'Full Day', 'val': 8.0},
+    ];
+    return Column(
+      children: [
+        _buildTextField(
+          TextEditingController(
+            text:
+                '${_selectedDuration == -1.0 ? _customHours : _selectedDuration} hours',
+          ),
+          'Duration',
+          suffixIcon: Icons.schedule,
+          readOnly: true,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ...presets.map((p) {
+              final isSel = _selectedDuration == p['val'];
+              return _buildChip(
+                p['label'] as String,
+                isSel,
+                () => setState(() {
+                  _selectedDuration = p['val'] as double;
+                  _recalcEndDate();
+                }),
+              );
+            }),
+            _buildChip(
+              '+ Custom',
+              _selectedDuration == -1.0,
+              _showCustomDurationPicker,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _showCustomDurationPicker() {
-    int tempH = _customHours;
+    int tempH = _customHours == 0 && _customMinutes == 0 ? 2 : _customHours;
     int tempM = _customMinutes;
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+        builder: (context, setModal) => Container(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36,
+                width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 20),
               const Text(
-                'Custom Duration',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                'Set Custom Duration',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1B2452)),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Select hours and minutes',
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
               Row(
                 children: [
-                  // Hours
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
-                          'Hours',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        const Text('Hours', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 160,
+                          height: 150,
                           child: ListWheelScrollView.useDelegate(
                             itemExtent: 44,
-                            perspective: 0.004,
-                            diameterRatio: 1.6,
+                            perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
-                            controller: FixedExtentScrollController(
-                              initialItem: tempH,
-                            ),
-                            onSelectedItemChanged: (i) =>
-                                setModal(() => tempH = i),
+                            onSelectedItemChanged: (i) => setModal(() => tempH = i),
                             childDelegate: ListWheelChildBuilderDelegate(
-                              childCount: 13,
+                              childCount: 24,
                               builder: (ctx, i) => Center(
                                 child: Text(
                                   '$i h',
                                   style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: tempH == i
-                                        ? FontWeight.bold
-                                        : FontWeight.w400,
-                                    color: tempH == i
-                                        ? AppColors.primary
-                                        : Colors.grey[500],
+                                    fontSize: 24,
+                                    fontWeight: tempH == i ? FontWeight.w800 : FontWeight.w500,
+                                    color: tempH == i ? const Color(0xFF3858C8) : Colors.grey[400],
                                   ),
                                 ),
                               ),
@@ -313,58 +1248,30 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 20),
-                    child: Text(
-                      ':',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  ),
-                  // Minutes
+                  const Text(':', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF1B2452))),
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
-                          'Minutes',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        const Text('Minutes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 160,
+                          height: 150,
                           child: ListWheelScrollView.useDelegate(
                             itemExtent: 44,
-                            perspective: 0.004,
-                            diameterRatio: 1.6,
+                            perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
-                            controller: FixedExtentScrollController(
-                              initialItem: tempM ~/ 5,
-                            ),
-                            onSelectedItemChanged: (i) =>
-                                setModal(() => tempM = i * 5),
+                            onSelectedItemChanged: (i) => setModal(() => tempM = i * 5),
                             childDelegate: ListWheelChildBuilderDelegate(
                               childCount: 12,
                               builder: (ctx, i) {
-                                final mins = i * 5;
+                                final m = i * 5;
                                 return Center(
                                   child: Text(
-                                    '${mins.toString().padLeft(2, '0')} min',
+                                    '${m.toString().padLeft(2, '0')} min',
                                     style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: tempM == mins
-                                          ? FontWeight.bold
-                                          : FontWeight.w400,
-                                      color: tempM == mins
-                                          ? AppColors.primary
-                                          : Colors.grey[500],
+                                      fontSize: 24,
+                                      fontWeight: tempM == m ? FontWeight.w800 : FontWeight.w500,
+                                      color: tempM == m ? const Color(0xFF3858C8) : Colors.grey[400],
                                     ),
                                   ),
                                 );
@@ -377,52 +1284,27 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  tempH == 0 && tempM == 0
-                      ? 'Invalid duration (min. 5 min)'
-                      : _formatDuration(tempH + tempM / 60.0),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: () {
                     if (tempH == 0 && tempM == 0) return;
                     Navigator.pop(ctx);
                     setState(() {
+                      _selectedDuration = -1.0;
                       _customHours = tempH;
                       _customMinutes = tempM;
-                      _selectedDuration = -1;
+                      _recalcEndDate();
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    backgroundColor: const Color(0xFF1B2452),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    elevation: 0,
                   ),
-                  child: const Text(
-                    'Confirm',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
+                  child: const Text('Confirm Duration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
               ),
             ],
@@ -432,728 +1314,157 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     );
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDuration == null) {
-      _showError('Please select a duration.');
-      return;
-    }
-    if (_effectiveDuration <= 0) {
-      _showError('Invalid duration.');
-      return;
-    }
-    if (_startDateTime == null) {
-      _showError('Please choose a start date and time.');
-      return;
-    }
+  // ── Save Button ──────────────────────────────────────────────────────────
 
-    setState(() => _isLoading = true);
-
-    final result = await ActivityService.updateActivity(
-      id: widget.activity.id,
-      titre: _titleCtrl.text.trim(),
-      typeActivite: _category!,
-      description: _descCtrl.text.trim(),
-      prix: double.tryParse(_priceCtrl.text) ?? 0,
-      capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
-      lieu: _locationCtrl.text.trim(),
-      duree: _effectiveDuration,
-      dateDebut: _startDateTime!,
-      dateFin: _endDateTime,
-      newPhotos: _newPhotos.map((x) => File(x.path)).toList(),
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Activity updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showError(result['message'] ?? 'Error updating activity.');
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
-  }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Edit Activity',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textDark,
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.borderLight),
-        ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // ── Basic Info ──────────────────────────────────────
-            _SectionTitle(icon: Icons.info, label: 'Basic Info'),
-            const SizedBox(height: 12),
-
-            _FieldLabel('Activity Title'),
-            _inputField(
-              controller: _titleCtrl,
-              hint: 'e.g. Desert Safari in Douz',
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Category'),
-            _dropdownField(),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Description'),
-            TextFormField(
-              controller: _descCtrl,
-              minLines: 4,
-              maxLines: 6,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-              decoration: _inputDecoration(
-                'Tell participants what makes this activity special...',
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Media ───────────────────────────────────────────
-            _SectionTitle(icon: Icons.image, label: 'Media'),
-            const SizedBox(height: 12),
-            _mediaSection(),
-            const SizedBox(height: 24),
-
-            // ── Pricing & Capacity ──────────────────────────────
-            _SectionTitle(icon: Icons.payments, label: 'Pricing & Capacity'),
-            const SizedBox(height: 12),
-
-            _FieldLabel('Price per person'),
-            TextFormField(
-              controller: _priceCtrl,
-              focusNode: _priceFocus,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-              ],
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-              decoration: _inputDecoration('0.00').copyWith(
-                suffixText: 'TND',
-                suffixStyle: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Participants'),
-            _inputField(
-              controller: _capacityCtrl,
-              hint: 'e.g. 15',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-            ),
-            const SizedBox(height: 24),
-
-            // ── Location ────────────────────────────────────────
-            _SectionTitle(icon: Icons.location_on, label: 'Location'),
-            const SizedBox(height: 12),
-            _inputField(
-              controller: _locationCtrl,
-              hint: 'Enter activity address',
-              prefixIcon: Icons.search,
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Required field' : null,
-            ),
-            const SizedBox(height: 10),
-            _mapPickerButton(),
-            const SizedBox(height: 24),
-
-            // ── Date & Time ─────────────────────────────────────
-            _SectionTitle(icon: Icons.calendar_month, label: 'Date & Time'),
-            const SizedBox(height: 12),
-
-            _FieldLabel('Start Date & Time'),
-            GestureDetector(
-              onTap: _pickDateTime,
-              child: _dateContainer(
-                _startDateTime == null
-                    ? 'mm/dd/yyyy, --:-- --'
-                    : DateFormat('dd/MM/yyyy, HH:mm').format(_startDateTime!),
-                _startDateTime != null,
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('End Date & Time (optional)'),
-            GestureDetector(
-              onTap: _pickEndDateTime,
-              child: _dateContainer(
-                _endDateTime == null
-                    ? 'mm/dd/yyyy, --:-- --'
-                    : DateFormat('dd/MM/yyyy, HH:mm').format(_endDateTime!),
-                _endDateTime != null,
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _FieldLabel('Duration'),
-            _durationSection(),
-            const SizedBox(height: 40),
-
-            // ── Save button ─────────────────────────────────────
-            SizedBox(
-              height: 54,
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _save,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.save_rounded, color: Colors.white),
-                label: Text(
-                  _isLoading ? 'Saving...' : 'Save Changes',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 4,
-                  shadowColor: AppColors.primary.withOpacity(0.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── UI helpers ─────────────────────────────────────────────────────────────
-
-  Widget _dateContainer(String text, bool hasValue) {
+  Widget _buildSaveButton() {
+    final bool isSaveDisabled = _isLoading || _isDurationTooLong;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      width: double.infinity,
+      height: 60,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight, width: 1.2),
+        color: isSaveDisabled ? Colors.grey[300] : const Color(0xFF1B2452),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: isSaveDisabled
+            ? null
+            : [
+                BoxShadow(
+                  color: const Color(0xFF1B2452).withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 14,
-                color: hasValue ? AppColors.textDark : Colors.grey[400],
-              ),
-            ),
-          ),
-          const Icon(Icons.calendar_today, size: 18, color: AppColors.textGrey),
-        ],
-      ),
-    );
-  }
-
-  Widget _mediaSection() {
-    return Column(
-      children: [
-        // Existing photos
-        if (_existingPhotoUrls.isNotEmpty) ...[
-          SizedBox(
-            height: 80,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _existingPhotoUrls.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      _existingPhotoUrls[i],
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 80,
-                        height: 80,
-                        color: Colors.grey[200],
-                        child: const Icon(
-                          Icons.broken_image,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _existingPhotoUrls.removeAt(i)),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          shape: BoxShape.circle,
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        // Add new photos button
-        GestureDetector(
-          onTap: _pickImages,
-          child: CustomPaint(
-            painter: _EditDashedBorderPainter(
-              color: AppColors.primary.withOpacity(0.45),
-              radius: 14,
-            ),
-            child: Container(
-              height: 110,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Column(
+      child: InkWell(
+        onTap: isSaveDisabled ? null : _save,
+        borderRadius: BorderRadius.circular(18),
+        child: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.add_a_photo_rounded,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
+                    Icon(
+                      Icons.save_outlined,
+                      color: isSaveDisabled ? Colors.grey[500] : Colors.white,
+                      size: 20,
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Add more photos',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
+                    const SizedBox(width: 12),
                     Text(
-                      'PNG, JPG up to 10MB',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                      'Save All Changes',
+                      style: TextStyle(
+                        color: isSaveDisabled ? Colors.grey[600] : Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
         ),
-        // New local photos preview
-        if (_newPhotos.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 80,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _newPhotos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => Stack(
+      ),
+    );
+  }
+
+  Widget _buildDurationWarning() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SizeTransition(sizeFactor: animation, child: child),
+      ),
+      child: _isDurationTooLong
+          ? Container(
+              key: const ValueKey('duration_warning'),
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFD1D1)),
+              ),
+              child: const Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(_newPhotos[i].path),
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _newPhotos.removeAt(i)),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          shape: BoxShape.circle,
+                  Icon(Icons.error_outline_rounded, color: Color(0xFFE11D48), size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'IMPOSSIBLE DURATION',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFE11D48),
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        padding: const EdgeInsets.all(3),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 14,
+                        SizedBox(height: 2),
+                        Text(
+                          'L\'activité ne peut pas dépasser minuit du même jour.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF9F1239),
+                            height: 1.3,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-        ],
-      ],
+            )
+          : const SizedBox.shrink(key: ValueKey('no_warning')),
     );
   }
 
-  Widget _durationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ..._kEditPresets.map((p) {
-              final selected = _selectedDuration == p.hours;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedDuration = p.hours),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.borderLight,
-                      width: selected ? 1.5 : 1,
-                    ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Text(
-                    p.label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : AppColors.textDark,
-                    ),
-                  ),
-                ),
-              );
-            }),
-            // Custom chip
-            GestureDetector(
-              onTap: _showCustomDurationPicker,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: _selectedDuration == -1
-                      ? AppColors.primary
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _selectedDuration == -1
-                        ? AppColors.primary
-                        : AppColors.borderLight,
-                    width: _selectedDuration == -1 ? 1.5 : 1,
-                  ),
-                  boxShadow: _selectedDuration == -1
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.25),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  _selectedDuration == -1
-                      ? _formatDuration(_customHours + _customMinutes / 60.0)
-                      : 'Custom',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _selectedDuration == -1
-                        ? Colors.white
-                        : AppColors.textDark,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (_selectedDuration != null) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'Selected: ${_formatDuration(_effectiveDuration)}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
+  Widget _buildPreviewFab() {
+    return FloatingActionButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivityDebugScreen(
+              title: _titleCtrl.text,
+              category: _category ?? 'Other',
+              description: _descCtrl.text,
+              price: double.tryParse(_priceCtrl.text) ?? 0,
+              capacity: int.tryParse(_capacityCtrl.text) ?? 1,
+              location: _locationCtrl.text,
+              duration: _currentDurationHours(),
+              existingPhotos: _existingPhotoUrls,
+              photos: _newPhotos,
+              requirements: _includedEquipment,
+              optional: _itemsToBring,
+              startDateTime: _startDateTime,
+              endDateTime: _endDateTime,
+              pickedLatLng: _pickedLatLng,
+              difficulty: _difficultyLevel,
+              languages: _languages,
             ),
           ),
-        ],
-      ],
+        );
+      },
+      backgroundColor: const Color(0xFF3858C8),
+      child: const Icon(Icons.visibility, color: Colors.white),
     );
   }
 
-  Widget _mapPickerButton() {
+  Widget _buildBadge(String text, Color bg, Color textCol) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.25),
-          width: 1,
-        ),
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: ListTile(
-        leading: const Icon(Icons.map_rounded, color: AppColors.primary),
-        title: const Text(
-          'Pick on Map',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.primary),
-        onTap: () async {
-          final result = await Navigator.push<MapPickerResult>(
-            context,
-            MaterialPageRoute(builder: (_) => const MapPickerScreen()),
-          );
-          if (result != null) {
-            setState(() => _locationCtrl.text = result.address);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _dropdownField() {
-    return DropdownButtonFormField<String>(
-      value: _category,
-      decoration: _inputDecoration('Select category'),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      validator: (v) => v == null ? 'Required field' : null,
-      items: _categories
-          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-          .toList(),
-      onChanged: (v) => setState(() => _category = v),
-    );
-  }
-
-  Widget _inputField({
-    required TextEditingController controller,
-    required String hint,
-    IconData? prefixIcon,
-    TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      decoration: _inputDecoration(hint).copyWith(
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: Colors.grey[400], size: 20)
-            : null,
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.borderLight, width: 1.2),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.borderLight, width: 1.2),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.2),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.8),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Small shared widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _SectionTitle({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.primary, size: 18),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textDark,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          color: textCol,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dashed border painter (same as create screen)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _EditDashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  const _EditDashedBorderPainter({required this.color, required this.radius});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke;
-    const dashWidth = 6.0;
-    const dashSpace = 4.0;
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height),
-          Radius.circular(radius),
-        ),
-      );
-    double distance = 0;
-    for (final metric in path.computeMetrics()) {
-      while (distance < metric.length) {
-        canvas.drawPath(
-          metric.extractPath(distance, distance + dashWidth),
-          paint,
-        );
-        distance += dashWidth + dashSpace;
-      }
-      distance = 0;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_EditDashedBorderPainter old) =>
-      old.color != color || old.radius != radius;
 }
