@@ -14,32 +14,46 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late Animation<double> _logoFadeAnimation;
+  late Animation<double> _subtitleFadeAnimation;
+  late Animation<int> _characterCountAnimation;
+  final String _logoText = 'DTrip';
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize animations
     _controller = AnimationController(
-      duration: Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 3500),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    // Fade and Scale for the entire Logo Container
+    _logoFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.2, curve: Curves.easeIn),
+      ),
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    // Typing effect for the letters
+    _characterCountAnimation = IntTween(begin: 0, end: _logoText.length)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.2, 0.6, curve: Curves.linear),
+          ),
+        );
 
-    // Start the animation
+    // Subtitle fade in
+    _subtitleFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.7, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
     _controller.forward();
-
     _checkLoginStatus();
   }
 
@@ -49,12 +63,13 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  // Check if user is already logged in
   Future<void> _checkLoginStatus() async {
-    // Wait 4 seconds to see the splash with animation
-    await Future.delayed(Duration(seconds: 4));
+    // Wait for animation to finish + small pause
+    await Future.delayed(const Duration(milliseconds: 4500));
+    if (!mounted) return;
 
     final isLoggedIn = await AuthService.isLoggedIn();
+    if (!mounted) return;
 
     if (isLoggedIn) {
       await AuthService.ensureAccountGuardSocket();
@@ -62,87 +77,86 @@ class _SplashScreenState extends State<SplashScreen>
       final user = await AuthService.getUser();
       if (user != null) {
         final String? userType = user['userType'];
-        // Navigate to appropriate screen based on user type
-        if (userType == 'Organisator' || userType == 'Organizer') {
-          Navigator.pushReplacementNamed(context, AppRoutes.organizerMain);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.touristMain);
-        }
+        final route = (userType == 'Organisator' || userType == 'Organizer')
+            ? AppRoutes.organizerMain
+            : AppRoutes.touristMain;
+        Navigator.pushReplacementNamed(context, route);
       } else {
-        // Invalid session - go to login
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
+        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
       }
     } else {
-      // Not logged in - go to login
-      Navigator.pushReplacementNamed(context, AppRoutes.login);
+      Navigator.pushReplacementNamed(context, AppRoutes.welcome);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primaryDark, AppColors.primaryLight],
-          ),
-        ),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // DJTrip logo with animation
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 30,
-                          offset: Offset(0, 15),
-                        ),
-                      ],
+      backgroundColor: Colors.white, // Pure white background
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Centered Animated Logo
+            FadeTransition(
+              opacity: _logoFadeAnimation,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary, // Blue square
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
-                    child: Image.asset(
-                      'assets/logos/logo2.png',
-                      height: 120,
-                      width: 120,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  SizedBox(height: 24),
-                  // Text with animation
-                  Text(
-                    "Discover Djerba with us",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  SizedBox(height: 32),
-                  // Loading indicator
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+                child: AnimatedBuilder(
+                  animation: _characterCountAnimation,
+                  builder: (context, child) {
+                    final textToShow = _logoText.substring(
+                      0,
+                      _characterCountAnimation.value,
+                    );
+                    return Text(
+                      textToShow,
+                      style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.white,
+                        letterSpacing: -1,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 30),
+            // Fading Subtitle
+            FadeTransition(
+              opacity: _subtitleFadeAnimation,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  'Discover Djerba with us\nYour guide to unforgettable journeys!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1B2458),
+                    letterSpacing: 0.4,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
