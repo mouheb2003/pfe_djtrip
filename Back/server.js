@@ -19,6 +19,7 @@ const {
 } = require("./middleware/errorHandler");
 
 systemLogStore.installConsoleCapture();
+// Initialize database connection before route registration.
 
 const connectDB = require("./config/db");
 connectDB();
