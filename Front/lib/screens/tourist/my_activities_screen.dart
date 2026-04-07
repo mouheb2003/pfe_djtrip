@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/activity_model.dart';
@@ -6,6 +8,7 @@ import '../../services/activity_service.dart';
 import '../../services/inscription_service.dart';
 import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
+import 'booking_selection_screen.dart';
 import 'bookings_screen.dart';
 
 class MyActivitiesScreen extends StatefulWidget {
@@ -212,6 +215,16 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       return;
     }
 
+    if (_tabIndex == 0) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingSelectionScreen(activity: activity),
+        ),
+      );
+      return;
+    }
+
     _openDetails(activity);
   }
 
@@ -266,6 +279,20 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   String _imageUrlFor(ActivityModel activity) {
     return activity.thumbnailUrl;
+  }
+
+  List<String> _imageUrlsFor(ActivityModel activity) {
+    final urls = <String>[];
+    if (activity.thumbnailUrl.isNotEmpty) {
+      urls.add(activity.thumbnailUrl);
+    }
+    for (final photo in activity.photos) {
+      final value = photo.trim();
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        urls.add(value);
+      }
+    }
+    return urls.toSet().toList(growable: false);
   }
 
   String _typeFor(ActivityModel activity) {
@@ -393,6 +420,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   timeLabel: _timeLabel,
                   titleFor: _titleFor,
                   imageUrlFor: _imageUrlFor,
+                  imageUrlsFor: _imageUrlsFor,
                   typeFor: _typeFor,
                   activityDate: _displayActivityDate,
                   buttonLabelFor: _buttonLabelFor,
@@ -533,6 +561,7 @@ class _ActivitiesFeed extends StatelessWidget {
   final String Function(DateTime?) timeLabel;
   final String Function(ActivityModel) titleFor;
   final String Function(ActivityModel) imageUrlFor;
+  final List<String> Function(ActivityModel) imageUrlsFor;
   final String Function(ActivityModel) typeFor;
   final DateTime? Function(ActivityModel) activityDate;
   final String Function(ActivityModel) buttonLabelFor;
@@ -550,6 +579,7 @@ class _ActivitiesFeed extends StatelessWidget {
     required this.timeLabel,
     required this.titleFor,
     required this.imageUrlFor,
+    required this.imageUrlsFor,
     required this.typeFor,
     required this.activityDate,
     required this.buttonLabelFor,
@@ -652,6 +682,7 @@ class _ActivitiesFeed extends StatelessWidget {
           _FeaturedActivityCard(
             title: titleFor(hero),
             imageUrl: imageUrlFor(hero),
+            imageUrls: imageUrlsFor(hero),
             typeLabel: typeFor(hero),
             statusBadge: statusBadgeFor(hero),
             statusColor: statusColorFor(hero),
@@ -670,6 +701,7 @@ class _ActivitiesFeed extends StatelessWidget {
               child: _ActivityCard(
                 title: titleFor(activity),
                 imageUrl: imageUrlFor(activity),
+                imageUrls: imageUrlsFor(activity),
                 typeLabel: typeFor(activity),
                 statusBadge: statusBadgeFor(activity),
                 statusColor: statusColorFor(activity),
@@ -690,6 +722,7 @@ class _ActivitiesFeed extends StatelessWidget {
 class _FeaturedActivityCard extends StatelessWidget {
   final String title;
   final String imageUrl;
+  final List<String> imageUrls;
   final String typeLabel;
   final String statusBadge;
   final Color statusColor;
@@ -701,6 +734,7 @@ class _FeaturedActivityCard extends StatelessWidget {
   const _FeaturedActivityCard({
     required this.title,
     required this.imageUrl,
+    required this.imageUrls,
     required this.typeLabel,
     required this.statusBadge,
     required this.statusColor,
@@ -731,18 +765,10 @@ class _FeaturedActivityCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (imageUrl.isNotEmpty)
-                Image.network(imageUrl, fit: BoxFit.cover)
-              else
-                Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
-                    ),
-                  ),
-                ),
+              _CardImageCarousel(
+                imageUrls: imageUrls,
+                fallbackImageUrl: imageUrl,
+              ),
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -878,6 +904,7 @@ class _FeaturedActivityCard extends StatelessWidget {
 class _ActivityCard extends StatelessWidget {
   final String title;
   final String imageUrl;
+  final List<String> imageUrls;
   final String typeLabel;
   final String statusBadge;
   final Color statusColor;
@@ -890,6 +917,7 @@ class _ActivityCard extends StatelessWidget {
   const _ActivityCard({
     required this.title,
     required this.imageUrl,
+    required this.imageUrls,
     required this.typeLabel,
     required this.statusBadge,
     required this.statusColor,
@@ -921,18 +949,10 @@ class _ActivityCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (imageUrl.isNotEmpty)
-                Image.network(imageUrl, fit: BoxFit.cover)
-              else
-                Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
-                    ),
-                  ),
-                ),
+              _CardImageCarousel(
+                imageUrls: imageUrls,
+                fallbackImageUrl: imageUrl,
+              ),
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -1066,6 +1086,138 @@ class _ActivityCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CardImageCarousel extends StatefulWidget {
+  final List<String> imageUrls;
+  final String fallbackImageUrl;
+
+  const _CardImageCarousel({
+    required this.imageUrls,
+    required this.fallbackImageUrl,
+  });
+
+  @override
+  State<_CardImageCarousel> createState() => _CardImageCarouselState();
+}
+
+class _CardImageCarouselState extends State<_CardImageCarousel> {
+  int _currentIndex = 0;
+  late final PageController _pageController;
+  Timer? _autoSlideTimer;
+
+  List<String> get _images {
+    final list = <String>[];
+    if (widget.fallbackImageUrl.isNotEmpty) {
+      list.add(widget.fallbackImageUrl);
+    }
+    list.addAll(widget.imageUrls);
+    return list.toSet().toList(growable: false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _restartAutoSlide();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CardImageCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldCount = oldWidget.imageUrls.length;
+    final newCount = widget.imageUrls.length;
+    if (oldCount != newCount ||
+        oldWidget.fallbackImageUrl != widget.fallbackImageUrl) {
+      _currentIndex = 0;
+      _restartAutoSlide();
+    }
+  }
+
+  void _restartAutoSlide() {
+    _autoSlideTimer?.cancel();
+    final count = _images.length;
+    if (count <= 1) return;
+
+    _autoSlideTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_pageController.hasClients) return;
+      final next = (_currentIndex + 1) % count;
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoSlideTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = _images;
+    if (images.isEmpty) {
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: images.length,
+          onPageChanged: (index) => setState(() => _currentIndex = index),
+          itemBuilder: (_, index) {
+            return Image.network(
+              images[index],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        if (images.length > 1)
+          Positioned(
+            right: 12,
+            top: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_currentIndex + 1}/${images.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

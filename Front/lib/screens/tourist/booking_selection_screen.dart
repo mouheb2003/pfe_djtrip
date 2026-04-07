@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../models/inscription_model.dart';
@@ -16,48 +15,79 @@ class BookingSelectionScreen extends StatefulWidget {
 }
 
 class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String _selectedTime = 'Sunset (18:30)';
-  int _adults = 2;
+  int _adults = 1;
   int _children = 0;
   bool _isLoading = false;
+  int _currentImage = 0;
+  late final PageController _imagePageController;
 
   final double _serviceFee = 5.0;
 
   double get _subtotal => (_adults + _children) * widget.activity.prix;
   double get _total => _subtotal + _serviceFee;
 
+  List<String> get _activityImages {
+    final images = <String>[];
+    for (final photo in widget.activity.photos) {
+      final value = photo.trim();
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        images.add(value);
+      }
+    }
+    if (widget.activity.thumbnailUrl.isNotEmpty) {
+      images.insert(0, widget.activity.thumbnailUrl);
+    }
+    if (images.isEmpty) {
+      return const [
+        'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1200&auto=format&fit=crop',
+      ];
+    }
+    return images.toSet().toList(growable: false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _imagePageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _imagePageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF2F4F8),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF2F4F8),
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Book the Activity',
+          'Book Activity',
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
           ),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 108),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildActivityHeader(),
-            _buildDatePicker(),
-            _buildTimePicker(),
+            const SizedBox(height: 14),
             _buildParticipantsCounter(),
             _buildPriceSummary(),
-            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -66,12 +96,20 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   }
 
   Widget _buildActivityHeader() {
+    final imageUrl = widget.activity.thumbnailUrl.isNotEmpty
+        ? widget.activity.thumbnailUrl
+        : (widget.activity.photos.isNotEmpty
+              ? widget.activity.photos.first
+              : '');
+    final images = _activityImages;
+
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFD8DFEA)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -88,9 +126,11 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
               children: [
                 Text(
                   widget.activity.titre,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     color: Color(0xFF1E293B),
                   ),
                 ),
@@ -99,10 +139,11 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: '${widget.activity.prix.toInt()} TND',
+                        text:
+                            '${widget.activity.prix.toStringAsFixed(widget.activity.prix.truncateToDouble() == widget.activity.prix ? 0 : 2)} TND',
                         style: const TextStyle(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
                           fontSize: 16,
                         ),
                       ),
@@ -119,163 +160,115 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: widget.activity.thumbnailUrl.isNotEmpty
-                ? Image.network(
-                    widget.activity.thumbnailUrl,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                  )
-                : Container(width: 80, height: 80, color: Colors.grey[200]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDatePicker() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Select a Date',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _CustomCalendar(
-            selectedDate: _selectedDate,
-            onDateSelected: (date) => setState(() => _selectedDate = date),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimePicker() {
-    final times = [
-      'Morning (09:00)',
-      'Afternoon (15:30)',
-      'Sunset (18:30)',
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Select a Time Slot',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: times.map((time) {
-              final isSelected = _selectedTime == time;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedTime = time),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        time.contains('Morning') ? Icons.wb_sunny_outlined : Icons.wb_twilight,
-                        size: 18,
-                        color: isSelected ? AppColors.primary : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        time,
-                        style: TextStyle(
-                          color: isSelected ? AppColors.primary : const Color(0xFF64748B),
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 128,
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: SizedBox(
+                    width: 128,
+                    height: 128,
+                    child: PageView.builder(
+                      controller: _imagePageController,
+                      itemCount: images.length,
+                      onPageChanged: (i) => setState(() => _currentImage = i),
+                      itemBuilder: (_, i) => Image.network(
+                        images[i],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey[200],
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_not_supported_outlined),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              );
-            }).toList(),
+                if (images.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(images.length, (index) {
+                      final active = index == _currentImage;
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        width: active ? 12 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? AppColors.primary
+                              : const Color(0xFFC3CDD9),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
   Widget _buildParticipantsCounter() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Participants',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Participants',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
           ),
-          const SizedBox(height: 16),
-          _CounterCard(
-            label: 'Adults',
-            sublabel: '12 years and over',
-            count: _adults,
-            onChanged: (val) => setState(() => _adults = (_adults + val).clamp(1, 10)),
-          ),
-          const SizedBox(height: 12),
-          _CounterCard(
-            label: 'Children',
-            sublabel: '2 to 11 years',
-            count: _children,
-            onChanged: (val) => setState(() => _children = (_children + val).clamp(0, 5)),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
+        ),
+        const SizedBox(height: 10),
+        _CounterCard(
+          label: 'Adults',
+          sublabel: '12 years and above',
+          count: _adults,
+          canDecrease: _adults > 1,
+          onChanged: (val) =>
+              setState(() => _adults = (_adults + val).clamp(1, 10)),
+        ),
+        const SizedBox(height: 12),
+        _CounterCard(
+          label: 'Children',
+          sublabel: '2 to 11 years',
+          count: _children,
+          canDecrease: _children > 0,
+          onChanged: (val) =>
+              setState(() => _children = (_children + val).clamp(0, 8)),
+        ),
+      ],
     );
   }
 
   Widget _buildPriceSummary() {
+    final participants = _adults + _children;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.only(top: 14),
       child: Column(
         children: [
-          const Divider(),
-          const SizedBox(height: 12),
+          Divider(color: const Color(0xFFC8D0DD)),
+          const SizedBox(height: 14),
           _PriceRow(
-            label: 'Subtotal (${_adults + _children}x Person)',
-            value: '${_subtotal.toInt()} TND',
+            label:
+                'Subtotal (${participants}x ${participants > 1 ? 'Adults' : 'Adult'})',
+            value: '${_subtotal.toStringAsFixed(0)} TND',
           ),
           const SizedBox(height: 8),
           _PriceRow(
-            label: 'Service Fee',
-            value: '${_serviceFee.toInt()} TND',
+            label: 'Service fee',
+            value: '${_serviceFee.toStringAsFixed(0)} TND',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          Divider(color: const Color(0xFFD8DEE8), endIndent: 0),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -283,21 +276,20 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                 'Total',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
                 ),
               ),
               Text(
-                '${_total.toInt()} TND',
+                '${_total.toStringAsFixed(0)} TND',
                 style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -305,7 +297,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
@@ -320,17 +312,23 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
           child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white)
+              ? const CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     Text(
-                      'Confirm Booking',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      'Confirm booking',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     SizedBox(width: 8),
                     Icon(Icons.arrow_forward, size: 20),
@@ -346,7 +344,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     final result = await InscriptionService.createInscription(
       activiteId: widget.activity.id,
       nombreParticipants: _adults + _children,
-      message: 'Time: $_selectedTime', // Storing time in message for now
+      message: 'Adults: $_adults, Children: $_children',
     );
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -374,23 +372,25 @@ class _CounterCard extends StatelessWidget {
   final String label;
   final String sublabel;
   final int count;
+  final bool canDecrease;
   final void Function(int) onChanged;
 
   const _CounterCard({
     required this.label,
     required this.sublabel,
     required this.count,
+    required this.canDecrease,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD8DFEA)),
       ),
       child: Row(
         children: [
@@ -401,9 +401,9 @@ class _CounterCard extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: Color(0xFF1E293B),
+                    color: Color(0xFF0F172A),
                   ),
                 ),
                 Text(
@@ -416,25 +416,69 @@ class _CounterCard extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => onChanged(-1),
-            icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF94A3B8)),
+          _CircleCounterButton(
+            icon: Icons.remove,
+            enabled: canDecrease,
+            onTap: () => onChanged(-1),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
             '$count',
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () => onChanged(1),
-            icon: const Icon(Icons.add_circle, color: AppColors.primary),
+          const SizedBox(width: 12),
+          _CircleCounterButton(
+            icon: Icons.add,
+            enabled: true,
+            onTap: () => onChanged(1),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CircleCounterButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _CircleCounterButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = enabled ? AppColors.primary : const Color(0xFFBFCBDD);
+    final fillColor = enabled ? AppColors.primary : Colors.transparent;
+    final iconColor = enabled ? Colors.white : const Color(0xFFBFCBDD);
+
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: fillColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: borderColor, width: 2),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(icon, size: 22, color: iconColor),
       ),
     );
   }
@@ -458,108 +502,12 @@ class _PriceRow extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w700,
             color: Color(0xFF1E293B),
-            fontSize: 14,
+            fontSize: 15,
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CustomCalendar extends StatelessWidget {
-  final DateTime selectedDate;
-  final void Function(DateTime) onDateSelected;
-
-  const _CustomCalendar({
-    required this.selectedDate,
-    required this.onDateSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
-    final lastDayOfMonth = DateTime(selectedDate.year, selectedDate.month + 1, 0);
-    final daysInMonth = lastDayOfMonth.day;
-    final startingWeekday = firstDayOfMonth.weekday; // 1 = Mon, 7 = Sun
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                onPressed: () {}, // Simple static view for now as per mockup
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Text(
-                DateFormat('MMMM yyyy').format(selectedDate),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-                .map((d) => Text(d, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)))
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-            ),
-            itemCount: 14, // Showing two weeks like in mockup
-            itemBuilder: (context, index) {
-              final day = index + 27; // Start from 27 for the J-1 display
-              final currentDay = day > 31 ? day - 31 : day;
-              final isTarget = currentDay == 5; // Highlight 5 as in mockup
-
-              return GestureDetector(
-                onTap: () {},
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isTarget ? AppColors.primary : Colors.transparent,
-                    shape: BoxShape.circle,
-                    boxShadow: isTarget ? [
-                      BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))
-                    ] : [],
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$currentDay',
-                      style: TextStyle(
-                        color: isTarget ? Colors.white : (day < 1 ? Colors.transparent : const Color(0xFF64748B)),
-                        fontWeight: isTarget ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 }

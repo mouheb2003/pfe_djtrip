@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
@@ -27,9 +30,11 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   int _activitiesCount = 0;
   double _avgRating = 0.0;
   int _reviewsCount = 0;
-  List<String> _specialties = [];
   List<ActivityModel> _myActivities = [];
+  List<String> _spokenLanguages = []; // 🚀 NEW: Organizer languages
+  List<String> _specialties = []; // 🚀 NEW: Organizer specialties
   bool _isLoading = true;
+  bool _isLoadingAll = false;
 
   bool _isValidHttpUrl(String value) {
     final uri = Uri.tryParse(value);
@@ -122,7 +127,73 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     _loadAll();
   }
 
+
+  void _showAvatarFullScreen(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Avatar Full Screen',
+      barrierColor: Colors.black.withOpacity(0.7),
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, anim1, anim2) {
+        return FadeTransition(
+          opacity: anim1,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(color: Colors.transparent),
+                  ),
+                  Center(
+                    child: Hero(
+                      tag: 'profile_avatar',
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.70,
+                        height: MediaQuery.of(context).size.width * 0.70,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 40,
+                    right: 20,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _loadAll() async {
+    if (_isLoadingAll) {
+      if (kDebugMode) {
+        debugPrint(
+          '[REBUILD] OrganizerProfileTab skip _loadAll (already loading)',
+        );
+      }
+      return;
+    }
+
+    _isLoadingAll = true;
     if (!mounted) return;
     setState(() => _isLoading = true);
 
@@ -156,7 +227,6 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
         ...?timeline['past'],
       ];
 
-      // Keep organizer endpoints as source of truth, then backfill from timeline if needed.
       final byId = <String, ActivityModel>{};
       for (final activity in primaryActivities) {
         if (activity.id.isEmpty) continue;
@@ -179,7 +249,6 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
       );
       final organizerReviewsFromProfile = user?.nombreAvis ?? 0;
 
-      // Prefer organizer-level fields from DB, fallback to activity/review aggregation.
       final computedAverage = organizerAvgFromProfile > 0
           ? organizerAvgFromProfile
           : (mine.isNotEmpty
@@ -206,37 +275,48 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
         _reviewsCount = computedReviews;
         _myActivities = mine;
 
-        if (userData != null && userData['specialites_activites'] != null) {
-          _specialties = List<String>.from(
-            userData['specialites_activites'] ?? [],
-          );
-        } else {
-          _specialties = mine
-              .map((a) => a.typeActivite.trim())
-              .where((v) => v.isNotEmpty)
-              .take(6)
-              .toList();
+        // 🚀 NEW: Load languages and specialties
+        if (userData != null) {
+          final rawLangs = (userData['langues_proposees'] as List?) ?? const [];
+          _spokenLanguages = rawLangs.map((e) => e.toString()).toList();
+
+          final rawSpecs = (userData['specialites_activites'] as List?) ?? const [];
+          _specialties = rawSpecs.map((e) => e.toString()).toList();
         }
+
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+    } finally {
+      _isLoadingAll = false;
     }
   }
 
+  String _displayLocation() {
+    final raw = _user?.paysOrigine?.trim() ?? '';
+    if (raw.isEmpty) return 'DJERBA, TUNISIA';
+    return raw.toUpperCase();
+  }
+
+  String _safeBio() {
+    final bio = _user?.bio?.trim() ?? '';
+    if (bio.isNotEmpty) return bio;
+    return 'Passionate activity organizer sharing memorable experiences.';
+  }
+
+  // ─── Cover Photo URL ──────────────────────────────────────────────
+  static const String _coverImage =
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80';
+
   @override
   Widget build(BuildContext context) {
-    final coverUrl =
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80';
-    final bioText = (_user?.bio ?? '').trim().isNotEmpty
-        ? (_user?.bio ?? '')
-        : 'Passionate activity organizer sharing memorable experiences in Tunisia.';
-    final displaySpecialties = _specialties
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .take(6)
-        .toList();
+    if (kDebugMode) {
+      debugPrint('[REBUILD] OrganizerProfileTab build');
+    }
+
+    final user = _user;
     final topActivities = List<ActivityModel>.from(_myActivities)
       ..sort((a, b) {
         final dateA =
@@ -248,12 +328,13 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     final profileActivities = topActivities.take(9).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F2FB),
+      backgroundColor: const Color(0xFFF2F1FA),
       floatingActionButton: SizedBox(
-        width: 66,
-        height: 66,
+        width: 60,
+        height: 60,
         child: FloatingActionButton(
-          backgroundColor: const Color(0xFF4D74F5),
+          backgroundColor: AppColors.primary,
+          elevation: 6,
           onPressed: () async {
             final created = await Navigator.push<bool>(
               context,
@@ -261,397 +342,320 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
             );
             if (created == true) _loadAll();
           },
-          child: const Icon(Icons.add, size: 32, color: Colors.white),
+          child: const Icon(Icons.add, size: 28, color: Colors.white),
         ),
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
-          child: SingleChildScrollView(
+          child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            padding: const EdgeInsets.fromLTRB(0, 6, 0, 100),
+            children: [
+              // ── Header Row ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   children: [
+                    IconButton(
+                      onPressed: () {
+                        final nav = Navigator.of(context);
+                        if (nav.canPop()) nav.pop();
+                      },
+                      icon: const Icon(Icons.arrow_back),
+                      color: AppColors.primary,
+                    ),
                     const Expanded(
                       child: Text(
-                        'Organizer',
+                        'Profile',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: Color(0xFF1A2254),
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF131A4A),
                         ),
                       ),
                     ),
                     IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SettingsScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.settings,
-                        color: Color(0xFF6A6F91),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
                       ),
-                      splashRadius: 20,
+                      icon: const Icon(Icons.settings),
+                      color: AppColors.primary,
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
+              ),
+              const SizedBox(height: 6),
+
+              // ── Cover Photo + Avatar ────────────────────────────────
+              Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.bottomCenter,
+                children: [
+                  // Cover photo
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
                       child: SizedBox(
-                        height: 190,
+                        height: 160,
                         width: double.infinity,
                         child: Image.network(
-                          coverUrl,
+                          _coverImage,
                           fit: BoxFit.cover,
-                          filterQuality: FilterQuality.high,
-                          errorBuilder: (_, __, ___) =>
-                              Container(color: const Color(0xFFCFDCF2)),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -54,
-                      child: CircleAvatar(
-                        radius: 66,
-                        backgroundColor: Colors.white,
-                        child: CircleAvatar(
-                          radius: 61,
-                          backgroundColor: const Color(0xFFE2E7F6),
-                          backgroundImage: (_user?.avatar ?? '').isNotEmpty
-                              ? NetworkImage(_user!.avatar!)
-                              : null,
-                          child: (_user?.avatar ?? '').isEmpty
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 46,
-                                  color: Color(0xFF8892AE),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 64),
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2E61F0),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'ORGANISATOR',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    _user?.fullname ?? 'Organizer',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                      color: Color(0xFF1A2254),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 18,
-                        color: Color(0xFF686E92),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _user?.paysOrigine?.trim().isNotEmpty == true
-                            ? (_user?.paysOrigine ?? 'Djerba, Tunisia')
-                            : 'Djerba, Tunisia',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF686E92),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEDEBFA),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'BIO',
-                        style: TextStyle(
-                          fontSize: 15,
-                          letterSpacing: 3.2,
-                          color: Color(0xFF525B8D),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        bioText,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          height: 1.45,
-                          color: Color(0xFF1D2557),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      const Text(
-                        'SPECIAL ACTIVITIES',
-                        style: TextStyle(
-                          fontSize: 13,
-                          letterSpacing: 1.6,
-                          color: Color(0xFF525B8D),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        alignment: WrapAlignment.center,
-                        children:
-                            (displaySpecialties.isNotEmpty
-                                    ? displaySpecialties
-                                    : [
-                                        'Water Sports',
-                                        'Excursions',
-                                        'Luxury Sailing',
-                                      ])
-                                .map((label) => _SpecialtyChip(label))
-                                .toList(),
-                      ),
-                      const SizedBox(height: 26),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _Metric(
-                              value: _avgRating > 0
-                                  ? _avgRating.toStringAsFixed(1)
-                                  : '0.0',
-                              label: 'RATING',
+                          errorBuilder: (_, __, ___) => Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(colors: [Color(0xFF4D74F5), Color(0xFF7B93FF)]),
                             ),
                           ),
-                          Expanded(
-                            child: _Metric(
-                              value: _reviewsCount.toString(),
-                              label: 'REVIEWS',
-                            ),
-                          ),
-                          Expanded(
-                            child: _Metric(
-                              value: _activitiesCount.toString(),
-                              label: 'ACTIVITIES',
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 30),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 30),
-
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 12.0;
-                    final tileSize = (constraints.maxWidth - (spacing * 2)) / 3;
-                    if (profileActivities.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment
-                          .start, // Aligne tout à gauche par défaut
+                  // Avatar overlapping the cover (Instagram style with blurred glow)
+                  Positioned(
+                    bottom: -50,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
                       children: [
-                        // 1. BLOC DES BOUTONS (EDIT & SETTINGS)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const EditProfileScreen(),
-                                  ),
-                                ).then((_) => _loadAll()),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
+                        // Blurred Glow Background
+                        if (user?.avatar != null)
+                          ImageFiltered(
+                            imageFilter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                            child: Container(
+                              width: 104,
+                              height: 104,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.primary.withOpacity(0.15),
+                                image: DecorationImage(
+                                  image: NetworkImage(user!.avatar!),
+                                  fit: BoxFit.cover,
+                                  opacity: 0.6,
                                 ),
-                                child: const Text('Edit Profile'),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const SettingsScreen(),
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFE8E8F6),
-                                  side: BorderSide.none,
-                                  foregroundColor: const Color(0xFF46508A),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                ),
-                                child: const Text('Settings'),
+                          ),
+                        
+                        // Main Avatar with White Border
+                        GestureDetector(
+                          onTap: () => _showAvatarFullScreen(user?.avatar),
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 3,
                               ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // 2. BLOC TITRE "MY ACTIVITIES" AVEC LIGNE ET BOUTON VIEW ALL
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment
-                              .end, // Aligne le bas du titre et du bouton
-                          children: [
-                            // Utilisation d'une Column ici pour que le Container soit SOUS le texte
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'My Activities',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF1A2254),
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  width: 64, // Largeur de la ligne bleue
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2E61F0),
-                                    borderRadius: BorderRadius.circular(99),
-                                  ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-
-                            const Spacer(), // Pousse le bouton VIEW ALL vers la droite
-
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const OrganizerMainScreen(
-                                      initialIndex: 1,
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF1C52E5),
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 0),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: const Text(
-                                'VIEW ALL',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  letterSpacing: 1.1,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                            child: Hero(
+                              tag: 'profile_avatar',
+                              child: ClipOval(
+                                child: user?.avatar != null
+                                    ? Image.network(
+                                        user!.avatar!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => _DefaultAvatar(),
+                                      )
+                                    : _DefaultAvatar(),
                               ),
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 56),
+
+              // ── Badge ───────────────────────────────────────────────
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EDFF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Text(
+                    'ORGANIZER',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ── Name ────────────────────────────────────────────────
+               Text(
+                user?.fullname ?? 'Organizer',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1B2458),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ── Identity Cards (Full Width) ───────────────────────
+              Column(
+                children: [
+                  _OrganizerBioCard(bio: _safeBio()),
+                  const SizedBox(height: 4),
+                  _OrganizerLocationCard(
+                    country: _user?.paysOrigine?.trim() ?? 'TUNISIA',
+                    subLocation: 'DJERBA',
+                  ),
+                  const SizedBox(height: 4),
+                  if (_specialties.isNotEmpty)
+                    _OrganizerSpecialtiesCard(specialties: _specialties),
+                  const SizedBox(height: 4),
+                  if (_spokenLanguages.isNotEmpty)
+                    _OrganizerLanguagesCard(languages: _spokenLanguages),
+                  const SizedBox(height: 4),
+                  _OrganizerStatsRow(
+                    activities: _activitiesCount,
+                    rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
+                    reviews: _reviewsCount,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Action Buttons ────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())).then((_) => _loadAll()),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                            ),
+                            child: const Text('Edit Profile'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE8E8F6),
+                              side: BorderSide.none,
+                              foregroundColor: const Color(0xFF46508A),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                            ),
+                            child: const Text('Settings'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // ── Create Activity ────────────
+                    InkWell(
+                      onTap: () async {
+                        final created = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const CreateActivityScreen()));
+                        if (created == true) _loadAll();
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundImage: _user?.avatar != null ? NetworkImage(_user!.avatar!) : null,
+                              child: _user?.avatar == null ? const Icon(Icons.person, size: 16) : null,
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text('Tap to create a new activity', style: TextStyle(color: Color(0xFF8C90B3), fontWeight: FontWeight.w600, fontSize: 13)),
+                            ),
+                            Icon(Icons.add_circle_outline, color: AppColors.primary.withOpacity(0.7)),
                           ],
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // 3. LA GRILLE D'ACTIVITÉS (WRAP)
-                        Wrap(
-                          spacing: spacing,
-                          runSpacing: spacing,
-                          children: profileActivities.map((activity) {
-                            return SizedBox(
-                              width: tileSize,
-                              height: tileSize,
-                              child: _ActivityTile(
-                                imageUrl: _resolveActivityImageUrl(activity),
-                                onTap: activity.id.isEmpty
-                                    ? null
-                                    : () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                ActivityDetailScreen(
-                                                  activityId: activity.id,
-                                                  viewOnly: true,
-                                                ),
-                                          ),
-                                        );
-                                      },
-                              ),
-                            );
-                          }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // ── My Activities ────────────
+                    const Text('MANAGED', style: TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                    Row(
+                      children: [
+                        const Text('My Activities', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1B2458))),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerMainScreen(initialIndex: 1))),
+                          child: const Text('VIEW ALL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
                         ),
-                        const SizedBox(height: 16),
                       ],
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 6),
+                    if (profileActivities.isEmpty)
+                      Container(
+                        height: 160,
+                        width: double.infinity,
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                        child: const Center(child: Text('No activities yet', style: TextStyle(color: AppColors.textGrey, fontWeight: FontWeight.w600))),
+                      )
+                    else
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: profileActivities.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 6, mainAxisSpacing: 6, childAspectRatio: 1),
+                        itemBuilder: (context, index) {
+                          final activity = profileActivities[index];
+                          return _ActivityTile(
+                            imageUrl: _resolveActivityImageUrl(activity),
+                            onTap: activity.id.isEmpty
+                                ? null
+                                : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: activity.id, viewOnly: true)),
+                                    ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -659,33 +663,50 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   }
 }
 
-class _Metric extends StatelessWidget {
+// ─── Shared Widgets ─────────────────────────────────────────────────────────
+
+class _StatItem extends StatelessWidget {
   final String value;
   final String label;
+  final IconData? icon;
+  final Color? iconColor;
 
-  const _Metric({required this.value, required this.label});
+  const _StatItem({
+    required this.value,
+    required this.label,
+    this.icon,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF1C52E5),
-            letterSpacing: -0.2,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: iconColor ?? AppColors.primary),
+              const SizedBox(width: 3),
+            ],
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 2),
         Text(
-          label,
+          label.toUpperCase(),
           style: const TextStyle(
-            fontSize: 12,
-            letterSpacing: 1.8,
-            color: Color(0xFF2D3562),
+            fontSize: 10,
             fontWeight: FontWeight.w700,
+            color: Color(0xFF6F7396),
+            letterSpacing: 1,
           ),
         ),
       ],
@@ -693,35 +714,6 @@ class _Metric extends StatelessWidget {
   }
 }
 
-class _SpecialtyChip extends StatelessWidget {
-  final String label;
-
-  const _SpecialtyChip(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFC6C6F8),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 220),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF2E3CA3),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _ActivityTile extends StatelessWidget {
   final String imageUrl;
@@ -732,37 +724,311 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFD9DFF0),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.image_not_supported,
-                      color: Color(0xFF8A94B2),
-                      size: 30,
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            GestureDetector(
+              onTap: onTap,
+              child: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFE8E8F6),
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            color: Color(0xFF8C93BE),
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFFE8E8F6),
+                      child: const Center(
+                        child: Icon(
+                          Icons.terrain_rounded,
+                          color: Color(0xFF8C93BE),
+                          size: 30,
+                        ),
+                      ),
                     ),
-                  )
-                : const Icon(Icons.image, color: Color(0xFF8A94B2), size: 30),
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+class _LanguageChip extends StatelessWidget {
+  final String label;
+
+  const _LanguageChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE1FEE7), // Soft green for languages
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF065F46),
+        ),
+      ),
+    );
+  }
+}
+
+class _SpecialtyChip extends StatelessWidget {
+  final String label;
+
+  const _SpecialtyChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    // Member colors updated to Blue as requested
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF), // Soft blue for specialties
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.2)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1E40AF),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrganizerBioCard extends StatelessWidget {
+  final String bio;
+  const _OrganizerBioCard({required this.bio});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8F6), // Matches StatsRow background
+      ),
+      child: Column(
+        children: [
+          const Text('BIO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
+          const SizedBox(height: 10),
+          Text(
+            bio,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF46508A)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganizerLocationCard extends StatelessWidget {
+  final String country, subLocation;
+  const _OrganizerLocationCard({required this.country, required this.subLocation});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8F6), // Matches StatsRow background
+      ),
+      child: Column(
+        children: [
+          const Text('COUNTRY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
+          const SizedBox(height: 10),
+          Text(country.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF131A4A))),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganizerSpecialtiesCard extends StatelessWidget {
+  final List<String> specialties;
+  const _OrganizerSpecialtiesCard({required this.specialties});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8F6), // Matches StatsRow background
+      ),
+      child: Column(
+        children: [
+          const Text('SPECIAL ACTIVITIES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: specialties.map((s) => _SpecialtyChip(label: s)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganizerLanguagesCard extends StatelessWidget {
+  final List<String> languages;
+  const _OrganizerLanguagesCard({required this.languages});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8F6), // Matches StatsRow background
+      ),
+      child: Column(
+        children: [
+          const Text('SPOKEN LANGUAGES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: languages.map((l) => _LanguageChip(label: l)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganizerStatsRow extends StatelessWidget {
+  final int activities, reviews;
+  final String rate;
+  const _OrganizerStatsRow({
+    required this.activities,
+    required this.rate,
+    required this.reviews,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFFE8E8F6),
+      ),
+      child: Row(
+        children: [
+          _StatCardItem(label: 'ACTIVITIES', value: activities.toString()),
+          Container(width: 1, height: 30, color: const Color(0xFFD8D9EC)),
+          _StatCardItem(label: 'RATE', value: rate),
+          Container(width: 1, height: 30, color: const Color(0xFFD8D9EC)),
+          _StatCardItem(label: 'REVIEWS', value: reviews.toString()),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatCardItem extends StatelessWidget {
+  final String label;
+  final String value;
+  const _StatCardItem({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (label == 'RATE')
+                const Icon(
+                  Icons.star,
+                  size: 16,
+                  color: Color(0xFFFFC107),
+                ),
+              if (label == 'RATE') const SizedBox(width: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF131A4A),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF6F7396),
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DefaultAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE2E7F6),
+      child: const Icon(
+        Icons.person,
+        size: 42,
+        color: Color(0xFF8892AE),
+      ),
+    );
+  }
+}
+
+class _EditBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.edit,
+        size: 15,
+        color: Colors.white,
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
 import '../../../widgets/auto_image_carousel.dart';
 import 'requests_tab.dart';
+import '../../shared/activity_detail_screen.dart';
 
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
@@ -305,6 +306,43 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _ActivityCard(
                             activity: a,
+                            onTap: () {
+                              // 🚀 Navigate to detailed activity screen
+                              print('🚀 [DEBUG] Activity card tapped: ${a.id} - ${a.titre}');
+                              
+                              // Validate activity ID
+                              if (a.id == null || a.id.isEmpty) {
+                                print('❌ [DEBUG] Invalid activity ID');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('ID d\'activité invalide'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              
+                              try {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ActivityDetailScreen(activityId: a.id),
+                                  ),
+                                );
+                              } catch (e) {
+                                print('❌ [DEBUG] Navigation error: $e');
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Erreur de navigation: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
                             onEditTap: () async {
                               final updated = await Navigator.push<bool>(
                                 context,
@@ -393,11 +431,13 @@ class _ActivityCard extends StatelessWidget {
   final ActivityModel activity;
   final VoidCallback onEditTap;
   final VoidCallback onDeleteTap;
+  final VoidCallback? onTap; // 🚀 NEW: Add main tap callback
 
   const _ActivityCard({
     required this.activity,
     required this.onEditTap,
     required this.onDeleteTap,
+    this.onTap, // 🚀 NEW: Optional main tap
   });
 
   String _getTimelineBadge() {
@@ -457,33 +497,38 @@ class _ActivityCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Image header
-          AutoImageCarousel(
-            imageUrls: activity.photos,
-            aspectRatio: 16 / 9,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            fit: BoxFit.cover,
-            showIndicators: activity.photos.length > 1,
-            interval: const Duration(seconds: 3),
+          // Image header - make it tappable
+          GestureDetector(
+            onTap: onTap, // 🚀 NEW: Handle main card tap on image
+            child: AutoImageCarousel(
+              imageUrls: activity.photos,
+              aspectRatio: 16 / 9,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              fit: BoxFit.cover,
+              showIndicators: activity.photos.length > 1,
+              interval: const Duration(seconds: 3),
+            ),
           ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                Text(
-                  activity.titre,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E293B),
+          // Content - make it tappable
+          GestureDetector(
+            onTap: onTap, // 🚀 NEW: Handle main card tap on content
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    activity.titre,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                 // Status label
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -569,54 +614,58 @@ class _ActivityCard extends StatelessWidget {
                         color: AppColors.primary,
                       ),
                     ),
-                    const Spacer(),
-                    // Actions: Edit and Delete
-                    Row(
-                      children: [
-                        // Delete button
-                        InkWell(
-                          onTap: onDeleteTap,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline_rounded,
-                              size: 20,
-                              color: Colors.redAccent,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Modify button
-                        InkWell(
-                          onTap: activity.timelineStatus == 'ONGOING'
-                              ? null
-                              : onEditTap,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: activity.timelineStatus == 'ONGOING'
-                                  ? Colors.grey.withOpacity(0.1)
-                                  : AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.edit_outlined,
-                              size: 20,
-                              color: activity.timelineStatus == 'ONGOING'
-                                  ? Colors.grey.shade400
-                                  : AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
+                ),
+              ],
+            ),
+          ),
+          ), // 🚀 FIX: Close the GestureDetector for content
+          // Action buttons - separate from main tap area
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Delete button
+                InkWell(
+                  onTap: onDeleteTap,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Modify button
+                InkWell(
+                  onTap: activity.timelineStatus == 'ONGOING'
+                      ? null
+                      : onEditTap,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: activity.timelineStatus == 'ONGOING'
+                          ? Colors.grey.withOpacity(0.1)
+                          : AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: activity.timelineStatus == 'ONGOING'
+                          ? Colors.grey.shade400
+                          : AppColors.primary,
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -645,7 +645,9 @@ exports.updateProfile = async (req, res) => {
     if (
       err.name === "ValidationError" ||
       err.name === "CastError" ||
-      err.code === 11000
+      err.code === 11000 ||
+      err.message.includes("Invalid") ||
+      err.message.includes("Phone")
     ) {
       return res.status(400).json({
         message: err.message || "Invalid profile data",

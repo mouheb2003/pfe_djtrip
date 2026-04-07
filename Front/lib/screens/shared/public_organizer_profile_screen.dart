@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/activity_model.dart';
@@ -221,32 +222,63 @@ class _PublicOrganizerProfileScreenState
                               )
                             : Container(color: const Color(0xFFCBD5E1)),
                       ),
+                      // Top Avatar (Instagram style with blurred glow)
                       Positioned(
                         left: 0,
                         right: 0,
-                        bottom: -44,
+                        bottom: -46,
                         child: Center(
-                          child: Container(
-                            width: 92,
-                            height: 92,
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE2E8F0),
-                              shape: BoxShape.circle,
-                            ),
-                            child: CircleAvatar(
-                              backgroundColor: const Color(0xFF0F172A),
-                              backgroundImage: avatarUrl.isNotEmpty
-                                  ? NetworkImage(avatarUrl)
-                                  : null,
-                              child: avatarUrl.isEmpty
-                                  ? const Icon(
-                                      Icons.person,
-                                      color: Color(0xFF64748B),
-                                      size: 34,
-                                    )
-                                  : null,
-                            ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Blurred Glow Background
+                              if (avatarUrl.isNotEmpty)
+                                ImageFiltered(
+                                  imageFilter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                                  child: Container(
+                                    width: 96,
+                                    height: 96,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: const Color(0xFF0F172A).withOpacity(0.1),
+                                      image: DecorationImage(
+                                        image: NetworkImage(avatarUrl),
+                                        fit: BoxFit.cover,
+                                        opacity: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              
+                              // Main Avatar Circle
+                              Container(
+                                width: 92,
+                                height: 92,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.12),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: avatarUrl.isNotEmpty
+                                      ? Image.network(
+                                          avatarUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => _DefaultAvatar(),
+                                        )
+                                      : _DefaultAvatar(),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -809,6 +841,20 @@ class _ActivityMiniCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DefaultAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE2E8F0),
+      child: const Icon(
+        Icons.person,
+        color: Color(0xFF64748B),
+        size: 34,
       ),
     );
   }

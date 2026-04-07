@@ -67,6 +67,41 @@ class ActivityModel {
       return 0;
     }
 
+    List<String> parseList(dynamic v) {
+      if (v == null) return [];
+      if (v is List) {
+        final List<String> result = [];
+        for (final item in v) {
+          final s = item?.toString() ?? '';
+          if (s.startsWith('[') && s.endsWith(']')) {
+            result.addAll(parseList(s));
+          } else {
+            if (s.isNotEmpty) result.add(s);
+          }
+        }
+        return result;
+      }
+      if (v is String) {
+        final s = v.trim();
+        if (s.startsWith('[') && s.endsWith(']')) {
+          // It's a string looking like a JSON array, e.g. '["item1", "item2"]'
+          try {
+            final content = s.substring(1, s.length - 1);
+            if (content.isEmpty) return [];
+            return content
+                .split(',')
+                .map((e) => e.trim().replaceAll('"', '').replaceAll("'", ''))
+                .where((e) => e.isNotEmpty)
+                .toList();
+          } catch (_) {
+            return [s];
+          }
+        }
+        return s.isNotEmpty ? [s] : [];
+      }
+      return [];
+    }
+
     return ActivityModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       titre: json['titre']?.toString() ?? '',
@@ -78,18 +113,12 @@ class ActivityModel {
       prix: toDouble(json['prix']),
       capaciteMax: nToInt(json['capacite_max']),
       nombreReservations: nToInt(json['nombre_reservations']),
-      photos: (json['photos'] is List)
-          ? List<String>.from(json['photos'] as List)
-          : [],
-      languesDisponibles: (json['langues_disponibles'] is List)
-          ? List<String>.from(json['langues_disponibles'] as List)
-          : const ['French'],
-      equipementsInclus: (json['equipements_inclus'] is List)
-          ? List<String>.from(json['equipements_inclus'] as List)
-          : const [],
-      aApporter: (json['a_apporter'] is List)
-          ? List<String>.from(json['a_apporter'] as List)
-          : const [],
+      photos: parseList(json['photos']),
+      languesDisponibles: parseList(json['langues_disponibles']).isEmpty
+          ? const ['French']
+          : parseList(json['langues_disponibles']),
+      equipementsInclus: parseList(json['equipements_inclus']),
+      aApporter: parseList(json['a_apporter']),
       niveauDifficulte: json['niveau_difficulte']?.toString() ?? 'Moderate',
       noteMoyenne: toDouble(json['note_moyenne']),
       nombreAvis: nToInt(json['nombre_avis']),

@@ -9,7 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import 'map_picker_screen.dart';
-import 'activity_debug_screen.dart';
+import 'activity_preview_screen.dart';
 
 class EditActivityScreen extends StatefulWidget {
   final ActivityModel activity;
@@ -41,7 +41,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   final List<XFile> _newPhotos = [];
 
   bool _isLoading = false;
-  bool _isDurationTooLong = false;
+
 
   static const _categories = [
     'Guided Tour',
@@ -164,9 +164,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     _endDateTime = _startDateTime!.add(
       Duration(minutes: (durationHours * 60).round()),
     );
-    // Validation: Start Time (Hour + Fraction) + Duration cannot exceed 24h of the same day
-    final startOffset = _startDateTime!.hour + (_startDateTime!.minute / 60.0);
-    _isDurationTooLong = (startOffset + durationHours) > 24.0001; // Tiny tolerance for floating point
   }
 
   Future<void> _pickImages() async {
@@ -392,7 +389,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       const SizedBox(height: 20),
                       _buildLabel('DURATION (HOURS)'),
                       _buildDurationChips(),
-                      _buildDurationWarning(),
+                      
                     ]),
                     const SizedBox(height: 40),
                     _buildSaveButton(),
@@ -430,13 +427,11 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.check_circle,
-              color: _isDurationTooLong
-                  ? Colors.grey[300]
-                  : const Color(0xFF4F67E8),
+              color: Color(0xFF4F67E8),
             ),
-            onPressed: _isDurationTooLong ? null : _save,
+            onPressed: _save,
           ),
         ],
       ),
@@ -1317,7 +1312,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   // ── Save Button ──────────────────────────────────────────────────────────
 
   Widget _buildSaveButton() {
-    final bool isSaveDisabled = _isLoading || _isDurationTooLong;
+    final bool isSaveDisabled = _isLoading;
     return Container(
       width: double.infinity,
       height: 60,
@@ -1364,58 +1359,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     );
   }
 
-  Widget _buildDurationWarning() {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SizeTransition(sizeFactor: animation, child: child),
-      ),
-      child: _isDurationTooLong
-          ? Container(
-              key: const ValueKey('duration_warning'),
-              margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFFD1D1)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.error_outline_rounded, color: Color(0xFFE11D48), size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'IMPOSSIBLE DURATION',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFE11D48),
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'L\'activité ne peut pas dépasser minuit du même jour.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF9F1239),
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(key: ValueKey('no_warning')),
-    );
-  }
+ 
 
   Widget _buildPreviewFab() {
     return FloatingActionButton(
@@ -1423,11 +1367,11 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ActivityDebugScreen(
+            builder: (_) => ActivityPreviewScreen(
               title: _titleCtrl.text,
               category: _category ?? 'Other',
               description: _descCtrl.text,
-              price: double.tryParse(_priceCtrl.text) ?? 0,
+              price: double.tryParse(_priceCtrl.text.replaceAll(',', '.')) ?? 0,
               capacity: int.tryParse(_capacityCtrl.text) ?? 1,
               location: _locationCtrl.text,
               duration: _currentDurationHours(),
@@ -1440,6 +1384,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               pickedLatLng: _pickedLatLng,
               difficulty: _difficultyLevel,
               languages: _languages,
+              durationLabel: _selectedDuration == -1.0 
+                  ? '${_customHours}h${_customMinutes > 0 ? ' ${_customMinutes}min' : ''}'
+                  : '${_selectedDuration.toString().replaceAll('.0', '')}h',
             ),
           ),
         );

@@ -213,7 +213,7 @@ exports.getAllActivites = async (req, res) => {
     else if (sort === "date_asc") sortOption = { date_debut: 1 };
 
     const activites = await Activite.find(filter)
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
+      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .sort(sortOption);
 
     res.status(200).json({
@@ -235,7 +235,7 @@ exports.getActiviteById = async (req, res) => {
   try {
     const activite = await Activite.findById(req.params.id).populate(
       "organisateur_id",
-      "fullname avatar email num_tel note_moyenne nombre_avis description",
+      "fullname avatar email num_tel note_moyenne nombre_avis description date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
     );
 
     if (!activite) {
@@ -410,7 +410,7 @@ exports.updateActivite = async (req, res) => {
       activiteId,
       updateData,
       { new: true, runValidators: true },
-    ).populate("organisateur_id", "fullname avatar note_moyenne nombre_avis");
+    ).populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites");
 
     res.status(200).json({
       message: "Activity updated successfully",
@@ -486,7 +486,7 @@ exports.getAdminActivites = async (_req, res) => {
     const activites = await Activite.find({})
       .sort({ createdAt: -1 })
       .limit(500)
-      .populate("organisateur_id", "fullname email avatar")
+      .populate("organisateur_id", "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .lean();
 
     return res.status(200).json({ activites });
@@ -535,7 +535,7 @@ exports.createAdminActivite = async (req, res) => {
 
     const populated = await Activite.findById(activite._id).populate(
       "organisateur_id",
-      "fullname email avatar",
+      "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
     );
 
     return res.status(201).json({
@@ -607,7 +607,7 @@ exports.updateAdminActivite = async (req, res) => {
     const activite = await Activite.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    }).populate("organisateur_id", "fullname email avatar");
+    }).populate("organisateur_id", "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites");
 
     if (!activite) {
       return res.status(404).json({ message: "Activity not found" });
@@ -664,7 +664,7 @@ exports.searchActivites = async (req, res) => {
       ],
       statut: "active",
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
+      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .limit(20);
 
     res.status(200).json({
@@ -695,7 +695,7 @@ exports.getMyActivities = async (req, res) => {
       organisateur_id: userId,
       date_fin: { $gte: maintenant }, // date_fin >= now
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
+      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .sort({ date_debut: 1 }); // Sort by start date
 
     console.log(`📋 Found ${activities.length} active activities`);
@@ -730,7 +730,7 @@ exports.getArchivedActivities = async (req, res) => {
       organisateur_id: userId,
       date_fin: { $lt: maintenant }, // date_fin < now
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis")
+      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .sort({ date_fin: -1 }); // Sort by end date (most recent first)
 
     res.status(200).json({
@@ -752,7 +752,7 @@ exports.getArchivedActivities = async (req, res) => {
 exports.getGlobalActivitiesByTimeline = async (req, res) => {
   try {
     const activites = await Activite.find({  })
-      .populate("organisateur_id", "fullname email avatar num_tel note_moyenne nombre_avis")
+      .populate("organisateur_id", "fullname email avatar num_tel note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
       .sort({ date_debut: 1 });
 
     const now = new Date();

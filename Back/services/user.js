@@ -152,6 +152,19 @@ class UserService {
       );
     }
 
+    // 🚀 NEW: Auto-validate spoken languages array (organizer field)
+    if (typeof normalizedData.langues_proposees !== "undefined") {
+      normalizedData.langues_proposees = this._coerceStringArray(
+        normalizedData.langues_proposees,
+      )
+        .filter((lang) => lang && lang.trim().length > 0)
+        .map((lang) => lang.trim())
+        .filter((lang, index, arr) => arr.indexOf(lang) === index);
+      console.log(
+        `🌐 Spoken languages validated: ${normalizedData.langues_proposees.length} items`,
+      );
+    }
+
     // Remove restricted fields from update data
     const sanitizedData = { ...normalizedData };
     restrictedFields.forEach((field) => delete sanitizedData[field]);

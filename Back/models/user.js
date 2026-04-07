@@ -93,6 +93,8 @@ const userSchema = new mongoose.Schema(
     ],
     // 🚀 NEW: Activity specialties for organizers
     specialites_activites: [{ type: String }],
+    // 🚀 NEW: Languages offered by organizers (also available for all users)
+    langues_proposees: [{ type: String }],
   },
   {
     discriminatorKey: "userType",
@@ -108,7 +110,5 @@ userSchema.index({ userType: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ favorites: 1 });
 userSchema.index({ accountStatus: 1, userType: 1 });
-userSchema.index({ googleId: 1 }, { sparse: true });
-userSchema.index({ facebookId: 1 }, { sparse: true });
 
 module.exports = User;

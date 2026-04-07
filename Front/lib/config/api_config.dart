@@ -9,19 +9,30 @@ class ApiConfig {
   static const List<String> devUrls = [
     'http://10.0.2.2:3000',
     'http://192.168.51.99:3000',
-    'http://192.168.100.9:3000'
+    'http://192.168.100.9:3000',
+    'http://192.168.1.189:3000',
+    'http://172.20.10.2:3000',
   ];
+
+  static String _ensureScheme(String url) {
+    final value = url.trim();
+    if (value.isEmpty) return value;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    return 'http://$value';
+  }
 
   static String get serverBaseUrl {
     if (_overrideBaseUrl.isNotEmpty) {
-      return _overrideBaseUrl;
+      return _ensureScheme(_overrideBaseUrl);
     }
 
     if (EnvConfig.isProd || EnvConfig.isStaging) {
       return 'https://backdjtrip.onrender.com';
     }
 
-    return devUrls[2]; // change ici si besoin
+    return _ensureScheme(devUrls[3]); // change ici si besoin
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

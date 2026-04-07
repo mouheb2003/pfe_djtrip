@@ -12,6 +12,8 @@ exports.signInSchema = Joi.object({
   // Accept both classic emails and username-like identifiers (e.g. admin)
   email: Joi.string().min(1).required(),
   mot_de_passe: Joi.string().min(5).max(128).required(),
+  // Keep login permissive to support seeded admin password "admin"
+  mot_de_passe: Joi.string().min(1).max(128).required(),
 });
 
 exports.forgotPasswordSchema = Joi.object({

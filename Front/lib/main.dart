@@ -18,35 +18,18 @@ final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
 
 // ✅ ADDED
 void _showGlobalError(String message) {
-  final messenger = rootScaffoldMessengerKey.currentState;
-  if (messenger == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final messenger = rootScaffoldMessengerKey.currentState;
+    if (messenger == null) return;
 
-  messenger
-    ..clearSnackBars()
-    ..showSnackBar(SnackBar(content: Text(message)));
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  });
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // ✅ ADDED
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    if (kDebugMode) {
-      debugPrint('FlutterError: ${details.exceptionAsString()}');
-    }
-    _showGlobalError('Something went wrong. Please try again.');
-  };
-
-  // ✅ ADDED
-  PlatformDispatcher.instance.onError = (error, stack) {
-    if (kDebugMode) {
-      debugPrint('PlatformDispatcher error: $error');
-      debugPrintStack(stackTrace: stack);
-    }
-    _showGlobalError('Unexpected error occurred.');
-    return true;
-  };
 
   // 👇 Initialisation des locales (corrige ton erreur)
   await initializeDateFormatting();

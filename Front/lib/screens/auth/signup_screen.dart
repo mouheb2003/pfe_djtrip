@@ -103,16 +103,17 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white, // Changed to pure white for consistency
       body: Stack(
         children: [
-          // Decorative Background
+          // Back Button
           Positioned(
-            top: -100,
-            left: -100,
-            child: CircleAvatar(
-              radius: 200,
-              backgroundColor: AppColors.primary.withOpacity(0.05),
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 10,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1F2937)),
+              padding: const EdgeInsets.all(12),
             ),
           ),
           SafeArea(
@@ -121,17 +122,15 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 60),
 
                   // Header
                   const Text(
                     'Create an account',
                     style: TextStyle(
                       fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1F2937),
                       letterSpacing: -1,
                     ),
                   ),
@@ -140,7 +139,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     'Join the DJTrip adventure today',
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: Color(0xFF6B7280),
                     ),
                   ),
                   const SizedBox(height: 40),

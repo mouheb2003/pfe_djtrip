@@ -147,6 +147,65 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     return 'Just now';
   }
 
+  void _showAvatarFullScreen(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Avatar Full Screen',
+      barrierColor: Colors.black.withOpacity(0.7),
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, anim1, anim2) {
+        return FadeTransition(
+          opacity: anim1,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(color: Colors.transparent),
+                  ),
+                  Center(
+                    child: Hero(
+                      tag: 'profile_avatar',
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.70,
+                        height: MediaQuery.of(context).size.width * 0.70,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 40,
+                    right: 20,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   bool get _isOrganizer {
     return _user?.isOrganisator ?? false;
   }
@@ -843,6 +902,11 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     return 'Curating unique experiences across Djerba.';
   }
 
+  List<String> _profileInterests() {
+    final raw = _user?.centresInteret ?? const <String>[];
+    return raw.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (kDebugMode) {
@@ -850,7 +914,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     }
 
     final user = _user;
-    final interests = user?.centresInteret ?? const <String>[];
+    final interests = _profileInterests();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),
@@ -889,104 +953,126 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 ],
               ),
               const SizedBox(height: 6),
-              Center(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 98,
-                      height: 98,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFD0D8FF),
-                          width: 3,
+              // ── Cover Photo + Avatar ────────────────────────────────
+              Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.bottomCenter,
+                children: [
+                  // Cover photo
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: SizedBox(
+                      height: 160,
+                      width: double.infinity,
+                      child: Image.network(
+                        'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1400&q=80',
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (_, __, ___) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF4D74F5), Color(0xFF7B93FF)],
+                            ),
+                          ),
                         ),
                       ),
-                      child: ClipOval(
-                        child: user?.avatar != null
-                            ? Image.network(
-                                user!.avatar!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.person,
-                                  size: 42,
-                                  color: Colors.grey,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.person,
-                                size: 42,
-                                color: Colors.grey,
-                              ),
-                      ),
                     ),
-                    Positioned(
-                      bottom: -16,
-                      left: 0,
-                      right: 0,
-                      child: Column(
-                        children: [
-                          // Empty box for spacing
-                          const SizedBox(width: 74, height: 12),
-                          // Badge with user type
-                          if (user != null)
-                            Container(
-                              width: 74,
-                              height: 32,
+                  ),
+                  // Avatar overlapping the cover (Instagram style with blurred glow)
+                  Positioned(
+                    bottom: -50,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Blurred Glow Background
+                        if (_user?.avatar != null)
+                          ImageFiltered(
+                            imageFilter: ImageFilter.blur(
+                              sigmaX: 12,
+                              sigmaY: 12,
+                            ),
+                            child: Container(
+                              width: 104,
+                              height: 104,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE8EDFF),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.primary.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _isOrganizer ? 'ORGANIZER' : 'TOURIST',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  textAlign: TextAlign.center,
+                                shape: BoxShape.circle,
+                                color: AppColors.primary.withOpacity(0.15),
+                                image: DecorationImage(
+                                  image: NetworkImage(_user!.avatar!),
+                                  fit: BoxFit.cover,
+                                  opacity: 0.6,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      right: -4,
-                      top: 58,
-                      child: GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EditProfileScreen(),
                           ),
-                        ).then((_) => _loadAll()),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 14,
-                            color: Colors.white,
+
+                        // Main Avatar with White Border
+                        GestureDetector(
+                          onTap: () => _showAvatarFullScreen(_user?.avatar),
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Hero(
+                              tag: 'profile_avatar',
+                              child: ClipOval(
+                                child: _user?.avatar != null
+                                    ? Image.network(
+                                        _user!.avatar!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            _DefaultAvatar(),
+                                      )
+                                    : _DefaultAvatar(),
+                              ),
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 56),
+              // ── Badge ───────────────────────────────────────────────
+              if (user != null)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8EDFF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3),
+                        width: 1,
                       ),
                     ),
-                  ],
+                    child: Text(
+                      _isOrganizer ? 'ORGANIZER' : 'TOURIST',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-              ),
               const SizedBox(height: 18),
               Text(
                 user?.fullname ?? 'Traveler',
@@ -1021,16 +1107,40 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   ),
                 ),
               ),
-              if (interests.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: interests
-                      .take(6)
-                      .map((i) => _InterestChip(label: i))
-                      .toList(),
+              if (!_isOrganizer && interests.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: interests
+                        .map(
+                          (interest) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8EDFF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: AppColors.primary.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Text(
+                              interest,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF3B4A8F),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
               ],
               const SizedBox(height: 14),
@@ -1280,31 +1390,6 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _InterestChip extends StatelessWidget {
-  final String label;
-
-  const _InterestChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFCACEF8),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF2B3470),
-        ),
-      ),
     );
   }
 }
@@ -1594,6 +1679,39 @@ class _CommentTile extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DefaultAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE2E7F6),
+      child: const Icon(Icons.person, size: 42, color: Color(0xFF8892AE)),
+    );
+  }
+}
+
+class _EditBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.edit, size: 15, color: Colors.white),
     );
   }
 }
