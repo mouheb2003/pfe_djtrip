@@ -10,7 +10,7 @@ class ApiConfig {
     'http://10.0.2.2:3000',
     'http://192.168.51.99:3000',
     'http://192.168.100.9:3000',
-    'http://192.168.1.189:3000',
+    'http://192.168.90.99:3000',
     'http://172.20.10.2:3000',
   ];
 
@@ -32,7 +32,8 @@ class ApiConfig {
       return 'https://backdjtrip.onrender.com';
     }
 
-    return _ensureScheme(devUrls[3]); // change ici si besoin
+    // Default local API target for development on physical devices.
+    return _ensureScheme(devUrls[3]);
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';
