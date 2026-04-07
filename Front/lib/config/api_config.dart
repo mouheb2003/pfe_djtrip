@@ -9,6 +9,7 @@ class ApiConfig {
   static const List<String> devUrls = [
     'http://10.0.2.2:3000',
     'http://192.168.51.99:3000',
+    'http://192.168.100.9:3000'
   ];
 
   static String get serverBaseUrl {
@@ -20,7 +21,7 @@ class ApiConfig {
       return 'https://backdjtrip.onrender.com';
     }
 
-    return devUrls[1]; // change ici si besoin
+    return devUrls[2]; // change ici si besoin
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

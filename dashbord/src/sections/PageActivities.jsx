@@ -26,7 +26,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import {
   getActivitesAdmin,
   createActiviteAdmin,
-  updateActiviteAdmin,
   deleteActiviteAdmin,
 } from 'src/Controller/actions';
 
@@ -130,7 +129,6 @@ export function ActivitiesView({ sx }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
-  const [editingRow, setEditingRow] = useState(null);
   const [form, setForm] = useState({
     titre: '',
     description: '',
@@ -218,7 +216,6 @@ export function ActivitiesView({ sx }) {
   }, [table, updateFilters]);
 
   const openCreateDialog = useCallback(() => {
-    setEditingRow(null);
     setForm({
       titre: '',
       description: '',
@@ -234,27 +231,6 @@ export function ActivitiesView({ sx }) {
       date_debut: '',
       date_fin: '',
       photos: '',
-    });
-    setOpenDialog(true);
-  }, []);
-
-  const openEditDialog = useCallback((row) => {
-    setEditingRow(row);
-    setForm({
-      titre: row.titre,
-      description: row.description,
-      type_activite: row.type_activite,
-      categorie: row.categorie,
-      organisateur_id: row.organisateur_id,
-      lieu: row.lieu,
-      duree: String(row.duree ?? 1),
-      prix: String(row.prix ?? 0),
-      capacite_max: String(row.capacite_max ?? 1),
-      niveau_difficulte: row.niveau_difficulte,
-      statut: row.statut,
-      date_debut: row.date_debut ? new Date(row.date_debut).toISOString().slice(0, 16) : '',
-      date_fin: row.date_fin ? new Date(row.date_fin).toISOString().slice(0, 16) : '',
-      photos: Array.isArray(row.photos) ? row.photos.join('\n') : '',
     });
     setOpenDialog(true);
   }, []);
@@ -316,13 +292,8 @@ export function ActivitiesView({ sx }) {
 
     try {
       setSubmitting(true);
-      if (editingRow?.id) {
-        await updateActiviteAdmin(editingRow.id, payload);
-        toast.success('Activité modifiée');
-      } else {
-        await createActiviteAdmin(payload);
-        toast.success('Activité créée');
-      }
+      await createActiviteAdmin(payload);
+      toast.success('Activité créée');
       setOpenDialog(false);
       await loadRows();
     } catch {
@@ -330,7 +301,7 @@ export function ActivitiesView({ sx }) {
     } finally {
       setSubmitting(false);
     }
-  }, [editingRow?.id, form, loadRows]);
+  }, [form, loadRows]);
 
   const handleDelete = useCallback(
     async (row) => {
@@ -440,11 +411,6 @@ export function ActivitiesView({ sx }) {
                                 <Iconify icon="solar:eye-bold" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Modifier">
-                              <IconButton color="warning" onClick={() => openEditDialog(row)}>
-                                <Iconify icon="solar:pen-bold" />
-                              </IconButton>
-                            </Tooltip>
                             <Tooltip title="Supprimer">
                               <IconButton color="error" onClick={() => handleDelete(row)}>
                                 <Iconify icon="solar:trash-bin-trash-bold" />
@@ -485,7 +451,7 @@ export function ActivitiesView({ sx }) {
         </Card>
 
         <Dialog open={openDialog} onClose={closeDialog} fullWidth maxWidth="sm">
-          <DialogTitle>{editingRow ? 'Modifier activité' : 'Créer activité'}</DialogTitle>
+          <DialogTitle>Créer activité</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
               <TextField
@@ -623,7 +589,7 @@ export function ActivitiesView({ sx }) {
               Annuler
             </Button>
             <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
-              {editingRow ? 'Enregistrer' : 'Créer'}
+              Créer
             </Button>
           </DialogActions>
         </Dialog>

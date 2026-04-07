@@ -11,6 +11,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_client.dart';
 import '../../services/message_service.dart';
+import '../../services/navigation_service.dart';
 import '../../theme/app_theme.dart';
 import 'public_organizer_profile_screen.dart';
 import 'voice_call_screen.dart';
@@ -22,6 +23,7 @@ class ChatConversationScreen extends StatefulWidget {
   final String partnerName;
   final String? partnerAvatar;
   final bool partnerOnline;
+  final bool isSupportChat;
 
   const ChatConversationScreen({
     super.key,
@@ -29,6 +31,7 @@ class ChatConversationScreen extends StatefulWidget {
     required this.partnerName,
     this.partnerAvatar,
     this.partnerOnline = false,
+    this.isSupportChat = false,
   });
 
   @override
@@ -37,6 +40,8 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen>
     with WidgetsBindingObserver {
+  static const Duration _refreshInterval = Duration(seconds: 2);
+
   final TextEditingController _msgCtrl = TextEditingController();
   final FocusNode _msgFocus = FocusNode();
   final ScrollController _scrollCtrl = ScrollController();
@@ -58,6 +63,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   Duration _voiceDuration = Duration.zero;
   String _editingMessageId = '';
   String _replacingMessageId = '';
+  Timer? _autoRefreshTimer;
 
   // 🚀 SIMPLIFIED: Simple online status tracking
   bool _partnerOnline = false;
@@ -69,9 +75,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _socket?.off('message_sent');
     _socket?.off('new_message');
     _socket?.off('user_status');
+    _socket?.off('account_restricted');
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (_) {
+      if (!mounted) return;
+      _loadMessages();
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
   }
 
   @override
@@ -85,6 +105,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _initVoicePlayer();
     _loadMessages();
     _initSocket();
+    _startAutoRefresh();
   }
 
   @override
@@ -98,6 +119,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _voicePlayer.dispose();
     _audioRecorder.dispose();
     _recordTicker?.cancel();
+    _stopAutoRefresh();
     _msgCtrl.dispose();
     _msgFocus.dispose();
     _scrollCtrl.dispose();
@@ -429,6 +451,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         print('⏸️ Chat going to background, forcing logout...');
         // 🚀 NEW: Force logout on app background
         _socket?.emit('force_logout');
+        _stopAutoRefresh();
         _disposeSocket();
         return;
 
@@ -437,6 +460,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         if (_socket == null) {
           _initSocket();
         }
+        _startAutoRefresh();
         break;
     }
   }
@@ -491,6 +515,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     socket.off('message_sent');
     socket.off('new_message');
     socket.off('user_status');
+    socket.off('account_restricted');
 
     // 🚀 SIMPLIFIED: Clean socket event handling
     socket.on('connect', (_) {
@@ -539,6 +564,21 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       } else {
         print('❌ [ChatScreen] User ID mismatch, ignoring status update');
       }
+    });
+
+    socket.on('account_restricted', (data) async {
+      if (!mounted) return;
+
+      String message = 'Votre compte a été restreint.';
+      if (data is Map && data['message'] != null) {
+        message = data['message'].toString();
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      await AuthService.clearLocalSession();
+      NavigationService.forceLogoutToLogin();
     });
 
     socket.connect();
@@ -758,6 +798,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   void _onCallTap({required bool isVideo}) {
+    if (widget.isSupportChat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Calls are disabled for support chat.')),
+      );
+      return;
+    }
+
     if (!_partnerOnline) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${widget.partnerName} is offline')),
@@ -1181,6 +1228,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   Widget _buildHeader(ColorScheme cs) {
     final partnerAvatar = widget.partnerAvatar;
+    final headerTitle = widget.isSupportChat
+        ? 'DJTrip Support'
+        : widget.partnerName;
+    final headerSubtitle = widget.isSupportChat
+        ? 'Customer assistance'
+        : (_partnerOnline ? 'Online' : 'Offline');
 
     return Container(
       color: cs.surface,
@@ -1194,16 +1247,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PublicOrganizerProfileScreen(
-                      organizerId: widget.partnerId,
-                    ),
-                  ),
-                );
-              },
+              onTap: widget.isSupportChat
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PublicOrganizerProfileScreen(
+                            organizerId: widget.partnerId,
+                          ),
+                        ),
+                      );
+                    },
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
@@ -1248,7 +1303,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.partnerName,
+                            headerTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1258,11 +1313,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                             ),
                           ),
                           Text(
-                            _partnerOnline ? 'Online' : 'Offline',
+                            headerSubtitle,
                             style: TextStyle(
-                              color: _partnerOnline
-                                  ? const Color(0xFF22C55E)
-                                  : cs.onSurfaceVariant,
+                              color: widget.isSupportChat
+                                  ? cs.primary
+                                  : (_partnerOnline
+                                        ? const Color(0xFF22C55E)
+                                        : cs.onSurfaceVariant),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1275,18 +1332,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               ),
             ),
           ),
+          if (!widget.isSupportChat) ...[
+            IconButton(
+              onPressed: () => _onCallTap(isVideo: false),
+              icon: Icon(Icons.call_rounded, color: cs.primary),
+              tooltip: 'Voice call',
+            ),
+            IconButton(
+              onPressed: () => _onCallTap(isVideo: true),
+              icon: Icon(Icons.videocam_rounded, color: cs.primary),
+              tooltip: 'Video call',
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(
+                Icons.support_agent_rounded,
+                color: cs.primary,
+                size: 22,
+              ),
+            ),
           IconButton(
-            onPressed: () => _onCallTap(isVideo: false),
-            icon: Icon(Icons.call_rounded, color: cs.primary),
-            tooltip: 'Voice call',
-          ),
-          IconButton(
-            onPressed: () => _onCallTap(isVideo: true),
-            icon: Icon(Icons.videocam_rounded, color: cs.primary),
-            tooltip: 'Video call',
-          ),
-          IconButton(
-            onPressed: () {},
+            onPressed: () {
+              if (!widget.isSupportChat) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Support chat is monitored. We reply as soon as possible.',
+                  ),
+                ),
+              );
+            },
             icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
             tooltip: 'More',
           ),
@@ -1296,6 +1372,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildEmptyState(ColorScheme cs) {
+    final title = widget.isSupportChat
+        ? 'Support is ready to help'
+        : 'No messages yet';
+    final subtitle = widget.isSupportChat
+        ? 'Describe your issue and the support team will answer shortly.'
+        : 'Start the conversation with your first message.';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -1313,7 +1396,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             ),
             const SizedBox(height: 14),
             Text(
-              'No messages yet',
+              title,
               style: TextStyle(
                 color: cs.onSurface,
                 fontSize: 18,
@@ -1322,7 +1405,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              'Start the conversation with your first message.',
+              subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: cs.onSurfaceVariant,
@@ -1344,14 +1427,49 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       return _buildEmptyState(cs);
     }
 
+    final hasSupportCard = widget.isSupportChat;
+
     return ListView.builder(
       controller: _scrollCtrl,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
-      itemCount: _messages.length,
+      itemCount: _messages.length + (hasSupportCard ? 1 : 0),
       itemBuilder: (_, i) {
-        final msg = _messages[i];
-        final previous = i > 0 ? _messages[i - 1] : null;
+        if (hasSupportCard && i == 0) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: const [
+                Icon(
+                  Icons.support_agent_rounded,
+                  color: Color(0xFF2563EB),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You are connected to DJTrip support. Calls are disabled in this chat.',
+                    style: TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final msgIndex = hasSupportCard ? i - 1 : i;
+        final msg = _messages[msgIndex];
+        final previous = msgIndex > 0 ? _messages[msgIndex - 1] : null;
         final showDay =
             previous == null || !_isSameDay(previous.time, msg.time);
 
@@ -1810,6 +1928,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final canSend = text.isNotEmpty;
     final isEditing = _editingMessageId.isNotEmpty;
     final isReplacing = _replacingMessageId.isNotEmpty;
+    final composerFill = widget.isSupportChat
+        ? const Color(0xFFF1F5FF)
+        : const Color(0xFFE8EDF5);
+    final sendButtonColor = widget.isSupportChat
+        ? const Color(0xFF1D4ED8)
+        : const Color(0xFF315CFF);
 
     // Définissons une taille commune pour les deux boutons d'action
     // pour une meilleure harmonie visuelle.
@@ -1929,7 +2053,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
                   // On active le remplissage ici
                   filled: true,
-                  fillColor: const Color(0xFFE8EDF5), // La couleur grise unie
+                  fillColor: composerFill,
                   // On définit les bordures (none) mais avec un border radius
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
@@ -1973,12 +2097,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   width: actionButtonSize,
                   height: actionButtonSize,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF315CFF),
+                    color: sendButtonColor,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         // CORRECTION : Ombre plus discrète et plus proche du bouton
-                        color: const Color(0xFF315CFF).withOpacity(0.18),
+                        color: sendButtonColor.withOpacity(0.18),
                         blurRadius: 10,
                         offset: const Offset(0, 6),
                       ),
@@ -2022,9 +2146,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: cs.surfaceVariant,
+      backgroundColor: widget.isSupportChat
+          ? const Color(0xFFF7FAFF)
+          : cs.surfaceVariant,
       body: Stack(
         children: [
+          if (widget.isSupportChat)
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFFEFF6FF), Color(0xFFF8FAFC)],
+                  ),
+                ),
+              ),
+            ),
           Column(
             children: [
               _buildHeader(cs),

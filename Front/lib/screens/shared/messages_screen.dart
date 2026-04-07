@@ -17,6 +17,8 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen>
     with WidgetsBindingObserver {
+  static const Duration _refreshInterval = Duration(seconds: 4);
+
   int _tabIndex = 0;
   final _tabs = const ['All Chats', 'Unread', 'Groups', 'Archived'];
 
@@ -28,6 +30,7 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   io.Socket? _socket;
   Timer? _presenceReloadTimer;
+  Timer? _autoRefreshTimer;
 
   // ✅ ADDED
   void _disposeSocket() {
@@ -40,17 +43,32 @@ class _MessagesScreenState extends State<MessagesScreen>
     _socket = null;
   }
 
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (_) {
+      if (!mounted) return;
+      _loadConversations();
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadConversations();
     _initSocket();
+    _startAutoRefresh();
   }
 
   @override
   void dispose() {
     _presenceReloadTimer?.cancel();
+    _stopAutoRefresh();
     _disposeSocket();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -60,7 +78,9 @@ class _MessagesScreenState extends State<MessagesScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (_socket == null) _initSocket();
+      _startAutoRefresh();
     } else {
+      _stopAutoRefresh();
       _disposeSocket();
     }
   }

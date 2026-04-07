@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart'; // 👈 IMPORTANT
 import 'config/app_routes.dart';
 import 'services/theme_service.dart';
 import 'services/api_service.dart';
+import 'services/navigation_service.dart';
 import 'providers/user_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -106,6 +107,7 @@ class _MyAppState extends State<MyApp> {
         ],
         child: MaterialApp(
           title: 'DJTrip',
+          navigatorKey: NavigationService.navigatorKey,
           scaffoldMessengerKey: rootScaffoldMessengerKey,
           debugShowCheckedModeBanner: false,
           builder: (context, child) {

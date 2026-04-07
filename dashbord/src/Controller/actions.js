@@ -98,6 +98,20 @@ export async function updateUserStatus(id, statusOrPayload) {
   return data?.user ?? data;
 }
 
+export async function banUser(id, reason) {
+  if (!id || !reason) return null;
+
+  const data = await Put(END_POINT.banUser(id), { banReason: reason });
+  return data?.user ?? data;
+}
+
+export async function unbanUser(id) {
+  if (!id) return null;
+
+  const data = await Put(END_POINT.unbanUser(id), { accountStatus: 'active' });
+  return data?.user ?? data;
+}
+
 export async function deleteUser(id) {
   if (!id) return null;
 

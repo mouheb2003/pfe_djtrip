@@ -297,3 +297,165 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
     return { success: false, error: error.message };
   }
 };
+
+// Send ban notification email
+exports.sendBanNotification = async (email, fullname, reason) => {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+      to: email,
+      subject: "Account Banned - DJTrip",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background-color: #d32f2f;
+              color: white;
+              padding: 20px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background-color: #f9f9f9;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .reason-box {
+              background-color: white;
+              border: 2px solid #d32f2f;
+              padding: 20px;
+              margin: 20px 0;
+              border-radius: 8px;
+              border-left: 4px solid #d32f2f;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              color: #666;
+              font-size: 12px;
+            }
+            .appeal-section {
+              margin-top: 20px;
+              padding: 15px;
+              background-color: #e3f2fd;
+              border-left: 4px solid #1976d2;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⛔ Account Suspended</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullname},</h2>
+              <p>We regret to inform you that your DJTrip account has been suspended effective immediately.</p>
+              
+              <p><strong>Reason for suspension:</strong></p>
+              <div class="reason-box">
+                <p>${reason}</p>
+              </div>
+              
+              <p>This means you will no longer be able to access your account or use our services.</p>
+              
+              <div class="appeal-section">
+                <p><strong>Appeal Process:</strong></p>
+                <p>If you believe this action was taken in error, you may appeal by contacting our support team at support@djtrip.com with your account details and an explanation.</p>
+              </div>
+              
+              <p style="margin-top: 20px;">For more information about our community guidelines and policies, please visit our website.</p>
+            </div>
+            <div class="footer">
+              <p>© 2026 DJTrip. All rights reserved.</p>
+              <p>This is an automated email, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nWe regret to inform you that your DJTrip account has been suspended effective immediately.\n\nReason for suspension:\n${reason}\n\nYou will no longer be able to access your account or use our services.\n\nIf you believe this action was taken in error, you may appeal by contacting our support team at support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Ban notification email sent:", info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending ban notification email:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send suspension notification email
+exports.sendSuspensionNotification = async (email, fullname, reason, suspendedUntil) => {
+  try {
+    const suspendedUntilText = suspendedUntil
+      ? new Date(suspendedUntil).toLocaleString("fr-FR")
+      : "jusqu'à nouvelle décision";
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+      to: email,
+      subject: "Account Suspended - DJTrip",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f57c00; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .reason-box { background-color: white; border: 2px solid #f57c00; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #f57c00; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+            .info-box { margin-top: 20px; padding: 15px; background-color: #fff3e0; border-left: 4px solid #f57c00; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⏸ Account Suspended</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullname},</h2>
+              <p>Your DJTrip account has been suspended.</p>
+              <p><strong>Suspension reason:</strong></p>
+              <div class="reason-box"><p>${reason}</p></div>
+              <p><strong>Suspended until:</strong> ${suspendedUntilText}</p>
+              <div class="info-box">
+                <p style="margin: 0;">If you need help, contact support@djtrip.com.</p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>© 2026 DJTrip. All rights reserved.</p>
+              <p>This is an automated email, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nYour DJTrip account has been suspended.\n\nSuspension reason: ${reason}\nSuspended until: ${suspendedUntilText}\n\nIf you need help, contact support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Suspension notification email sent:", info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending suspension notification email:", error);
+    return { success: false, error: error.message };
+  }
+};

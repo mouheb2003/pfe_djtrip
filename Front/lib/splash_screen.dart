@@ -57,6 +57,7 @@ class _SplashScreenState extends State<SplashScreen>
     final isLoggedIn = await AuthService.isLoggedIn();
 
     if (isLoggedIn) {
+      await AuthService.ensureAccountGuardSocket();
       // User logged in - retrieve info and go to Main
       final user = await AuthService.getUser();
       if (user != null) {

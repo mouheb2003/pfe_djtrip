@@ -9,8 +9,9 @@ exports.signUpSchema = Joi.object({
 });
 
 exports.signInSchema = Joi.object({
-  email: Joi.string().email().required(),
-  mot_de_passe: Joi.string().min(6).max(128).required(),
+  // Accept both classic emails and username-like identifiers (e.g. admin)
+  email: Joi.string().min(1).required(),
+  mot_de_passe: Joi.string().min(5).max(128).required(),
 });
 
 exports.forgotPasswordSchema = Joi.object({

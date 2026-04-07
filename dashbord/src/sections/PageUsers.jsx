@@ -31,6 +31,8 @@ import {
   getUserById,
   toggleUserRole,
   updateUserStatus,
+  banUser,
+  unbanUser,
 } from 'src/Controller/actions';
 
 import { Label } from 'src/components/label';
@@ -149,9 +151,13 @@ export function UsersView({ sx }) {
   const [busyUserId, setBusyUserId] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [suspendTargetUser, setSuspendTargetUser] = useState(null);
-  const [customSuspendDays, setCustomSuspendDays] = useState('');
+  const [suspendReason, setSuspendReason] = useState('');
+  const [banTargetUser, setBanTargetUser] = useState(null);
+  const [banReason, setBanReason] = useState('');
+  const [customSuspendUntil, setCustomSuspendUntil] = useState('');
 
   const filters = useSetState({
     query: '',
@@ -255,7 +261,14 @@ export function UsersView({ sx }) {
   const closeSuspendDialog = useCallback(() => {
     setSuspendDialogOpen(false);
     setSuspendTargetUser(null);
-    setCustomSuspendDays('');
+    setSuspendReason('');
+    setCustomSuspendUntil('');
+  }, []);
+
+  const closeBanDialog = useCallback(() => {
+    setBanDialogOpen(false);
+    setBanTargetUser(null);
+    setBanReason('');
   }, []);
 
   const handleOpenSuspendDialog = useCallback(
@@ -269,7 +282,24 @@ export function UsersView({ sx }) {
 
       setSuspendDialogOpen(true);
       setSuspendTargetUser(user);
-      setCustomSuspendDays('');
+      setSuspendReason('');
+      setCustomSuspendUntil('');
+    },
+    []
+  );
+
+  const handleOpenBanDialog = useCallback(
+    (user) => {
+      if (!user?.id) return;
+
+      if (user.role === 'admin') {
+        toast.error('Le compte admin ne peut pas être banni');
+        return;
+      }
+
+      setBanDialogOpen(true);
+      setBanTargetUser(user);
+      setBanReason('');
     },
     []
   );
@@ -295,73 +325,90 @@ export function UsersView({ sx }) {
     [fetchUsers, selectedUser?.id]
   );
 
-  const handleSuspendPreset = useCallback(
-    async (preset) => {
-      if (!suspendTargetUser?.id) return;
-
-      const baseDate = new Date();
-      let payload = { accountStatus: 'suspended' };
-      let successMessage = 'Utilisateur suspendu';
-
-      if (preset === 'reactivate') {
-        payload = { accountStatus: 'active' };
-        successMessage = 'Utilisateur réactivé avec succès';
-      }
-
-      if (preset === 'until-reactivate') {
-        payload = { accountStatus: 'suspended' };
-        successMessage = 'Utilisateur suspendu jusqu a reactivation';
-      }
-
-      if (preset === '30m') {
-        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 30 * 60 * 1000).toISOString() };
-        successMessage = 'Utilisateur suspendu pour 30 minutes';
-      }
-
-      if (preset === '1h') {
-        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 60 * 60 * 1000).toISOString() };
-        successMessage = 'Utilisateur suspendu pour 1 heure';
-      }
-
-      if (preset === '12h') {
-        payload = { accountStatus: 'suspended', suspendedUntil: new Date(baseDate.getTime() + 12 * 60 * 60 * 1000).toISOString() };
-        successMessage = 'Utilisateur suspendu pour 12 heures';
-      }
-
-      if (preset === '1j') {
-        payload = { accountStatus: 'suspended', suspendDays: 1 };
-        successMessage = 'Utilisateur suspendu pour 1 jour';
-      }
-
-      if (preset === '1mois') {
-        const oneMonthLater = new Date(baseDate);
-        oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
-        payload = { accountStatus: 'suspended', suspendedUntil: oneMonthLater.toISOString() };
-        successMessage = 'Utilisateur suspendu pour 1 mois';
-      }
-
-      closeSuspendDialog();
-      await applyStatusUpdate(suspendTargetUser, payload, successMessage);
-    },
-    [applyStatusUpdate, closeSuspendDialog, suspendTargetUser]
-  );
-
-  const handleApplyCustomSuspendDays = useCallback(async () => {
+  const handleApplyCustomSuspendUntil = useCallback(async () => {
     if (!suspendTargetUser?.id) return;
 
-    const days = Number.parseInt(customSuspendDays, 10);
-    if (!Number.isInteger(days) || days <= 0) {
-      toast.error('Veuillez saisir un nombre de jours valide');
+    if (!suspendReason.trim()) {
+      toast.error('Veuillez saisir une raison pour la suspension');
+      return;
+    }
+
+    if (!customSuspendUntil) {
+      toast.error('Veuillez choisir une date et une heure valides');
+      return;
+    }
+
+    const parsedUntil = new Date(customSuspendUntil);
+    if (Number.isNaN(parsedUntil.getTime()) || parsedUntil <= new Date()) {
+      toast.error('La date de suspension doit être dans le futur');
       return;
     }
 
     closeSuspendDialog();
     await applyStatusUpdate(
       suspendTargetUser,
-      { accountStatus: 'suspended', suspendDays: days },
-      `Utilisateur suspendu pour ${days} jour(s)`
+      { accountStatus: 'suspended', suspendedUntil: parsedUntil.toISOString(), suspendReason: suspendReason.trim() },
+      `Utilisateur suspendu jusqu au ${parsedUntil.toLocaleString('fr-FR')}`
     );
-  }, [applyStatusUpdate, closeSuspendDialog, customSuspendDays, suspendTargetUser]);
+  }, [applyStatusUpdate, closeSuspendDialog, customSuspendUntil, suspendReason, suspendTargetUser]);
+
+  const handleApplyUnsuspend = useCallback(async () => {
+    if (!suspendTargetUser?.id) return;
+
+    closeSuspendDialog();
+    await applyStatusUpdate(
+      suspendTargetUser,
+      { accountStatus: 'active' },
+      'Utilisateur désuspendu avec succès'
+    );
+  }, [applyStatusUpdate, closeSuspendDialog, suspendTargetUser]);
+
+  const handleApplyBan = useCallback(async () => {
+    if (!banTargetUser?.id || !banReason.trim()) {
+      toast.error('Veuillez saisir une raison pour le bannissement');
+      return;
+    }
+
+    try {
+      setBusyUserId(banTargetUser.id);
+      await banUser(banTargetUser.id, banReason);
+      toast.success('Utilisateur banni et email envoyé');
+
+      closeBanDialog();
+      await fetchUsers();
+
+      if (selectedUser?.id === banTargetUser.id) {
+        const refreshed = await getUserById(banTargetUser.id);
+        setSelectedUser(normalizeUser(refreshed));
+      }
+    } catch {
+      toast.error('Échec du bannissement de l\'utilisateur');
+    } finally {
+      setBusyUserId('');
+    }
+  }, [banTargetUser, banReason, closeBanDialog, fetchUsers, selectedUser?.id]);
+
+  const handleApplyUnban = useCallback(async () => {
+    if (!banTargetUser?.id) return;
+
+    try {
+      setBusyUserId(banTargetUser.id);
+      await unbanUser(banTargetUser.id);
+      toast.success('Utilisateur débanni avec succès');
+
+      closeBanDialog();
+      await fetchUsers();
+
+      if (selectedUser?.id === banTargetUser.id) {
+        const refreshed = await getUserById(banTargetUser.id);
+        setSelectedUser(normalizeUser(refreshed));
+      }
+    } catch {
+      toast.error('Échec du débannissement de l\'utilisateur');
+    } finally {
+      setBusyUserId('');
+    }
+  }, [banTargetUser?.id, closeBanDialog, fetchUsers, selectedUser?.id]);
 
   const dataFiltered = useMemo(
     () =>
@@ -598,13 +645,13 @@ export function UsersView({ sx }) {
                               </IconButton>
                             </Tooltip>
 
-                            <Tooltip title="Basculer touriste/organisateur">
+                            <Tooltip title="Bannir l'utilisateur">
                               <IconButton
-                                color="warning"
-                                onClick={() => handleToggleRole(user)}
+                                color="error"
+                                onClick={() => handleOpenBanDialog(user)}
                                 disabled={busyUserId === user.id || user.role === 'admin'}
                               >
-                                <Iconify icon="solar:user-check-bold" />
+                                <Iconify icon="solar:forbidden-circle-bold" />
                               </IconButton>
                             </Tooltip>
 
@@ -721,11 +768,11 @@ export function UsersView({ sx }) {
               Suspension
             </Button>
             <Button
-              color="warning"
-              onClick={() => handleToggleRole(selectedUser)}
+              color="error"
+              onClick={() => handleOpenBanDialog(selectedUser)}
               disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
             >
-              Basculer rôle
+              Bannir
             </Button>
             <Button
               color="error"
@@ -750,32 +797,39 @@ export function UsersView({ sx }) {
                 Utilisateur: <strong>{suspendTargetUser?.fullname ?? '-'}</strong>
               </Typography>
 
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Raison de la suspension"
+                placeholder="Expliquez pourquoi cet utilisateur est suspendu..."
+                value={suspendReason}
+                onChange={(event) => setSuspendReason(event.target.value)}
+                helperText="La raison sera envoyée à l'utilisateur par email"
+              />
+
               {suspendTargetUser?.status === 'suspendu' ? (
-                <Button variant="contained" color="success" onClick={() => handleSuspendPreset('reactivate')}>
-                  Réactiver maintenant
+                <Button
+                  variant="outlined"
+                  color="success"
+                  onClick={handleApplyUnsuspend}
+                  disabled={busyUserId === suspendTargetUser?.id}
+                >
+                  Désuspendre maintenant
                 </Button>
               ) : null}
-
-              <Button variant="outlined" onClick={() => handleSuspendPreset('30m')}>30m</Button>
-              <Button variant="outlined" onClick={() => handleSuspendPreset('1h')}>1h</Button>
-              <Button variant="outlined" onClick={() => handleSuspendPreset('12h')}>12h</Button>
-              <Button variant="outlined" onClick={() => handleSuspendPreset('1j')}>1j</Button>
-              <Button variant="outlined" onClick={() => handleSuspendPreset('1mois')}>1mois</Button>
-              <Button variant="outlined" color="warning" onClick={() => handleSuspendPreset('until-reactivate')}>
-                Jusqu a reactive
-              </Button>
 
               <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
                 <TextField
                   size="small"
-                  type="number"
-                  label="Nombre de jours"
-                  value={customSuspendDays}
-                  onChange={(event) => setCustomSuspendDays(event.target.value)}
-                  inputProps={{ min: 1 }}
+                  type="datetime-local"
+                  label="Suspendre jusqu au"
+                  value={customSuspendUntil}
+                  onChange={(event) => setCustomSuspendUntil(event.target.value)}
                   fullWidth
+                  InputLabelProps={{ shrink: true }}
                 />
-                <Button variant="contained" onClick={handleApplyCustomSuspendDays}>
+                <Button variant="contained" onClick={handleApplyCustomSuspendUntil}>
                   OK
                 </Button>
               </Stack>
@@ -785,6 +839,73 @@ export function UsersView({ sx }) {
             <Button onClick={closeSuspendDialog} color="inherit">
               Fermer
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={banDialogOpen}
+          onClose={closeBanDialog}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>
+            {banTargetUser?.status === 'banni' ? 'Débannir l\'utilisateur' : 'Bannir l\'utilisateur'}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Utilisateur: <strong>{banTargetUser?.fullname ?? '-'}</strong>
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Email: <strong>{banTargetUser?.email ?? '-'}</strong>
+              </Typography>
+
+              {banTargetUser?.status === 'banni' ? (
+                <Stack spacing={1}>
+                  <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                    Cet utilisateur est actuellement banni
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Raison du bannissement: <strong>{banTargetUser?.banReason ?? '-'}</strong>
+                  </Typography>
+                </Stack>
+              ) : (
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Raison du bannissement"
+                  placeholder="Expliquez pourquoi cet utilisateur est banni..."
+                  value={banReason}
+                  onChange={(event) => setBanReason(event.target.value)}
+                  helperText="Cette raison sera envoyée à l'utilisateur par email"
+                />
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeBanDialog} color="inherit">
+              Annuler
+            </Button>
+            {banTargetUser?.status === 'banni' ? (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleApplyUnban}
+                disabled={busyUserId === banTargetUser?.id}
+              >
+                Débannir maintenant
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleApplyBan}
+                disabled={busyUserId === banTargetUser?.id || !banReason.trim()}
+              >
+                Confirmer le bannissement
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
       </Stack>

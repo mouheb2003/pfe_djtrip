@@ -14,8 +14,8 @@ if (!JWT_SECRET || !REFRESH_TOKEN_SECRET) {
 }
 
 // Generate Access Token (short-lived)
-exports.generateAccessToken = (userId, email, userType) => {
-  return jwt.sign({ userId, email, userType }, JWT_SECRET, {
+exports.generateAccessToken = (userId, email, userType, tokenVersion = 0) => {
+  return jwt.sign({ userId, email, userType, tokenVersion }, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
 };
@@ -31,7 +31,12 @@ exports.generateRefreshToken = (userId, email, userType, tokenVersion = 0) => {
 
 // Generate both tokens
 exports.generateTokens = (userId, email, userType, tokenVersion = 0) => {
-  const accessToken = exports.generateAccessToken(userId, email, userType);
+  const accessToken = exports.generateAccessToken(
+    userId,
+    email,
+    userType,
+    tokenVersion,
+  );
   const refreshToken = exports.generateRefreshToken(
     userId,
     email,
@@ -42,7 +47,7 @@ exports.generateTokens = (userId, email, userType, tokenVersion = 0) => {
 };
 
 // Middleware to verify access token
-exports.verifyToken = (req, res, next) => {
+exports.verifyToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
@@ -51,7 +56,71 @@ exports.verifyToken = (req, res, next) => {
         message: "Authentication token is required",
       });
     }
+
     const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await User.findById(decoded.userId).select(
+      "accountStatus suspendedUntil suspendReason banReason tokenVersion",
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Revoke old access tokens after admin actions (ban/suspend/logout)
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      return res.status(401).json({
+        success: false,
+        forceLogout: true,
+        message: "Session expired. Please log in again.",
+      });
+    }
+
+    // Auto-reactivate when suspension is expired
+    if (user.accountStatus === "suspended" && user.suspendedUntil) {
+      const now = new Date();
+      if (user.suspendedUntil <= now) {
+        user.accountStatus = "active";
+        user.suspendedUntil = null;
+        user.suspendReason = null;
+        await user.save();
+      }
+    }
+
+    if (user.accountStatus === "suspended") {
+      return res.status(403).json({
+        success: false,
+        forceLogout: true,
+        reason: user.suspendReason || null,
+        suspendedUntil: user.suspendedUntil || null,
+        message: user.suspendReason
+          ? `Compte suspendu: ${user.suspendReason}`
+          : "Compte suspendu. Contactez le support.",
+      });
+    }
+
+    if (user.accountStatus === "banned") {
+      return res.status(403).json({
+        success: false,
+        forceLogout: true,
+        reason: user.banReason || null,
+        message: user.banReason
+          ? `Compte banni: ${user.banReason}`
+          : "Compte banni. Contactez le support.",
+      });
+    }
+
+    if (user.accountStatus === "inactive") {
+      return res.status(403).json({
+        success: false,
+        forceLogout: true,
+        message: "Compte inactif. Contactez le support.",
+      });
+    }
+
     req.user = decoded;
     next();
   } catch (err) {
@@ -135,6 +204,7 @@ exports.refreshToken = async (req, res) => {
       decoded.userId,
       decoded.email,
       decoded.userType,
+      user.tokenVersion || 0,
     );
 
     res.status(200).json({

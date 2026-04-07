@@ -9,6 +9,8 @@ export const END_POINT = {
   userById: (id) => `/api/users/${id}`,
   updateUserStatus: (id) => `/api/users/${id}/status`,
   toggleUserRole: (id) => `/api/users/${id}/status`,
+  banUser: (id) => `/api/users/${id}/ban`,
+  unbanUser: (id) => `/api/users/${id}/unban`,
   posts: '/api/posts/admin',
   postById: (id) => `/api/posts/admin/${id}`,
   activites: '/api/activites/admin',

@@ -50,7 +50,6 @@ router.use(verifyToken);
 
 router.get(
   "/conversations",
-  cacheGet("messages:conversations", 30),
   messageController.getConversations,
 );
 router.post(
@@ -70,7 +69,6 @@ router.delete(
 );
 router.get(
   "/with/:partnerId",
-  cacheGet("messages:thread", 30),
   messageController.getMessages,
 );
 router.post(

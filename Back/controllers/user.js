@@ -168,10 +168,14 @@ exports.signIn = async (req, res) => {
       if (user.suspendedUntil && user.suspendedUntil <= new Date()) {
         user.accountStatus = "active";
         user.suspendedUntil = undefined;
+        user.suspendReason = undefined;
         await user.save();
       } else {
         return res.status(403).json({
-          message: "Account is suspended. Please contact support.",
+          message: user.suspendReason
+            ? `Account is suspended: ${user.suspendReason}`
+            : "Account is suspended. Please contact support.",
+          reason: user.suspendReason || null,
           suspendedUntil: user.suspendedUntil || null,
         });
       }
@@ -180,7 +184,12 @@ exports.signIn = async (req, res) => {
     if (user.accountStatus === "banned") {
       return res
         .status(403)
-        .json({ message: "Account is banned. Please contact support." });
+        .json({
+          message: user.banReason
+            ? `Account is banned: ${user.banReason}`
+            : "Account is banned. Please contact support.",
+          reason: user.banReason || null,
+        });
     }
 
     if (user.accountStatus === "inactive") {
@@ -802,7 +811,7 @@ exports.updateAccountStatusBasedOnActivity = async (userId) => {
 exports.updateAccountStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { accountStatus, suspendedUntil, suspendDays } = req.body;
+    const { accountStatus, suspendedUntil, suspendDays, suspendReason } = req.body;
 
     // Validate accountStatus
     if (
@@ -817,6 +826,12 @@ exports.updateAccountStatus = async (req, res) => {
     const updatePayload = { accountStatus };
 
     if (accountStatus === "suspended") {
+      if (!suspendReason || typeof suspendReason !== "string" || !suspendReason.trim()) {
+        return res.status(400).json({
+          message: "suspendReason must be a non-empty string",
+        });
+      }
+
       if (typeof suspendDays !== "undefined") {
         const days = Number.parseInt(suspendDays, 10);
 
@@ -843,14 +858,25 @@ exports.updateAccountStatus = async (req, res) => {
         // No end date means suspension stays active until manual reactivation.
         updatePayload.suspendedUntil = null;
       }
+
+      updatePayload.suspendReason = suspendReason.trim();
+      updatePayload.suspendedAt = new Date();
     } else {
       updatePayload.suspendedUntil = null;
+      updatePayload.suspendReason = null;
+      updatePayload.suspendedAt = null;
     }
 
+    const shouldRevokeSession = accountStatus === "suspended";
+
     // Update user account status
-    const user = await User.findByIdAndUpdate(id, updatePayload, {
-      new: true,
-    }).select("-mot_de_passe");
+    const user = await User.findByIdAndUpdate(
+      id,
+      shouldRevokeSession
+        ? { $set: { ...updatePayload, isOnline: false }, $inc: { tokenVersion: 1 } }
+        : { $set: updatePayload },
+      { new: true },
+    ).select("-mot_de_passe");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -860,10 +886,128 @@ exports.updateAccountStatus = async (req, res) => {
       message: "Account status updated successfully",
       user: user,
     });
+
+    if (shouldRevokeSession) {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`user_${id}`).emit("account_restricted", {
+          type: "suspended",
+          reason: updatePayload.suspendReason || null,
+          suspendedUntil: updatePayload.suspendedUntil || null,
+          message: updatePayload.suspendReason
+            ? `Compte suspendu: ${updatePayload.suspendReason}`
+            : "Compte suspendu. Contactez le support.",
+        });
+        io.in(`user_${id}`).disconnectSockets(true);
+      }
+    }
+
+    if (accountStatus === "suspended") {
+      try {
+        await emailService.sendSuspensionNotification(
+          user.email,
+          user.fullname,
+          updatePayload.suspendReason,
+          updatePayload.suspendedUntil,
+        );
+      } catch (emailErr) {
+        console.error("Error sending suspension notification email:", emailErr);
+      }
+    }
   } catch (err) {
     res
       .status(500)
       .json({ message: "Error updating account status", error: err.message });
+  }
+};
+
+// Ban User - Ban a user and send email notification (Admin only)
+exports.banUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { banReason } = req.body;
+
+    if (!banReason || typeof banReason !== "string" || !banReason.trim()) {
+      return res.status(400).json({
+        message: "Ban reason must be a non-empty string",
+      });
+    }
+
+    // Find user and update status to banned
+    const user = await User.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          accountStatus: "banned",
+          banReason: banReason.trim(),
+          bannedAt: new Date(),
+          isOnline: false,
+        },
+        $inc: { tokenVersion: 1 },
+      },
+      { new: true },
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Send ban notification email
+    try {
+      await emailService.sendBanNotification(user.email, user.fullname, banReason);
+    } catch (emailErr) {
+      console.error("Error sending ban notification email:", emailErr);
+      // Don't fail the request if email fails, just log it
+    }
+
+    res.status(200).json({
+      message: "User banned successfully and notification email sent",
+      user: user,
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user_${id}`).emit("account_restricted", {
+        type: "banned",
+        reason: banReason.trim(),
+        message: `Compte banni: ${banReason.trim()}`,
+      });
+      io.in(`user_${id}`).disconnectSockets(true);
+    }
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error banning user", error: err.message });
+  };
+};
+
+// Unban User - Restore a banned user account (Admin only)
+exports.unbanUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      {
+        accountStatus: "active",
+        banReason: null,
+        bannedAt: null,
+      },
+      { new: true }
+    ).select("-mot_de_passe");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      message: "User unbanned successfully",
+      user: user,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error unbanning user", error: err.message });
   }
 };
 

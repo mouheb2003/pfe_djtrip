@@ -228,11 +228,26 @@ app.use("/api/lieux", lieuRoutes);
 app.post("/api/auth/refresh", authMiddleware.refreshToken);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error("Authentication error"));
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await UserService.getUserById(decoded.userId);
+    if (!user) {
+      return next(new Error("Authentication error"));
+    }
+
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      return next(new Error("Session expired"));
+    }
+
+    if (["suspended", "banned", "inactive"].includes(user.accountStatus)) {
+      return next(new Error("Account restricted"));
+    }
+
     socket.userId = decoded.userId;
     next();
   } catch {

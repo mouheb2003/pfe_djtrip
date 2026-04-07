@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import 'auth_service.dart';
 import 'connectivity_service.dart';
+import 'navigation_service.dart';
 
 class ApiResponse<T> {
   final bool success;
@@ -229,6 +230,30 @@ class ApiService {
           if (refreshed) {
             return retryOriginal();
           }
+
+          await AuthService.clearLocalSession();
+          await NavigationService.forceLogoutToLogin(
+            message: 'Session expiree. Veuillez vous reconnecter.',
+          );
+          return response;
+        }
+
+        if (response.statusCode == 403 && auth) {
+          try {
+            final body = jsonDecode(response.body);
+            if (body is Map && body['forceLogout'] == true) {
+              final fromMessage = body['message']?.toString().trim() ?? '';
+              final fromReason = body['reason']?.toString().trim() ?? '';
+              final popupMessage = fromMessage.isNotEmpty
+                  ? fromMessage
+                  : (fromReason.isNotEmpty
+                        ? fromReason
+                        : 'Votre compte a ete restreint.');
+
+              await AuthService.clearLocalSession();
+              await NavigationService.forceLogoutToLogin(message: popupMessage);
+            }
+          } catch (_) {}
         }
 
         if (response.statusCode >= 500 && attempt < _maxRetries) {

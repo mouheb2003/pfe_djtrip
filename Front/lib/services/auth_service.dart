@@ -3,8 +3,10 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'api_client.dart';
 import 'api_service.dart';
+import 'navigation_service.dart';
 import '../config/oauth_config.dart';
 
 class AuthService {
@@ -23,6 +25,8 @@ class AuthService {
   static const _keyAccess = 'djtrip_access_token';
   static const _keyRefresh = 'djtrip_refresh_token';
   static const _keyUser = 'djtrip_user_data';
+  static io.Socket? _guardSocket;
+  static bool _handlingRestriction = false;
 
   // ── In-memory cache ──────────────────────────────────────────
   static Map<String, dynamic>? _cachedUser;
@@ -44,6 +48,95 @@ class AuthService {
       _storage.write(key: _keyAccess, value: accessToken),
       _storage.write(key: _keyRefresh, value: refreshToken),
     ]);
+
+    _startAccountGuardSocket(accessToken);
+  }
+
+  static void _stopAccountGuardSocket() {
+    _guardSocket?.off('connect');
+    _guardSocket?.off('disconnect');
+    _guardSocket?.off('connect_error');
+    _guardSocket?.off('account_restricted');
+    _guardSocket?.disconnect();
+    _guardSocket?.dispose();
+    _guardSocket = null;
+  }
+
+  static Future<void> _handleAccountRestriction(dynamic data) async {
+    if (_handlingRestriction) return;
+    _handlingRestriction = true;
+
+    String message = 'Votre compte a ete restreint. Veuillez vous reconnecter.';
+    if (data is Map) {
+      final fromMessage = data['message']?.toString().trim() ?? '';
+      final fromReason = data['reason']?.toString().trim() ?? '';
+      if (fromMessage.isNotEmpty) {
+        message = fromMessage;
+      } else if (fromReason.isNotEmpty) {
+        message = fromReason;
+      }
+    }
+
+    await clearLocalSession();
+    await NavigationService.forceLogoutToLogin(message: message);
+
+    _handlingRestriction = false;
+  }
+
+  static void _startAccountGuardSocket(String accessToken) {
+    if (accessToken.isEmpty) return;
+
+    _stopAccountGuardSocket();
+
+    final serverUrl = ApiClient.baseUrl.replaceFirst(
+      RegExp(r'/api(?:/v1)?\$'),
+      '',
+    );
+
+    final socket = io.io(
+      serverUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .enableReconnection()
+          .setReconnectionAttempts(20)
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(8000)
+          .disableAutoConnect()
+          .setAuth({'token': accessToken})
+          .build(),
+    );
+
+    socket.on('connect', (_) {});
+    socket.on('disconnect', (_) {});
+
+    socket.on('account_restricted', (data) async {
+      await _handleAccountRestriction(data);
+    });
+
+    socket.on('connect_error', (error) async {
+      final msg = error?.toString().toLowerCase() ?? '';
+      if (msg.contains('account restricted') ||
+          msg.contains('session expired')) {
+        await _handleAccountRestriction({
+          'message':
+              'Votre session a ete interrompue: compte suspendu ou banni.',
+        });
+      }
+    });
+
+    socket.connect();
+    _guardSocket = socket;
+  }
+
+  static Future<void> ensureAccountGuardSocket() async {
+    final token = await getAccessToken();
+    if (token == null || token.isEmpty) {
+      _stopAccountGuardSocket();
+      return;
+    }
+
+    if (_guardSocket?.connected == true) return;
+    _startAccountGuardSocket(token);
   }
 
   // ── User cache ───────────────────────────────────────────────
@@ -70,7 +163,11 @@ class AuthService {
   // ── Convenience ──────────────────────────────────────────────
   static Future<bool> isLoggedIn() async {
     final token = await getAccessToken();
-    return token != null && token.isNotEmpty;
+    final loggedIn = token != null && token.isNotEmpty;
+    if (loggedIn) {
+      await ensureAccountGuardSocket();
+    }
+    return loggedIn;
   }
 
   static Future<String?> getUserType() async {
@@ -238,7 +335,9 @@ class AuthService {
       }, auth: false);
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
-        await _storage.write(key: _keyAccess, value: body['accessToken']);
+        final nextAccessToken = (body['accessToken'] ?? '').toString();
+        await _storage.write(key: _keyAccess, value: nextAccessToken);
+        _startAccountGuardSocket(nextAccessToken);
         return true;
       }
       return false;
@@ -339,6 +438,12 @@ class AuthService {
     try {
       await FacebookAuth.instance.logOut();
     } catch (_) {}
+    await clearLocalSession();
+  }
+
+  /// Clears local auth/session state without calling backend.
+  static Future<void> clearLocalSession() async {
+    _stopAccountGuardSocket();
     _cachedUser = null;
     await _storage.deleteAll();
   }

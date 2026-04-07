@@ -27,7 +27,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import {
   getPublications,
   createPublication,
-  updatePublication,
   deletePublication,
 } from 'src/Controller/actions';
 
@@ -122,7 +121,6 @@ export function PublicationsView({ sx }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
-  const [editingRow, setEditingRow] = useState(null);
   const [form, setForm] = useState({
     content: '',
     postType: 'post',
@@ -204,7 +202,6 @@ export function PublicationsView({ sx }) {
   }, [table, updateFilters]);
 
   const openCreateDialog = useCallback(() => {
-    setEditingRow(null);
     setForm({
       content: '',
       postType: 'post',
@@ -212,19 +209,6 @@ export function PublicationsView({ sx }) {
       hashtags: '',
       locationLabel: '',
       imageUrls: '',
-    });
-    setOpenDialog(true);
-  }, []);
-
-  const openEditDialog = useCallback((row) => {
-    setEditingRow(row);
-    setForm({
-      content: row.content,
-      postType: row.postType,
-      audience: row.audience,
-      hashtags: row.hashtags,
-      locationLabel: row.locationLabel,
-      imageUrls: row.imageUrls.join('\n'),
     });
     setOpenDialog(true);
   }, []);
@@ -261,13 +245,8 @@ export function PublicationsView({ sx }) {
 
     try {
       setSubmitting(true);
-      if (editingRow?.id) {
-        await updatePublication(editingRow.id, payload);
-        toast.success('Publication modifiée');
-      } else {
-        await createPublication(payload);
-        toast.success('Publication créée');
-      }
+      await createPublication(payload);
+      toast.success('Publication créée');
       setOpenDialog(false);
       await loadRows();
     } catch {
@@ -275,7 +254,7 @@ export function PublicationsView({ sx }) {
     } finally {
       setSubmitting(false);
     }
-  }, [editingRow?.id, form, loadRows]);
+  }, [form, loadRows]);
 
   const handleDelete = useCallback(
     async (row) => {
@@ -395,11 +374,6 @@ export function PublicationsView({ sx }) {
                                 <Iconify icon="solar:eye-bold" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Modifier">
-                              <IconButton color="warning" onClick={() => openEditDialog(row)}>
-                                <Iconify icon="solar:pen-bold" />
-                              </IconButton>
-                            </Tooltip>
                             <Tooltip title="Supprimer">
                               <IconButton color="error" onClick={() => handleDelete(row)}>
                                 <Iconify icon="solar:trash-bin-trash-bold" />
@@ -440,9 +414,7 @@ export function PublicationsView({ sx }) {
         </Card>
 
         <Dialog open={openDialog} onClose={closeDialog} fullWidth maxWidth="sm">
-          <DialogTitle>
-            {editingRow ? 'Modifier la publication' : 'Créer une publication'}
-          </DialogTitle>
+          <DialogTitle>Créer une publication</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
               <TextField
@@ -503,7 +475,7 @@ export function PublicationsView({ sx }) {
               Annuler
             </Button>
             <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
-              {editingRow ? 'Enregistrer' : 'Créer'}
+              Créer
             </Button>
           </DialogActions>
         </Dialog>

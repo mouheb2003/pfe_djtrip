@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import '../../services/api_client.dart';
 import '../../services/theme_service.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
+import 'chat_conversation_screen.dart';
 import '../settings/privacy_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -22,6 +26,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.primary),
     );
+  }
+
+  Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return null;
+  }
+
+  Future<void> _openContactUsChat() async {
+    try {
+      final response = await ApiClient.get('/users/all', auth: false);
+      if (response.statusCode != 200) {
+        throw Exception('Unable to load support contact');
+      }
+
+      final decoded = jsonDecode(response.body);
+      final users = decoded is Map<String, dynamic> ? decoded['users'] : null;
+      final admin = users is List
+          ? users
+                .map(_asMap)
+                .whereType<Map<String, dynamic>>()
+                .firstWhere(
+                  (user) => user['userType']?.toString() == 'Admin',
+                  orElse: () => <String, dynamic>{},
+                )
+          : <String, dynamic>{};
+
+      if (!mounted) return;
+
+      if (admin.isEmpty) {
+        _showInfo('Support chat is not available right now.');
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatConversationScreen(
+            partnerId: admin['_id']?.toString() ?? '',
+            partnerName: admin['fullname']?.toString() ?? 'Admin',
+            partnerAvatar: admin['avatar']?.toString(),
+            partnerOnline: admin['isOnline'] == true,
+            isSupportChat: true,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showInfo('Unable to open support chat right now.');
+    }
   }
 
   Future<void> _logout() async {
@@ -145,7 +201,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Privacy Settings',
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const PrivacySettingsScreen(),
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -188,14 +246,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsTile(
               icon: Icons.description,
               label: 'Terms of Use',
-              onTap: () =>
-                  _showInfo('Terms of use coming soon.'),
+              onTap: () => _showInfo('Terms of use coming soon.'),
             ),
             _SettingsTile(
               icon: Icons.privacy_tip,
               label: 'Privacy Policy',
-              onTap: () =>
-                  _showInfo('Privacy policy coming soon.'),
+              onTap: () => _showInfo('Privacy policy coming soon.'),
+            ),
+            _SettingsTile(
+              icon: Icons.support_agent,
+              label: 'Contact Us',
+              onTap: _openContactUsChat,
               showDivider: false,
             ),
             const SizedBox(height: 32),

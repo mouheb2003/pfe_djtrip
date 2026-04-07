@@ -136,6 +136,24 @@ router.put(
   userController.updateAccountStatus,
 );
 
+// PUT /:id/ban - Ban user account (Admin only)
+router.put(
+  "/:id/ban",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["users", "touristes", "organisators"]),
+  userController.banUser,
+);
+
+// PUT /:id/unban - Unban user account (Admin only)
+router.put(
+  "/:id/unban",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["users", "touristes", "organisators"]),
+  userController.unbanUser,
+);
+
 // GET / - Get all users (Admin only)
 router.get(
   "/",
