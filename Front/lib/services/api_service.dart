@@ -233,7 +233,7 @@ class ApiService {
 
           await AuthService.clearLocalSession();
           await NavigationService.forceLogoutToLogin(
-            message: 'Session expiree. Veuillez vous reconnecter.',
+            message: 'Session expired. Please sign in again.',
           );
           return response;
         }
@@ -242,16 +242,37 @@ class ApiService {
           try {
             final body = jsonDecode(response.body);
             if (body is Map && body['forceLogout'] == true) {
+              final restriction = <String, dynamic>{};
+              final type = body['type']?.toString().trim() ?? '';
               final fromMessage = body['message']?.toString().trim() ?? '';
               final fromReason = body['reason']?.toString().trim() ?? '';
+              final suspendedUntil = body['suspendedUntil'];
+              final remainingSeconds = body['remainingSeconds'];
+
+              if (type.isNotEmpty) restriction['type'] = type;
+              if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
+              if (suspendedUntil != null) {
+                restriction['suspendedUntil'] = suspendedUntil.toString();
+              }
+              if (remainingSeconds != null) {
+                restriction['remainingSeconds'] = remainingSeconds;
+              }
+
               final popupMessage = fromMessage.isNotEmpty
                   ? fromMessage
                   : (fromReason.isNotEmpty
                         ? fromReason
-                        : 'Votre compte a ete restreint.');
+                        : 'Your account is restricted.');
+
+              if (popupMessage.isNotEmpty) {
+                restriction['message'] = popupMessage;
+              }
 
               await AuthService.clearLocalSession();
-              await NavigationService.forceLogoutToLogin(message: popupMessage);
+              await NavigationService.forceLogoutToLogin(
+                message: popupMessage,
+                restriction: restriction,
+              );
             }
           } catch (_) {}
         }

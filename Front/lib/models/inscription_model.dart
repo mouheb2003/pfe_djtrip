@@ -8,6 +8,7 @@ class InscriptionModel {
   final double prixTotal;
   final DateTime? dateDemande;
   final String? messageTouriste;
+  final String? messageOrganisateur;
   final Map<String, dynamic>? activite; // populated activite_id
   final Map<String, dynamic>? touriste; // populated touriste_id
   final Map<String, dynamic>? organisateur; // populated organisateur_id
@@ -19,6 +20,7 @@ class InscriptionModel {
     required this.prixTotal,
     this.dateDemande,
     this.messageTouriste,
+    this.messageOrganisateur,
     this.activite,
     this.touriste,
     this.organisateur,
@@ -67,6 +69,7 @@ class InscriptionModel {
           ? DateTime.tryParse(json['date_demande'])
           : null,
       messageTouriste: json['message_touriste'] as String?,
+      messageOrganisateur: json['message_organisateur'] as String?,
       activite: _safeMap(json['activite_id']),
       touriste: _safeMap(json['touriste_id']),
       organisateur: _safeMap(json['organisateur_id']),
@@ -114,6 +117,13 @@ class InscriptionModel {
   bool get canBeApproved => isPending;
   bool get canBeRejected => isPending;
 
+  String get qrData => 'DJTRIP_BOOKING:$id';
+
+  String? get organizerReason {
+    final value = messageOrganisateur?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       '_id': id,
@@ -122,6 +132,7 @@ class InscriptionModel {
       'prix_total': prixTotal,
       'date_demande': dateDemande?.toIso8601String(),
       'message_touriste': messageTouriste,
+      'message_organisateur': messageOrganisateur,
       'activite_id': activite,
       'touriste_id': touriste,
       'organisateur_id': organisateur,

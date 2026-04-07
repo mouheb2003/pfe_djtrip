@@ -66,19 +66,38 @@ class AuthService {
     if (_handlingRestriction) return;
     _handlingRestriction = true;
 
-    String message = 'Votre compte a ete restreint. Veuillez vous reconnecter.';
+    String message = 'Your account is restricted. Please sign in again.';
+    final restriction = <String, dynamic>{};
     if (data is Map) {
+      final type = data['type']?.toString().trim() ?? '';
       final fromMessage = data['message']?.toString().trim() ?? '';
       final fromReason = data['reason']?.toString().trim() ?? '';
+      final suspendedUntil = data['suspendedUntil'];
+      final remainingSeconds = data['remainingSeconds'];
+
+      if (type.isNotEmpty) restriction['type'] = type;
+      if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
+      if (suspendedUntil != null) {
+        restriction['suspendedUntil'] = suspendedUntil.toString();
+      }
+      if (remainingSeconds != null) {
+        restriction['remainingSeconds'] = remainingSeconds;
+      }
+
       if (fromMessage.isNotEmpty) {
         message = fromMessage;
       } else if (fromReason.isNotEmpty) {
         message = fromReason;
       }
+
+      if (message.isNotEmpty) restriction['message'] = message;
     }
 
     await clearLocalSession();
-    await NavigationService.forceLogoutToLogin(message: message);
+    await NavigationService.forceLogoutToLogin(
+      message: message,
+      restriction: restriction.isEmpty ? null : restriction,
+    );
 
     _handlingRestriction = false;
   }
@@ -114,13 +133,51 @@ class AuthService {
     });
 
     socket.on('connect_error', (error) async {
-      final msg = error?.toString().toLowerCase() ?? '';
-      if (msg.contains('account restricted') ||
-          msg.contains('session expired')) {
-        await _handleAccountRestriction({
-          'message':
-              'Votre session a ete interrompue: compte suspendu ou banni.',
-        });
+      final msg = error?.toString() ?? '';
+      final msgLower = msg.toLowerCase();
+
+      final payload = <String, dynamic>{};
+      if (error is Map) {
+        final data = error['data'];
+        if (data is Map) {
+          payload.addAll(Map<String, dynamic>.from(data));
+        }
+        final mapMessage = error['message']?.toString().trim() ?? '';
+        if (mapMessage.isNotEmpty) {
+          payload['message'] = mapMessage;
+        }
+      } else {
+        try {
+          final data = (error as dynamic).data;
+          if (data is Map) {
+            payload.addAll(Map<String, dynamic>.from(data));
+          }
+        } catch (_) {}
+      }
+
+      if ((payload['message'] ?? '').toString().trim().isEmpty &&
+          msg.trim().isNotEmpty) {
+        payload['message'] = msg;
+      }
+
+      final probe = '${payload['message'] ?? ''} ${payload['type'] ?? ''}'
+          .toString()
+          .toLowerCase();
+      final isRestriction =
+          probe.contains('restricted') ||
+          probe.contains('suspended') ||
+          probe.contains('banned') ||
+          msgLower.contains('account restricted');
+      final isSessionExpired =
+          probe.contains('session expired') ||
+          msgLower.contains('session expired');
+
+      if (isRestriction || isSessionExpired) {
+        if (payload.isEmpty) {
+          payload['message'] =
+              'Your session was interrupted: account suspended or banned.';
+        }
+        await _handleAccountRestriction(payload);
       }
     });
 
@@ -245,6 +302,38 @@ class AuthService {
           'message': body['message'] ?? 'Account temporarily locked.',
           'remainingSeconds': body['remainingSeconds'] ?? 60,
         };
+      }
+
+      if (res.statusCode == 403) {
+        final restriction = <String, dynamic>{};
+        final type = body['type']?.toString().trim() ?? '';
+        final fromMessage = body['message']?.toString().trim() ?? '';
+        final fromReason = body['reason']?.toString().trim() ?? '';
+        final suspendedUntil = body['suspendedUntil'];
+        final remainingSeconds = body['remainingSeconds'];
+
+        if (type.isNotEmpty) restriction['type'] = type;
+        if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
+        if (suspendedUntil != null) {
+          restriction['suspendedUntil'] = suspendedUntil.toString();
+        }
+        if (remainingSeconds != null) {
+          restriction['remainingSeconds'] = remainingSeconds;
+        }
+
+        final popupMessage = fromMessage.isNotEmpty
+            ? fromMessage
+            : (fromReason.isNotEmpty
+                  ? fromReason
+                  : 'Your account is restricted.');
+        restriction['message'] = popupMessage;
+
+        await NavigationService.forceLogoutToLogin(
+          message: popupMessage,
+          restriction: restriction,
+        );
+
+        return {'success': false, 'handledRestriction': true, 'message': null};
       }
 
       return {'success': false, 'message': body['message'] ?? 'Sign-in error'};

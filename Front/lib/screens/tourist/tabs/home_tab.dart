@@ -6,11 +6,13 @@ import '../place_detail_screen.dart';
 class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
+  final bool showMessagesDot;
 
   const HomeTab({
     super.key,
     required this.onExploreTap,
     required this.onMessagesTap,
+    this.showMessagesDot = false,
   });
 
   @override
@@ -150,6 +152,7 @@ class _HomeTabState extends State<HomeTab> {
               backgroundImage: _heroImage,
               onExploreTap: widget.onExploreTap,
               onMessagesTap: widget.onMessagesTap,
+              showMessagesDot: widget.showMessagesDot,
             ),
             Transform.translate(
               offset: const Offset(0, -32),
@@ -337,11 +340,13 @@ class _HomeHero extends StatelessWidget {
   final String backgroundImage;
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
+  final bool showMessagesDot;
 
   const _HomeHero({
     required this.backgroundImage,
     required this.onExploreTap,
     required this.onMessagesTap,
+    required this.showMessagesDot,
   });
 
   @override
@@ -383,6 +388,7 @@ class _HomeHero extends StatelessWidget {
                       _HeroIcon(
                         icon: Icons.chat_bubble_outline,
                         onTap: onMessagesTap,
+                        showDot: showMessagesDot,
                       ),
                       const SizedBox(width: 12),
                       const _HeroIcon(icon: Icons.notifications_none),
@@ -460,8 +466,9 @@ class _HomeHero extends StatelessWidget {
 class _HeroIcon extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
+  final bool showDot;
 
-  const _HeroIcon({required this.icon, this.onTap});
+  const _HeroIcon({required this.icon, this.onTap, this.showDot = false});
 
   @override
   Widget build(BuildContext context) {
@@ -475,7 +482,30 @@ class _HeroIcon extends StatelessWidget {
           shape: BoxShape.circle,
           color: Colors.white,
         ),
-        child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(child: Icon(icon, color: const Color(0xFF1E293B), size: 20)),
+            if (showDot) const Positioned(top: 9, right: 10, child: _RedDot()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RedDot extends StatelessWidget {
+  const _RedDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3B30),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.2),
       ),
     );
   }

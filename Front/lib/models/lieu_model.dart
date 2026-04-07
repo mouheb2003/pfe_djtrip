@@ -34,9 +34,10 @@ class LieuModel {
   });
 
   factory LieuModel.fromJson(Map<String, dynamic> json) {
-    final coords = (json['coordonnees'] ??
-        json['coordinates'] ??
-        json['location']) as Map<String, dynamic>?;
+    final coords =
+        (json['coordonnees'] ?? json['coordinates'] ?? json['location'])
+            as Map<String, dynamic>?;
+    final position = json['position'] as Map<String, dynamic>?;
     final activiteLiee = json['activiteLiee'] ?? json['activity_id'];
     String? activiteId;
     if (activiteLiee is String) activiteId = activiteLiee;
@@ -44,16 +45,35 @@ class LieuModel {
       activiteId = activiteLiee['_id'] as String?;
     }
 
-    final rawTitre = (json['titre'] ?? json['title'] ?? '').toString();
+    final rawTitre = (json['titre'] ?? json['title'] ?? json['nom'] ?? '')
+        .toString();
     final rawSousTitre =
         (json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'] ?? '')
-            .toString();
+            .toString()
+            .trim()
+            .isNotEmpty
+        ? (json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'])
+              .toString()
+        : (position?['description'] ?? '').toString();
     final rawDescription =
-        (json['description'] ?? json['desc'] ?? '').toString();
+        (json['description'] ?? json['desc'] ?? position?['description'] ?? '')
+            .toString();
     final rawImagePortrait =
-        (json['imagePortrait'] ?? json['image'] ?? '').toString();
-    final rawCategorie =
-        (json['categorie'] ?? json['category'] ?? 'Other').toString();
+        (json['imagePortrait'] ??
+                json['image'] ??
+                (json['images'] as List?)
+                    ?.whereType<String>()
+                    .cast<String?>()
+                    .firstWhere(
+                      (value) => value != null && value.isNotEmpty,
+                      orElse: () => null,
+                    ) ??
+                '')
+            .toString();
+    final rawCategorie = _normalizeCategory(
+      (json['categorie'] ?? json['category'] ?? json['type'] ?? 'Other')
+          .toString(),
+    );
     final rawTopDestination =
         json['topDestination'] == true || json['top_destination'] == true;
 
@@ -64,9 +84,9 @@ class LieuModel {
       description: rawDescription,
       imagePortrait: rawImagePortrait,
       imagePaysage: json['imagePaysage'] as String?,
-      images: (json['images'] as List? ?? [])
-          .whereType<String>()
-          .toList(growable: false),
+      images: (json['images'] as List? ?? []).whereType<String>().toList(
+        growable: false,
+      ),
       noteMoyenne:
           (json['noteMoyenne'] as num? ?? json['note_moyenne'] as num? ?? 0)
               .toDouble(),
@@ -76,12 +96,32 @@ class LieuModel {
       categorie: rawCategorie,
       topDestination: rawTopDestination,
       prix: json['prix'] as String? ?? 'FREE',
-      latitude: (coords?['latitude'] as num? ?? coords?['lat'] as num?)
-          ?.toDouble(),
-      longitude: (coords?['longitude'] as num? ?? coords?['lng'] as num?)
-          ?.toDouble(),
+      latitude:
+          (coords?['latitude'] as num? ??
+                  coords?['lat'] as num? ??
+                  position?['latitude'] as num?)
+              ?.toDouble(),
+      longitude:
+          (coords?['longitude'] as num? ??
+                  coords?['lng'] as num? ??
+                  position?['longitude'] as num? ??
+                  position?['lng'] as num?)
+              ?.toDouble(),
       activiteLieeId: activiteId,
     );
+  }
+
+  static String _normalizeCategory(String raw) {
+    final value = raw.trim().toLowerCase();
+    if (value.contains('heberg')) return 'Hotels';
+    if (value.contains('rest') || value.contains('food')) return 'Restaurants';
+    if (value.contains('activ')) return 'Activities';
+    if (value.contains('nature')) return 'Nature';
+    if (value.contains('museum')) return 'Museums';
+    if (value.contains('village') || value.contains('histor'))
+      return 'Villages';
+    if (value.contains('beach') || value.contains('plage')) return 'Beaches';
+    return raw;
   }
 
   String get displayImage {

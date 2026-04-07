@@ -165,6 +165,10 @@ class _MessagesScreenState extends State<MessagesScreen>
     }
   }
 
+  Future<void> _refreshConversations() async {
+    await _loadConversations();
+  }
+
   List<ConversationModel> get _filteredConversations {
     var list = _conversations;
 
@@ -222,112 +226,136 @@ class _MessagesScreenState extends State<MessagesScreen>
 
             /// LIST
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                  ? Center(
-                      child: Padding(
+              child: RefreshIndicator(
+                onRefresh: _refreshConversations,
+                child: _isLoading
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 220),
+                          Center(child: CircularProgressIndicator()),
+                        ],
+                      )
+                    : _errorMessage != null
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _errorMessage!.replaceFirst('Exception: ', ''),
-                              textAlign: TextAlign.center,
+                        children: [
+                          const SizedBox(height: 180),
+                          Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _errorMessage!.replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  onPressed: _loadConversations,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              onPressed: _loadConversations,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : _filteredConversations.isEmpty
-                  ? const Center(child: Text('No conversations'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredConversations.length,
-                      itemBuilder: (_, i) {
-                        final c = _filteredConversations[i];
+                          ),
+                        ],
+                      )
+                    : _filteredConversations.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 220),
+                          Center(child: Text('No conversations')),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredConversations.length,
+                        itemBuilder: (_, i) {
+                          final c = _filteredConversations[i];
 
-                        return Dismissible(
-                          key: ValueKey('conversation-${c.partnerId}'),
-                          direction: DismissDirection.horizontal,
-                          background: _SwipeActionBackground(
-                            color: c.isArchived
-                                ? const Color(0xFF4F6BFF)
-                                : const Color(0xFF2FBF71),
-                            icon: c.isArchived
-                                ? Icons.unarchive_rounded
-                                : Icons.archive_rounded,
-                            label: c.isArchived ? 'Restore' : 'Archive',
-                            alignment: Alignment.centerLeft,
-                          ),
-                          secondaryBackground: const _SwipeActionBackground(
-                            color: Color(0xFFE53935),
-                            icon: Icons.delete_forever_rounded,
-                            label: 'Delete',
-                            alignment: Alignment.centerRight,
-                          ),
-                          onDismissed: (direction) async {
-                            if (direction == DismissDirection.startToEnd) {
-                              final result = c.isArchived
-                                  ? await MessageService.unarchiveConversation(
-                                      c.partnerId,
-                                    )
-                                  : await MessageService.archiveConversation(
+                          return Dismissible(
+                            key: ValueKey('conversation-${c.partnerId}'),
+                            direction: DismissDirection.horizontal,
+                            background: _SwipeActionBackground(
+                              color: c.isArchived
+                                  ? const Color(0xFF4F6BFF)
+                                  : const Color(0xFF2FBF71),
+                              icon: c.isArchived
+                                  ? Icons.unarchive_rounded
+                                  : Icons.archive_rounded,
+                              label: c.isArchived ? 'Restore' : 'Archive',
+                              alignment: Alignment.centerLeft,
+                            ),
+                            secondaryBackground: const _SwipeActionBackground(
+                              color: Color(0xFFE53935),
+                              icon: Icons.delete_forever_rounded,
+                              label: 'Delete',
+                              alignment: Alignment.centerRight,
+                            ),
+                            onDismissed: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                final result = c.isArchived
+                                    ? await MessageService.unarchiveConversation(
+                                        c.partnerId,
+                                      )
+                                    : await MessageService.archiveConversation(
+                                        c.partnerId,
+                                      );
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      result['message']?.toString() ??
+                                          (c.isArchived
+                                              ? 'Conversation restored'
+                                              : 'Conversation archived'),
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                final result =
+                                    await MessageService.deleteConversation(
                                       c.partnerId,
                                     );
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result['message']?.toString() ??
-                                        (c.isArchived
-                                            ? 'Conversation restored'
-                                            : 'Conversation archived'),
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      result['message']?.toString() ??
+                                          'Conversation deleted',
+                                    ),
                                   ),
-                                ),
-                              );
-                            } else {
-                              final result =
-                                  await MessageService.deleteConversation(
-                                    c.partnerId,
-                                  );
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result['message']?.toString() ??
-                                        'Conversation deleted',
-                                  ),
-                                ),
-                              );
-                            }
-                            await _loadConversations();
-                          },
-                          child: _MessageTile(
-                            conversation: c,
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatConversationScreen(
-                                    partnerId: c.partnerId,
-                                    partnerName: c.partnerName,
-                                    partnerAvatar: c.partnerAvatar,
-                                    partnerOnline: c.partnerOnline,
-                                  ),
-                                ),
-                              );
-                              _loadConversations();
+                                );
+                              }
+                              await _loadConversations();
                             },
-                          ),
-                        );
-                      },
-                    ),
+                            child: _MessageTile(
+                              conversation: c,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatConversationScreen(
+                                      partnerId: c.partnerId,
+                                      partnerName: c.partnerName,
+                                      partnerAvatar: c.partnerAvatar,
+                                      partnerType: c.partnerType,
+                                      partnerOnline: c.partnerOnline,
+                                    ),
+                                  ),
+                                );
+                                _loadConversations();
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
             ),
           ],
         ),
@@ -451,6 +479,21 @@ class _MessageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unread = conversation.unreadCount > 0;
+    final isAdminConversation =
+        conversation.partnerType.trim().toLowerCase() == 'admin' ||
+        conversation.partnerName.toLowerCase().contains('admin');
+    final rawAvatar = (conversation.partnerAvatar ?? '').trim();
+    final hasValidRemoteAvatar =
+        rawAvatar.startsWith('http://') || rawAvatar.startsWith('https://');
+    final titleName = isAdminConversation
+        ? 'DJTrip Admin'
+        : conversation.partnerName;
+
+    // 🔧 REMOVE: Filter out "General" label from display
+    final displayName = titleName
+        .replaceAll(RegExp(r'\s*General\s*'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -464,10 +507,12 @@ class _MessageTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundImage: (conversation.partnerAvatar ?? '').isNotEmpty
-                  ? NetworkImage(conversation.partnerAvatar!)
-                  : null,
-              child: (conversation.partnerAvatar ?? '').isEmpty
+              backgroundImage: isAdminConversation
+                  ? const AssetImage('assets/logos/app_logo.png')
+                  : (hasValidRemoteAvatar ? NetworkImage(rawAvatar) : null),
+              child:
+                  ((conversation.partnerAvatar ?? '').isEmpty &&
+                      !isAdminConversation)
                   ? const Icon(Icons.person)
                   : null,
             ),
@@ -487,14 +532,41 @@ class _MessageTile extends StatelessWidget {
               ),
           ],
         ),
-        title: Text(
-          conversation.partnerName,
-          style: TextStyle(
-            fontWeight: unread ? FontWeight.bold : FontWeight.w500,
-          ),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                displayName.isEmpty ? titleName : displayName,
+                style: TextStyle(
+                  fontWeight: unread ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (isAdminConversation) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCE9FF),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'ADMIN',
+                  style: TextStyle(
+                    color: Color(0xFF2E5BFF),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         subtitle: Text(
-          conversation.lastMessageContent,
+          isAdminConversation
+              ? 'Avertissement administrateur'
+              : conversation.lastMessageContent,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

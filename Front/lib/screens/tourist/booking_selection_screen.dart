@@ -23,6 +23,10 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
   final double _serviceFee = 5.0;
 
+  int get _totalParticipants => _adults + _children;
+  int get _maxParticipants => widget.activity.placesDisponibles;
+  bool get _canAddParticipant => _totalParticipants < _maxParticipants;
+
   double get _subtotal => (_adults + _children) * widget.activity.prix;
   double get _total => _subtotal + _serviceFee;
 
@@ -232,8 +236,9 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
           sublabel: '12 years and above',
           count: _adults,
           canDecrease: _adults > 1,
+          canIncrease: _canAddParticipant,
           onChanged: (val) =>
-              setState(() => _adults = (_adults + val).clamp(1, 10)),
+              setState(() => _adults = (_adults + val).clamp(1, 99)),
         ),
         const SizedBox(height: 12),
         _CounterCard(
@@ -241,8 +246,20 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
           sublabel: '2 to 11 years',
           count: _children,
           canDecrease: _children > 0,
+          canIncrease: _canAddParticipant,
           onChanged: (val) =>
-              setState(() => _children = (_children + val).clamp(0, 8)),
+              setState(() => _children = (_children + val).clamp(0, 99)),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _maxParticipants > 0
+              ? 'Maximum available: $_maxParticipants participant${_maxParticipants > 1 ? 's' : ''}'
+              : 'No seats available for this activity',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -340,10 +357,32 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   }
 
   Future<void> _submitBooking() async {
+    final requested = _totalParticipants;
+    if (_maxParticipants <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No seats available for this activity.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (requested > _maxParticipants) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Maximum $_maxParticipants participant${_maxParticipants > 1 ? 's' : ''} allowed for this activity.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     final result = await InscriptionService.createInscription(
       activiteId: widget.activity.id,
-      nombreParticipants: _adults + _children,
+      nombreParticipants: requested,
       message: 'Adults: $_adults, Children: $_children',
     );
     if (!mounted) return;
@@ -373,6 +412,7 @@ class _CounterCard extends StatelessWidget {
   final String sublabel;
   final int count;
   final bool canDecrease;
+  final bool canIncrease;
   final void Function(int) onChanged;
 
   const _CounterCard({
@@ -380,6 +420,7 @@ class _CounterCard extends StatelessWidget {
     required this.sublabel,
     required this.count,
     required this.canDecrease,
+    required this.canIncrease,
     required this.onChanged,
   });
 
@@ -433,7 +474,7 @@ class _CounterCard extends StatelessWidget {
           const SizedBox(width: 12),
           _CircleCounterButton(
             icon: Icons.add,
-            enabled: true,
+            enabled: canIncrease,
             onTap: () => onChanged(1),
           ),
         ],

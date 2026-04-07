@@ -24,7 +24,7 @@ const inscriptionSchema = new mongoose.Schema(
     // Registration status
     statut: {
       type: String,
-      enum: ["en_attente", "approuvee", "refusee", "annulee"],
+      enum: ["en_attente", "approuvee", "refusee", "annulee", "verifie"],
       default: "en_attente",
     },
     // Number of participants (if the tourist registers multiple people)

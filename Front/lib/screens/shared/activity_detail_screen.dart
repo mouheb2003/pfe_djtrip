@@ -34,6 +34,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   int _currentImage = 0;
   ActivityModel? _activity;
   String _currentUserId = '';
+  String _currentUserType = '';
   bool _loadingActivity = true;
   bool _isBooking = false;
 
@@ -85,6 +86,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     if (organizerId.isEmpty) return false;
     if (_currentUserId.isEmpty) return true;
     return organizerId != _currentUserId;
+  }
+
+  bool get _isTouristUser {
+    final role = _currentUserType.trim().toLowerCase();
+    return role == 'touriste' || role == 'tourist';
   }
 
   String _getDateRangeLabel(ActivityModel a) {
@@ -160,11 +166,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       final results = await Future.wait([
         ActivityService.getActivityById(widget.activityId),
         AuthService.getUserId(),
+        AuthService.getUserType(),
       ]);
       if (!mounted) return;
       setState(() {
         _activity = results[0] as ActivityModel?;
         _currentUserId = (results[1] as String? ?? '').trim();
+        _currentUserType = (results[2] as String? ?? '').trim();
         _loadingActivity = false;
       });
     } catch (e) {
@@ -287,6 +295,34 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       _SectionTitle('Organizer'),
                       _OrganizerCard(
                         organizer: activity.organisateur,
+                        canContact: _isTouristUser && _canContactOrganizer,
+                        onContact: () {
+                          final organizer = activity.organisateur;
+                          final orgId =
+                              (organizer?['_id'] ?? organizer?['id'] ?? '')
+                                  .toString()
+                                  .trim();
+                          if (orgId.isEmpty) return;
+
+                          final orgName =
+                              (organizer?['fullname'] ?? 'Organizer')
+                                  .toString();
+                          final orgAvatar = organizer?['avatar']?.toString();
+                          final orgOnline = organizer?['isOnline'] == true;
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatConversationScreen(
+                                partnerId: orgId,
+                                partnerName: orgName,
+                                partnerAvatar: orgAvatar,
+                                partnerType: 'Organisator',
+                                partnerOnline: orgOnline,
+                              ),
+                            ),
+                          );
+                        },
                         onTap: () {
                           final orgId =
                               (activity.organisateur?['_id'] ??
@@ -779,7 +815,14 @@ class _LocationCard extends StatelessWidget {
 class _OrganizerCard extends StatelessWidget {
   final Map<String, dynamic>? organizer;
   final VoidCallback onTap;
-  const _OrganizerCard({required this.organizer, required this.onTap});
+  final bool canContact;
+  final VoidCallback? onContact;
+  const _OrganizerCard({
+    required this.organizer,
+    required this.onTap,
+    this.canContact = false,
+    this.onContact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -794,33 +837,63 @@ class _OrganizerCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-              child: avatar.isEmpty ? const Icon(Icons.person) : null,
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: avatar.isNotEmpty
+                      ? NetworkImage(avatar)
+                      : null,
+                  child: avatar.isEmpty ? const Icon(Icons.person) : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text(
+                        'View full profile',
+                        style: TextStyle(color: Colors.blue, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+            if (canContact && onContact != null) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: ElevatedButton.icon(
+                  onPressed: onContact,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF315CFF),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  const Text(
-                    'View full profile',
-                    style: TextStyle(color: Colors.blue, fontSize: 12),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                  label: const Text(
+                    'Contact',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
-                ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
           ],
         ),
       ),

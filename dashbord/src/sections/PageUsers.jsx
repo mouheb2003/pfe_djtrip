@@ -33,6 +33,7 @@ import {
   updateUserStatus,
   banUser,
   unbanUser,
+  sendMessageTo,
 } from 'src/Controller/actions';
 
 import { Label } from 'src/components/label';
@@ -158,6 +159,9 @@ export function UsersView({ sx }) {
   const [banTargetUser, setBanTargetUser] = useState(null);
   const [banReason, setBanReason] = useState('');
   const [customSuspendUntil, setCustomSuspendUntil] = useState('');
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [warningTargetUser, setWarningTargetUser] = useState(null);
+  const [warningMessage, setWarningMessage] = useState('');
 
   const filters = useSetState({
     query: '',
@@ -185,6 +189,59 @@ export function UsersView({ sx }) {
     fetchUsers();
   }, [fetchUsers]);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchUsers();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      fetchUsers();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUsers();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    const now = Date.now();
+    const nearestExpiryMs = users
+      .map((user) => {
+        const status = String(user?.status ?? '').toLowerCase();
+        if (status !== 'suspendu' || !user?.suspendedUntil) return null;
+
+        const expiryMs = new Date(user.suspendedUntil).getTime();
+        if (Number.isNaN(expiryMs) || expiryMs <= now) return null;
+
+        return expiryMs;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a - b)[0];
+
+    if (!nearestExpiryMs) return undefined;
+
+    const timeoutMs = Math.max(500, nearestExpiryMs - now + 500);
+    const timeoutId = setTimeout(() => {
+      fetchUsers();
+    }, timeoutMs);
+
+    return () => clearTimeout(timeoutId);
+  }, [users, fetchUsers]);
+
   const handleViewDetails = useCallback(async (id) => {
     try {
       setBusyUserId(id);
@@ -197,6 +254,32 @@ export function UsersView({ sx }) {
       setBusyUserId('');
     }
   }, []);
+
+  const handleOpenWarningDialog = useCallback((user) => {
+    setWarningTargetUser(user);
+    setWarningMessage('');
+    setWarningDialogOpen(true);
+  }, []);
+
+  const handleSendWarning = useCallback(async () => {
+    if (!warningTargetUser?.id || !warningMessage.trim()) {
+      toast.warning('Veuillez saisir un message');
+      return;
+    }
+
+    try {
+      setBusyUserId(warningTargetUser.id);
+      await sendMessageTo(warningTargetUser.id, warningMessage, { messageType: 'warning' });
+      toast.success('Avertissement envoyé');
+      setWarningDialogOpen(false);
+      setWarningTargetUser(null);
+      setWarningMessage('');
+    } catch {
+      toast.error('Envoi de l’avertissement échoué');
+    } finally {
+      setBusyUserId('');
+    }
+  }, [warningTargetUser, warningMessage]);
 
   const handleToggleRole = useCallback(
     async (user) => {
@@ -231,7 +314,7 @@ export function UsersView({ sx }) {
       if (!user?.id) return;
 
       if (user.role === 'admin') {
-        toast.error('Suppression d\'un compte admin non autorisée');
+        toast.error("Suppression d'un compte admin non autorisée");
         return;
       }
 
@@ -271,38 +354,32 @@ export function UsersView({ sx }) {
     setBanReason('');
   }, []);
 
-  const handleOpenSuspendDialog = useCallback(
-    (user) => {
-      if (!user?.id) return;
+  const handleOpenSuspendDialog = useCallback((user) => {
+    if (!user?.id) return;
 
-      if (user.role === 'admin') {
-        toast.error('Le compte admin ne peut pas être suspendu');
-        return;
-      }
+    if (user.role === 'admin') {
+      toast.error('Le compte admin ne peut pas être suspendu');
+      return;
+    }
 
-      setSuspendDialogOpen(true);
-      setSuspendTargetUser(user);
-      setSuspendReason('');
-      setCustomSuspendUntil('');
-    },
-    []
-  );
+    setSuspendDialogOpen(true);
+    setSuspendTargetUser(user);
+    setSuspendReason('');
+    setCustomSuspendUntil('');
+  }, []);
 
-  const handleOpenBanDialog = useCallback(
-    (user) => {
-      if (!user?.id) return;
+  const handleOpenBanDialog = useCallback((user) => {
+    if (!user?.id) return;
 
-      if (user.role === 'admin') {
-        toast.error('Le compte admin ne peut pas être banni');
-        return;
-      }
+    if (user.role === 'admin') {
+      toast.error('Le compte admin ne peut pas être banni');
+      return;
+    }
 
-      setBanDialogOpen(true);
-      setBanTargetUser(user);
-      setBanReason('');
-    },
-    []
-  );
+    setBanDialogOpen(true);
+    setBanTargetUser(user);
+    setBanReason('');
+  }, []);
 
   const applyStatusUpdate = useCallback(
     async (user, statusPayload, successMessage) => {
@@ -347,7 +424,11 @@ export function UsersView({ sx }) {
     closeSuspendDialog();
     await applyStatusUpdate(
       suspendTargetUser,
-      { accountStatus: 'suspended', suspendedUntil: parsedUntil.toISOString(), suspendReason: suspendReason.trim() },
+      {
+        accountStatus: 'suspended',
+        suspendedUntil: parsedUntil.toISOString(),
+        suspendReason: suspendReason.trim(),
+      },
       `Utilisateur suspendu jusqu au ${parsedUntil.toLocaleString('fr-FR')}`
     );
   }, [applyStatusUpdate, closeSuspendDialog, customSuspendUntil, suspendReason, suspendTargetUser]);
@@ -382,7 +463,7 @@ export function UsersView({ sx }) {
         setSelectedUser(normalizeUser(refreshed));
       }
     } catch {
-      toast.error('Échec du bannissement de l\'utilisateur');
+      toast.error("Échec du bannissement de l'utilisateur");
     } finally {
       setBusyUserId('');
     }
@@ -404,7 +485,7 @@ export function UsersView({ sx }) {
         setSelectedUser(normalizeUser(refreshed));
       }
     } catch {
-      toast.error('Échec du débannissement de l\'utilisateur');
+      toast.error("Échec du débannissement de l'utilisateur");
     } finally {
       setBusyUserId('');
     }
@@ -546,24 +627,24 @@ export function UsersView({ sx }) {
             </Stack>
           ) : (
             <Box sx={{ position: 'relative' }}>
-                <TableSelectedAction
-                  dense={table.dense}
-                  numSelected={selectedInFilteredCount}
-                  rowCount={dataFiltered.length}
-                  onSelectAllRows={(checked) =>
-                    table.onSelectAllRows(
-                      checked,
-                      dataFiltered.map((row) => row.id)
-                    )
-                  }
-                  action={
-                    <Tooltip title="Supprimer sélection">
-                      <IconButton color="primary" onClick={handleDeleteSelected}>
-                        <Iconify icon="solar:trash-bin-trash-bold" />
-                      </IconButton>
-                    </Tooltip>
-                  }
-                />
+              <TableSelectedAction
+                dense={table.dense}
+                numSelected={selectedInFilteredCount}
+                rowCount={dataFiltered.length}
+                onSelectAllRows={(checked) =>
+                  table.onSelectAllRows(
+                    checked,
+                    dataFiltered.map((row) => row.id)
+                  )
+                }
+                action={
+                  <Tooltip title="Supprimer sélection">
+                    <IconButton color="primary" onClick={handleDeleteSelected}>
+                      <Iconify icon="solar:trash-bin-trash-bold" />
+                    </IconButton>
+                  </Tooltip>
+                }
+              />
 
               {!!error && (
                 <Alert severity="error" sx={{ m: 2 }}>
@@ -645,6 +726,16 @@ export function UsersView({ sx }) {
                               </IconButton>
                             </Tooltip>
 
+                            <Tooltip title="Envoyer avertissement">
+                              <IconButton
+                                color="warning"
+                                onClick={() => handleOpenWarningDialog(user)}
+                                disabled={busyUserId === user.id || user.role === 'admin'}
+                              >
+                                <Iconify icon="solar:danger-triangle-bold" />
+                              </IconButton>
+                            </Tooltip>
+
                             <Tooltip title="Bannir l'utilisateur">
                               <IconButton
                                 color="error"
@@ -716,7 +807,7 @@ export function UsersView({ sx }) {
                 onChangeDense={table.onChangeDense}
                 onRowsPerPageChange={table.onChangeRowsPerPage}
               />
-              </Box>
+            </Box>
           )}
         </Card>
 
@@ -763,33 +854,34 @@ export function UsersView({ sx }) {
             <Button
               color="inherit"
               onClick={() => handleOpenSuspendDialog(selectedUser)}
-              disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
+              disabled={
+                !selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id
+              }
             >
               Suspension
             </Button>
             <Button
               color="error"
               onClick={() => handleOpenBanDialog(selectedUser)}
-              disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
+              disabled={
+                !selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id
+              }
             >
               Bannir
             </Button>
             <Button
               color="error"
               onClick={() => handleDeleteUser(selectedUser)}
-              disabled={!selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id}
+              disabled={
+                !selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id
+              }
             >
               Supprimer
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog
-          open={suspendDialogOpen}
-          onClose={closeSuspendDialog}
-          fullWidth
-          maxWidth="xs"
-        >
+        <Dialog open={suspendDialogOpen} onClose={closeSuspendDialog} fullWidth maxWidth="xs">
           <DialogTitle>Suspension utilisateur</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.25}>
@@ -842,14 +934,9 @@ export function UsersView({ sx }) {
           </DialogActions>
         </Dialog>
 
-        <Dialog
-          open={banDialogOpen}
-          onClose={closeBanDialog}
-          fullWidth
-          maxWidth="sm"
-        >
+        <Dialog open={banDialogOpen} onClose={closeBanDialog} fullWidth maxWidth="sm">
           <DialogTitle>
-            {banTargetUser?.status === 'banni' ? 'Débannir l\'utilisateur' : 'Bannir l\'utilisateur'}
+            {banTargetUser?.status === 'banni' ? "Débannir l'utilisateur" : "Bannir l'utilisateur"}
           </DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
@@ -906,6 +993,46 @@ export function UsersView({ sx }) {
                 Confirmer le bannissement
               </Button>
             )}
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={warningDialogOpen}
+          onClose={() => setWarningDialogOpen(false)}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>Envoyer un avertissement</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                L’avertissement sera envoyé dans le chat normal de{' '}
+                {warningTargetUser?.fullname ?? 'cet utilisateur'}.
+              </Typography>
+              <TextField
+                autoFocus
+                fullWidth
+                multiline
+                minRows={4}
+                label="Message d’avertissement"
+                value={warningMessage}
+                onChange={(event) => setWarningMessage(event.target.value)}
+                placeholder="Rédigez votre avertissement..."
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWarningDialogOpen(false)} color="inherit">
+              Annuler
+            </Button>
+            <Button
+              onClick={handleSendWarning}
+              variant="contained"
+              color="warning"
+              disabled={!warningMessage.trim() || busyUserId === warningTargetUser?.id}
+            >
+              Envoyer
+            </Button>
           </DialogActions>
         </Dialog>
       </Stack>

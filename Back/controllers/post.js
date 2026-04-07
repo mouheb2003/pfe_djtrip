@@ -1,5 +1,6 @@
 const Post = require("../models/post");
 const cloudinary = require("../config/cloudinary");
+const { createActivityLog } = require("../services/activityLogService");
 
 const basePopulate = {
   path: "author_id",
@@ -125,6 +126,24 @@ exports.createPost = async (req, res) => {
     const populated = await Post.findById(post._id)
       .populate(basePopulate)
       .lean();
+
+    try {
+      await createActivityLog({
+        actorId: authorId,
+        action: "create_post",
+        targetType: "post",
+        targetId: post._id,
+        templateKey: "create_post",
+        metadata: {
+          title:
+            trimmedContent.length > 80
+              ? `${trimmedContent.slice(0, 77)}...`
+              : trimmedContent || "Publication sans titre",
+        },
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for createPost:", logError.message);
+    }
 
     return res.status(201).json({
       message: "Post created successfully",
@@ -453,6 +472,27 @@ exports.createAdminPost = async (req, res) => {
       .populate(basePopulate)
       .lean();
 
+    try {
+      await createActivityLog({
+        actorId: adminId,
+        action: "create_post",
+        targetType: "post",
+        targetId: post._id,
+        templateKey: "create_post",
+        metadata: {
+          title:
+            trimmedContent.length > 80
+              ? `${trimmedContent.slice(0, 77)}...`
+              : trimmedContent || "Publication admin",
+        },
+      });
+    } catch (logError) {
+      console.warn(
+        "Activity log failed for createAdminPost:",
+        logError.message,
+      );
+    }
+
     return res.status(201).json({
       message: "Post created successfully",
       post: populated,
@@ -467,6 +507,7 @@ exports.createAdminPost = async (req, res) => {
 
 exports.updatePostByAdmin = async (req, res) => {
   try {
+    const adminId = req.user.userId;
     const { postId } = req.params;
     const post = await Post.findOne({ _id: postId, is_active: true });
 
@@ -519,6 +560,24 @@ exports.updatePostByAdmin = async (req, res) => {
       .populate(basePopulate)
       .lean();
 
+    try {
+      await createActivityLog({
+        actorId: adminId,
+        action: "update_post_admin",
+        targetType: "post",
+        targetId: post._id,
+        templateKey: "update_post_admin",
+        metadata: {
+          title: post.content?.slice(0, 80) || "Publication",
+        },
+      });
+    } catch (logError) {
+      console.warn(
+        "Activity log failed for updatePostByAdmin:",
+        logError.message,
+      );
+    }
+
     return res.status(200).json({
       message: "Post updated successfully",
       post: populated,
@@ -533,6 +592,7 @@ exports.updatePostByAdmin = async (req, res) => {
 
 exports.deletePostByAdmin = async (req, res) => {
   try {
+    const adminId = req.user.userId;
     const { postId } = req.params;
     const post = await Post.findById(postId);
 
@@ -542,6 +602,24 @@ exports.deletePostByAdmin = async (req, res) => {
 
     post.is_active = false;
     await post.save();
+
+    try {
+      await createActivityLog({
+        actorId: adminId,
+        action: "delete_post_admin",
+        targetType: "post",
+        targetId: post._id,
+        templateKey: "delete_post_admin",
+        metadata: {
+          title: post.content?.slice(0, 80) || "Publication",
+        },
+      });
+    } catch (logError) {
+      console.warn(
+        "Activity log failed for deletePostByAdmin:",
+        logError.message,
+      );
+    }
 
     return res.status(200).json({ message: "Post deleted" });
   } catch (error) {

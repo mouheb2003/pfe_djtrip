@@ -17,6 +17,7 @@ const ActivitiesPage = lazy(() => import('src/pages/dashboard/Activities'));
 const PublicationsPage = lazy(() => import('src/pages/dashboard/Publications'));
 const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
+const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
 
 // ----------------------------------------------------------------------
 
@@ -40,12 +41,11 @@ export const dashboardRoutes = [
       { path: 'two', element: <ActivitiesPage /> },
       { path: 'publications', element: <PublicationsPage /> },
       { path: 'messages', element: <MessagesPage /> },
+      { path: 'logs', element: <LogsPage /> },
       { path: 'three', element: <UsersPage /> },
       {
         path: 'group',
-        children: [
-
-        ],
+        children: [],
       },
     ],
   },

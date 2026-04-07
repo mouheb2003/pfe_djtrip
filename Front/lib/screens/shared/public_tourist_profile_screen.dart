@@ -12,8 +12,15 @@ import 'chat_conversation_screen.dart';
 
 class PublicUserProfileScreen extends StatefulWidget {
   final String userId;
+  final bool canContact;
+  final VoidCallback? onContact;
 
-  const PublicUserProfileScreen({super.key, required this.userId});
+  const PublicUserProfileScreen({
+    super.key,
+    required this.userId,
+    this.canContact = false,
+    this.onContact,
+  });
 
   @override
   State<PublicUserProfileScreen> createState() =>
@@ -91,7 +98,10 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
     if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
     }
-    final serverUrl = ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '');
+    final serverUrl = ApiClient.baseUrl.replaceFirst(
+      RegExp(r'/api(?:/v1)?$'),
+      '',
+    );
     if (value.startsWith('/')) {
       return '$serverUrl$value';
     }
@@ -102,7 +112,7 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
   Widget build(BuildContext context) {
     final user = _user;
     final avatarUrl = _resolveUrl(user?['avatar']);
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -111,7 +121,9 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
         scrolledUnderElevation: 0,
         foregroundColor: const Color(0xFF0F172A),
         title: Text(
-          (user?['fullname'] ?? '').isEmpty ? 'DJTrip User' : user!['fullname']!,
+          (user?['fullname'] ?? '').isEmpty
+              ? 'DJTrip User'
+              : user!['fullname']!,
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         centerTitle: true,
@@ -124,7 +136,10 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
           : RefreshIndicator(
               onRefresh: _loadData,
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 children: [
                   // Profile Header
                   Container(
@@ -164,7 +179,9 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    (user?['fullname'] ?? '').isEmpty ? 'DJTrip User' : user!['fullname']!,
+                                    (user?['fullname'] ?? '').isEmpty
+                                        ? 'DJTrip User'
+                                        : user!['fullname']!,
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
@@ -207,6 +224,35 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                             ),
                           ],
                         ),
+                        if (widget.canContact && widget.onContact != null) ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onContact,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF315CFF),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                'Contact',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         // Location
                         if ((user?['paysOrigine'] ?? '').trim().isNotEmpty)
@@ -227,7 +273,8 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    user?['paysOrigine']?.trim() ?? 'No location specified',
+                                    user?['paysOrigine']?.trim() ??
+                                        'No location specified',
                                     style: const TextStyle(
                                       color: Color(0xFF0F172A),
                                       fontSize: 14,
@@ -271,7 +318,8 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                           ),
                         const SizedBox(height: 16),
                         // Interests
-                        if ((user?['centresInteret'] as List?)?.isNotEmpty ?? false)
+                        if ((user?['centresInteret'] as List?)?.isNotEmpty ??
+                            false)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
@@ -294,26 +342,31 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                                 Wrap(
                                   spacing: 6,
                                   runSpacing: 6,
-                                  children: (user?['centresInteret'] as List? ?? [])
-                                      .map((interest) => Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF0F172A),
-                                              borderRadius: BorderRadius.circular(16),
-                                            ),
-                                            child: Text(
-                                              interest.toString(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
+                                  children:
+                                      (user?['centresInteret'] as List? ?? [])
+                                          .map(
+                                            (interest) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF0F172A),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              child: Text(
+                                                interest.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                             ),
-                                          ))
-                                      .toList(),
+                                          )
+                                          .toList(),
                                 ),
                               ],
                             ),
@@ -430,11 +483,7 @@ class _ActivityCard extends StatelessWidget {
   final ActivityModel activity;
   final VoidCallback? onTap;
 
-  const _ActivityCard({
-    super.key,
-    required this.activity,
-    this.onTap,
-  });
+  const _ActivityCard({super.key, required this.activity, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -477,11 +526,7 @@ class _ActivityCard extends StatelessWidget {
                 color: imageUrl == null ? const Color(0xFFF0F0F0) : null,
               ),
               child: imageUrl == null
-                  ? const Icon(
-                      Icons.image,
-                      color: Colors.grey,
-                      size: 32,
-                    )
+                  ? const Icon(Icons.image, color: Colors.grey, size: 32)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -558,7 +603,10 @@ class _ActivityCard extends StatelessWidget {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF0F172A),
                             borderRadius: BorderRadius.circular(8),

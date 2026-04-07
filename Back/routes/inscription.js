@@ -31,7 +31,6 @@ router.get(
   inscriptionController.getInscriptionsByTouriste,
 );
 
-
 // Get my bookings for the logged-in tourist (bucketed by status)
 router.get(
   "/touriste/my-bookings",
@@ -118,6 +117,19 @@ router.get(
   verifyTouriste,
   cacheGet("inscriptions:stats:tourist", 60),
   inscriptionController.getTouristStats,
+);
+
+// ========================================
+// QR CODE VERIFICATION ROUTES
+// ========================================
+
+// Verify/confirm booking via QR code scan (Organizer only)
+router.put(
+  "/:inscriptionId/verifier",
+  verifyToken,
+  verifyOrganisator,
+  invalidateCache(["inscriptions", "activites"]),
+  inscriptionController.verifyInscription,
 );
 
 module.exports = wrapRouter(router);

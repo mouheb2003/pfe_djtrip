@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const emailService = require("../services/email");
 
 // JWT Secrets — must be defined in .env
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -60,7 +61,7 @@ exports.verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const user = await User.findById(decoded.userId).select(
-      "accountStatus suspendedUntil suspendReason banReason tokenVersion",
+      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion",
     );
 
     if (!user) {
@@ -83,19 +84,47 @@ exports.verifyToken = async (req, res, next) => {
     if (user.accountStatus === "suspended" && user.suspendedUntil) {
       const now = new Date();
       if (user.suspendedUntil <= now) {
+        const previousReason = user.suspendReason || null;
         user.accountStatus = "active";
         user.suspendedUntil = null;
         user.suspendReason = null;
         await user.save();
+
+        if (user.email) {
+          try {
+            await emailService.sendAccountRestoredEmail(
+              user.email,
+              user.fullname || "DJTrip User",
+              "suspended",
+              previousReason,
+            );
+          } catch (emailErr) {
+            console.error(
+              "Error sending auto-restored account email:",
+              emailErr,
+            );
+          }
+        }
       }
     }
 
     if (user.accountStatus === "suspended") {
+      const remainingSeconds = user.suspendedUntil
+        ? Math.max(
+            0,
+            Math.ceil(
+              (new Date(user.suspendedUntil).getTime() - Date.now()) / 1000,
+            ),
+          )
+        : null;
+
       return res.status(403).json({
         success: false,
         forceLogout: true,
+        type: "suspended",
         reason: user.suspendReason || null,
         suspendedUntil: user.suspendedUntil || null,
+        remainingSeconds,
         message: user.suspendReason
           ? `Compte suspendu: ${user.suspendReason}`
           : "Compte suspendu. Contactez le support.",
@@ -106,6 +135,7 @@ exports.verifyToken = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         forceLogout: true,
+        type: "banned",
         reason: user.banReason || null,
         message: user.banReason
           ? `Compte banni: ${user.banReason}`

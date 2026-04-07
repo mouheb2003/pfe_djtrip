@@ -64,7 +64,7 @@ export const navData = [
     items: [
       {
         title: 'Lieux',
-         path: paths.dashboard.lieux.root,
+        path: paths.dashboard.lieux.root,
         icon: ICONS.tour,
       },
       {
@@ -107,6 +107,11 @@ export const navData = [
         title: 'Messagerie',
         path: paths.dashboard.messages,
         icon: ICONS.chat,
+      },
+      {
+        title: 'Logs',
+        path: paths.dashboard.logs,
+        icon: ICONS.file,
       },
     ],
   },

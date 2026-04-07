@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
 import 'tabs/home_tab.dart';
@@ -6,6 +7,11 @@ import 'tabs/explore_tab.dart';
 import 'tabs/screen_network.dart';
 import 'tabs/tourist_profile_tab.dart';
 import '../shared/messages_screen.dart';
+import '../../services/lieu_service.dart';
+import '../../services/post_service.dart';
+import '../../services/message_service.dart';
+import '../../services/inscription_service.dart';
+import '../../services/novelty_badge_service.dart';
 
 class TouristMainScreen extends StatefulWidget {
   final int initialIndex;
@@ -16,8 +22,26 @@ class TouristMainScreen extends StatefulWidget {
 }
 
 class _TouristMainScreenState extends State<TouristMainScreen> {
+  static const Duration _noveltyRefreshInterval = Duration(seconds: 12);
+
+  static const String _sectionHome = 'tourist_home';
+  static const String _sectionActivities = 'tourist_bookings';
+  static const String _sectionNetwork = 'tourist_network';
+  static const String _sectionMessages = 'tourist_messages';
+
   late int _currentIndex;
   late final List<Widget> _pages;
+  Timer? _noveltyTimer;
+
+  bool _showHomeDot = false;
+  bool _showActivitiesDot = false;
+  bool _showNetworkDot = false;
+  bool _showMessagesDot = false;
+
+  String _homeSignature = '';
+  String _activitiesSignature = '';
+  String _networkSignature = '';
+  String _messagesSignature = '';
 
   @override
   void initState() {
@@ -27,6 +51,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       HomeTab(
         onExploreTap: () => _goToTab(1),
         onMessagesTap: () => _goToTab(5),
+        showMessagesDot: _showMessagesDot,
       ),
       const ExploreTab(),
       const MyActivitiesScreen(),
@@ -34,11 +59,149 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       TouristProfileTab(onNavigateToTab: _goToTab),
       const MessagesScreen(),
     ];
+
+    _refreshNoveltyBadges();
+    _noveltyTimer = Timer.periodic(_noveltyRefreshInterval, (_) {
+      _refreshNoveltyBadges();
+    });
+  }
+
+  @override
+  void dispose() {
+    _noveltyTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<String> _buildHomeSignature() async {
+    final lieux = await LieuService.getLieux();
+    final ids = lieux.map((e) => e.id).where((e) => e.isNotEmpty).toList()
+      ..sort();
+    if (ids.isEmpty) return 'none';
+    return 'count:${ids.length}|first:${ids.first}|last:${ids.last}';
+  }
+
+  Future<String> _buildActivitiesSignature() async {
+    final bookings = await InscriptionService.getMyBookings();
+    final entries = <String>[];
+    for (final status in ['pending', 'confirmed', 'cancelled']) {
+      final list = bookings[status] ?? const [];
+      for (final item in list) {
+        entries.add('${item.id}:${item.statut}');
+      }
+    }
+    entries.sort();
+    if (entries.isEmpty) return 'none';
+    return 'count:${entries.length}|${entries.join(',')}';
+  }
+
+  Future<String> _buildNetworkSignature() async {
+    final posts = await PostService.getFeedPosts();
+    if (posts.isEmpty) return 'none';
+
+    posts.sort((a, b) {
+      final aDate =
+          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate =
+          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+
+    final first = posts.first;
+    final latestId = (first['_id'] ?? first['id'] ?? '').toString();
+    final latestTs = (first['createdAt'] ?? '').toString();
+    return 'count:${posts.length}|id:$latestId|ts:$latestTs';
+  }
+
+  Future<String> _buildMessagesSignature() async {
+    final conversations = await MessageService.getConversations();
+    if (conversations.isEmpty) return 'none';
+
+    final unread = conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+    conversations.sort((a, b) {
+      final aTime = a.lastMessageTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.lastMessageTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+
+    final latest = conversations.first;
+    final latestTs = latest.lastMessageTime?.millisecondsSinceEpoch ?? 0;
+    return 'unread:$unread|latest:${latest.partnerId}:$latestTs';
+  }
+
+  Future<void> _refreshNoveltyBadges() async {
+    try {
+      final signatures = await Future.wait<String>([
+        _buildHomeSignature(),
+        _buildActivitiesSignature(),
+        _buildNetworkSignature(),
+        _buildMessagesSignature(),
+      ]);
+      if (!mounted) return;
+
+      _homeSignature = signatures[0];
+      _activitiesSignature = signatures[1];
+      _networkSignature = signatures[2];
+      _messagesSignature = signatures[3];
+
+      final unseen = await Future.wait<bool>([
+        NoveltyBadgeService.hasUnseen(_sectionHome, _homeSignature),
+        NoveltyBadgeService.hasUnseen(_sectionActivities, _activitiesSignature),
+        NoveltyBadgeService.hasUnseen(_sectionNetwork, _networkSignature),
+        NoveltyBadgeService.hasUnseen(_sectionMessages, _messagesSignature),
+      ]);
+      if (!mounted) return;
+
+      setState(() {
+        _showHomeDot = _currentIndex != 0 && unseen[0];
+        _showActivitiesDot = _currentIndex != 2 && unseen[1];
+        _showNetworkDot = _currentIndex != 3 && unseen[2];
+        _showMessagesDot = _currentIndex != 5 && unseen[3];
+
+        // Keep Home hero message icon in sync by rebuilding first page instance.
+        _pages[0] = HomeTab(
+          onExploreTap: () => _goToTab(1),
+          onMessagesTap: () => _goToTab(5),
+          showMessagesDot: _showMessagesDot,
+        );
+      });
+    } catch (_) {
+      // Best-effort badges: ignore network/service failures.
+    }
+  }
+
+  void _markSeenForTab(int index) {
+    if (index == 0 && _homeSignature.isNotEmpty) {
+      NoveltyBadgeService.markSeen(_sectionHome, _homeSignature);
+    }
+    if (index == 2 && _activitiesSignature.isNotEmpty) {
+      NoveltyBadgeService.markSeen(_sectionActivities, _activitiesSignature);
+    }
+    if (index == 3 && _networkSignature.isNotEmpty) {
+      NoveltyBadgeService.markSeen(_sectionNetwork, _networkSignature);
+    }
+    if (index == 5 && _messagesSignature.isNotEmpty) {
+      NoveltyBadgeService.markSeen(_sectionMessages, _messagesSignature);
+    }
   }
 
   void _goToTab(int index) {
     if (!mounted) return;
-    setState(() => _currentIndex = index);
+    _markSeenForTab(index);
+    setState(() {
+      _currentIndex = index;
+      if (index == 0) _showHomeDot = false;
+      if (index == 2) _showActivitiesDot = false;
+      if (index == 3) _showNetworkDot = false;
+      if (index == 5) _showMessagesDot = false;
+
+      _pages[0] = HomeTab(
+        onExploreTap: () => _goToTab(1),
+        onMessagesTap: () => _goToTab(5),
+        showMessagesDot: _showMessagesDot,
+      );
+    });
   }
 
   @override
@@ -87,6 +250,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                           onTap: _goToTab,
                           activeColor: navActive,
                           inactiveColor: navInactive,
+                          showDot: _showHomeDot,
                         ),
                       ),
                       Expanded(
@@ -112,6 +276,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                           onTap: _goToTab,
                           activeColor: navActive,
                           inactiveColor: navInactive,
+                          showDot: _showActivitiesDot,
                         ),
                       ),
                       Expanded(
@@ -134,37 +299,44 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                 top: -8,
                 child: GestureDetector(
                   onTap: () => _goToTab(3),
-                  child: Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      color: navBg,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.2),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Container(
-                        width: 34,
-                        height: 34,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 62,
+                        height: 62,
                         decoration: BoxDecoration(
-                          color: _currentIndex == 3
-                              ? AppColors.primaryDark
-                              : AppColors.primary,
+                          color: navBg,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: Icon(
-                          Icons.public,
-                          color: cs.onPrimary,
-                          size: 18,
+                        child: Center(
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: _currentIndex == 3
+                                  ? AppColors.primaryDark
+                                  : AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.public,
+                              color: cs.onPrimary,
+                              size: 18,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      if (_showNetworkDot)
+                        const Positioned(top: 7, right: 7, child: _RedDot()),
+                    ],
                   ),
                 ),
               ),
@@ -196,6 +368,7 @@ class _NavItem extends StatelessWidget {
   final void Function(int) onTap;
   final Color activeColor;
   final Color inactiveColor;
+  final bool showDot;
 
   const _NavItem({
     required this.icon,
@@ -206,6 +379,7 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
     required this.activeColor,
     required this.inactiveColor,
+    this.showDot = false,
   });
 
   @override
@@ -219,10 +393,17 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive ? activeColor : inactiveColor,
-              size: 20,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isActive ? activeIcon : icon,
+                  color: isActive ? activeColor : inactiveColor,
+                  size: 20,
+                ),
+                if (showDot)
+                  const Positioned(top: -2, right: -5, child: _RedDot()),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
@@ -235,6 +416,23 @@ class _NavItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RedDot extends StatelessWidget {
+  const _RedDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3B30),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.2),
       ),
     );
   }

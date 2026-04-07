@@ -4,6 +4,9 @@ import '../../../models/inscription_model.dart';
 import '../../../services/inscription_service.dart';
 import '../../../services/activity_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../shared/chat_conversation_screen.dart';
+import '../../shared/public_tourist_profile_screen.dart';
+import '../verify_booking_screen.dart';
 
 // ── IMAGE UTILITIES ────────────────────────────────────────────────────────
 const List<String> _fallbackImages = [
@@ -110,7 +113,10 @@ class _RequestsTabState extends State<RequestsTab> {
       final id = (activity['_id'] ?? activity['id'] ?? '').toString();
       if (id.isNotEmpty) {
         // If photos field doesn't look like a real list with URLs
-        final rawPhotos = activity['photos'] ?? activity['photos_activite'] ?? activity['images'];
+        final rawPhotos =
+            activity['photos'] ??
+            activity['photos_activite'] ??
+            activity['images'];
         final clean = _extractImageUrls(rawPhotos);
         // Only fetch if it returned fallback images (which means real photos were not found)
         if (clean == _fallbackImages) {
@@ -202,12 +208,13 @@ class _RequestsTabState extends State<RequestsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final String todayLabel = "TODAY — ${DateFormat('d MMMM').format(DateTime.now()).toUpperCase()}";
-    
+    final String todayLabel =
+        "TODAY — ${DateFormat('d MMMM').format(DateTime.now()).toUpperCase()}";
+
     // Custom Header Logic per Tab
     String headerLabel = todayLabel;
     String headerTitle = "New Requests";
-    
+
     if (_tabIndex == 1) {
       headerLabel = "CONFIRMED REQUESTS";
       headerTitle = ""; // Empty as per user request to remove it
@@ -234,6 +241,25 @@ class _RequestsTabState extends State<RequestsTab> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Tooltip(
+              message: 'Verify QR Codes',
+              child: IconButton(
+                icon: const Icon(Icons.qr_code_2, color: Color(0xFF315CFF)),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VerifyBookingScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -254,15 +280,19 @@ class _RequestsTabState extends State<RequestsTab> {
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: active ? const Color(0xFF315CFF) : const Color(0xFFF1F4FF),
+                          color: active
+                              ? const Color(0xFF315CFF)
+                              : const Color(0xFFF1F4FF),
                           borderRadius: BorderRadius.circular(25),
                           boxShadow: active
                               ? [
                                   BoxShadow(
-                                    color: const Color(0xFF315CFF).withOpacity(0.3),
+                                    color: const Color(
+                                      0xFF315CFF,
+                                    ).withOpacity(0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
-                                  )
+                                  ),
                                 ]
                               : null,
                         ),
@@ -272,7 +302,9 @@ class _RequestsTabState extends State<RequestsTab> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: active ? Colors.white : const Color(0xFF717BBC),
+                            color: active
+                                ? Colors.white
+                                : const Color(0xFF717BBC),
                           ),
                         ),
                       ),
@@ -329,26 +361,36 @@ class _RequestsTabState extends State<RequestsTab> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null
-                      ? _RequestsErrorState(
-                          message: _errorMessage!,
-                          onRetry: _loadRequests,
-                        )
-                      : _filteredRequests.isEmpty
-                          ? const _RequestsEmptyState()
-                          : ListView.builder(
-                              physics: const BouncingScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                              itemCount: _filteredRequests.length,
-                              itemBuilder: (_, index) {
-                                final item = _filteredRequests[index];
-                                return _RequestCard(
-                                  inscription: item,
-                                  cachedPhotos: _activityPhotosCache[(item.activite?['_id'] ?? item.activite?['id'] ?? '').toString()],
-                                  onApprove: _normalizeStatus(item.statut) == 'en_attente' ? () => _approve(item.id) : null,
-                                  onReject: _normalizeStatus(item.statut) == 'en_attente' ? () => _reject(item.id) : null,
-                                );
-                              },
-                            ),
+                  ? _RequestsErrorState(
+                      message: _errorMessage!,
+                      onRetry: _loadRequests,
+                    )
+                  : _filteredRequests.isEmpty
+                  ? const _RequestsEmptyState()
+                  : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                      itemCount: _filteredRequests.length,
+                      itemBuilder: (_, index) {
+                        final item = _filteredRequests[index];
+                        return _RequestCard(
+                          inscription: item,
+                          cachedPhotos:
+                              _activityPhotosCache[(item.activite?['_id'] ??
+                                      item.activite?['id'] ??
+                                      '')
+                                  .toString()],
+                          onApprove:
+                              _normalizeStatus(item.statut) == 'en_attente'
+                              ? () => _approve(item.id)
+                              : null,
+                          onReject:
+                              _normalizeStatus(item.statut) == 'en_attente'
+                              ? () => _reject(item.id)
+                              : null,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -375,6 +417,48 @@ class _RequestCard extends StatelessWidget {
     return DateFormat('d MMM yyyy').format(value);
   }
 
+  Map<String, dynamic> get _tourist => inscription.touriste ?? const {};
+
+  String get _participantId {
+    return (_tourist['_id'] ?? _tourist['id'] ?? '').toString().trim();
+  }
+
+  String get _participantName {
+    return (_tourist['fullname'] ?? 'Unknown').toString();
+  }
+
+  String get _participantAvatar {
+    return _tourist['avatar']?.toString() ?? '';
+  }
+
+  void _openParticipantProfile(BuildContext context) {
+    final participantId = _participantId;
+    if (participantId.isEmpty) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicUserProfileScreen(
+          userId: participantId,
+          canContact: true,
+          onContact: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatConversationScreen(
+                  partnerId: participantId,
+                  partnerName: _participantName,
+                  partnerAvatar: _participantAvatar,
+                  partnerType: 'Tourist',
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = inscription.statut.trim().toLowerCase();
@@ -390,17 +474,18 @@ class _RequestCard extends StatelessWidget {
 
   // ── PENDING CARD (IMAGE 1 STYLE) ──────────────────────────────────────────
   Widget _buildPendingCard(BuildContext context) {
-    final tourist = inscription.touriste ?? const {};
     final activity = inscription.activite ?? const {};
-    final avatar = tourist['avatar']?.toString() ?? '';
-    final name = (tourist['fullname'] ?? 'Unknown').toString();
+    final avatar = _participantAvatar;
+    final name = _participantName;
     final activityTitle = (activity['titre'] ?? 'Activity').toString();
     final nbParticipants = inscription.nombreParticipants ?? 1;
 
     final activityDateRaw = activity['date_debut'];
     final activityDate = activityDateRaw is DateTime
         ? activityDateRaw
-        : activityDateRaw is String ? DateTime.tryParse(activityDateRaw) : null;
+        : activityDateRaw is String
+        ? DateTime.tryParse(activityDateRaw)
+        : null;
     final date = _formatDate(inscription.dateDemande ?? activityDate);
 
     return Container(
@@ -435,72 +520,107 @@ class _RequestCard extends StatelessWidget {
                             ? Image.network(
                                 avatar,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF717BBC), size: 40),
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF717BBC),
+                                  size: 40,
+                                ),
                               )
-                            : const Icon(Icons.person, color: Color(0xFF717BBC), size: 40),
+                            : const Icon(
+                                Icons.person,
+                                color: Color(0xFF717BBC),
+                                size: 40,
+                              ),
                       ),
                     ),
                     Positioned(
                       bottom: -2,
                       right: -2,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF9F2089),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
-                        child: const Text('NEW', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white)),
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  child: InkWell(
+                    onTap: () => _openParticipantProfile(context),
+                    borderRadius: BorderRadius.circular(18),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF1B2452),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF1B2452),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const Icon(Icons.verified, color: Color(0xFF315CFF), size: 16),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              activityTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF717BBC),
+                              const Icon(
+                                Icons.verified,
+                                color: Color(0xFF315CFF),
+                                size: 16,
                               ),
-                            ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  activityTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF717BBC),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              _InfoChip(
+                                icon: Icons.calendar_today_rounded,
+                                label: date,
+                              ),
+                              _InfoChip(
+                                icon: Icons.people_rounded,
+                                label: '$nbParticipants Participants',
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _InfoChip(icon: Icons.calendar_today_rounded, label: date),
-                          _InfoChip(icon: Icons.people_rounded, label: '$nbParticipants Participants'),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -515,9 +635,14 @@ class _RequestCard extends StatelessWidget {
                       foregroundColor: const Color(0xFFE11D48),
                       side: const BorderSide(color: Color(0xFFFEE2E2)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
-                    child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w800)),
+                    child: const Text(
+                      'Reject',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -529,10 +654,15 @@ class _RequestCard extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       shadowColor: const Color(0xFF315CFF).withOpacity(0.5),
                     ),
-                    child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w800)),
+                    child: const Text(
+                      'Approve',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
               ],
@@ -545,23 +675,28 @@ class _RequestCard extends StatelessWidget {
 
   // ── APPROVED CARD (WITH IMAGE CAROUSEL) ──────────────────────────────────
   Widget _buildApprovedCard(BuildContext context) {
-    final tourist = inscription.touriste ?? const {};
     final activity = inscription.activite ?? const {};
-    
-    // Prioritize cached full activity photos
-    final List<String> photos = cachedPhotos ?? _extractImageUrls(
-      activity['photos'] ?? activity['photos_activite'] ?? activity['images']
-    );
 
-    final avatar = tourist['avatar']?.toString() ?? '';
-    final name = (tourist['fullname'] ?? 'Unknown').toString();
+    // Prioritize cached full activity photos
+    final List<String> photos =
+        cachedPhotos ??
+        _extractImageUrls(
+          activity['photos'] ??
+              activity['photos_activite'] ??
+              activity['images'],
+        );
+
+    final avatar = _participantAvatar;
+    final name = _participantName;
     final activityTitle = (activity['titre'] ?? 'Activity').toString();
     final nbParticipants = inscription.nombreParticipants ?? 1;
 
     final activityDateRaw = activity['date_debut'];
     final activityDate = activityDateRaw is DateTime
         ? activityDateRaw
-        : activityDateRaw is String ? DateTime.tryParse(activityDateRaw) : null;
+        : activityDateRaw is String
+        ? DateTime.tryParse(activityDateRaw)
+        : null;
     final date = _formatDate(activityDate);
     final time = (activity['heure_debut'] ?? '00:00').toString();
 
@@ -585,14 +720,20 @@ class _RequestCard extends StatelessWidget {
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
                 child: SizedBox(
                   height: 220,
                   width: double.infinity,
                   child: photos.isEmpty
                       ? Container(
                           color: const Color(0xFFF3F5FF),
-                          child: const Icon(Icons.image, color: Color(0xFF717BBC), size: 50),
+                          child: const Icon(
+                            Icons.image,
+                            color: Color(0xFF717BBC),
+                            size: 50,
+                          ),
                         )
                       : _ActivityCarousel(photos: photos),
                 ),
@@ -601,15 +742,27 @@ class _RequestCard extends StatelessWidget {
                 top: 16,
                 right: 16,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(99),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                      ),
+                    ],
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 14),
+                      Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF22C55E),
+                        size: 14,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'CONFIRMED',
@@ -633,35 +786,66 @@ class _RequestCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: const Color(0xFFF3F5FF),
-                      backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                      child: avatar.isEmpty ? const Icon(Icons.person, size: 20) : null,
+                    GestureDetector(
+                      onTap: () => _openParticipantProfile(context),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFFF3F5FF),
+                        backgroundImage: avatar.isNotEmpty
+                            ? NetworkImage(avatar)
+                            : null,
+                        child: avatar.isEmpty
+                            ? const Icon(Icons.person, size: 20)
+                            : null,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF1B2452)),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _openParticipantProfile(context),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1B2452),
+                                ),
+                              ),
+                              Text(
+                                '$nbParticipants people',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF717BBC),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        Text(
-                          '$nbParticipants people',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF717BBC), fontWeight: FontWeight.w500),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 Text(
                   activityTitle,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1B2452)),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1B2452),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                _InfoChip(icon: Icons.calendar_today_rounded, label: '$date • $time'),
+                _InfoChip(
+                  icon: Icons.calendar_today_rounded,
+                  label: '$date • $time',
+                ),
               ],
             ),
           ),
@@ -674,20 +858,25 @@ class _RequestCard extends StatelessWidget {
   Widget _buildCancelledCard(BuildContext context) {
     final status = inscription.statut.trim().toLowerCase();
     final isRejected = status == 'refusee';
-    final tourist = inscription.touriste ?? const {};
     final activity = inscription.activite ?? const {};
-    final avatar = tourist['avatar']?.toString() ?? '';
-    final name = (tourist['fullname'] ?? 'Unknown').toString();
+    final avatar = _participantAvatar;
+    final name = _participantName;
     final activityTitle = (activity['titre'] ?? 'Activity').toString();
 
     final activityDateRaw = activity['date_debut'];
     final activityDate = activityDateRaw is DateTime
         ? activityDateRaw
-        : activityDateRaw is String ? DateTime.tryParse(activityDateRaw) : null;
+        : activityDateRaw is String
+        ? DateTime.tryParse(activityDateRaw)
+        : null;
     final date = _formatDate(activityDate);
 
-    final badgeColor = isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFFEF3C7);
-    final textColor = isRejected ? const Color(0xFFE11D48) : const Color(0xFFD97706);
+    final badgeColor = isRejected
+        ? const Color(0xFFFEE2E2)
+        : const Color(0xFFFEF3C7);
+    final textColor = isRejected
+        ? const Color(0xFFE11D48)
+        : const Color(0xFFD97706);
     final label = isRejected ? 'REJECTED' : 'CANCELLED';
     final footerText = isRejected ? 'Rejected by you' : 'Cancelled by traveler';
 
@@ -710,34 +899,67 @@ class _RequestCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: const Color(0xFFF3F5FF),
-                  backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
-                  child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
+                GestureDetector(
+                  onTap: () => _openParticipantProfile(context),
+                  child: CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFFF3F5FF),
+                    backgroundImage: avatar.isNotEmpty
+                        ? NetworkImage(avatar)
+                        : null,
+                    child: avatar.isEmpty
+                        ? const Icon(Icons.person, size: 24)
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF1B2452)),
+                  child: InkWell(
+                    onTap: () => _openParticipantProfile(context),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF1B2452),
+                            ),
+                          ),
+                          const Text(
+                            'PREMIUM TRAVELER',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF717BBC),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
-                      const Text(
-                        'PREMIUM TRAVELER',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF717BBC), letterSpacing: 0.5),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
                     label,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: textColor),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
                   ),
                 ),
               ],
@@ -748,7 +970,11 @@ class _RequestCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     activityTitle,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1B2452)),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1B2452),
+                    ),
                   ),
                 ),
               ],
@@ -756,11 +982,19 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF717BBC)),
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  size: 14,
+                  color: Color(0xFF717BBC),
+                ),
                 const SizedBox(width: 10),
                 Text(
                   'On $date',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF717BBC), fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF717BBC),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -772,7 +1006,11 @@ class _RequestCard extends StatelessWidget {
               children: [
                 Text(
                   footerText,
-                  style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF717BBC)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF717BBC),
+                  ),
                 ),
                 TextButton(
                   onPressed: () {},
@@ -784,7 +1022,13 @@ class _RequestCard extends StatelessWidget {
                   ),
                   child: const Row(
                     children: [
-                      Text('Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                      Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       Icon(Icons.chevron_right, size: 16),
                     ],
                   ),
@@ -943,7 +1187,11 @@ class _ActivityCarouselState extends State<_ActivityCarousel> {
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               color: const Color(0xFFF3F5FF),
-              child: const Icon(Icons.broken_image, color: Color(0xFF717BBC), size: 50),
+              child: const Icon(
+                Icons.broken_image,
+                color: Color(0xFF717BBC),
+                size: 50,
+              ),
             ),
           ),
         ),
@@ -961,7 +1209,9 @@ class _ActivityCarouselState extends State<_ActivityCarousel> {
                   height: 6,
                   width: _currentPage == idx ? 20 : 6,
                   decoration: BoxDecoration(
-                    color: _currentPage == idx ? Colors.white : Colors.white.withOpacity(0.5),
+                    color: _currentPage == idx
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 );

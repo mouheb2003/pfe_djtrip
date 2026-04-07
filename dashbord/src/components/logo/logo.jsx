@@ -38,16 +38,16 @@ export const Logo = forwardRef((props, ref) => {
 
   const singleLogo = (
     <img
-      alt="Djerba Trip Logo"
-      src="/logo/logo-single.png"
+      alt="DJTrip Logo"
+      src="/logo/app_logo.png"
       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
     />
   );
 
   const fullLogo = (
     <img
-      alt="Djerba Trip Full Logo"
-      src="/logo/logo-full.png"
+      alt="DJTrip Full Logo"
+      src="/logo/app_logo.png"
       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
     />
   );

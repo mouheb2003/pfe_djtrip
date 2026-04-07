@@ -44,12 +44,13 @@ export const paths = {
   dashboard: {
     root: ROOTS.DASHBOARD,
     lieux: {
-       root: `${ROOTS.DASHBOARD}/lieux`,
+      root: `${ROOTS.DASHBOARD}/lieux`,
       details: (id) => `${ROOTS.DASHBOARD}/lieux/${id}`,
     },
     activites: `${ROOTS.DASHBOARD}/activites`,
     publications: `${ROOTS.DASHBOARD}/publications`,
     messages: `${ROOTS.DASHBOARD}/messages`,
+    logs: `${ROOTS.DASHBOARD}/logs`,
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
     group: {

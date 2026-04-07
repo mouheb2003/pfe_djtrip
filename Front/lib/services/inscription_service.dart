@@ -203,30 +203,26 @@ class InscriptionService {
     return _decodeObject(res.body);
   }
 
-
-
-
-
   /// Get ALL bookings for the tourist, bucketed by reservation status
   /// Returns a map with 'pending', 'confirmed', 'cancelled'
   static Future<Map<String, List<InscriptionModel>>> getMyBookings() async {
     try {
       final body = await _get('/inscriptions/touriste/my-bookings');
-      
+
       if (body['success'] == true && body['data'] != null) {
         final data = body['data'] as Map<String, dynamic>;
-        
+
         List<InscriptionModel> parseList(dynamic listRaw, String listName) {
           if (listRaw is! List) {
             print('$listName is not a List: $listRaw');
             return [];
           }
-          
+
           final result = <InscriptionModel>[];
           for (int i = 0; i < listRaw.length; i++) {
             try {
               final item = listRaw[i];
-              
+
               // Ensure item is a Map before parsing
               if (item is Map<String, dynamic>) {
                 final inscription = InscriptionModel.fromJson(item);
@@ -239,7 +235,7 @@ class InscriptionService {
               continue; // Skip problematic items
             }
           }
-          
+
           return result;
         }
 
@@ -248,14 +244,14 @@ class InscriptionService {
           'confirmed': parseList(data['confirmed'], 'confirmed'),
           'cancelled': parseList(data['cancelled'], 'cancelled'),
         };
-        
+
         return result;
       }
-      
+
       return {'pending': [], 'confirmed': [], 'cancelled': []};
     } catch (e) {
       print('Error in getMyBookings: $e');
-       throw Exception(_extractErrorMessage(e.toString()));
+      throw Exception(_extractErrorMessage(e.toString()));
     }
   }
 
@@ -267,7 +263,10 @@ class InscriptionService {
 
   /// Organizer: pending requests.
   static Future<List<InscriptionModel>> getOrganizerPendingRequests() async {
-    final res = await ApiClient.get('/inscriptions/organisateur/en-attente');
+    final res = await ApiClient.get(
+      '/inscriptions/organisateur/en-attente',
+      cacheFirst: false,
+    );
     if (res.statusCode == 200) {
       final body = _decodeObject(res.body);
       final list = _extractInscriptions(body);
@@ -285,7 +284,10 @@ class InscriptionService {
 
   /// Organizer: all requests (all statuses).
   static Future<List<InscriptionModel>> getOrganizerAllRequests() async {
-    final res = await ApiClient.get('/inscriptions/organisateur/mes-demandes');
+    final res = await ApiClient.get(
+      '/inscriptions/organisateur/mes-demandes',
+      cacheFirst: false,
+    );
     if (res.statusCode == 200) {
       final body = _decodeObject(res.body);
       final list = _extractInscriptions(body);
@@ -378,5 +380,41 @@ class InscriptionService {
       return _decodeObject(res.body);
     }
     return {'totalBookings': 0};
+  }
+
+  /// Organizer: get inscription by ID for QR verification
+  static Future<InscriptionModel?> getInscriptionById(
+    String inscriptionId,
+  ) async {
+    try {
+      final res = await ApiClient.get(
+        '/inscriptions/$inscriptionId',
+        cacheFirst: false,
+      );
+      if (res.statusCode == 200) {
+        final body = _decodeObject(res.body);
+        final data = body['data'] ?? body['inscription'];
+        if (data is Map<String, dynamic>) {
+          return InscriptionModel.fromJson(data);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching inscription: $e');
+      return null;
+    }
+  }
+
+  /// Organizer: verify/confirm booking (mark as used)
+  static Future<bool> verifyInscription(String inscriptionId) async {
+    try {
+      final res = await ApiClient.put('/inscriptions/$inscriptionId/verifier', {
+        'statut': 'verifie',
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      print('Error verifying inscription: $e');
+      return false;
+    }
   }
 }

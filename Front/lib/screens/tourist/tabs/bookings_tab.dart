@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/inscription_model.dart';
 import '../../../services/inscription_service.dart';
 import '../../../theme/app_theme.dart';
-import '../../tourist/booking_detail_screen.dart';
+import '../../tourist/booking_confirmation_screen.dart';
 
 class BookingsTab extends StatefulWidget {
   final int initialTabIndex;
@@ -152,7 +152,7 @@ class _BookingsTabState extends State<BookingsTab> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BookingDetailScreen(inscription: inscription),
+        builder: (_) => BookingConfirmationScreen(inscription: inscription),
       ),
     );
   }

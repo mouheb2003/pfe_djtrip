@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
 import 'tourist_main_screen.dart';
@@ -9,17 +10,75 @@ class BookingConfirmationScreen extends StatelessWidget {
 
   const BookingConfirmationScreen({super.key, required this.inscription});
 
+  String _normalizeStatus(String rawStatus) {
+    final status = rawStatus.trim().toLowerCase();
+    if (status == 'approved' ||
+        status == 'confirmée' ||
+        status == 'confirmed') {
+      return 'approuvee';
+    }
+    if (status == 'pending' || status == 'en attente') {
+      return 'en_attente';
+    }
+    if (status == 'rejected' || status == 'refusée') {
+      return 'refusee';
+    }
+    if (status == 'cancelled' || status == 'canceled' || status == 'annulée') {
+      return 'annulee';
+    }
+    return status;
+  }
+
+  double _bookingTotal(Map<String, dynamic>? activity) {
+    final unitPrice = (activity?['prix'] as num?)?.toDouble() ?? 0.0;
+    final computed = unitPrice * inscription.nombreParticipants;
+    if (inscription.prixTotal > 0) {
+      return inscription.prixTotal;
+    }
+    return computed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final activity = inscription.activite;
     final photos = activity?['photos'] as List? ?? [];
     final imageUrl = photos.isNotEmpty ? photos.first as String : '';
     final title = activity?['titre'] as String? ?? 'Activity';
-    final date = inscription.dateDemande ?? DateTime.now();
+    final date =
+        DateTime.tryParse(
+          (activity?['date_debut'] ?? activity?['dateDebut'] ?? '').toString(),
+        ) ??
+        inscription.dateDemande ??
+        DateTime.now();
     final dateStr = DateFormat('MMM dd, yyyy').format(date);
-    
-    // Fallback for time if not in activity
     final timeStr = activity?['heure'] as String? ?? '10:00 AM';
+    final status = _normalizeStatus(inscription.statut);
+    final isApproved = status == 'approuvee';
+    final isPending = status == 'en_attente';
+    final isRejected = status == 'refusee';
+    final isCancelled = status == 'annulee';
+    final totalPrice = _bookingTotal(activity);
+    final qrData = inscription.qrData;
+    final hasQrData = qrData.trim().isNotEmpty;
+    final reason = inscription.organizerReason;
+    final showQr = isApproved;
+    final showReason = (isRejected || isCancelled) && reason != null;
+    final statusLabel = inscription.statusLabel.toUpperCase();
+    final statusColor = inscription.statusColor;
+    final headline = isApproved
+        ? 'Booking Confirmed!'
+        : isPending
+        ? 'Waiting for approval'
+        : isRejected
+        ? 'Booking Rejected'
+        : 'Booking Cancelled';
+    final subtitle = isApproved
+        ? 'Your booking is approved. Keep your QR code for check-in.'
+        : isPending
+        ? 'Your request has been sent. The organizer will review it soon.'
+        : isRejected
+        ? 'The organizer rejected this booking request.'
+        : 'This booking was cancelled.';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -46,24 +105,28 @@ class BookingConfirmationScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Success Icon
+              // Status Icon
               Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.05),
+                  color: statusColor.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Container(
                     width: 48,
                     height: 48,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
+                    decoration: BoxDecoration(
+                      color: statusColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.check,
+                    child: Icon(
+                      isApproved
+                          ? Icons.check
+                          : isPending
+                          ? Icons.hourglass_top_rounded
+                          : Icons.info_outline_rounded,
                       color: Colors.white,
                       size: 32,
                     ),
@@ -71,8 +134,8 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
-                'Booking Confirmed!',
+              Text(
+                headline,
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -80,8 +143,8 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Your adventure with DJTrip is all set. Get ready for an unforgettable experience!',
+              Text(
+                subtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -90,15 +153,31 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              // Activity Image
+              // Top media section: show QR for approved bookings, otherwise activity image
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: SizedBox(
-                  height: 160,
+                  height: 200,
                   width: double.infinity,
-                  child: imageUrl.isNotEmpty
+                  child: showQr && hasQrData
+                      ? Container(
+                          color: Colors.white,
+                          alignment: Alignment.center,
+                          child: QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 170,
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.all(10),
+                          ),
+                        )
+                      : imageUrl.isNotEmpty
                       ? Image.network(imageUrl, fit: BoxFit.cover)
-                      : Container(color: Colors.grey[200]),
+                      : Container(
+                          color: Colors.grey[200],
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image_outlined, size: 42),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -122,7 +201,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Booking Summary',
                           style: TextStyle(
                             fontSize: 18,
@@ -136,11 +215,11 @@ class BookingConfirmationScreen extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: statusColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            inscription.statusLabel.toUpperCase(),
+                            statusLabel,
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -182,14 +261,16 @@ class BookingConfirmationScreen extends StatelessWidget {
                           child: _SummaryRow(
                             icon: Icons.people_outline,
                             label: 'PEOPLE',
-                            value: '${inscription.nombreParticipants} Participants',
+                            value:
+                                '${inscription.nombreParticipants} Participants',
                           ),
                         ),
                         Expanded(
                           child: _SummaryRow(
                             icon: Icons.confirmation_number_outlined,
                             label: 'ID',
-                            value: '#DJT-${inscription.id.substring(inscription.id.length - 5).toUpperCase()}',
+                            value:
+                                '#DJT-${inscription.id.substring(inscription.id.length - 5).toUpperCase()}',
                           ),
                         ),
                       ],
@@ -207,7 +288,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '${inscription.prixTotal.toStringAsFixed(2)} TND',
+                          '${totalPrice.toStringAsFixed(2)} TND',
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -220,31 +301,70 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              // Email Notification
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'A confirmation email has been sent to your registered address with the QR code ticket and arrival instructions.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                          height: 1.5,
+              if (showQr) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.email_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'A confirmation email has been sent to your registered address with the QR code ticket and arrival instructions.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            height: 1.5,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
+              if (showReason) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDF2F2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF5C2C7)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Reason provided by organizer',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        reason!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7F1D1D),
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               const SizedBox(height: 32),
               // Buttons
               SizedBox(
@@ -252,9 +372,12 @@ class BookingConfirmationScreen extends StatelessWidget {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                     // Navigate to bookings tab (index 2 in TouristMainScreen)
-                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const TouristMainScreen(initialIndex: 2)),
+                    // Navigate to bookings tab (index 2 in TouristMainScreen)
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const TouristMainScreen(initialIndex: 2),
+                      ),
                       (route) => false,
                     );
                   },
@@ -279,7 +402,10 @@ class BookingConfirmationScreen extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const TouristMainScreen(initialIndex: 0)),
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const TouristMainScreen(initialIndex: 0),
+                      ),
                       (route) => false,
                     );
                   },

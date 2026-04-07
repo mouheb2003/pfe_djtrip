@@ -62,7 +62,7 @@ export async function getLieuById(id) {
 }
 
 export async function getUsers() {
-  const data = await Get(END_POINT.users);
+  const data = await Get(`${END_POINT.users}?_t=${Date.now()}`);
 
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.users)) return data.users;
@@ -90,9 +90,7 @@ export async function updateUserStatus(id, statusOrPayload) {
   if (!id || !statusOrPayload) return null;
 
   const payload =
-    typeof statusOrPayload === 'string'
-      ? { accountStatus: statusOrPayload }
-      : statusOrPayload;
+    typeof statusOrPayload === 'string' ? { accountStatus: statusOrPayload } : statusOrPayload;
 
   const data = await Put(END_POINT.updateUserStatus(id), payload);
   return data?.user ?? data;
@@ -195,9 +193,61 @@ export async function getMessagesWith(partnerId) {
   return [];
 }
 
-export async function sendMessageTo(partnerId, content) {
+export async function sendMessageTo(partnerId, content, options = {}) {
   if (!partnerId || !content?.trim()) return null;
 
-  const data = await Post(END_POINT.messageWith(partnerId), { content: content.trim() });
+  const data = await Post(END_POINT.messageWith(partnerId), {
+    content: content.trim(),
+    message_type: options.messageType ?? 'text',
+  });
   return data?.message ?? data;
+}
+
+export async function editMessageById(messageId, content) {
+  if (!messageId || !content?.trim()) return null;
+
+  const data = await Put(END_POINT.messageById(messageId), {
+    content: content.trim(),
+  });
+  return data?.message ?? data;
+}
+
+export async function deleteMessageById(messageId) {
+  if (!messageId) return null;
+
+  return Delete(END_POINT.messageById(messageId));
+}
+
+export async function getSystemLogs(filters = {}) {
+  const params = {};
+
+  if (filters.source && filters.source.trim()) params.targetType = filters.source.trim();
+  if (filters.search && filters.search.trim()) params.search = filters.search.trim();
+  if (filters.start) params.start = filters.start;
+  if (filters.end) params.end = filters.end;
+  if (filters.limit) params.limit = filters.limit;
+  if (filters.page) params.page = filters.page;
+  if (filters.action && filters.action.trim()) params.action = filters.action.trim();
+
+  const data = await Get(END_POINT.activityLogs, { params });
+
+  const logs = Array.isArray(data?.logs)
+    ? data.logs.map((item) => ({
+        id: item?._id ?? item?.id,
+        timestamp: item?.createdAt,
+        level: 'info',
+        source: item?.targetType ?? '-',
+        action: item?.action ?? '-',
+        userId: item?.actorName ?? item?.actorId ?? '-',
+        userType: item?.actorId ?? '-',
+        message: item?.description ?? '-',
+      }))
+    : [];
+
+  return {
+    logs,
+    total: Number(data?.pagination?.total ?? data?.total ?? 0),
+    page: Number(data?.pagination?.page ?? data?.page ?? 1),
+    limit: Number(data?.pagination?.limit ?? data?.limit ?? filters.limit ?? 100),
+  };
 }

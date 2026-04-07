@@ -22,6 +22,7 @@ class ChatConversationScreen extends StatefulWidget {
   final String partnerId;
   final String partnerName;
   final String? partnerAvatar;
+  final String? partnerType;
   final bool partnerOnline;
   final bool isSupportChat;
 
@@ -30,6 +31,7 @@ class ChatConversationScreen extends StatefulWidget {
     required this.partnerId,
     required this.partnerName,
     this.partnerAvatar,
+    this.partnerType,
     this.partnerOnline = false,
     this.isSupportChat = false,
   });
@@ -40,7 +42,8 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen>
     with WidgetsBindingObserver {
-  static const Duration _refreshInterval = Duration(seconds: 2);
+  // 🔧 FIX: Support chat uses socket only, normal chat: longer interval to reduce flickering
+  late Duration _refreshInterval;
 
   final TextEditingController _msgCtrl = TextEditingController();
   final FocusNode _msgFocus = FocusNode();
@@ -64,6 +67,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   String _editingMessageId = '';
   String _replacingMessageId = '';
   Timer? _autoRefreshTimer;
+  bool _hasInitialLoadCompleted = false;
 
   // 🚀 SIMPLIFIED: Simple online status tracking
   bool _partnerOnline = false;
@@ -102,6 +106,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     // 🚀 FIX: Initialize with widget value
     _partnerOnline = widget.partnerOnline;
 
+    // 🔧 OPTIMIZE: Support chat uses socket only (longer fallback interval)
+    // Regular chats use moderate interval to handle offline scenarios
+    _refreshInterval = widget.isSupportChat
+        ? Duration(
+            seconds: 15,
+          ) // Support: socket is primary, refresh is fallback
+        : Duration(seconds: 6); // Normal: moderate refresh to reduce flickering
+
     _initVoicePlayer();
     _loadMessages();
     _initSocket();
@@ -110,9 +122,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   @override
   void dispose() {
-    print('🔴 [ChatScreen] DISPOSE: Forcing logout...');
-
-    _socket?.emit('force_logout');
     _disposeSocket();
     WidgetsBinding.instance.removeObserver(this);
     _voicePlayer.stop();
@@ -156,6 +165,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       _replacingMessageId = '';
     });
   }
+
+  bool _isWarningType(String type) => type.trim().toLowerCase() == 'warning';
+
+  bool get _isWarningInboxMode => _isDjTripAdminThread && !widget.isSupportChat;
+
+  bool get _isReplyLocked => _messages.any(
+    (message) =>
+        _isWarningInboxMode && _isWarningType(message.type) && !message.isMine,
+  );
 
   Future<void> _finalizeReplacement(Map<String, dynamic> payload) async {
     final replacingId = _replacingMessageId;
@@ -448,9 +466,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
-        print('⏸️ Chat going to background, forcing logout...');
-        // 🚀 NEW: Force logout on app background
-        _socket?.emit('force_logout');
         _stopAutoRefresh();
         _disposeSocket();
         return;
@@ -570,15 +585,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       if (!mounted) return;
 
       String message = 'Votre compte a été restreint.';
+      final restriction = <String, dynamic>{};
       if (data is Map && data['message'] != null) {
         message = data['message'].toString();
+
+        final type = data['type']?.toString().trim() ?? '';
+        final reason = data['reason']?.toString().trim() ?? '';
+        final suspendedUntil = data['suspendedUntil'];
+
+        if (type.isNotEmpty) restriction['type'] = type;
+        if (reason.isNotEmpty) restriction['reason'] = reason;
+        if (suspendedUntil != null) {
+          restriction['suspendedUntil'] = suspendedUntil.toString();
+        }
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      restriction['message'] = message;
       await AuthService.clearLocalSession();
-      NavigationService.forceLogoutToLogin();
+      NavigationService.forceLogoutToLogin(
+        message: message,
+        restriction: restriction,
+      );
     });
 
     socket.connect();
@@ -591,8 +618,22 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     final sender = (data['sender_id'] ?? '').toString();
     final receiver = (data['receiver_id'] ?? '').toString();
+    final messageType = (data['message_type'] ?? 'text')
+        .toString()
+        .trim()
+        .toLowerCase();
     final me = _currentUserId ?? '';
     final partner = widget.partnerId;
+    final warningModeActive = _isWarningInboxMode;
+
+    // Warnings must be shown only to the warned side (receiver).
+    final isWarningSentByMe = _isWarningType(messageType) && sender == me;
+    if (_isWarningInboxMode && isWarningSentByMe) return;
+
+    if (widget.isSupportChat && _isWarningType(messageType)) return;
+
+    // In warning mode, keep only warning messages visible.
+    if (warningModeActive && !_isWarningType(messageType)) return;
 
     final belongsToCurrentChat =
         (sender == partner && receiver == me) ||
@@ -602,7 +643,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final msg = _UiMessage(
       id: (data['_id'] ?? '').toString(),
       text: (data['content'] ?? '').toString(),
-      type: (data['message_type'] ?? 'text').toString(),
+      type: messageType,
       audioUrl: (data['media_url'] ?? '').toString(),
       durationSec: (data['media_duration'] as num?)?.toInt() ?? 0,
       isMine: forceMine || sender == me,
@@ -639,11 +680,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       return _UiMessage(
         id: (m['_id'] ?? '').toString(),
         text: (m['content'] ?? '').toString(),
-        type: (m['message_type'] ?? 'text').toString(),
+        type: (m['message_type'] ?? 'text').toString().trim().toLowerCase(),
         audioUrl: (m['media_url'] ?? '').toString(),
         durationSec: (m['media_duration'] as num?)?.toInt() ?? 0,
         isMine: sender == (userId ?? ''),
-        time: createdAt ?? DateTime.now(), // 🚀 FIX: Handle null createdAt
+        time: createdAt ?? DateTime.now(),
         isEdited: m['is_edited'] == true,
         editedAt: DateTime.tryParse((m['edited_at'] ?? '').toString()),
         isRead: (m['is_read'] == true),
@@ -651,9 +692,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       );
     }).toList();
 
+    final visibleMessages = widget.isSupportChat
+        ? mapped.where((m) => !_isWarningType(m.type)).toList()
+        : (_isWarningInboxMode
+              ? mapped.where((m) => _isWarningType(m.type)).toList()
+              : mapped);
+
     setState(() {
       _currentUserId = userId;
-      _messages = mapped;
+
+      // 🔧 SMART UPDATE: Only replace list on first load or if count changes significantly
+      if (!_hasInitialLoadCompleted) {
+        _messages = visibleMessages;
+        _hasInitialLoadCompleted = true;
+      } else if (visibleMessages.length != _messages.length) {
+        // Count changed - likely new message(s)
+        _messages = visibleMessages;
+      } else {
+        // Merge updates for existing messages (e.g., read status, edits)
+        for (int i = 0; i < visibleMessages.length; i++) {
+          if (i < _messages.length &&
+              visibleMessages[i].id == _messages[i].id) {
+            // Update if read status or edit changed
+            if (visibleMessages[i].isRead != _messages[i].isRead ||
+                visibleMessages[i].isEdited != _messages[i].isEdited) {
+              _messages[i] = visibleMessages[i];
+            }
+          }
+        }
+      }
+
       _loading = false;
     });
 
@@ -728,6 +796,59 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
     if (raw.startsWith('/')) return '$serverUrl$raw';
     return '$serverUrl/$raw';
+  }
+
+  String? _resolveAvatarUrl(String? rawUrl) {
+    final raw = (rawUrl ?? '').trim();
+    if (raw.isEmpty || raw == 'null' || raw == 'undefined') return null;
+
+    // Local file URIs are not valid for NetworkImage in this context.
+    if (raw.startsWith('file://')) return null;
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+
+    final serverUrl = ApiClient.baseUrl.replaceFirst(
+      RegExp(r'/api(?:/v1)?$'),
+      '',
+    );
+
+    if (raw.startsWith('/')) return '$serverUrl$raw';
+    return '$serverUrl/$raw';
+  }
+
+  bool get _isDjTripAdminThread {
+    final type = (widget.partnerType ?? '').trim().toLowerCase();
+    final name = widget.partnerName.trim().toLowerCase();
+    return type == 'admin' || name.contains('admin');
+  }
+
+  ImageProvider<Object>? _partnerAvatarProvider() {
+    if (_isDjTripAdminThread) {
+      return const AssetImage('assets/logos/app_logo.png');
+    }
+
+    final url = _resolveAvatarUrl(widget.partnerAvatar);
+    if (url == null || url.isEmpty) return null;
+    return NetworkImage(url);
+  }
+
+  Widget _adminBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCE9FF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'ADMIN',
+        style: TextStyle(
+          color: Color(0xFF2E5BFF),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
   }
 
   bool _isImageMessage(_UiMessage msg) {
@@ -1146,18 +1267,33 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   color: const Color(0xFF0EA5E9),
                   onTap: () => Navigator.pop(ctx, 'camera'),
                 ),
-                _attachmentTile(
-                  icon: Icons.location_on_rounded,
-                  label: 'Location',
-                  color: const Color(0xFF22C55E),
-                  onTap: () => Navigator.pop(ctx, 'location'),
-                ),
-                _attachmentTile(
-                  icon: Icons.video_collection_rounded,
-                  label: 'Video',
-                  color: const Color(0xFF8B5CF6),
-                  onTap: () => Navigator.pop(ctx, 'video'),
-                ),
+                // 🔧 CONDITIONAL: Show different options based on chat type
+                if (!widget.isSupportChat) ...[
+                  _attachmentTile(
+                    icon: Icons.location_on_rounded,
+                    label: 'Location',
+                    color: const Color(0xFF22C55E),
+                    onTap: () => Navigator.pop(ctx, 'location'),
+                  ),
+                  _attachmentTile(
+                    icon: Icons.video_collection_rounded,
+                    label: 'Video',
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () => Navigator.pop(ctx, 'video'),
+                  ),
+                ] else
+                  // 🔧 SUPPORT CHAT: Show message hint
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Support chat: Text & Photos only',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF999),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1227,10 +1363,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildHeader(ColorScheme cs) {
-    final partnerAvatar = widget.partnerAvatar;
-    final headerTitle = widget.isSupportChat
-        ? 'DJTrip Support'
-        : widget.partnerName;
+    final showAdminIdentity = _isDjTripAdminThread;
+    final callsDisabled =
+        widget.isSupportChat || showAdminIdentity || _isReplyLocked;
+    final partnerAvatarProvider = _partnerAvatarProvider();
+    final headerTitle = showAdminIdentity
+        ? 'DJTrip Admin'
+        : (widget.isSupportChat ? 'DJTrip Support' : widget.partnerName);
     final headerSubtitle = widget.isSupportChat
         ? 'Customer assistance'
         : (_partnerOnline ? 'Online' : 'Offline');
@@ -1269,10 +1408,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         CircleAvatar(
                           radius: 21,
                           backgroundColor: cs.surfaceVariant,
-                          backgroundImage: partnerAvatar != null
-                              ? NetworkImage(partnerAvatar)
-                              : null,
-                          child: partnerAvatar == null
+                          backgroundImage: partnerAvatarProvider,
+                          child: partnerAvatarProvider == null
                               ? Icon(
                                   Icons.person,
                                   size: 19,
@@ -1280,21 +1417,22 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                                 )
                               : null,
                         ),
-                        Positioned(
-                          right: -1,
-                          bottom: -1,
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: _partnerOnline
-                                  ? const Color(0xFF22C55E)
-                                  : cs.outline,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: cs.surface, width: 2),
+                        if (!showAdminIdentity)
+                          Positioned(
+                            right: -1,
+                            bottom: -1,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: _partnerOnline
+                                    ? const Color(0xFF22C55E)
+                                    : cs.outline,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: cs.surface, width: 2),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(width: 10),
@@ -1302,28 +1440,39 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            headerTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: cs.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  headerTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: cs.onSurface,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (showAdminIdentity) ...[
+                                const SizedBox(width: 8),
+                                _adminBadge(),
+                              ],
+                            ],
                           ),
-                          Text(
-                            headerSubtitle,
-                            style: TextStyle(
-                              color: widget.isSupportChat
-                                  ? cs.primary
-                                  : (_partnerOnline
-                                        ? const Color(0xFF22C55E)
-                                        : cs.onSurfaceVariant),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                          if (!showAdminIdentity)
+                            Text(
+                              headerSubtitle,
+                              style: TextStyle(
+                                color: widget.isSupportChat
+                                    ? cs.primary
+                                    : (_partnerOnline
+                                          ? const Color(0xFF22C55E)
+                                          : cs.onSurfaceVariant),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1332,18 +1481,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               ),
             ),
           ),
-          if (!widget.isSupportChat) ...[
-            IconButton(
-              onPressed: () => _onCallTap(isVideo: false),
-              icon: Icon(Icons.call_rounded, color: cs.primary),
-              tooltip: 'Voice call',
-            ),
-            IconButton(
-              onPressed: () => _onCallTap(isVideo: true),
-              icon: Icon(Icons.videocam_rounded, color: cs.primary),
-              tooltip: 'Video call',
-            ),
-          ] else
+          if (widget.isSupportChat)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Icon(
@@ -1351,7 +1489,29 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 color: cs.primary,
                 size: 22,
               ),
+            )
+          else ...[
+            IconButton(
+              onPressed: callsDisabled
+                  ? null
+                  : () => _onCallTap(isVideo: false),
+              icon: Icon(
+                callsDisabled ? Icons.phone_disabled : Icons.call_rounded,
+                color: callsDisabled ? cs.outline : cs.primary,
+              ),
+              tooltip: callsDisabled ? 'Voice call disabled' : 'Voice call',
             ),
+            IconButton(
+              onPressed: callsDisabled ? null : () => _onCallTap(isVideo: true),
+              icon: Icon(
+                callsDisabled
+                    ? Icons.videocam_off_rounded
+                    : Icons.videocam_rounded,
+                color: callsDisabled ? cs.outline : cs.primary,
+              ),
+              tooltip: callsDisabled ? 'Video call disabled' : 'Video call',
+            ),
+          ],
           IconButton(
             onPressed: () {
               if (!widget.isSupportChat) return;
@@ -1427,13 +1587,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       return _buildEmptyState(cs);
     }
 
-    final hasSupportCard = widget.isSupportChat;
+    final hasSupportCard =
+        widget.isSupportChat && !_isReplyLocked && !_isDjTripAdminThread;
+    final warningMessages = _messages
+        .where((m) => _isWarningType(m.type))
+        .toList();
+    final supportMessages = _messages
+        .where((m) => !_isWarningType(m.type))
+        .toList();
+    final displayMessages = widget.isSupportChat
+        ? supportMessages
+        : (_isWarningInboxMode ? warningMessages : _messages);
 
     return ListView.builder(
       controller: _scrollCtrl,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
-      itemCount: _messages.length + (hasSupportCard ? 1 : 0),
+      itemCount: displayMessages.length + (hasSupportCard ? 1 : 0),
       itemBuilder: (_, i) {
         if (hasSupportCard && i == 0) {
           return Container(
@@ -1454,7 +1624,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'You are connected to DJTrip support. Calls are disabled in this chat.',
+                    'Support messages and admin warnings are separated below.',
                     style: TextStyle(
                       color: Color(0xFF1E3A8A),
                       fontSize: 12,
@@ -1468,40 +1638,95 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         }
 
         final msgIndex = hasSupportCard ? i - 1 : i;
-        final msg = _messages[msgIndex];
-        final previous = msgIndex > 0 ? _messages[msgIndex - 1] : null;
-        final showDay =
-            previous == null || !_isSameDay(previous.time, msg.time);
+        if (widget.isSupportChat && warningMessages.isNotEmpty) {
+          if (msgIndex == 0 && warningMessages.isNotEmpty) {
+            return Column(
+              children: [
+                _buildSectionPill('ADMIN WARNING'),
+                _buildRowMessage(
+                  msg: displayMessages[msgIndex],
+                  previous: null,
+                  cs: cs,
+                ),
+              ],
+            );
+          }
 
-        return Column(
-          children: [
-            if (showDay)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14, top: 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _dayLabel(msg.time),
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      letterSpacing: 1.4,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+          if (warningMessages.isNotEmpty &&
+              msgIndex == warningMessages.length) {
+            return Column(
+              children: [
+                _buildSectionPill('SUPPORT CHAT'),
+                _buildRowMessage(
+                  msg: displayMessages[msgIndex],
+                  previous: msgIndex > 0 ? displayMessages[msgIndex - 1] : null,
+                  cs: cs,
+                ),
+              ],
+            );
+          }
+        }
+
+        final msg = displayMessages[msgIndex];
+        final previous = msgIndex > 0 ? displayMessages[msgIndex - 1] : null;
+        return _buildRowMessage(msg: msg, previous: previous, cs: cs);
+      },
+    );
+  }
+
+  Widget _buildSectionPill(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE2E8F0),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            letterSpacing: 1.1,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRowMessage({
+    required _UiMessage msg,
+    required _UiMessage? previous,
+    required ColorScheme cs,
+  }) {
+    final showDay = previous == null || !_isSameDay(previous.time, msg.time);
+
+    return Column(
+      children: [
+        if (showDay)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14, top: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                _dayLabel(msg.time),
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  letterSpacing: 1.4,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            _buildMessageItem(msg, cs),
-          ],
-        );
-      },
+            ),
+          ),
+        _buildMessageItem(msg, cs),
+      ],
     );
   }
 
@@ -1510,7 +1735,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final bubbleColor = isMine ? AppColors.primary : const Color(0xFFFDFEFF);
     final textColor = isMine ? Colors.white : const Color(0xFF1E293B);
     final timeColor = cs.onSurfaceVariant.withOpacity(0.82);
-    final partnerAvatar = widget.partnerAvatar;
+    final partnerAvatarProvider = _partnerAvatarProvider();
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -1520,16 +1745,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (!isMine)
+            if (!isMine && !_isWarningType(msg.type))
               Padding(
                 padding: const EdgeInsets.only(right: 8, bottom: 18),
                 child: CircleAvatar(
                   radius: 13,
                   backgroundColor: cs.surfaceVariant,
-                  backgroundImage: partnerAvatar != null
-                      ? NetworkImage(partnerAvatar)
-                      : null,
-                  child: partnerAvatar == null
+                  backgroundImage: partnerAvatarProvider,
+                  child: partnerAvatarProvider == null
                       ? Icon(Icons.person, size: 13, color: cs.onSurfaceVariant)
                       : null,
                 ),
@@ -1618,8 +1841,89 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildMessageContent(_UiMessage msg, Color textColor, ColorScheme cs) {
+    if (_isWarningType(msg.type)) {
+      final avatarProvider = _partnerAvatarProvider();
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 11,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  backgroundImage: avatarProvider,
+                  child: avatarProvider == null
+                      ? const Icon(
+                          Icons.person,
+                          size: 12,
+                          color: Color(0xFF64748B),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 7),
+                const Text(
+                  'DJTrip Admin',
+                  style: TextStyle(
+                    color: Color(0xFF7C2D12),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _adminBadge(),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: Color(0xFFD97706),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    msg.text,
+                    style: const TextStyle(
+                      color: Color(0xFF9A3412),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_isVoiceMessage(msg)) {
+      // 🔧 DISABLE: No audio playback in support chat
+      if (widget.isSupportChat) {
+        return Text(
+          '[Audio not available in support chat]',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+          ),
+        );
+      }
+
       final isCurrent = _playingMessageId == msg.id;
+      final isPlaying = isCurrent && _voicePlayer.playing;
       final duration = isCurrent && _voiceDuration.inSeconds > 0
           ? _voiceDuration
           : Duration(seconds: msg.durationSec);
@@ -1630,8 +1934,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             )
           : 0.0;
 
+      // 🎵 ENHANCED: Better styling for audio messages
+      final playButtonColor = msg.isMine
+          ? Colors.white70
+          : const Color(0xFF1D4ED8);
+      final bgColor = msg.isMine
+          ? Colors.white.withOpacity(0.15)
+          : const Color(0xFFF3F6FB);
+
       return SizedBox(
-        width: 220,
+        width: 240,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1641,38 +1953,85 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 GestureDetector(
                   onTap: () => _toggleVoicePlayback(msg),
                   child: Container(
-                    width: 32,
-                    height: 32,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F6FB),
+                      color: bgColor,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFE0E7F3),
+                        color: msg.isMine
+                            ? Colors.white.withOpacity(0.3)
+                            : const Color(0xFFE0E7F3),
                         width: 1,
                       ),
                     ),
                     child: Icon(
-                      isCurrent && _voicePlayer.playing
+                      isPlaying
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded,
-                      color: const Color(0xFF111827),
-                      size: 18,
+                      color: playButtonColor,
+                      size: 20,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                _buildAudioWave(progress),
-                const SizedBox(width: 8),
-                Text(
-                  _formatDuration(duration.inSeconds),
-                  style: TextStyle(
-                    color: const Color(0xFF111827),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 3,
+                          backgroundColor: msg.isMine
+                              ? Colors.white.withOpacity(0.2)
+                              : const Color(0xFFE0E7F3),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            msg.isMine ? Colors.white : const Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _formatDuration(
+                              isCurrent ? _voicePosition.inSeconds : 0,
+                            ),
+                            style: TextStyle(
+                              color: msg.isMine
+                                  ? Colors.white.withOpacity(0.8)
+                                  : const Color(0xFF666F7D),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            _formatDuration(duration.inSeconds),
+                            style: TextStyle(
+                              color: msg.isMine
+                                  ? Colors.white.withOpacity(0.8)
+                                  : const Color(0xFF666F7D),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+            if (msg.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                msg.text,
+                style: TextStyle(color: textColor, fontSize: 13, height: 1.3),
+              ),
+            ],
           ],
         ),
       );
@@ -1928,6 +2287,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final canSend = text.isNotEmpty;
     final isEditing = _editingMessageId.isNotEmpty;
     final isReplacing = _replacingMessageId.isNotEmpty;
+    final isReplyLocked = _isReplyLocked;
     final composerFill = widget.isSupportChat
         ? const Color(0xFFF1F5FF)
         : const Color(0xFFE8EDF5);
@@ -1942,6 +2302,38 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (isReplyLocked)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFF59E0B).withOpacity(0.35),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFD97706),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'This conversation is locked by an administrator notice. You cannot reply here.',
+                    style: TextStyle(
+                      color: Color(0xFF9A3412),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (isEditing || isReplacing)
           Container(
             margin: const EdgeInsets.only(bottom: 6),
@@ -1995,12 +2387,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             Padding(
               padding: const EdgeInsets.only(right: 8, bottom: 2),
               child: InkWell(
-                onTap: () {
-                  if (isEditing) {
-                    _cancelEditingMessage();
-                  }
-                  _openAttachmentSheet();
-                },
+                onTap: isReplyLocked
+                    ? null
+                    : () {
+                        if (isEditing) {
+                          _cancelEditingMessage();
+                        }
+                        _openAttachmentSheet();
+                      },
                 borderRadius: BorderRadius.circular(actionButtonSize / 2),
                 child: Container(
                   width: actionButtonSize,
@@ -2042,10 +2436,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 focusNode: _msgFocus,
                 minLines: 1,
                 maxLines: 4,
+                enabled: !isReplyLocked,
                 onChanged: (_) => setState(() {}),
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: isEditing ? 'Edit message...' : 'Type a message...',
+                  hintText: isReplyLocked
+                      ? 'Replies disabled by admin notice'
+                      : (isEditing ? 'Edit message...' : 'Type a message...'),
                   hintStyle: const TextStyle(
                     color: Color(0xFF6C7C97),
                     fontSize: 15,
@@ -2087,13 +2484,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               // avec la base du champ de texte
               padding: const EdgeInsets.only(bottom: 2),
               child: InkWell(
-                onTap: canSend
+                onTap: isReplyLocked
+                    ? null
+                    : canSend
                     ? (isEditing ? _updateMessage : _send)
-                    : _startRecordingUi,
-                onLongPress: !canSend ? _startRecordingUi : null,
+                    : (widget.isSupportChat
+                          ? null // 🔧 DISABLE: No audio in support chat
+                          : _startRecordingUi),
+                onLongPress: !isReplyLocked && !canSend && !widget.isSupportChat
+                    ? _startRecordingUi
+                    : null, // 🔧 DISABLE: No audio in support chat
                 borderRadius: BorderRadius.circular(actionButtonSize / 2),
                 child: Container(
-                  // CORRECTION : Nous utilisons la même taille commune
                   width: actionButtonSize,
                   height: actionButtonSize,
                   decoration: BoxDecoration(
@@ -2101,7 +2503,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        // CORRECTION : Ombre plus discrète et plus proche du bouton
                         color: sendButtonColor.withOpacity(0.18),
                         blurRadius: 10,
                         offset: const Offset(0, 6),
@@ -2109,11 +2510,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     ],
                   ),
                   child: Icon(
-                    canSend
+                    isReplyLocked
+                        ? Icons.lock_rounded
+                        : canSend
                         ? (isEditing ? Icons.check_rounded : Icons.send_rounded)
-                        : Icons.mic_rounded,
+                        : (widget.isSupportChat
+                              ? Icons
+                                    .send_rounded // 🔧 Always show send in support
+                              : Icons.mic_rounded),
                     color: Colors.white,
-                    // CORRECTION : Icône légèrement plus petite pour un bouton plus petit
                     size: 22,
                   ),
                 ),
@@ -2126,6 +2531,49 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildBottomComposer(ColorScheme cs) {
+    if (_isReplyLocked) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border(top: BorderSide(color: AppColors.borderLight)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFF59E0B).withOpacity(0.35),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFD97706),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'This conversation is locked by an administrator notice. You cannot reply here.',
+                    style: TextStyle(
+                      color: Color(0xFF9A3412),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: BoxDecoration(

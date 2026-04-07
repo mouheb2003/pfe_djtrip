@@ -8,6 +8,10 @@ import '../models/conversation_model.dart';
 import 'api_service.dart';
 
 class MessageService {
+  static String _responseText(http.Response res) {
+    return utf8.decode(res.bodyBytes, allowMalformed: true);
+  }
+
   static dynamic _decodeFlexible(String body) {
     try {
       var decoded = jsonDecode(body);
@@ -53,6 +57,10 @@ class MessageService {
           if (decoded is List) {
             return decoded.whereType<Map<String, dynamic>>().toList();
           }
+          if (decoded is Map<String, dynamic>) {
+            final nested = _extractMapList(decoded);
+            if (nested.isNotEmpty) return nested;
+          }
         }
       }
     }
@@ -62,17 +70,31 @@ class MessageService {
   /// Get all conversations for the logged-in user.
   static Future<List<ConversationModel>> getConversations() async {
     try {
-      final res = await ApiClient.get('/messages/conversations');
+      final res = await ApiClient.get(
+        '/messages/conversations',
+        cacheFirst: false,
+      );
+      final body = _responseText(res);
       if (res.statusCode == 200) {
-        final decoded = _decodeFlexible(res.body);
+        final decoded = _decodeFlexible(body);
         final list = _extractMapList(decoded);
         if (list.isNotEmpty) {
-          return list.map(ConversationModel.fromJson).toList();
+          final conversations = <ConversationModel>[];
+          for (final item in list) {
+            try {
+              final conversation = ConversationModel.fromJson(item);
+              if (conversation.partnerId.isEmpty) continue;
+              conversations.add(conversation);
+            } catch (_) {
+              // Skip malformed entries to keep the messages screen usable.
+            }
+          }
+          return conversations;
         }
         return const [];
       }
 
-      final decoded = _safeDecodeObject(res.body);
+      final decoded = _safeDecodeObject(body);
       final message =
           (decoded['message'] as String?) ??
           'Unable to load conversations (HTTP ${res.statusCode})';
@@ -160,9 +182,13 @@ class MessageService {
     String partnerId,
   ) async {
     try {
-      final res = await ApiClient.get('/messages/with/$partnerId');
+      final res = await ApiClient.get(
+        '/messages/with/$partnerId',
+        cacheFirst: false,
+      );
+      final body = _responseText(res);
       if (res.statusCode == 200) {
-        final decoded = _decodeFlexible(res.body);
+        final decoded = _decodeFlexible(body);
         final list = _extractMapList(decoded);
         if (list.isNotEmpty) return list;
       }

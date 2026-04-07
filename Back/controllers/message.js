@@ -22,15 +22,27 @@ exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.userId;
     const currentUser = await User.findById(userId).select(
-      "archivedConversationPartners",
+      "archivedConversationPartners deletedConversationPartners",
     );
     const archivedPartners = new Set(
       (currentUser?.archivedConversationPartners || []).map(String),
     );
+    const deletedPartners = new Set(
+      (currentUser?.deletedConversationPartners || []).map(String),
+    );
 
-    // All messages involving this user, newest first
+    // All messages involving this user, newest first.
+    // Warning messages are visible only to the warned receiver.
     const messages = await Message.find({
-      $or: [{ sender_id: userId }, { receiver_id: userId }],
+      $or: [
+        {
+          sender_id: userId,
+          message_type: { $ne: "warning" },
+        },
+        {
+          receiver_id: userId,
+        },
+      ],
     }).sort({ createdAt: -1 });
 
     // Collect last message per unique partner
@@ -42,6 +54,7 @@ exports.getConversations = async (req, res) => {
           : msg.sender_id.toString();
       // Skip messages sent to yourself
       if (partnerId === userId) continue;
+      if (deletedPartners.has(partnerId)) continue;
       if (!partnerMap.has(partnerId)) {
         partnerMap.set(partnerId, msg);
       }
@@ -114,15 +127,8 @@ exports.deleteConversation = async (req, res) => {
     const userId = req.user.userId;
     const { partnerId } = req.params;
 
-    await Message.deleteMany({
-      $or: [
-        { sender_id: userId, receiver_id: partnerId },
-        { sender_id: partnerId, receiver_id: userId },
-      ],
-    });
-
     await User.findByIdAndUpdate(userId, {
-      $pull: { archivedConversationPartners: partnerId },
+      $addToSet: { deletedConversationPartners: partnerId },
     });
 
     res.status(200).json({ success: true, partnerId });
@@ -146,7 +152,11 @@ exports.getMessages = async (req, res) => {
 
     const messages = await Message.find({
       $or: [
-        { sender_id: userId, receiver_id: partnerId },
+        {
+          sender_id: userId,
+          receiver_id: partnerId,
+          message_type: { $ne: "warning" },
+        },
         { sender_id: partnerId, receiver_id: userId },
       ],
     })
@@ -177,16 +187,24 @@ exports.sendMessage = async (req, res) => {
   try {
     const senderId = req.user.userId;
     const { partnerId } = req.params;
-    const { content } = req.body;
+    const { content, message_type } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ message: "Message content is required" });
+    }
+
+    const normalizedType = message_type === "warning" ? "warning" : "text";
+
+    const senderRole = String(req.user.userType || "").toLowerCase();
+    if (normalizedType === "warning" && senderRole !== "admin") {
+      return res.status(403).json({ message: "Only admins can send warnings" });
     }
 
     const msg = new Message({
       sender_id: senderId,
       receiver_id: partnerId,
       content: content.trim(),
+      message_type: normalizedType,
     });
 
     await msg.save();

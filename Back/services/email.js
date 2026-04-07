@@ -195,6 +195,98 @@ exports.sendWelcomeEmail = async (email, fullname) => {
   }
 };
 
+// Send booking confirmation email with QR code
+exports.sendBookingConfirmationEmail = async ({
+  email,
+  fullname,
+  bookingCode,
+  activityTitle,
+  bookingDate,
+  bookingTime,
+  participants,
+  totalPrice,
+  qrDataUrl,
+}) => {
+  try {
+    const qrAttachment = (() => {
+      if (!qrDataUrl) return null;
+      const match = qrDataUrl.match(
+        /^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/i,
+      );
+      if (!match) return null;
+
+      const mimeType =
+        match[1].toLowerCase() === "image/jpg"
+          ? "image/jpeg"
+          : match[1].toLowerCase();
+      const base64Data = match[2];
+      return {
+        filename: "booking-qr.png",
+        content: Buffer.from(base64Data, "base64"),
+        cid: "booking-qr-code",
+        contentType: mimeType,
+      };
+    })();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER || "noreply@djtrip.com",
+      to: email,
+      subject: "Your booking is confirmed - DJTrip",
+      attachments: qrAttachment ? [qrAttachment] : [],
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; }
+            .container { max-width: 680px; margin: 0 auto; padding: 24px; }
+            .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+            .header { background: linear-gradient(135deg, #1d4ed8, #4f6bff); color:#fff; padding: 28px; }
+            .content { padding: 28px; }
+            .qr { text-align:center; padding: 18px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fbff; }
+            .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
+            .meta p { margin: 6px 0; }
+            .code { font-weight:700; letter-spacing:1px; color:#1d4ed8; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="card">
+              <div class="header">
+                <h1 style="margin:0; font-size:24px;">Booking Confirmed</h1>
+                <p style="margin:8px 0 0; opacity:.92;">Hello ${fullname}, your booking is approved.</p>
+              </div>
+              <div class="content">
+                <p>Keep this QR code for check-in at the activity.</p>
+                ${qrAttachment ? `<div class="qr"><img src="cid:booking-qr-code" alt="Booking QR code" width="220" height="220" /></div>` : ""}
+                <div class="meta">
+                  <p><strong>Activity:</strong> ${activityTitle}</p>
+                  <p><strong>Date:</strong> ${bookingDate}</p>
+                  <p><strong>Time:</strong> ${bookingTime}</p>
+                  <p><strong>Participants:</strong> ${participants}</p>
+                  <p><strong>Total:</strong> ${totalPrice}</p>
+                  <p><strong>Booking code:</strong> <span class="code">${bookingCode}</span></p>
+                </div>
+                <p>If you need help, open the Help Center inside the app.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nYour booking is confirmed.\n\nActivity: ${activityTitle}\nDate: ${bookingDate}\nTime: ${bookingTime}\nParticipants: ${participants}\nTotal: ${totalPrice}\nBooking code: ${bookingCode}\n\nOpen the app and present your QR code at check-in.`,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Booking confirmation email sent:", info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending booking confirmation email:", error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, code, fullname) => {
   try {
@@ -359,13 +451,13 @@ exports.sendBanNotification = async (email, fullname, reason) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1>⛔ Account Suspended</h1>
+              <h1>⛔ Account Banned</h1>
             </div>
             <div class="content">
               <h2>Hello ${fullname},</h2>
-              <p>We regret to inform you that your DJTrip account has been suspended effective immediately.</p>
+              <p>We regret to inform you that your DJTrip account has been banned effective immediately.</p>
               
-              <p><strong>Reason for suspension:</strong></p>
+              <p><strong>Reason for ban:</strong></p>
               <div class="reason-box">
                 <p>${reason}</p>
               </div>
@@ -387,7 +479,7 @@ exports.sendBanNotification = async (email, fullname, reason) => {
         </body>
         </html>
       `,
-      text: `Hello ${fullname},\n\nWe regret to inform you that your DJTrip account has been suspended effective immediately.\n\nReason for suspension:\n${reason}\n\nYou will no longer be able to access your account or use our services.\n\nIf you believe this action was taken in error, you may appeal by contacting our support team at support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
+      text: `Hello ${fullname},\n\nWe regret to inform you that your DJTrip account has been banned effective immediately.\n\nReason for ban:\n${reason}\n\nYou will no longer be able to access your account or use our services.\n\nIf you believe this action was taken in error, you may appeal by contacting our support team at support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -399,8 +491,76 @@ exports.sendBanNotification = async (email, fullname, reason) => {
   }
 };
 
+// Send account restoration email when a suspension/ban is lifted
+exports.sendAccountRestoredEmail = async (
+  email,
+  fullname,
+  previousStatus,
+  previousReason,
+) => {
+  try {
+    const normalizedStatus =
+      (previousStatus || "").toString().trim().toLowerCase() || "restricted";
+    const statusLabel = normalizedStatus === "banned" ? "ban" : "suspension";
+    const reasonText = (previousReason || "").toString().trim();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+      to: email,
+      subject: "Your DJTrip account is active again",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #1b9c53; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .reason-box { background-color: white; border: 1px solid #d1fae5; padding: 14px; margin: 16px 0; border-radius: 8px; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✅ Account Restored</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullname},</h2>
+              <p>Your DJTrip account has been reactivated. You can now sign in and use the app again.</p>
+              <p><strong>Previous restriction:</strong> ${statusLabel}</p>
+              ${reasonText ? `<div class="reason-box"><p style="margin:0;"><strong>Reason shown previously:</strong> ${reasonText}</p></div>` : ""}
+              <p>If you still face access issues, please contact support@djtrip.com.</p>
+            </div>
+            <div class="footer">
+              <p>© 2026 DJTrip. All rights reserved.</p>
+              <p>This is an automated email, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nYour DJTrip account has been reactivated. You can now sign in again.\n\nPrevious restriction: ${statusLabel}${reasonText ? `\nReason shown previously: ${reasonText}` : ""}\n\nIf you still face access issues, contact support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Account restored email sent:", info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("Error sending account restored email:", error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Send suspension notification email
-exports.sendSuspensionNotification = async (email, fullname, reason, suspendedUntil) => {
+exports.sendSuspensionNotification = async (
+  email,
+  fullname,
+  reason,
+  suspendedUntil,
+) => {
   try {
     const suspendedUntilText = suspendedUntil
       ? new Date(suspendedUntil).toLocaleString("fr-FR")

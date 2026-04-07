@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/api_client.dart';
 import '../../services/theme_service.dart';
+import '../../services/message_service.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 import 'chat_conversation_screen.dart';
+import 'help_center_screen.dart';
 import '../settings/privacy_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -36,28 +38,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return null;
   }
 
+  List<Map<String, dynamic>> _extractUsers(dynamic decoded) {
+    dynamic users;
+    if (decoded is Map<String, dynamic>) {
+      users = decoded['users'];
+      if (users == null && decoded['data'] is Map<String, dynamic>) {
+        users = (decoded['data'] as Map<String, dynamic>)['users'];
+      }
+      if (users == null && decoded['data'] is List) {
+        users = decoded['data'];
+      }
+    }
+
+    if (users is! List) return const <Map<String, dynamic>>[];
+
+    return users.map(_asMap).whereType<Map<String, dynamic>>().toList();
+  }
+
   Future<void> _openContactUsChat() async {
+    Future<bool> openFromConversationsFallback() async {
+      try {
+        final conversations = await MessageService.getConversations();
+        final adminConversation = conversations.firstWhere(
+          (c) =>
+              c.partnerType.trim().toLowerCase() == 'admin' ||
+              c.partnerName.toLowerCase().contains('admin'),
+          orElse: () => throw Exception('No admin conversation found'),
+        );
+
+        if (!mounted) return false;
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatConversationScreen(
+              partnerId: adminConversation.partnerId,
+              partnerName: adminConversation.partnerName,
+              partnerAvatar: adminConversation.partnerAvatar,
+              partnerType: adminConversation.partnerType,
+              partnerOnline: adminConversation.partnerOnline,
+              isSupportChat: true,
+            ),
+          ),
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     try {
       final response = await ApiClient.get('/users/all', auth: false);
       if (response.statusCode != 200) {
+        final opened = await openFromConversationsFallback();
+        if (opened || !mounted) return;
         throw Exception('Unable to load support contact');
       }
 
       final decoded = jsonDecode(response.body);
-      final users = decoded is Map<String, dynamic> ? decoded['users'] : null;
-      final admin = users is List
-          ? users
-                .map(_asMap)
-                .whereType<Map<String, dynamic>>()
-                .firstWhere(
-                  (user) => user['userType']?.toString() == 'Admin',
-                  orElse: () => <String, dynamic>{},
-                )
-          : <String, dynamic>{};
+      final users = _extractUsers(decoded);
+      final admin = users.firstWhere(
+        (user) => user['userType']?.toString().trim().toLowerCase() == 'admin',
+        orElse: () => <String, dynamic>{},
+      );
 
       if (!mounted) return;
 
       if (admin.isEmpty) {
+        final opened = await openFromConversationsFallback();
+        if (opened || !mounted) return;
         _showInfo('Support chat is not available right now.');
         return;
       }
@@ -76,6 +125,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } catch (_) {
       if (!mounted) return;
+      final opened = await openFromConversationsFallback();
+      if (opened || !mounted) return;
       _showInfo('Unable to open support chat right now.');
     }
   }
@@ -241,7 +292,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _SettingsTile(
               icon: Icons.help,
               label: 'Help Center',
-              onTap: () => _showInfo('Help center coming soon.'),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+              ),
             ),
             _SettingsTile(
               icon: Icons.description,

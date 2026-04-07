@@ -104,6 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacementNamed(context, route);
       } else if (result['locked'] == true) {
         _startLockoutTimer(result['remainingSeconds'] as int? ?? 60);
+      } else if (result['handledRestriction'] == true) {
+        setState(() => _errorMsg = null);
       } else {
         setState(() => _errorMsg = result['message'] as String?);
       }
@@ -127,7 +129,10 @@ class _LoginScreenState extends State<LoginScreen> {
               left: 10,
               child: IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1F2937)),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF1F2937),
+                ),
               ),
             ),
             Center(
@@ -176,10 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text(
                       'Sign in to continue your journey',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
                     ),
                     const SizedBox(height: 50),
 
@@ -204,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
-                    
+
                     // Remember Me & Forgot Password
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -216,7 +218,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 24,
                               child: Checkbox(
                                 value: _rememberMe,
-                                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                                onChanged: (v) =>
+                                    setState(() => _rememberMe = v ?? false),
                                 activeColor: AppColors.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(4),

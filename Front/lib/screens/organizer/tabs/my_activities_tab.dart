@@ -5,12 +5,19 @@ import '../../../services/activity_service.dart';
 import '../../../widgets/auto_image_carousel.dart';
 import 'requests_tab.dart';
 import '../../shared/activity_detail_screen.dart';
-
+import '../verify_booking_screen.dart';
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
 
 class MyActivitiesTab extends StatefulWidget {
-  const MyActivitiesTab({super.key});
+  final bool showRequestsDot;
+  final VoidCallback? onOpenRequests;
+
+  const MyActivitiesTab({
+    super.key,
+    this.showRequestsDot = false,
+    this.onOpenRequests,
+  });
 
   @override
   State<MyActivitiesTab> createState() => _MyActivitiesTabState();
@@ -57,6 +64,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       }
     }
   }
+
   List<String> get _tabs => ['Active (${_activeActivities.length})'];
 
   List<ActivityModel> get _currentActivities {
@@ -86,7 +94,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Activity?'),
-        content: Text('Are you sure you want to delete "${activity.titre}"? This action cannot be undone.'),
+        content: Text(
+          'Are you sure you want to delete "${activity.titre}"? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -194,22 +204,44 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
             // Header
             Container(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Spacer(),
-                  const Text(
-                    'My Activities',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const RequestsTab()),
-                      );
-                    },
-                    icon: const Icon(Icons.assignment_turned_in, size: 18),
-                    label: const Text('Requests'),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      const Text(
+                        'My Activities',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          widget.onOpenRequests?.call();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const RequestsTab(),
+                            ),
+                          );
+                        },
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            const Icon(Icons.assignment_turned_in, size: 18),
+                            if (widget.showRequestsDot)
+                              const Positioned(
+                                top: -2,
+                                right: -4,
+                                child: _RedDot(),
+                              ),
+                          ],
+                        ),
+                        label: const Text('Requests'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -308,8 +340,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                             activity: a,
                             onTap: () {
                               // 🚀 Navigate to detailed activity screen
-                              print('🚀 [DEBUG] Activity card tapped: ${a.id} - ${a.titre}');
-                              
+                              print(
+                                '🚀 [DEBUG] Activity card tapped: ${a.id} - ${a.titre}',
+                              );
+
                               // Validate activity ID
                               if (a.id == null || a.id.isEmpty) {
                                 print('❌ [DEBUG] Invalid activity ID');
@@ -323,12 +357,13 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                 }
                                 return;
                               }
-                              
+
                               try {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ActivityDetailScreen(activityId: a.id),
+                                    builder: (_) =>
+                                        ActivityDetailScreen(activityId: a.id),
                                   ),
                                 );
                               } catch (e) {
@@ -351,7 +386,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                       EditActivityScreen(activity: a),
                                 ),
                               );
-                              if (updated == true) _loadActivities(refresh: true);
+                              if (updated == true)
+                                _loadActivities(refresh: true);
                             },
                             onDeleteTap: () => _deleteActivity(a),
                           ),
@@ -402,26 +438,145 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
           ],
         ),
       ),
-      floatingActionButton: Hero(
-        tag: 'organizer_fab',
-        child: Material(
-          color: AppColors.primary,
-          shape: const CircleBorder(),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(28),
-            onTap: () async {
-              final created = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateActivityScreen()),
-              );
-              if (created == true) _loadActivities(refresh: true);
-            },
-            child: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Icon(Icons.add, color: Colors.white, size: 28),
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 278),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 0),
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width - 32,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Centered over bottom nav (Network zone)
+                Align(
+                  alignment: Alignment.center,
+                  child: Material(
+                    color: Colors.transparent,
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(28),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(28),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const VerifyBookingScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF4CAF50).withOpacity(0.45),
+                              blurRadius: 14,
+                              offset: const Offset(0, 7),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Verify Booking',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Hero(
+                    tag: 'organizer_fab',
+                    child: Material(
+                      color: AppColors.primary,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () async {
+                          final created = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CreateActivityScreen(),
+                            ),
+                          );
+                          if (created == true) _loadActivities(refresh: true);
+                        },
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primaryDark,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+}
+
+class _RedDot extends StatelessWidget {
+  const _RedDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3B30),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.2),
       ),
     );
   }
@@ -503,7 +658,9 @@ class _ActivityCard extends StatelessWidget {
             child: AutoImageCarousel(
               imageUrls: activity.photos,
               aspectRatio: 16 / 9,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
               fit: BoxFit.cover,
               showIndicators: activity.photos.length > 1,
               interval: const Duration(seconds: 3),
@@ -529,96 +686,96 @@ class _ActivityCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 12),
-                // Status label
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _getTimelineBadge().toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
+                  // Status label
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _getTimelineBadge().toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Booking status
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Booking Status',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF64748B),
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '$numReservations/$capacity places booked',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Duration and price row
-                Row(
-                  children: [
-                    // Duration
-                    Row(
+                  const SizedBox(height: 12),
+                  // Booking status
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.schedule,
-                          size: 16,
-                          color: Color(0xFF64748B),
+                        const Text(
+                          'Booking Status',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                            letterSpacing: 0.3,
+                          ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(height: 6),
                         Text(
-                          durationText,
+                          '$numReservations/$capacity places booked',
                           style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF334155),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(width: 20),
-                    // Price
-                    Text(
-                      activity.prixFormatted,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 12),
+                  // Duration and price row
+                  Row(
+                    children: [
+                      // Duration
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule,
+                            size: 16,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            durationText,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 20),
+                      // Price
+                      Text(
+                        activity.prixFormatted,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
           ), // 🚀 FIX: Close the GestureDetector for content
           // Action buttons - separate from main tap area
           Padding(

@@ -91,6 +91,10 @@ const userSchema = new mongoose.Schema(
     archivedConversationPartners: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ],
+    // Deleted chat partners hidden only for the current user
+    deletedConversationPartners: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    ],
     // 🚀 NEW: Activity specialties for organizers
     specialites_activites: [{ type: String }],
     // 🚀 NEW: Languages offered by organizers (also available for all users)

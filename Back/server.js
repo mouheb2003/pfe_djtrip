@@ -12,10 +12,13 @@ const requestLogger = require("./middleware/requestLogger");
 const requestTimeout = require("./middleware/requestTimeout");
 const sanitizeInput = require("./middleware/sanitizeInput");
 const responseNormalizer = require("./middleware/responseNormalizer");
+const systemLogStore = require("./services/systemLogStore");
 const {
   notFoundHandler,
   globalErrorHandler,
 } = require("./middleware/errorHandler");
+
+systemLogStore.installConsoleCapture();
 
 const connectDB = require("./config/db");
 connectDB();
@@ -29,7 +32,10 @@ const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
 const postRoutes = require("./routes/post");
+const systemLogRoutes = require("./routes/systemLog");
+const logRoutes = require("./routes/logRoutes");
 const Message = require("./models/message");
+const User = require("./models/user");
 const UserService = require("./services/user");
 const authMiddleware = require("./middleware/auth");
 
@@ -193,6 +199,8 @@ app.get("/", (req, res) => {
       posts: "/api/v1/posts",
       messages: "/api/v1/messages",
       lieux: "/api/v1/lieux",
+      systemLogs: "/api/v1/system-logs",
+      activityLogs: "/api/v1/logs",
     },
   });
 });
@@ -208,6 +216,8 @@ app.use("/api/v1/avis", avisRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/lieux", lieuRoutes);
+app.use("/api/v1/system-logs", systemLogRoutes);
+app.use("/api/v1/logs", logRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);
@@ -225,6 +235,8 @@ app.use("/api/avis", avisRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/lieux", lieuRoutes);
+app.use("/api/system-logs", systemLogRoutes);
+app.use("/api/logs", logRoutes);
 app.post("/api/auth/refresh", authMiddleware.refreshToken);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
@@ -240,12 +252,75 @@ io.use(async (socket, next) => {
       return next(new Error("Authentication error"));
     }
 
-    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
-      return next(new Error("Session expired"));
+    // Keep socket auth in sync with HTTP auth: if suspension has ended,
+    // auto-restore account before evaluating restriction state.
+    if (user.accountStatus === "suspended" && user.suspendedUntil) {
+      const now = new Date();
+      if (new Date(user.suspendedUntil) <= now) {
+        await User.findByIdAndUpdate(user._id, {
+          $set: {
+            accountStatus: "active",
+            suspendedUntil: null,
+            suspendReason: null,
+            suspendedAt: null,
+          },
+        });
+
+        user.accountStatus = "active";
+        user.suspendedUntil = null;
+        user.suspendReason = null;
+      }
     }
 
+    const buildRestrictionError = () => {
+      const err = new Error("Account restricted");
+      if (user.accountStatus === "suspended") {
+        const remainingSeconds = user.suspendedUntil
+          ? Math.max(
+              0,
+              Math.ceil(
+                (new Date(user.suspendedUntil).getTime() - Date.now()) / 1000,
+              ),
+            )
+          : null;
+
+        err.data = {
+          type: "suspended",
+          reason: user.suspendReason || null,
+          suspendedUntil: user.suspendedUntil || null,
+          remainingSeconds,
+          message: user.suspendReason
+            ? `Account is suspended: ${user.suspendReason}`
+            : "Account is suspended. Please contact support.",
+        };
+      } else if (user.accountStatus === "banned") {
+        err.data = {
+          type: "banned",
+          reason: user.banReason || null,
+          message: user.banReason
+            ? `Account is banned: ${user.banReason}`
+            : "Account is banned. Please contact support.",
+        };
+      } else {
+        err.data = {
+          type: "inactive",
+          message: "Account is inactive. Please contact support.",
+        };
+      }
+      return err;
+    };
+
     if (["suspended", "banned", "inactive"].includes(user.accountStatus)) {
-      return next(new Error("Account restricted"));
+      return next(buildRestrictionError());
+    }
+
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      const err = new Error("Session expired");
+      err.data = {
+        forceLogout: true,
+        message: "Session expired. Please sign in again.",
+      };
+      return next(err);
     }
 
     socket.userId = decoded.userId;
@@ -295,7 +370,6 @@ async function cleanupOrphanedUsers() {
     );
 
     // Find all users marked as online
-    const User = require("./models/user");
     const onlineUsers = await User.find({ isOnline: true })
       .select("_id email userType")
       .lean();

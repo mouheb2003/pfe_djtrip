@@ -17,4 +17,7 @@ export const END_POINT = {
   activiteById: (id) => `/api/activites/admin/${id}`,
   messageConversations: '/api/messages/conversations',
   messageWith: (partnerId) => `/api/messages/with/${partnerId}`,
+  messageById: (messageId) => `/api/messages/${messageId}`,
+  systemLogs: '/api/system-logs',
+  activityLogs: '/api/logs',
 };
