@@ -1,19 +1,226 @@
 const nodemailer = require("nodemailer");
 
-// Email transporter configuration
-// For development, you can use Gmail or other email services
-// For production, use a proper email service like SendGrid, Mailgun, etc.
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-  // Add timeout configurations
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000, // 10 seconds
-  socketTimeout: 10000, // 10 seconds
+const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
+const EMAIL_SERVICE = (
+  process.env.EMAIL_PROVIDER ||
+  process.env.EMAIL_SERVICE ||
+  "gmail"
+)
+  .trim()
+  .toLowerCase();
+const EMAIL_USER = (process.env.EMAIL_USER || "").trim();
+const EMAIL_PASSWORD = (process.env.EMAIL_PASSWORD || "").trim();
+const EMAIL_HOST = (process.env.EMAIL_HOST || "").trim();
+const EMAIL_FROM = (
+  process.env.EMAIL_FROM ||
+  EMAIL_USER ||
+  "noreply@djtrip.com"
+).trim();
+const EMAIL_FROM_NAME = (process.env.EMAIL_FROM_NAME || "DJTrip").trim();
+const EMAIL_REPLY_TO = (process.env.EMAIL_REPLY_TO || EMAIL_FROM).trim();
+const EMAIL_PORT = Number(
+  process.env.EMAIL_PORT ||
+    (EMAIL_HOST || EMAIL_SERVICE === "gmail" ? 465 : 587),
+);
+const EMAIL_SECURE =
+  process.env.EMAIL_SECURE != null
+    ? ["true", "1", "yes"].includes(process.env.EMAIL_SECURE.toLowerCase())
+    : EMAIL_PORT === 465;
+
+function maskEmail(email) {
+  if (!email || typeof email !== "string") return "-";
+
+  const [localPart, domainPart] = email.split("@");
+  if (!localPart || !domainPart) return "***";
+
+  return `${localPart.slice(0, 2)}***@${domainPart}`;
+}
+
+function emailLog(level, message, meta = {}) {
+  const payload = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
+  const line = `[email] ${message}${payload}`;
+
+  if (level === "error") return console.error(line);
+  if (level === "warn") return console.warn(line);
+  return console.info(line);
+}
+
+function getFromAddress() {
+  return EMAIL_FROM_NAME ? `${EMAIL_FROM_NAME} <${EMAIL_FROM}>` : EMAIL_FROM;
+}
+
+function buildTransportConfig() {
+  return {
+    host: EMAIL_HOST || "smtp.gmail.com",
+    port: EMAIL_PORT,
+    secure: EMAIL_SECURE,
+    requireTLS: !EMAIL_SECURE,
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASSWORD,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+  };
+}
+
+const transporter = nodemailer.createTransport(buildTransportConfig());
+
+const transporterReady = transporter
+  .verify()
+  .then(() => {
+    emailLog("info", "SMTP transporter verified", {
+      provider: EMAIL_SERVICE,
+      host:
+        EMAIL_HOST ||
+        (EMAIL_SERVICE === "gmail" ? "smtp.gmail.com" : EMAIL_SERVICE),
+      port: EMAIL_PORT,
+      secure: EMAIL_SECURE,
+      from: maskEmail(EMAIL_FROM),
+    });
+    return true;
+  })
+  .catch((error) => {
+    emailLog("error", "SMTP verification failed", {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+    });
+    return false;
+  });
+
+async function ensureTransporterReady() {
+  await transporterReady;
+}
+
+async function sendMailWithLogging(context, mailOptions) {
+  await ensureTransporterReady();
+
+  const startedAt = Date.now();
+  emailLog("info", `Sending ${context}`, {
+    to: Array.isArray(mailOptions.to)
+      ? mailOptions.to.map((value) => maskEmail(value))
+      : maskEmail(mailOptions.to),
+    subject: mailOptions.subject,
+  });
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+
+    emailLog("info", `Sent ${context}`, {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      durationMs: Date.now() - startedAt,
+    });
+
+    return info;
+  } catch (error) {
+    emailLog("error", `Failed ${context}`, {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+function getBaseMailOptions({ to, subject, html, text, attachments = [] }) {
+  return {
+    from: getFromAddress(),
+    replyTo: EMAIL_REPLY_TO,
+    to,
+    subject,
+    html,
+    text,
+    attachments,
+  };
+}
+
+emailLog("info", "Email service initialized", {
+  env: NODE_ENV,
+  provider: EMAIL_SERVICE,
+  host: EMAIL_HOST || "smtp.gmail.com",
+  port: EMAIL_PORT,
+  secure: EMAIL_SECURE,
+  from: maskEmail(EMAIL_FROM),
+  hasUser: Boolean(EMAIL_USER),
+  hasPassword: Boolean(EMAIL_PASSWORD),
 });
+
+if (NODE_ENV === "production" && (!EMAIL_USER || !EMAIL_PASSWORD)) {
+  emailLog("warn", "Production email credentials are missing or incomplete.", {
+    hasUser: Boolean(EMAIL_USER),
+    hasPassword: Boolean(EMAIL_PASSWORD),
+  });
+}
+
+if (NODE_ENV === "production" && EMAIL_SERVICE === "gmail") {
+  emailLog(
+    "warn",
+    "Gmail SMTP is less reliable for production than SendGrid, Mailgun, or Resend.",
+  );
+}
+
+exports.getEmailConfigStatus = () => ({
+  env: NODE_ENV,
+  provider: EMAIL_SERVICE,
+  host: EMAIL_HOST || "smtp.gmail.com",
+  port: EMAIL_PORT,
+  secure: EMAIL_SECURE,
+  from: getFromAddress(),
+  replyTo: EMAIL_REPLY_TO,
+  hasUser: Boolean(EMAIL_USER),
+  hasPassword: Boolean(EMAIL_PASSWORD),
+});
+
+exports.verifyEmailTransport = async () => {
+  await ensureTransporterReady();
+  return {
+    success: true,
+    config: exports.getEmailConfigStatus(),
+  };
+};
+
+exports.sendTestEmail = async ({
+  to,
+  fullname = "Test User",
+  subject,
+  message,
+}) => {
+  if (!to) {
+    throw new Error("Recipient email is required for the test email");
+  }
+
+  const mailOptions = getBaseMailOptions({
+    to,
+    subject: subject || "DJTrip email test",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+      </head>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 16px;">
+          <h1 style="margin-top: 0; color: #ff6b1a;">DJTrip email test</h1>
+          <p>Hello ${fullname},</p>
+          <p>${message || "This is a test email sent from the DJTrip production backend."}</p>
+          <p style="color: #6b7280; font-size: 13px;">If you received this email, the SMTP configuration is working.</p>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Hello ${fullname},\n\n${message || "This is a test email sent from the DJTrip production backend."}\n\nIf you received this email, the SMTP configuration is working.`,
+  });
+
+  const info = await sendMailWithLogging("test email", mailOptions);
+  return { success: true, messageId: info.messageId };
+};
 
 // Generate a 6-digit verification code
 exports.generateVerificationCode = () => {
@@ -23,8 +230,7 @@ exports.generateVerificationCode = () => {
 // Send verification email
 exports.sendVerificationEmail = async (email, code, fullname) => {
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Verify your email - DJTrip",
       html: `
@@ -114,13 +320,15 @@ exports.sendVerificationEmail = async (email, code, fullname) => {
         </html>
       `,
       text: `Hello ${fullname},\n\nThank you for registering with DJTrip. Your verification code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you didn't create an account with DJTrip, please ignore this email.\n\n© 2026 DJTrip. All rights reserved.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Verification email sent:", info.messageId);
+    const info = await sendMailWithLogging("verification email", mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending verification email:", error);
+    emailLog("error", "Error sending verification email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -128,8 +336,7 @@ exports.sendVerificationEmail = async (email, code, fullname) => {
 // Send welcome email after verification
 exports.sendWelcomeEmail = async (email, fullname) => {
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@djtrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Welcome to DJTrip!",
       html: `
@@ -184,13 +391,15 @@ exports.sendWelcomeEmail = async (email, fullname) => {
         </body>
         </html>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Welcome email sent:", info.messageId);
+    const info = await sendMailWithLogging("welcome email", mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending welcome email:", error);
+    emailLog("error", "Error sending welcome email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -228,8 +437,7 @@ exports.sendBookingConfirmationEmail = async ({
       };
     })();
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@djtrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Your booking is confirmed - DJTrip",
       attachments: qrAttachment ? [qrAttachment] : [],
@@ -276,13 +484,18 @@ exports.sendBookingConfirmationEmail = async ({
         </html>
       `,
       text: `Hello ${fullname},\n\nYour booking is confirmed.\n\nActivity: ${activityTitle}\nDate: ${bookingDate}\nTime: ${bookingTime}\nParticipants: ${participants}\nTotal: ${totalPrice}\nBooking code: ${bookingCode}\n\nOpen the app and present your QR code at check-in.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Booking confirmation email sent:", info.messageId);
+    const info = await sendMailWithLogging(
+      "booking confirmation email",
+      mailOptions,
+    );
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending booking confirmation email:", error);
+    emailLog("error", "Error sending booking confirmation email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -290,8 +503,7 @@ exports.sendBookingConfirmationEmail = async ({
 // Send password reset email
 exports.sendPasswordResetEmail = async (email, code, fullname) => {
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Reset Your Password - DJTrip",
       html: `
@@ -379,13 +591,15 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
         </html>
       `,
       text: `Hello ${fullname},\n\nWe received a request to reset your DJTrip password.\n\nYour password reset code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request a password reset, please ignore this email.\n\n© 2026 DJTrip. All rights reserved.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Password reset email sent:", info.messageId);
+    const info = await sendMailWithLogging("password reset email", mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending password reset email:", error);
+    emailLog("error", "Error sending password reset email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -393,8 +607,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
 // Send ban notification email
 exports.sendBanNotification = async (email, fullname, reason) => {
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Account Banned - DJTrip",
       html: `
@@ -480,13 +693,18 @@ exports.sendBanNotification = async (email, fullname, reason) => {
         </html>
       `,
       text: `Hello ${fullname},\n\nWe regret to inform you that your DJTrip account has been banned effective immediately.\n\nReason for ban:\n${reason}\n\nYou will no longer be able to access your account or use our services.\n\nIf you believe this action was taken in error, you may appeal by contacting our support team at support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Ban notification email sent:", info.messageId);
+    const info = await sendMailWithLogging(
+      "ban notification email",
+      mailOptions,
+    );
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending ban notification email:", error);
+    emailLog("error", "Error sending ban notification email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -504,8 +722,7 @@ exports.sendAccountRestoredEmail = async (
     const statusLabel = normalizedStatus === "banned" ? "ban" : "suspension";
     const reasonText = (previousReason || "").toString().trim();
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Your DJTrip account is active again",
       html: `
@@ -543,13 +760,18 @@ exports.sendAccountRestoredEmail = async (
         </html>
       `,
       text: `Hello ${fullname},\n\nYour DJTrip account has been reactivated. You can now sign in again.\n\nPrevious restriction: ${statusLabel}${reasonText ? `\nReason shown previously: ${reasonText}` : ""}\n\nIf you still face access issues, contact support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Account restored email sent:", info.messageId);
+    const info = await sendMailWithLogging(
+      "account restored email",
+      mailOptions,
+    );
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending account restored email:", error);
+    emailLog("error", "Error sending account restored email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };
@@ -566,8 +788,7 @@ exports.sendSuspensionNotification = async (
       ? new Date(suspendedUntil).toLocaleString("fr-FR")
       : "jusqu'à nouvelle décision";
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@DJTrip.com",
+    const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Account Suspended - DJTrip",
       html: `
@@ -609,13 +830,18 @@ exports.sendSuspensionNotification = async (
         </html>
       `,
       text: `Hello ${fullname},\n\nYour DJTrip account has been suspended.\n\nSuspension reason: ${reason}\nSuspended until: ${suspendedUntilText}\n\nIf you need help, contact support@djtrip.com.\n\n© 2026 DJTrip. All rights reserved.`,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Suspension notification email sent:", info.messageId);
+    const info = await sendMailWithLogging(
+      "suspension notification email",
+      mailOptions,
+    );
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Error sending suspension notification email:", error);
+    emailLog("error", "Error sending suspension notification email", {
+      message: error.message,
+      code: error.code,
+    });
     return { success: false, error: error.message };
   }
 };

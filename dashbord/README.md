@@ -26,6 +26,12 @@ yarn build
 npm run build
 ```
 
+## Backend mode switch
+
+The dashboard supports a built-in Dev/Prod backend switch from the Settings drawer.
+
+- Guide: [BACKEND_MODE_GUIDE.md](BACKEND_MODE_GUIDE.md)
+
 ## Mock server
 
 By default we provide demo data from : `https://api-dev-minimal-[version].vercel.app`

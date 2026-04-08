@@ -38,6 +38,7 @@ const logRoutes = require("./routes/logRoutes");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
+const emailService = require("./services/email");
 const authMiddleware = require("./middleware/auth");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -222,6 +223,68 @@ app.use("/api/v1/logs", logRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);
+
+// ─── Email Debug Endpoints ──────────────────────────────────────────────────
+app.get(
+  "/api/v1/debug/email/health",
+  authMiddleware.verifyToken,
+  authMiddleware.verifyAdmin,
+  async (req, res) => {
+    try {
+      const health = await emailService.verifyEmailTransport();
+
+      res.status(200).json({
+        success: true,
+        message: "Email transport is ready",
+        ...health,
+      });
+    } catch (error) {
+      res.status(503).json({
+        success: false,
+        message: "Email transport verification failed",
+        error: error.message,
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/v1/debug/email/test",
+  authMiddleware.verifyToken,
+  authMiddleware.verifyAdmin,
+  async (req, res) => {
+    try {
+      const { to, fullname, subject, message } = req.body || {};
+      const recipient = (to || req.user?.email || "").trim();
+
+      if (!recipient) {
+        return res.status(400).json({
+          success: false,
+          message: "Recipient email is required",
+        });
+      }
+
+      const result = await emailService.sendTestEmail({
+        to: recipient,
+        fullname: fullname || req.user?.email || "DJTrip Admin",
+        subject,
+        message,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Test email sent",
+        ...result,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to send test email",
+        error: error.message,
+      });
+    }
+  },
+);
 
 // ─── Backward compatible aliases (pre-v1) ────────────────────────────────────
 // Some clients/tools still call routes under `/api/*` instead of `/api/v1/*`.

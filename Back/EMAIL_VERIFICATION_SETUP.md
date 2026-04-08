@@ -11,6 +11,11 @@
    EMAIL_SERVICE=gmail
    EMAIL_USER=votre-email@gmail.com
    EMAIL_PASSWORD=votre-mot-de-passe-application
+   EMAIL_FROM=DJTrip <votre-email@gmail.com>
+   EMAIL_REPLY_TO=support@djtrip.com
+   EMAIL_HOST=smtp.gmail.com
+   EMAIL_PORT=465
+   EMAIL_SECURE=true
    ```
 
 3. **Obtenir un mot de passe d'application Gmail:**
@@ -27,6 +32,18 @@ Pour un environnement de production, utilisez un service professionnel:
 - **Mailgun**
 - **AWS SES**
 - **Postmark**
+
+Sur Render, gardez aussi ces points en tête:
+
+- `NODE_ENV=production`
+- `PORT` est fourni par Render, ne le forcez pas
+- Vérifiez que `EMAIL_USER` et `EMAIL_PASSWORD` sont bien ajoutés dans les variables d'environnement du service
+- Si vous utilisez Gmail, préférez `host=smtp.gmail.com`, `port=465`, `secure=true`
+
+Endpoint de test:
+
+- `GET /api/v1/debug/email/health` pour vérifier le transport SMTP
+- `POST /api/v1/debug/email/test` pour envoyer un email de test
 
 Modifiez `services/email.js` pour configurer le transporteur selon le service choisi.
 

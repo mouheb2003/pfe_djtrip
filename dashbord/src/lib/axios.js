@@ -1,10 +1,16 @@
 import axios from 'axios';
 
 import { CONFIG } from 'src/global-config';
+import { getBackendUrl } from 'src/services/backend';
 
 // ----------------------------------------------------------------------
 
 const axiosInstance = axios.create({ baseURL: CONFIG.serverUrl });
+
+axiosInstance.interceptors.request.use((config) => {
+  config.baseURL = getBackendUrl();
+  return config;
+});
 
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -31,28 +37,28 @@ export const fetcher = async (args) => {
 // ----------------------------------------------------------------------
 
 export const endpoints = {
-  chat: '/api/chat',
-  kanban: '/api/kanban',
-  calendar: '/api/calendar',
+  chat: '/api/v1/chat',
+  kanban: '/api/v1/kanban',
+  calendar: '/api/v1/calendar',
   auth: {
-    me: '/api/users/me',
-    signIn: '/api/users/signin',
-    signUp: '/api/users/signup',
+    me: '/api/v1/users/me',
+    signIn: '/api/v1/users/signin',
+    signUp: '/api/v1/users/signup',
   },
   mail: {
-    list: '/api/mail/list',
-    details: '/api/mail/details',
-    labels: '/api/mail/labels',
+    list: '/api/v1/mail/list',
+    details: '/api/v1/mail/details',
+    labels: '/api/v1/mail/labels',
   },
   post: {
-    list: '/api/post/list',
-    details: '/api/post/details',
-    latest: '/api/post/latest',
-    search: '/api/post/search',
+    list: '/api/v1/post/list',
+    details: '/api/v1/post/details',
+    latest: '/api/v1/post/latest',
+    search: '/api/v1/post/search',
   },
   product: {
-    list: '/api/product/list',
-    details: '/api/product/details',
-    search: '/api/product/search',
+    list: '/api/v1/product/list',
+    details: '/api/v1/product/details',
+    search: '/api/v1/product/search',
   },
 };

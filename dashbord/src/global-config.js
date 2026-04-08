@@ -1,4 +1,5 @@
 import { paths } from 'src/routes/paths';
+import { getBackendMode, getBackendUrl } from 'src/services/backend';
 
 import packageJson from '../package.json';
 
@@ -7,8 +8,11 @@ import packageJson from '../package.json';
 export const CONFIG = {
   appName: 'Minimal UI',
   appVersion: packageJson.version,
-  serverUrl:
-    import.meta.env.VITE_SERVER_URL ?? import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000',
+  backend: {
+    mode: getBackendMode(),
+    url: getBackendUrl(),
+  },
+  serverUrl: getBackendUrl(),
   assetsDir: import.meta.env.VITE_ASSETS_DIR ?? '',
   /**
    * Auth

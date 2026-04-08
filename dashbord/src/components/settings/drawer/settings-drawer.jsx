@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { hasKeys, varAlpha } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
@@ -21,11 +21,14 @@ import { FullScreenButton } from './fullscreen-button';
 import { FontSizeOptions, FontFamilyOptions } from './font-options';
 import { useSettingsContext } from '../context/use-settings-context';
 import { NavColorOptions, NavLayoutOptions } from './nav-layout-option';
+import { OptionButton } from './styles';
+import { BACKEND_MODES, getBackendMode, setBackendMode } from 'src/services/backend';
 
 // ----------------------------------------------------------------------
 
 export function SettingsDrawer({ sx, defaultSettings }) {
   const settings = useSettingsContext();
+  const [backendMode, setBackendModeState] = useState(getBackendMode());
 
   const { mode, setMode, systemMode } = useColorScheme();
 
@@ -35,6 +38,10 @@ export function SettingsDrawer({ sx, defaultSettings }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, systemMode]);
+
+  useEffect(() => {
+    setBackendModeState(getBackendMode());
+  }, [settings.openDrawer]);
 
   // Visible options by default settings
   const isFontFamilyVisible = hasKeys(defaultSettings, ['fontFamily']);
@@ -180,6 +187,47 @@ export function SettingsDrawer({ sx, defaultSettings }) {
     </LargeBlock>
   );
 
+  const renderBackend = () => (
+    <LargeBlock title="Backend" tooltip="Switch between local and hosted API">
+      <Box
+        sx={{
+          gap: 1.25,
+          mt: 1.5,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+        }}
+      >
+        {BACKEND_MODES.map((option) => (
+          <OptionButton
+            key={option.value}
+            selected={backendMode === option.value}
+            onClick={() => {
+              const nextMode = setBackendMode(option.value);
+              setBackendModeState(nextMode);
+            }}
+            sx={{ p: 0 }}
+          >
+            <Box
+              sx={{
+                width: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 0.25,
+                p: 1.5,
+              }}
+            >
+              <Typography variant="subtitle2">{option.label}</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {option.description}
+              </Typography>
+            </Box>
+          </OptionButton>
+        ))}
+      </Box>
+    </LargeBlock>
+  );
+
   const renderFont = () => (
     <LargeBlock title="Font" sx={{ gap: 2.5 }}>
       {isFontFamilyVisible && (
@@ -261,6 +309,7 @@ export function SettingsDrawer({ sx, defaultSettings }) {
           </Box>
 
           {(isNavColorVisible || isNavLayoutVisible) && renderNav()}
+          {renderBackend()}
           {isPrimaryColorVisible && renderPresets()}
           {(isFontFamilyVisible || isFontSizeVisible) && renderFont()}
         </Box>
