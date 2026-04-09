@@ -35,6 +35,9 @@ const lieuRoutes = require("./routes/lieu");
 const postRoutes = require("./routes/post");
 const systemLogRoutes = require("./routes/systemLog");
 const logRoutes = require("./routes/logRoutes");
+const appealRoutes = require("./routes/appeal");
+const notificationRoutes = require("./routes/notification");
+const onboardingRoutes = require("./routes/onboarding");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
@@ -203,6 +206,8 @@ app.get("/", (req, res) => {
       lieux: "/api/v1/lieux",
       systemLogs: "/api/v1/system-logs",
       activityLogs: "/api/v1/logs",
+      appeals: "/api/v1/appeals",
+      notifications: "/api/v1/notifications",
     },
   });
 });
@@ -220,6 +225,9 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/lieux", lieuRoutes);
 app.use("/api/v1/system-logs", systemLogRoutes);
 app.use("/api/v1/logs", logRoutes);
+app.use("/api/v1/appeals", appealRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/onboarding", onboardingRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);

@@ -1,15 +1,20 @@
+import { useState } from 'react';
 import { varAlpha } from 'minimal-shared/utils';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
+import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Drawer from '@mui/material/Drawer';
 import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
 import { usePathname } from 'src/routes/hooks';
@@ -23,6 +28,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { AnimateBorder } from 'src/components/animate';
 
 import { useMockedUser } from 'src/auth/hooks';
+import { getBackendMode, setBackendMode, BACKEND_MODES } from 'src/services/backend';
 
 import { UpgradeBlock } from './nav-upgrade';
 import { AccountButton } from './account-button';
@@ -36,6 +42,16 @@ export function AccountDrawer({ data = [], sx, ...other }) {
   const { user } = useMockedUser();
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
+
+  const [backendMode, setBackendModeState] = useState(getBackendMode());
+
+  const handleChangeBackendMode = (event, newMode) => {
+    if (newMode !== null) {
+      setBackendMode(newMode);
+      setBackendModeState(newMode);
+      window.location.reload();
+    }
+  };
 
   const renderAvatar = () => (
     <AnimateBorder
@@ -153,6 +169,30 @@ export function AccountDrawer({ data = [], sx, ...other }) {
             </Typography>
           </Box>
 
+          <Box sx={{ p: 2.5 }}>
+            <Typography variant="overline" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
+              Backend Mode
+            </Typography>
+            <ToggleButtonGroup
+              fullWidth
+              color="primary"
+              value={backendMode}
+              exclusive
+              onChange={handleChangeBackendMode}
+              size="small"
+            >
+              {BACKEND_MODES.map((mode) => (
+                <ToggleButton key={mode.value} value={mode.value} sx={{ typography: 'caption' }}>
+                  {mode.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>
+              {BACKEND_MODES.find((m) => m.value === backendMode)?.description}
+            </Typography>
+          </Box>
+
+          <Divider sx={{ borderStyle: 'dashed' }} />
 
           {renderList()}
 

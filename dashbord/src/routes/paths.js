@@ -51,6 +51,9 @@ export const paths = {
     publications: `${ROOTS.DASHBOARD}/publications`,
     messages: `${ROOTS.DASHBOARD}/messages`,
     logs: `${ROOTS.DASHBOARD}/logs`,
+    notifications: `${ROOTS.DASHBOARD}/notifications`,
+    appeals: `${ROOTS.DASHBOARD}/appeals`,
+    approvals: `${ROOTS.DASHBOARD}/approvals`,
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
     group: {

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../theme/app_theme.dart';
+import 'dart:ui' as ui;
+
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
-import 'package:intl/intl.dart';
+import '../../theme/app_theme.dart';
+
+enum _VerifyView { scanner, manualEntry, manualSuccess, manualFailure }
 
 class VerifyBookingScreen extends StatefulWidget {
   const VerifyBookingScreen({super.key});
@@ -13,13 +17,13 @@ class VerifyBookingScreen extends StatefulWidget {
 }
 
 class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
-  late MobileScannerController _scannerController;
-  bool _isScannerInitialized = false;
+  late final MobileScannerController _scannerController;
+  final TextEditingController _manualCodeController = TextEditingController();
+
   bool _isLoading = false;
-  String? _scannedCode;
-  InscriptionModel? _verifiedBooking;
-  VerificationStatus? _verificationStatus;
-  String? _statusMessage;
+  String? _lastScannedCode;
+  _VerifyView _view = _VerifyView.scanner;
+  _VerificationPayload? _lastResult;
 
   @override
   void initState() {
@@ -29,543 +33,1130 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
       autoStart: true,
       torchEnabled: false,
     );
-    // Scanner is initialized on widget build
-    setState(() => _isScannerInitialized = true);
-  }
-
-  Future<void> _verifyBooking(String bookingCode) async {
-    if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-      _scannedCode = bookingCode;
-      _verificationStatus = null;
-      _statusMessage = null;
-    });
-
-    try {
-      // Fetch booking by ID from QR code
-      final booking = await InscriptionService.getInscriptionById(bookingCode);
-
-      if (booking == null) {
-        setState(() {
-          _verificationStatus = VerificationStatus.invalid;
-          _statusMessage = 'Booking not found';
-        });
-        return;
-      }
-
-      // Check if booking is already used/verified
-      if (booking.statut == 'verifie' || booking.statut == 'verified') {
-        setState(() {
-          _verifiedBooking = booking;
-          _verificationStatus = VerificationStatus.alreadyUsed;
-          _statusMessage = 'This booking has already been verified';
-        });
-        return;
-      }
-
-      // Check if booking is approved
-      if (booking.statut != 'approuvee' && booking.statut != 'approved') {
-        setState(() {
-          _verifiedBooking = booking;
-          _verificationStatus = VerificationStatus.notApproved;
-          _statusMessage =
-              'Booking must be approved first. Current status: ${booking.statut}';
-        });
-        return;
-      }
-
-      // Booking is valid and can be verified
-      setState(() {
-        _verifiedBooking = booking;
-        _verificationStatus = VerificationStatus.valid;
-        _statusMessage = 'Booking verified successfully!';
-      });
-    } catch (e) {
-      setState(() {
-        _verificationStatus = VerificationStatus.error;
-        _statusMessage = 'Error verifying booking: $e';
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _confirmVerification() async {
-    if (_verifiedBooking == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      // Call API to mark booking as verified
-      final success = await InscriptionService.verifyInscription(
-        _verifiedBooking!.id,
-      );
-
-      if (success) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 28),
-                  SizedBox(width: 12),
-                  Text('Verification Confirmed'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Booking Details:',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    'Tourist:',
-                    _verifiedBooking?.touriste?['fullname'] ?? 'N/A',
-                  ),
-                  _buildDetailRow(
-                    'Participants:',
-                    '${_verifiedBooking?.nombreParticipants ?? 0}',
-                  ),
-                  _buildDetailRow(
-                    'Total Price:',
-                    '\$${_verifiedBooking?.prixTotal?.toStringAsFixed(2) ?? '0.00'}',
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _resetScanner();
-                  },
-                  child: const Text('Scan Another'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Done'),
-                ),
-              ],
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to confirm verification'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.grey),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _resetScanner() {
-    setState(() {
-      _scannedCode = null;
-      _verifiedBooking = null;
-      _verificationStatus = null;
-      _statusMessage = null;
-    });
-    _scannerController.start();
   }
 
   @override
   void dispose() {
+    _manualCodeController.dispose();
     _scannerController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Verify Booking'),
-        elevation: 0,
-        backgroundColor: AppColors.primary,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _verificationStatus == null
-          ? _buildScannerView()
-          : _buildVerificationResultView(),
+  Map<String, dynamic>? _asMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return null;
+  }
+
+  VerificationStatus _statusFromCode(String? code) {
+    switch ((code ?? '').toUpperCase()) {
+      case 'INVALID_TOKEN':
+      case 'BOOKING_NOT_FOUND':
+        return VerificationStatus.invalid;
+      case 'NOT_CONFIRMED':
+        return VerificationStatus.notApproved;
+      case 'ALREADY_USED':
+        return VerificationStatus.alreadyUsed;
+      case 'ACTIVITY_EXPIRED':
+        return VerificationStatus.expired;
+      case 'UNAUTHORIZED':
+        return VerificationStatus.unauthorized;
+      default:
+        return VerificationStatus.error;
+    }
+  }
+
+  Future<_VerificationPayload> _validateBooking(String rawInput) async {
+    final input = rawInput.trim();
+
+    Map<String, dynamic> result = await InscriptionService.validateQrBooking(
+      input,
+    );
+
+    // Manual users can type plain booking IDs. Retry once with QR prefix.
+    if (result['success'] != true &&
+        (result['code']?.toString().toUpperCase() == 'BOOKING_NOT_FOUND') &&
+        !input.startsWith('DJTRIP_BOOKING:')) {
+      result = await InscriptionService.validateQrBooking(
+        'DJTRIP_BOOKING:$input',
+      );
+    }
+
+    final bookingData = _asMap(result['booking']);
+    final booking = bookingData != null
+        ? InscriptionModel.fromJson(bookingData)
+        : null;
+    final status = result['success'] == true && booking != null
+        ? VerificationStatus.valid
+        : _statusFromCode(result['code']?.toString());
+
+    return _VerificationPayload(
+      status: status,
+      message: result['message']?.toString() ?? 'Verification failed',
+      booking: booking,
+      scannedCode: input,
+      source: VerificationSource.scanner,
     );
   }
 
-  Widget _buildScannerView() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Scanner
-          Container(
-            height: 400,
-            margin: const EdgeInsets.all(16),
+  Future<void> _onScanned(String code) async {
+    if (_isLoading || code.trim().isEmpty) return;
+    if (_lastScannedCode == code) return;
+
+    setState(() {
+      _lastScannedCode = code;
+    });
+
+    await _scannerController.stop();
+    await _verifyAndRoute(code, source: VerificationSource.scanner);
+  }
+
+  Future<void> _verifyAndRoute(
+    String input, {
+    required VerificationSource source,
+  }) async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final payload = await _validateBooking(input);
+      final resolved = payload.copyWith(source: source);
+      if (!mounted) return;
+
+      setState(() {
+        _lastResult = resolved;
+      });
+
+      if (source == VerificationSource.scanner) {
+        await _showScannerOutcomeSheet(resolved);
+      } else {
+        await _scannerController.stop();
+        setState(() {
+          _view = resolved.status == VerificationStatus.valid
+              ? _VerifyView.manualSuccess
+              : _VerifyView.manualFailure;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final fallback = _VerificationPayload(
+        status: VerificationStatus.error,
+        message: 'Error verifying booking: $e',
+        booking: null,
+        scannedCode: input,
+        source: source,
+      );
+      setState(() {
+        _lastResult = fallback;
+        if (source == VerificationSource.manual) {
+          _view = _VerifyView.manualFailure;
+        }
+      });
+      if (source == VerificationSource.scanner) {
+        await _showScannerOutcomeSheet(fallback);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _showScannerOutcomeSheet(_VerificationPayload payload) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF8FAFF),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+          child: SafeArea(
+            top: false,
+            child: payload.status == VerificationStatus.valid
+                ? _buildScannerValidSheet(payload)
+                : _buildScannerInvalidSheet(payload),
+          ),
+        );
+      },
+    );
+
+    if (_view == _VerifyView.scanner) {
+      _resetScanner();
+    }
+  }
+
+  Widget _buildScannerValidSheet(_VerificationPayload payload) {
+    final booking = payload.booking;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 42,
+            height: 4,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary, width: 2),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: _isScannerInitialized
-                  ? MobileScanner(
-                      controller: _scannerController,
-                      onDetect: (capture) {
-                        final List<Barcode> barcodes = capture.barcodes;
-                        for (final barcode in barcodes) {
-                          if (barcode.rawValue != null &&
-                              barcode.rawValue != _scannedCode) {
-                            _verifyBooking(barcode.rawValue!);
-                            _scannerController.stop();
-                            break;
-                          }
-                        }
-                      },
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.camera_alt,
-                            size: 48,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Initializing camera...',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              color: const Color(0xFFDDE3F6),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-
-          // Instructions
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFD1FAE5),
+              ),
+              child: const Icon(Icons.check_rounded, color: Color(0xFF059669)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Ticket Valid',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF1F2A44),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          payload.message,
+          style: const TextStyle(color: Color(0xFF667085), fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        _detailsPanel(booking, payload.scannedCode),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: (_isLoading || booking == null)
+                ? null
+                : () async {
+                    await _confirmAdmission(booking, fromManualFlow: false);
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
+                  },
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.verified_rounded),
+            label: const Text('Confirm Admission'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2C67F2),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _openManualEntry();
+            },
+            icon: const Icon(Icons.keyboard_alt_outlined),
+            label: const Text('Manual Entry'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF2C67F2),
+              side: const BorderSide(color: Color(0xFFD5DDF5)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScannerInvalidSheet(_VerificationPayload payload) {
+    final booking = payload.booking;
+    final title = _invalidTitle(payload.status);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDDE3F6),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: Container(
+            width: 94,
+            height: 94,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFEE2E2),
+              border: Border.all(color: const Color(0xFFFECACA), width: 2),
+            ),
+            child: const Icon(
+              Icons.close_rounded,
+              color: Color(0xFFDC2626),
+              size: 48,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFFEF4444),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            payload.message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF667085),
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _detailsPanel(booking, payload.scannedCode),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _openManualEntry(prefill: payload.scannedCode);
+            },
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try Again'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _resetScanner();
+            },
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            label: const Text('Back to Scanner'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF475467),
+              side: const BorderSide(color: Color(0xFFD5DDF5)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _detailsPanel(InscriptionModel? booking, String code) {
+    final guestName =
+        booking?.touriste?['fullname']?.toString() ?? 'Unknown Guest';
+    final activity = booking?.activite?['titre']?.toString() ?? 'N/A';
+    final participants = booking?.nombreParticipants ?? 0;
+    final bookingId = booking != null
+        ? '#DJT-${booking.id.substring(booking.id.length - 5).toUpperCase()}'
+        : code;
+    final usedAt = booking?.qrUsedAt;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE4E7EC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _kv('Guest Name', guestName),
+          _kv('Booking ID', bookingId),
+          _kv('Activity', activity),
+          _kv(
+            'Participants',
+            participants > 0 ? '$participants Guests' : 'N/A',
+          ),
+          if (usedAt != null)
+            _kv('Last Scan', DateFormat('dd/MM HH:mm').format(usedAt)),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              k,
+              style: const TextStyle(
+                color: Color(0xFF98A2B3),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              v,
+              style: const TextStyle(
+                color: Color(0xFF1D2939),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmAdmission(
+    InscriptionModel booking, {
+    required bool fromManualFlow,
+  }) async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final success = await InscriptionService.markInscriptionAsUsed(
+        booking.id,
+      );
+      if (!mounted) return;
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to confirm admission'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final updated = InscriptionModel.fromJson({
+        ...booking.toJson(),
+        'statut': 'verifie',
+        'qr_used_at': DateTime.now().toIso8601String(),
+      });
+
+      setState(() {
+        _lastResult = _lastResult?.copyWith(
+          booking: updated,
+          status: VerificationStatus.valid,
+          message: 'Identity confirmed. Guest can enter now.',
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admission confirmed successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      if (fromManualFlow) {
+        _resetScanner();
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _openManualEntry({String? prefill}) {
+    setState(() {
+      _view = _VerifyView.manualEntry;
+      if (prefill != null && prefill.trim().isNotEmpty) {
+        _manualCodeController.text = prefill.trim();
+      }
+    });
+    _scannerController.stop();
+  }
+
+  void _resetScanner() {
+    setState(() {
+      _view = _VerifyView.scanner;
+      _lastScannedCode = null;
+      _lastResult = null;
+      _manualCodeController.clear();
+    });
+    _scannerController.start();
+  }
+
+  String _invalidTitle(VerificationStatus status) {
+    switch (status) {
+      case VerificationStatus.alreadyUsed:
+        return 'Invalid Ticket';
+      case VerificationStatus.notApproved:
+        return 'Not Confirmed';
+      case VerificationStatus.expired:
+        return 'Activity Expired';
+      case VerificationStatus.unauthorized:
+        return 'Access Denied';
+      case VerificationStatus.invalid:
+      case VerificationStatus.error:
+      default:
+        return 'Verification Failed';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_view) {
+      case _VerifyView.manualEntry:
+        return _buildManualEntryScreen();
+      case _VerifyView.manualSuccess:
+        return _buildManualResultScreen(success: true);
+      case _VerifyView.manualFailure:
+        return _buildManualResultScreen(success: false);
+      case _VerifyView.scanner:
+      default:
+        return _buildScannerScreen();
+    }
+  }
+
+  Widget _buildScannerScreen() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F4FF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Verify Ticket',
+          style: TextStyle(
+            color: Color(0xFF1D2939),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Row(
+                MobileScanner(
+                  controller: _scannerController,
+                  onDetect: (capture) {
+                    for (final barcode in capture.barcodes) {
+                      final code = barcode.rawValue;
+                      if (code != null && code.trim().isNotEmpty) {
+                        _onScanned(code);
+                        break;
+                      }
+                    }
+                  },
+                ),
+                Container(color: Colors.black.withOpacity(0.38)),
+                Column(
                   children: [
-                    Icon(Icons.info, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
+                    const Spacer(flex: 2),
+                    Center(
+                      child: Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: const Color(0xFF1D4ED8),
+                            width: 6,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.qr_code_scanner_rounded,
+                            color: Color(0xFF9FB6FF),
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
                     const Text(
-                      'Scanning Instructions',
+                      'Align QR code within the frame',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
                         fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _scannerGlassButton(
+                          icon: _scannerController.torchEnabled
+                              ? Icons.flash_on_rounded
+                              : Icons.flash_off_rounded,
+                          onTap: _toggleTorch,
+                        ),
+                        const SizedBox(width: 14),
+                        _scannerGlassButton(
+                          icon: Icons.cameraswitch_rounded,
+                          onTap: _switchCamera,
+                        ),
+                      ],
+                    ),
+                    const Spacer(flex: 2),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xE6F4F5FF),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.55),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.18),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Event Entry',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF414672),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _lastResult?.booking?.activite?['titre']
+                                        ?.toString() ??
+                                    'Ready for ticket scan',
+                                style: const TextStyle(
+                                  color: Color(0xFF7078A4),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () {
+                                          final last = _lastScannedCode;
+                                          if (last == null ||
+                                              last.trim().isEmpty) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Scan a ticket first or use Manual Entry',
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          _verifyAndRoute(
+                                            last,
+                                            source: VerificationSource.scanner,
+                                          );
+                                        },
+                                  icon: const Icon(Icons.verified_rounded),
+                                  label: const Text('Verify Ticket'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1F4FE0),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(22),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 54,
+                                child: OutlinedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _openManualEntry(),
+                                  icon: const Icon(
+                                    Icons.keyboard_alt_outlined,
+                                    color: Color(0xFF2F63E9),
+                                  ),
+                                  label: const Text('Manual Entry'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF4F5B84),
+                                    side: const BorderSide(
+                                      color: Color(0xFFC3CAE6),
+                                    ),
+                                    backgroundColor: const Color(0xFFE5E8F5),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  '• Point camera at QR code on booking ticket\n'
-                  '• Wait for automatic scanning\n'
-                  '• Booking will be verified instantly\n'
-                  '• Ensure good lighting condition',
-                  style: TextStyle(fontSize: 12, height: 1.6),
-                ),
               ],
             ),
           ),
-
-          // Torch Control
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton.outlined(
-                  icon: Icon(
-                    _scannerController.torchEnabled
-                        ? Icons.flash_on
-                        : Icons.flash_off,
-                  ),
-                  onPressed: () async {
-                    await _scannerController.toggleTorch();
-                    setState(() {});
-                  },
-                ),
-                const SizedBox(width: 16),
-                IconButton.outlined(
-                  icon: const Icon(Icons.qr_code_2),
-                  onPressed: () {
-                    // Could open gallery or manual entry
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildVerificationResultView() {
-    Color statusColor = Colors.grey;
-    IconData statusIcon = Icons.help;
-    String statusTitle = 'Unknown';
-
-    switch (_verificationStatus) {
-      case VerificationStatus.valid:
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        statusTitle = 'Valid Booking';
-        break;
-      case VerificationStatus.invalid:
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
-        statusTitle = 'Invalid Booking';
-        break;
-      case VerificationStatus.alreadyUsed:
-        statusColor = Colors.orange;
-        statusIcon = Icons.warning;
-        statusTitle = 'Already Used';
-        break;
-      case VerificationStatus.notApproved:
-        statusColor = Colors.amber;
-        statusIcon = Icons.schedule;
-        statusTitle = 'Not Approved';
-        break;
-      case VerificationStatus.error:
-        statusColor = Colors.red;
-        statusIcon = Icons.error;
-        statusTitle = 'Verification Error';
-        break;
-      default:
-        break;
-    }
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Status Header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              border: Border(bottom: BorderSide(color: statusColor, width: 2)),
+  Widget _scannerGlassButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.18),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.35)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            child: Column(
-              children: [
-                Icon(statusIcon, size: 64, color: statusColor),
-                const SizedBox(height: 16),
-                Text(
-                  statusTitle,
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 24),
+      ),
+    );
+  }
+
+  Widget _buildManualEntryScreen() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F5FF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          onPressed: _resetScanner,
+        ),
+        title: const Text(
+          'Verify Booking',
+          style: TextStyle(
+            color: Color(0xFF1D2939),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const SizedBox(height: 22),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EDFF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.confirmation_num_rounded,
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Enter Ticket Details',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1D2939),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Enter Booking ID or Ticket Code to verify manually.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF667085), height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'BOOKING ID OR TICKET CODE',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
+                    color: AppColors.primary.withOpacity(0.85),
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _statusMessage ?? '',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _manualCodeController,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  hintText: '#DJT-98421 or DJTRIP_BOOKING:...',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
+                  ),
+                  suffixIcon: const Icon(Icons.edit_outlined),
                 ),
-              ],
-            ),
-          ),
-
-          // Booking Details (if available)
-          if (_verifiedBooking != null)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          final input = _manualCodeController.text.trim();
+                          if (input.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please enter booking ID or ticket code',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          await _verifyAndRoute(
+                            input,
+                            source: VerificationSource.manual,
+                          );
+                        },
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.verified_rounded),
+                  label: const Text('Verify Ticket'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C67F2),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _resetScanner,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Switch to Scanner'),
+              ),
+              const Spacer(),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Booking Information',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDetailField('Booking ID:', _scannedCode ?? 'N/A'),
-                      _buildDetailField(
-                        'Tourist:',
-                        _verifiedBooking?.touriste?['fullname'] ?? 'N/A',
-                      ),
-                      _buildDetailField(
-                        'Activity:',
-                        _verifiedBooking?.activite?['titre'] ?? 'N/A',
-                      ),
-                      _buildDetailField(
-                        'Participants:',
-                        '${_verifiedBooking?.nombreParticipants ?? 0} people',
-                      ),
-                      _buildDetailField(
-                        'Total Price:',
-                        '\$${_verifiedBooking?.prixTotal?.toStringAsFixed(2) ?? '0.00'}',
-                      ),
-                      _buildDetailField(
-                        'Booking Date:',
-                        _verifiedBooking?.dateDemande != null
-                            ? DateFormat(
-                                'dd MMM yyyy, hh:mm a',
-                              ).format(_verifiedBooking!.dateDemande!)
-                            : 'N/A',
-                      ),
-                      _buildDetailField(
-                        'Status:',
-                        _verifiedBooking?.statut ?? 'N/A',
-                        statusColor: statusColor,
-                      ),
-                    ],
+                child: const Text(
+                  'Codes are case-sensitive. Include the DJTRIP_BOOKING prefix when available.',
+                  style: TextStyle(
+                    color: Color(0xFF475467),
+                    fontSize: 12,
+                    height: 1.35,
                   ),
                 ),
               ),
-            ),
-
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (_verificationStatus == VerificationStatus.valid)
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _confirmVerification,
-                    icon: _isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).primaryColor,
-                              ),
-                            ),
-                          )
-                        : const Icon(Icons.check),
-                    label: Text(
-                      _isLoading ? 'Confirming...' : 'Confirm Verification',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _resetScanner,
-                  icon: const Icon(Icons.qr_code_2),
-                  label: const Text('Scan Another Booking'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  label: const Text('Close'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailField(String label, String value, {Color? statusColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
-            ),
+  Widget _buildManualResultScreen({required bool success}) {
+    final payload = _lastResult;
+    final booking = payload?.booking;
+
+    final title = success ? 'Identity Confirmed' : 'Verification Failed';
+    final subtitle = success
+        ? 'The guest is cleared for immediate entry.'
+        : (payload?.message ?? 'Ticket code is invalid or already used.');
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF344054)),
+          onPressed: _openManualEntry,
+        ),
+        title: Text(
+          success ? 'VerificationSuccess' : 'Verification Result',
+          style: const TextStyle(
+            color: Color(0xFF1D2939),
+            fontWeight: FontWeight.w700,
           ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w500, color: statusColor),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+        ),
       ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 128,
+                  height: 128,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: success
+                        ? const Color(0xFFD1FAE5)
+                        : const Color(0xFFFEE2E2),
+                  ),
+                  child: Icon(
+                    success ? Icons.check_rounded : Icons.close_rounded,
+                    size: 64,
+                    color: success
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFDC2626),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: success
+                      ? const Color(0xFF111827)
+                      : const Color(0xFF1F2937),
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF667085),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _detailsPanel(booking, payload?.scannedCode ?? '-'),
+              const SizedBox(height: 20),
+              if (success)
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: (_isLoading || booking == null)
+                        ? null
+                        : () =>
+                              _confirmAdmission(booking, fromManualFlow: true),
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.verified_user_rounded),
+                    label: const Text('Confirm Admission'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F6FFF),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        _openManualEntry(prefill: payload?.scannedCode),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFCF002E),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _resetScanner,
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Back to Scanner'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475467),
+                    side: const BorderSide(color: Color(0xFFD0D5DD)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _switchCamera() async {
+    try {
+      await _scannerController.switchCamera();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _scannerController.toggleTorch();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+}
+
+class _VerificationPayload {
+  final VerificationStatus status;
+  final String message;
+  final InscriptionModel? booking;
+  final String scannedCode;
+  final VerificationSource source;
+
+  const _VerificationPayload({
+    required this.status,
+    required this.message,
+    required this.booking,
+    required this.scannedCode,
+    required this.source,
+  });
+
+  _VerificationPayload copyWith({
+    VerificationStatus? status,
+    String? message,
+    InscriptionModel? booking,
+    String? scannedCode,
+    VerificationSource? source,
+  }) {
+    return _VerificationPayload(
+      status: status ?? this.status,
+      message: message ?? this.message,
+      booking: booking ?? this.booking,
+      scannedCode: scannedCode ?? this.scannedCode,
+      source: source ?? this.source,
     );
   }
 }
 
-enum VerificationStatus { valid, invalid, alreadyUsed, notApproved, error }
+enum VerificationSource { scanner, manual }
+
+enum VerificationStatus {
+  valid,
+  invalid,
+  alreadyUsed,
+  notApproved,
+  expired,
+  unauthorized,
+  error,
+}

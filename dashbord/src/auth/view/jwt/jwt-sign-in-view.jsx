@@ -129,7 +129,7 @@ export function JwtSignInView() {
       <FormHead title="Admin sign in" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
       <Alert severity="info" sx={{ mb: 3 }}>
-        Connexion reservee a l administrateur. Identifiant: admin, mot de passe: admin.
+        Accès administrateur requis. Identifiant: admin, mot de passe: admin.
       </Alert>
 
       {!!errorMessage && (

@@ -405,8 +405,36 @@ class InscriptionService {
     }
   }
 
-  /// Organizer: verify/confirm booking (mark as used)
-  static Future<bool> verifyInscription(String inscriptionId) async {
+  /// Organizer: validate a scanned QR code and get the booking state.
+  static Future<Map<String, dynamic>> validateQrBooking(String qrData) async {
+    try {
+      final res = await ApiClient.post('/inscriptions/qr/validate', {
+        'qrData': qrData,
+      });
+      final body = _decodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'statusCode': res.statusCode,
+        'message': body['message'] ?? 'Unknown validation result',
+        'code': body['code'],
+        'booking': body['booking'],
+        'canMarkUsed': body['canMarkUsed'] == true,
+        'tokenType': body['tokenType'],
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'statusCode': 500,
+        'message': e.toString(),
+        'code': 'ERROR',
+        'booking': null,
+        'canMarkUsed': false,
+      };
+    }
+  }
+
+  /// Organizer: mark a validated booking as used.
+  static Future<bool> markInscriptionAsUsed(String inscriptionId) async {
     try {
       final res = await ApiClient.put('/inscriptions/$inscriptionId/verifier', {
         'statut': 'verifie',
@@ -416,5 +444,10 @@ class InscriptionService {
       print('Error verifying inscription: $e');
       return false;
     }
+  }
+
+  /// Backward-compatible alias.
+  static Future<bool> verifyInscription(String inscriptionId) async {
+    return markInscriptionAsUsed(inscriptionId);
   }
 }

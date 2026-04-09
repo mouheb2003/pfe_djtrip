@@ -170,7 +170,9 @@ class ActivityService {
   }
 
   /// Organizer: fetch their own active activities.
-  static Future<List<ActivityModel>> getMyActivities({bool refresh = false}) async {
+  static Future<List<ActivityModel>> getMyActivities({
+    bool refresh = false,
+  }) async {
     try {
       final res = await ApiClient.get(
         '/activites/my-activities',
@@ -179,16 +181,19 @@ class ActivityService {
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
         final list = _safeMapList(body['activities'] ?? body['activites']);
-        
+
         // Map safely to avoid one bad activity crashing the whole list
-        return list.map((item) {
-          try {
-            return ActivityModel.fromJson(item);
-          } catch (e) {
-            print('❌ Skipping corrupted activity in list: $e');
-            return null;
-          }
-        }).whereType<ActivityModel>().toList();
+        return list
+            .map((item) {
+              try {
+                return ActivityModel.fromJson(item);
+              } catch (e) {
+                print('❌ Skipping corrupted activity in list: $e');
+                return null;
+              }
+            })
+            .whereType<ActivityModel>()
+            .toList();
       }
       return [];
     } catch (e) {
@@ -197,12 +202,54 @@ class ActivityService {
     }
   }
 
-  /// Organizer: fetch archived activities.
-  static Future<List<ActivityModel>> getArchivedActivities({bool refresh = false}) async {
+  /// Organizer: fetch all their activities (active + archived).
+  static Future<List<ActivityModel>> getAllMyActivities({
+    bool refresh = false,
+  }) async {
     try {
+      final res = await ApiClient.get(
+        '/activites/my-activities?include_archived=true',
+        cacheFirst: !refresh,
+      );
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activities'] ?? body['activites']);
+
+        // Map safely to avoid one bad activity crashing the whole list
+        return list
+            .map((item) {
+              try {
+                return ActivityModel.fromJson(item);
+              } catch (e) {
+                print('❌ Skipping corrupted activity in list: $e');
+                return null;
+              }
+            })
+            .whereType<ActivityModel>()
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ getAllMyActivities failed: $e');
+      return [];
+    }
+  }
+
+  /// Organizer: fetch archived activities.
+  static Future<List<ActivityModel>> getArchivedActivities({
+    bool refresh = false,
+    int? offset,
+    int? limit,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+      if (offset != null) queryParams['offset'] = offset.toString();
+      if (limit != null) queryParams['limit'] = limit.toString();
+      
       final res = await ApiClient.get(
         '/activites/archived',
         cacheFirst: !refresh,
+        query: queryParams.isNotEmpty ? queryParams : null,
       );
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
@@ -235,8 +282,15 @@ class ActivityService {
   }
 
   /// Delete an activity (organizer only).
-  static Future<bool> deleteActivity(String id) async {
-    final res = await ApiClient.delete('/activites/$id');
+  static Future<bool> deleteActivity(
+    String id, {
+    String? cancellationMessage,
+  }) async {
+    final reason = cancellationMessage?.trim();
+    final query = reason != null && reason.isNotEmpty
+        ? '?cancel_message=${Uri.encodeComponent(reason)}'
+        : '';
+    final res = await ApiClient.delete('/activites/$id$query');
     return res.statusCode == 200;
   }
 
@@ -324,7 +378,9 @@ class ActivityService {
 
       if (res.statusCode == 201 || res.statusCode == 200) {
         // Invalidate cache for my-activities and all activities
-        await ApiService.instance.invalidateByPrefix('GET:${ApiClient.baseUrl}/activites');
+        await ApiService.instance.invalidateByPrefix(
+          'GET:${ApiClient.baseUrl}/activites',
+        );
         return {'success': true, 'activite': body['activite'] ?? body};
       }
       return {
@@ -421,7 +477,9 @@ class ActivityService {
 
       if (res.statusCode == 200) {
         // Invalidate cache for my-activities and all activities
-        await ApiService.instance.invalidateByPrefix('GET:${ApiClient.baseUrl}/activites');
+        await ApiService.instance.invalidateByPrefix(
+          'GET:${ApiClient.baseUrl}/activites',
+        );
         return {'success': true, 'activite': body['activite'] ?? body};
       }
       return {
@@ -431,5 +489,77 @@ class ActivityService {
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
+  }
+
+  // Get all activities
+  static Future<List<ActivityModel>> getAllActivities() async {
+    try {
+      final response = await ApiClient.get('/activites');
+      
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> activitiesData = body['activites'] ?? body['data'] ?? [];
+        
+        return activitiesData.map((activityData) => ActivityModel.fromJson(activityData)).toList();
+      } else {
+        throw Exception('Failed to load activities: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading activities: $e');
+      
+      // Return mock data for development
+      return _getMockActivities();
+    }
+  }
+
+  // Mock data for development
+  static List<ActivityModel> _getMockActivities() {
+    return [
+      ActivityModel(
+        id: '1',
+        titre: 'Paris City Tour',
+        description: 'Discover the beautiful city of Paris with our guided tour.',
+        typeActivite: 'Tour',
+        categorie: 'Cultural',
+        lieu: 'Paris, France',
+        duree: 3.0,
+        prix: 45.0,
+        capaciteMax: 20,
+        photos: ['https://picsum.photos/seed/paris1/400/300'],
+        noteMoyenne: 4.5,
+        nombreAvis: 128,
+        createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+      ActivityModel(
+        id: '2',
+        titre: 'Wine Tasting Experience',
+        description: 'Enjoy a delightful wine tasting session in Bordeaux.',
+        typeActivite: 'Experience',
+        categorie: 'Food & Wine',
+        lieu: 'Bordeaux, France',
+        duree: 2.5,
+        prix: 75.0,
+        capaciteMax: 15,
+        photos: ['https://picsum.photos/seed/wine1/400/300'],
+        noteMoyenne: 4.8,
+        nombreAvis: 89,
+        createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      ),
+      ActivityModel(
+        id: '3',
+        titre: 'Mountain Hiking Adventure',
+        description: 'Explore the stunning mountain trails with experienced guides.',
+        typeActivite: 'Adventure',
+        categorie: 'Nature',
+        lieu: 'Alps, France',
+        duree: 6.0,
+        prix: 120.0,
+        capaciteMax: 12,
+        photos: ['https://picsum.photos/seed/mountain1/400/300'],
+        noteMoyenne: 4.7,
+        nombreAvis: 56,
+        createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      ),
+    ];
   }
 }

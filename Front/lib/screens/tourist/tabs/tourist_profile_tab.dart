@@ -7,14 +7,18 @@ import 'package:share_plus/share_plus.dart';
 import '../../../models/user_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/inscription_service.dart';
+import '../../../services/lieu_service.dart';
 import '../../../services/post_service.dart';
 import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/auto_image_carousel.dart';
+import '../../../widgets/guide_arrow_button.dart';
 import '../../shared/edit_profile_screen.dart';
 import '../../shared/settings_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
+import '../place_detail_screen.dart';
+import '../all_places_simple.dart';
 import 'screen_network.dart';
 
 class TouristProfileTab extends StatefulWidget {
@@ -34,6 +38,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
   bool _isLoadingAll = false;
 
   List<Map<String, dynamic>> _myPosts = [];
+List<Map<String, dynamic>> _featuredPlaces = [];
 
   @override
   void initState() {
@@ -79,6 +84,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         PostService.getMyPosts(),
         AuthService.getUser(),
         PostService.getFeedPosts(),
+        LieuService.getFeaturedLieuxAsMap(),
       ]);
 
       if (!mounted) return;
@@ -90,6 +96,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       final stats = _toMap(results[1]);
       final myPostsFromApi = _toMapList(results[2]);
       final feedPosts = _toMapList(results[4]);
+      final featuredPlaces = _toMapList(results[5]);
       final currentUserId = (userData?['_id'] ?? '').toString();
 
       final myPosts =
@@ -120,6 +127,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
             user?.nombreAvis ??
             0;
         _myPosts = myPosts;
+        _featuredPlaces = featuredPlaces.take(6).toList();
       });
     } catch (e, st) {
       if (kDebugMode) {
@@ -132,6 +140,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         _postsCount = 0;
         _reviewsCount = 0;
         _myPosts = <Map<String, dynamic>>[];
+        _featuredPlaces = <Map<String, dynamic>>[];
       });
     } finally {
       _isLoadingAll = false;
@@ -642,6 +651,24 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
           },
         );
       },
+    );
+  }
+
+  void _navigateToPlaceDetails(Map<String, dynamic> place) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PlaceDetailScreen(place: place),
+      ),
+    );
+  }
+
+  void _navigateToAllPlaces() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AllPlacesSimpleScreen(),
+      ),
     );
   }
 
@@ -1353,8 +1380,82 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     );
                   },
                 ),
-            ],
-          ),
+            const SizedBox(height: 20),
+            // Featured Places Section
+            const Text(
+              'FEATURED PLACES',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                const Text(
+                  'Discover Amazing Places',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1B2458),
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _navigateToAllPlaces,
+                  child: const Text(
+                    'SEE ALL',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (_featuredPlaces.isEmpty)
+              Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No featured places available',
+                    style: TextStyle(
+                      color: AppColors.textGrey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: _featuredPlaces.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.8,
+                ),
+                itemBuilder: (context, index) {
+                  final place = _featuredPlaces[index];
+                  return _PlaceCard(
+                    place: place,
+                    onTap: () => _navigateToPlaceDetails(place),
+                  );
+                },
+              ),
+          ],
+        ),
         ),
       ),
     );
@@ -1712,6 +1813,180 @@ class _EditBadge extends StatelessWidget {
         ],
       ),
       child: const Icon(Icons.edit, size: 15, color: Colors.white),
+    );
+  }
+}
+
+class _PlaceCard extends StatelessWidget {
+  final Map<String, dynamic> place;
+  final VoidCallback onTap;
+
+  const _PlaceCard({
+    required this.place,
+    required this.onTap,
+  });
+
+  String get _name => (place['name'] ?? place['title'] ?? place['titre'] ?? 'Place').toString();
+  String get _image => (place['main_image'] ?? place['image'] ?? place['imagePortrait'] ?? '').toString();
+  String get _city => (place['city'] ?? '').toString();
+  String get _rating => (place['rating'] ?? '0.0').toString();
+  bool get _isFeatured => place['is_featured'] == true || place['top_destination'] == true || place['topDestination'] == true;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image section
+            Expanded(
+              flex: 3,
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      color: const Color(0xFFF5F5F5),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: _image.isNotEmpty
+                          ? Image.network(
+                              _image,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFE8E8F6),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.location_on,
+                                    size: 40,
+                                    color: Color(0xFFB8BCC8),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFFE8E8F6),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.location_on,
+                                  size: 40,
+                                  color: Color(0xFFB8BCC8),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Featured badge
+                  if (_isFeatured)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'TOP',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Guide arrow
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: GuideArrowButton(onTap: onTap),
+                  ),
+                ],
+              ),
+            ),
+            // Info section
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _city.isNotEmpty ? _city : 'Location',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          size: 12,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _rating,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

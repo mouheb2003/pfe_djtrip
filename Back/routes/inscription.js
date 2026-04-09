@@ -124,12 +124,51 @@ router.get(
 // ========================================
 
 // Verify/confirm booking via QR code scan (Organizer only)
+router.post(
+  "/qr/validate",
+  verifyToken,
+  verifyOrganisator,
+  invalidateCache(["inscriptions", "activites"]),
+  inscriptionController.validateQrBooking,
+);
+
 router.put(
   "/:inscriptionId/verifier",
   verifyToken,
   verifyOrganisator,
   invalidateCache(["inscriptions", "activites"]),
   inscriptionController.verifyInscription,
+);
+
+// ========================================
+// REVIEW REMINDER ROUTES
+// ========================================
+
+// POST /inscriptions/:id/dismiss-review-reminder
+// Dismiss review reminder and schedule next reminder
+router.post(
+  "/:id/dismiss-review-reminder",
+  verifyToken,
+  verifyTouriste,
+  inscriptionController.dismissReviewReminder,
+);
+
+// GET /inscriptions/:id/review-reminder
+// Get review reminder data for a booking
+router.get(
+  "/:id/review-reminder",
+  verifyToken,
+  verifyTouriste,
+  inscriptionController.getReviewReminderData,
+);
+
+// GET /inscriptions/review-reminders
+// Get all bookings that should show review reminder for authenticated user
+router.get(
+  "/review-reminders",
+  verifyToken,
+  verifyTouriste,
+  inscriptionController.getPendingReviewReminders,
 );
 
 module.exports = wrapRouter(router);

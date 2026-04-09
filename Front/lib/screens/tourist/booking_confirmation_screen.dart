@@ -38,12 +38,32 @@ class BookingConfirmationScreen extends StatelessWidget {
     return computed;
   }
 
+  List<String> _activityPhotoUrls(Map<String, dynamic>? activity) {
+    final raw = activity?['photos'];
+    if (raw is! List) return const [];
+
+    final urls = <String>[];
+    for (final item in raw) {
+      final value = item?.toString().trim() ?? '';
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        urls.add(value);
+      }
+    }
+    return urls.toSet().toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final activity = inscription.activite;
-    final photos = activity?['photos'] as List? ?? [];
-    final imageUrl = photos.isNotEmpty ? photos.first as String : '';
+    final photoUrls = _activityPhotoUrls(activity);
     final title = activity?['titre'] as String? ?? 'Activity';
+    final location =
+        (activity?['lieu'] ??
+                activity?['localisation'] ??
+                activity?['adresse'] ??
+                activity?['address'])
+            ?.toString() ??
+        'Location not specified';
     final date =
         DateTime.tryParse(
           (activity?['date_debut'] ?? activity?['dateDebut'] ?? '').toString(),
@@ -57,6 +77,7 @@ class BookingConfirmationScreen extends StatelessWidget {
     final isPending = status == 'en_attente';
     final isRejected = status == 'refusee';
     final isCancelled = status == 'annulee';
+    final isUsed = status == 'verifie';
     final totalPrice = _bookingTotal(activity);
     final qrData = inscription.qrData;
     final hasQrData = qrData.trim().isNotEmpty;
@@ -71,6 +92,8 @@ class BookingConfirmationScreen extends StatelessWidget {
         ? 'Waiting for approval'
         : isRejected
         ? 'Booking Rejected'
+        : isUsed
+        ? 'Checked In'
         : 'Booking Cancelled';
     final subtitle = isApproved
         ? 'Your booking is approved. Keep your QR code for check-in.'
@@ -78,6 +101,8 @@ class BookingConfirmationScreen extends StatelessWidget {
         ? 'Your request has been sent. The organizer will review it soon.'
         : isRejected
         ? 'The organizer rejected this booking request.'
+        : isUsed
+        ? 'This booking has already been checked in at the venue.'
         : 'This booking was cancelled.';
 
     return Scaffold(
@@ -90,7 +115,7 @@ class BookingConfirmationScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Confirmation',
+          'Booking Details',
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontSize: 18,
@@ -126,6 +151,8 @@ class BookingConfirmationScreen extends StatelessWidget {
                           ? Icons.check
                           : isPending
                           ? Icons.hourglass_top_rounded
+                          : isUsed
+                          ? Icons.verified_rounded
                           : Icons.info_outline_rounded,
                       color: Colors.white,
                       size: 32,
@@ -153,31 +180,18 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              // Top media section: show QR for approved bookings, otherwise activity image
+              // Top media section: show QR for approved bookings, otherwise activity carousel
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: SizedBox(
                   height: 200,
                   width: double.infinity,
-                  child: showQr && hasQrData
-                      ? Container(
-                          color: Colors.white,
-                          alignment: Alignment.center,
-                          child: QrImageView(
-                            data: qrData,
-                            version: QrVersions.auto,
-                            size: 170,
-                            backgroundColor: Colors.white,
-                            padding: const EdgeInsets.all(10),
-                          ),
-                        )
-                      : imageUrl.isNotEmpty
-                      ? Image.network(imageUrl, fit: BoxFit.cover)
-                      : Container(
-                          color: Colors.grey[200],
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.image_outlined, size: 42),
-                        ),
+                  child: _BookingMediaPanel(
+                    showQr: showQr,
+                    hasQrData: hasQrData,
+                    qrData: qrData,
+                    photoUrls: photoUrls,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -234,6 +248,12 @@ class BookingConfirmationScreen extends StatelessWidget {
                       icon: Icons.surfing,
                       label: 'ACTIVITY',
                       value: title,
+                    ),
+                    const SizedBox(height: 16),
+                    _SummaryRow(
+                      icon: Icons.location_on_outlined,
+                      label: 'LOCATION',
+                      value: location,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -330,6 +350,34 @@ class BookingConfirmationScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+              ],
+              if (isUsed) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDFA),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF99F6E4)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.verified_rounded, color: Color(0xFF0F766E)),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'This booking has already been checked in successfully.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF115E59),
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
               if (showReason) ...[
                 Container(
@@ -482,6 +530,110 @@ class _SummaryRow extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _BookingMediaPanel extends StatefulWidget {
+  final bool showQr;
+  final bool hasQrData;
+  final String qrData;
+  final List<String> photoUrls;
+
+  const _BookingMediaPanel({
+    required this.showQr,
+    required this.hasQrData,
+    required this.qrData,
+    required this.photoUrls,
+  });
+
+  @override
+  State<_BookingMediaPanel> createState() => _BookingMediaPanelState();
+}
+
+class _BookingMediaPanelState extends State<_BookingMediaPanel> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.showQr && widget.hasQrData) {
+      return Container(
+        color: Colors.white,
+        alignment: Alignment.center,
+        child: QrImageView(
+          data: widget.qrData,
+          version: QrVersions.auto,
+          size: 170,
+          backgroundColor: Colors.white,
+          padding: const EdgeInsets.all(10),
+        ),
+      );
+    }
+
+    if (widget.photoUrls.isEmpty) {
+      return Container(
+        color: const Color(0xFFF1F5F9),
+        alignment: Alignment.center,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.qr_code_2_outlined, size: 34, color: Color(0xFF94A3B8)),
+            SizedBox(height: 10),
+            Text(
+              'No QR code found',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        PageView.builder(
+          itemCount: widget.photoUrls.length,
+          onPageChanged: (value) => setState(() => _index = value),
+          itemBuilder: (context, index) {
+            return Image.network(
+              widget.photoUrls[index],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFE2E8F0),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.broken_image_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 36,
+                ),
+              ),
+            );
+          },
+        ),
+        if (widget.photoUrls.length > 1)
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_index + 1}/${widget.photoUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

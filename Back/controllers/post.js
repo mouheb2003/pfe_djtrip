@@ -34,6 +34,17 @@ const mapComment = (c) => {
         }
       : { _id: author };
 
+  // Get reaction counts
+  const reactionCounts = {};
+  let totalReactions = 0;
+  
+  if (c.reactions && typeof c.reactions.entries === 'function') {
+    for (const [type, data] of c.reactions.entries()) {
+      reactionCounts[type] = data.count || 0;
+      totalReactions += data.count || 0;
+    }
+  }
+
   return {
     _id: c._id,
     content: c.content,
@@ -41,6 +52,8 @@ const mapComment = (c) => {
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
     author_id: authorObj,
+    total_reactions: totalReactions,
+    reaction_counts: reactionCounts,
   };
 };
 
@@ -335,6 +348,131 @@ exports.addPostComment = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error adding comment",
+      error: error.message,
+    });
+  }
+};
+
+// React to a comment
+exports.reactToComment = async (req, res) => {
+  try {
+    const userId = String(req.user.userId || "");
+    const { postId, commentId } = req.params;
+    const { reactionType } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    // Valid reaction types
+    const validReactions = ["like", "love", "laugh", "wow", "sad", "angry"];
+    if (!validReactions.includes(reactionType)) {
+      return res.status(400).json({ message: "Invalid reaction type" });
+    }
+
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Find the comment
+    const comment = (post.comments || []).find(
+      (c) => String(c._id) === String(commentId) && c.is_active !== false
+    );
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Initialize reactions if not exists
+    if (!comment.reactions) {
+      comment.reactions = new Map();
+    }
+
+    // Remove user from all reactions first (toggle behavior)
+    let userReaction = null;
+    for (const [type, reactionData] of comment.reactions.entries()) {
+      const userIndex = reactionData.users.findIndex(
+        (u) => String(u) === userId
+      );
+      if (userIndex !== -1) {
+        reactionData.users.splice(userIndex, 1);
+        reactionData.count = Math.max(0, reactionData.count - 1);
+        if (type === reactionType) {
+          // User is removing their reaction
+          userReaction = null;
+        }
+      }
+    }
+
+    // Add new reaction if not removing
+    if (userReaction !== null) {
+      if (!comment.reactions.has(reactionType)) {
+        comment.reactions.set(reactionType, { users: [], count: 0 });
+      }
+      const reaction = comment.reactions.get(reactionType);
+      reaction.users.push(userId);
+      reaction.count += 1;
+      userReaction = reactionType;
+    }
+
+    // Recalculate total reactions
+    comment.total_reactions = Array.from(comment.reactions.values())
+      .reduce((sum, r) => sum + r.count, 0);
+
+    await post.save();
+
+    // Get reaction counts for response
+    const reactionCounts = {};
+    for (const [type, data] of comment.reactions.entries()) {
+      reactionCounts[type] = data.count;
+    }
+
+    return res.status(200).json({
+      message: "Reaction updated successfully",
+      userReaction,
+      totalReactions: comment.total_reactions,
+      reactionCounts,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error reacting to comment",
+      error: error.message,
+    });
+  }
+};
+
+// Get comment reactions
+exports.getCommentReactions = async (req, res) => {
+  try {
+    const { postId, commentId } = req.params;
+
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const comment = (post.comments || []).find(
+      (c) => String(c._id) === String(commentId) && c.is_active !== false
+    );
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Get reaction counts
+    const reactionCounts = {};
+    for (const [type, data] of comment.reactions?.entries() || []) {
+      reactionCounts[type] = data.count;
+    }
+
+    return res.status(200).json({
+      totalReactions: comment.total_reactions || 0,
+      reactionCounts,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error getting comment reactions",
       error: error.message,
     });
   }

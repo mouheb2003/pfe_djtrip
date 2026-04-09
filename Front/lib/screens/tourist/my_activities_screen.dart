@@ -7,6 +7,7 @@ import '../../models/inscription_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/inscription_service.dart';
 import '../../theme/app_theme.dart';
+import 'booking_detail_screen.dart';
 import '../shared/activity_detail_screen.dart';
 import 'booking_selection_screen.dart';
 import 'bookings_screen.dart';
@@ -28,6 +29,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     'past': [],
   };
   Map<String, String> _bookingStatusByActivityId = {};
+  Map<String, InscriptionModel> _latestBookingByActivityId = {};
 
   @override
   void initState() {
@@ -118,6 +120,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       setState(() {
         _buckets = filteredResult;
         _bookingStatusByActivityId = bookingStatus;
+        _latestBookingByActivityId = _buildLatestBookingMap(bookings);
         _isLoading = false;
         _errorMessage = null;
       });
@@ -143,6 +146,14 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   Map<String, String> _buildBookingStatusMap(
+    Map<String, List<InscriptionModel>> bookings,
+  ) {
+    final latestByActivityId = _buildLatestBookingMap(bookings);
+
+    return latestByActivityId.map((key, value) => MapEntry(key, value.statut));
+  }
+
+  Map<String, InscriptionModel> _buildLatestBookingMap(
     Map<String, List<InscriptionModel>> bookings,
   ) {
     final latestByActivityId = <String, InscriptionModel>{};
@@ -178,7 +189,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     collect(bookings['confirmed'] ?? const <InscriptionModel>[]);
     collect(bookings['cancelled'] ?? const <InscriptionModel>[]);
 
-    return latestByActivityId.map((key, value) => MapEntry(key, value.statut));
+    return latestByActivityId;
   }
 
   int _bookingsTabIndexForStatus(String statut) {
@@ -204,12 +215,12 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   void _onPrimaryAction(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
     if (_tabIndex == 0 && status != null) {
+      final booking = _latestBookingByActivityId[activity.id];
+      if (booking == null) return;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => BookingsScreen(
-            initialTabIndex: _bookingsTabIndexForStatus(status),
-          ),
+          builder: (_) => BookingDetailScreen(inscription: booking),
         ),
       );
       return;

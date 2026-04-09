@@ -232,4 +232,29 @@ class PostService {
       return {'success': false, 'message': 'Unable to update like right now.'};
     }
   }
+
+  static Future<Map<String, dynamic>> reactToComment(String postId, String commentId, String reactionType) async {
+    try {
+      final res = await ApiClient.post('/posts/$postId/comments/$commentId/react', {
+        'reactionType': reactionType,
+      });
+
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update reaction',
+        'userReaction': body['userReaction']?.toString(),
+        'totalReactions': (body['totalReactions'] as num?)?.toInt() ?? 0,
+        'reactionCounts': body['reactionCounts'] as Map<String, dynamic>? ?? {},
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update reaction right now.'};
+    }
+  }
 }

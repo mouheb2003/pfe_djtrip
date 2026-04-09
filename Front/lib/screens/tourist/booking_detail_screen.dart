@@ -4,6 +4,7 @@ import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
 import 'package:intl/intl.dart';
 import '../shared/activity_detail_screen.dart';
+import '../shared/chat_conversation_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final InscriptionModel inscription;
@@ -17,6 +18,50 @@ class BookingDetailScreen extends StatefulWidget {
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _isCancelling = false;
   late InscriptionModel _inscription;
+
+  double _asDouble(dynamic value, {double fallback = 0}) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.trim()) ?? fallback;
+    }
+    return fallback;
+  }
+
+  int _asInt(dynamic value, {int fallback = 0}) {
+    if (value is num) return value.toInt();
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? fallback;
+    }
+    return fallback;
+  }
+
+  Future<void> _openOrganizerChat({
+    required String organizerId,
+    required String organizerName,
+    required String organizerAvatar,
+  }) async {
+    if (organizerId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Organizer contact is not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatConversationScreen(
+          partnerId: organizerId,
+          partnerName: organizerName,
+          partnerAvatar: organizerAvatar.isEmpty ? null : organizerAvatar,
+          partnerType: 'Organisator',
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -67,8 +112,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     setState(() => _isCancelling = true);
 
     try {
-      final success = await InscriptionService.cancelInscription(_inscription.id);
-      
+      final success = await InscriptionService.cancelInscription(
+        _inscription.id,
+      );
+
       if (success) {
         setState(() {
           _inscription = InscriptionModel(
@@ -120,7 +167,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Widget build(BuildContext context) {
     final act = _inscription.activite ?? {};
     final photos = act['photos'] as List?;
-    final imageUrl = photos != null && photos.isNotEmpty ? photos[0] as String : '';
+    final imageUrl = photos != null && photos.isNotEmpty
+        ? photos[0] as String
+        : '';
     final title = act['titre'] as String? ?? 'Activity';
     final lieu = act['lieu'] as String? ?? 'Location';
     final placeCount = _inscription.nombreParticipants;
@@ -128,11 +177,32 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final subtotal = unitPrice * placeCount;
     const serviceFee = 4.50; // Mock service fee for the design
     final total = subtotal + serviceFee;
-    
-    // Organizer
-    final orga = act['organisateur'] is Map ? act['organisateur'] as Map : {};
-    final orgaName = orga['nom'] as String? ?? 'Organizer Name';
-    final orgaPhoto = orga['photoProfil'] as String? ?? '';
+
+    // Organizer profile (real values when available)
+    final orgaRaw =
+        _inscription.organisateur ??
+        (act['organisateur'] is Map
+            ? Map<String, dynamic>.from(act['organisateur'] as Map)
+            : null) ??
+        (act['organisateur_id'] is Map
+            ? Map<String, dynamic>.from(act['organisateur_id'] as Map)
+            : null) ??
+        const <String, dynamic>{};
+    final organizerId = (orgaRaw['_id'] ?? orgaRaw['id'] ?? '')
+        .toString()
+        .trim();
+    final orgaName = (orgaRaw['fullname'] ?? orgaRaw['nom'] ?? 'Organizer')
+        .toString();
+    final orgaPhoto = (orgaRaw['avatar'] ?? orgaRaw['photoProfil'] ?? '')
+        .toString();
+    final orgaRating = _asDouble(
+      orgaRaw['note_moyenne'] ?? orgaRaw['noteMoyenne'] ?? orgaRaw['rating'],
+    );
+    final orgaReviews = _asInt(
+      orgaRaw['nombre_avis'] ??
+          orgaRaw['nombreAvis'] ??
+          orgaRaw['reviewsCount'],
+    );
 
     // Get activity dates properly
     DateTime? activityDate;
@@ -178,7 +248,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
-            )
+            ),
           ],
         ),
         child: SafeArea(
@@ -186,7 +256,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _openOrganizerChat(
+                    organizerId: organizerId,
+                    organizerName: orgaName,
+                    organizerAvatar: orgaPhoto,
+                  ),
                   icon: const Icon(Icons.chat_bubble_outline, size: 20),
                   label: const Text('Message'),
                   style: OutlinedButton.styleFrom(
@@ -204,7 +278,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: _inscription.isApproved
                     ? ElevatedButton.icon(
                         onPressed: () {},
-                        icon: const Icon(Icons.confirmation_num_outlined, size: 20),
+                        icon: const Icon(
+                          Icons.confirmation_num_outlined,
+                          size: 20,
+                        ),
                         label: const Text('View Ticket'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -217,43 +294,45 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         ),
                       )
                     : _inscription.canBeCancelled
-                        ? ElevatedButton.icon(
-                            onPressed: _isCancelling ? null : _cancelBooking,
-                            icon: _isCancelling
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.cancel_outlined, size: 20),
-                            label: Text(_isCancelling ? 'Cancelling...' : 'Cancel Booking'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                            ),
-                          )
-                        : ElevatedButton.icon(
-                            onPressed: null,
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            label: Text(_inscription.statusLabel),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                            ),
+                    ? ElevatedButton.icon(
+                        onPressed: _isCancelling ? null : _cancelBooking,
+                        icon: _isCancelling
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.cancel_outlined, size: 20),
+                        label: Text(
+                          _isCancelling ? 'Cancelling...' : 'Cancel Booking',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
                           ),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.info_outline, size: 20),
+                        label: Text(_inscription.statusLabel),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -289,14 +368,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       color: Colors.black.withOpacity(0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
-                    )
+                    ),
                   ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                       child: AspectRatio(
                         aspectRatio: 16 / 9,
                         child: imageUrl.isNotEmpty
@@ -313,9 +394,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _inscription.statusColor.withOpacity(0.15),
+                                  color: _inscription.statusColor.withOpacity(
+                                    0.15,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -349,22 +435,38 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+                              const Icon(
+                                Icons.calendar_today,
+                                size: 14,
+                                color: Colors.black54,
+                              ),
                               const SizedBox(width: 8),
                               Text(
-                                activityDate != null ? _formatDate(activityDate) : _formatDate(_inscription.dateDemande),
-                                style: const TextStyle(fontSize: 13, color: Colors.black54),
+                                activityDate != null
+                                    ? _formatDate(activityDate)
+                                    : _formatDate(_inscription.dateDemande),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.location_on, size: 14, color: Colors.black54),
+                              const Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.black54,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 lieu,
-                                style: const TextStyle(fontSize: 13, color: Colors.black54),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                ),
                               ),
                             ],
                           ),
@@ -390,7 +492,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -422,11 +524,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             color: Colors.black.withOpacity(0.1),
                             blurRadius: 4,
                             offset: const Offset(2, 2),
-                          )
+                          ),
                         ],
                       ),
                       child: const Center(
-                        child: Icon(Icons.qr_code_2, size: 80, color: Colors.black87),
+                        child: Icon(
+                          Icons.qr_code_2,
+                          size: 80,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                   ),
@@ -434,10 +540,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   const Text(
                     'Present this QR code to the organizer at the meeting point.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ],
               ),
@@ -448,7 +551,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             // Participants
             const Text(
               'Participants',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -461,7 +568,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Row(
@@ -482,7 +589,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               backgroundColor: const Color(0xFF2C413D),
                               child: Text(
                                 '+$placeCount',
-                                style: const TextStyle(color: Colors.white, fontSize: 10),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
                               ),
                             ),
                           ),
@@ -492,7 +602,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   const Spacer(),
                   Text(
                     '$placeCount Person${placeCount > 1 ? 's' : ''}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -503,7 +616,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             // Price Details
             const Text(
               'Price Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -516,7 +633,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -524,16 +641,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Adult x $placeCount', style: const TextStyle(color: Colors.black54, fontSize: 14)),
-                      Text('${subtotal.toStringAsFixed(2)} TND', style: const TextStyle(color: Colors.black54, fontSize: 14)),
+                      Text(
+                        'Adult x $placeCount',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '${subtotal.toStringAsFixed(2)} TND',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Service Fee', style: TextStyle(color: Colors.black54, fontSize: 14)),
-                      Text('${serviceFee.toStringAsFixed(2)} TND', style: const TextStyle(color: Colors.black54, fontSize: 14)),
+                      const Text(
+                        'Service Fee',
+                        style: TextStyle(color: Colors.black54, fontSize: 14),
+                      ),
+                      Text(
+                        '${serviceFee.toStringAsFixed(2)} TND',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                   const Padding(
@@ -543,10 +681,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                      const Text(
+                        'Total',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                      ),
                       Text(
                         '${total.toStringAsFixed(2)} TND',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ],
                   ),
@@ -559,7 +708,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             // Organizer
             const Text(
               'Organizer',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -572,38 +725,85 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    radius: 24,
                     backgroundColor: Colors.grey[200],
-                    backgroundImage: orgaPhoto.isNotEmpty ? NetworkImage(orgaPhoto) : null,
-                    child: orgaPhoto.isEmpty ? const Icon(Icons.person, color: Colors.grey) : null,
+                    backgroundImage: orgaPhoto.isNotEmpty
+                        ? NetworkImage(orgaPhoto)
+                        : null,
+                    child: orgaPhoto.isEmpty
+                        ? const Icon(Icons.person, color: Colors.grey)
+                        : null,
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        orgaName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          orgaName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: Color(0xFFF59E0B),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              orgaRating > 0
+                                  ? orgaRating.toStringAsFixed(1)
+                                  : 'No rating',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              orgaReviews > 0
+                                  ? '$orgaReviews reviews'
+                                  : '0 reviews',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _openOrganizerChat(
+                      organizerId: organizerId,
+                      organizerName: orgaName,
+                      organizerAvatar: orgaPhoto,
+                    ),
+                    icon: const Icon(Icons.chat_outlined, size: 16),
+                    label: const Text('Contact'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: Color(0xFFBFDBFE)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: const [
-                          Icon(Icons.star, size: 12, color: Colors.orange),
-                          Icon(Icons.star, size: 12, color: Colors.orange),
-                          Icon(Icons.star, size: 12, color: Colors.orange),
-                          Icon(Icons.star, size: 12, color: Colors.orange),
-                          Icon(Icons.star_half, size: 12, color: Colors.orange),
-                          SizedBox(width: 4),
-                          Text('4.8 (124 reviews)', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),

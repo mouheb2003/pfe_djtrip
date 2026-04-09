@@ -25,6 +25,7 @@
   },
   "packageManager": "yarn@1.22.22",
   "dependencies": {
+    "@ant-design/icons": "^6.1.1",
     "@emotion/cache": "^11.13.5",
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
@@ -48,6 +49,7 @@
     "@tiptap/extension-underline": "^3.16.0",
     "@tiptap/react": "^3.16.0",
     "@tiptap/starter-kit": "^3.16.0",
+    "antd": "^6.3.5",
     "autosuggest-highlight": "^3.3.4",
     "axios": "^1.7.9",
     "dayjs": "^1.11.13",

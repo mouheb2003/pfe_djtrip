@@ -1,5 +1,6 @@
 const Activite = require("../models/activite");
 const Organisator = require("../models/organisator");
+const Inscription = require("../models/inscription");
 const ActiviteService = require("../services/activite");
 const cloudinary = require("../config/cloudinary");
 
@@ -213,7 +214,10 @@ exports.getAllActivites = async (req, res) => {
     else if (sort === "date_asc") sortOption = { date_debut: 1 };
 
     const activites = await Activite.find(filter)
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+      .populate(
+        "organisateur_id",
+        "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .sort(sortOption);
 
     res.status(200).json({
@@ -410,7 +414,10 @@ exports.updateActivite = async (req, res) => {
       activiteId,
       updateData,
       { new: true, runValidators: true },
-    ).populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites");
+    ).populate(
+      "organisateur_id",
+      "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+    );
 
     res.status(200).json({
       message: "Activity updated successfully",
@@ -429,6 +436,14 @@ exports.deleteActivite = async (req, res) => {
   try {
     const userId = req.user.userId;
     const activiteId = req.params.id;
+    const cancellationMessage = String(req.query.cancel_message || "").trim();
+
+    if (!cancellationMessage) {
+      return res.status(400).json({
+        message:
+          "A cancellation message is required to notify tourists before deleting this activity",
+      });
+    }
 
     // Find the activity
     const activite = await Activite.findById(activiteId);
@@ -467,6 +482,18 @@ exports.deleteActivite = async (req, res) => {
       $pull: { liste_activites: activiteId },
     });
 
+    // Cancel all related bookings and keep organizer reason visible to tourists
+    await Inscription.updateMany(
+      { activite_id: activiteId, statut: { $ne: "annulee" } },
+      {
+        $set: {
+          statut: "annulee",
+          message_organisateur: cancellationMessage,
+          date_reponse: new Date(),
+        },
+      },
+    );
+
     // Delete the activity
     await Activite.findByIdAndDelete(activiteId);
 
@@ -486,7 +513,10 @@ exports.getAdminActivites = async (_req, res) => {
     const activites = await Activite.find({})
       .sort({ createdAt: -1 })
       .limit(500)
-      .populate("organisateur_id", "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+      .populate(
+        "organisateur_id",
+        "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .lean();
 
     return res.status(200).json({ activites });
@@ -607,7 +637,10 @@ exports.updateAdminActivite = async (req, res) => {
     const activite = await Activite.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    }).populate("organisateur_id", "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites");
+    }).populate(
+      "organisateur_id",
+      "fullname email avatar date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+    );
 
     if (!activite) {
       return res.status(404).json({ message: "Activity not found" });
@@ -664,7 +697,10 @@ exports.searchActivites = async (req, res) => {
       ],
       statut: "active",
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+      .populate(
+        "organisateur_id",
+        "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .limit(20);
 
     res.status(200).json({
@@ -695,7 +731,10 @@ exports.getMyActivities = async (req, res) => {
       organisateur_id: userId,
       date_fin: { $gte: maintenant }, // date_fin >= now
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+      .populate(
+        "organisateur_id",
+        "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .sort({ date_debut: 1 }); // Sort by start date
 
     console.log(`📋 Found ${activities.length} active activities`);
@@ -730,7 +769,10 @@ exports.getArchivedActivities = async (req, res) => {
       organisateur_id: userId,
       date_fin: { $lt: maintenant }, // date_fin < now
     })
-      .populate("organisateur_id", "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+      .populate(
+        "organisateur_id",
+        "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .sort({ date_fin: -1 }); // Sort by end date (most recent first)
 
     res.status(200).json({
@@ -751,8 +793,11 @@ exports.getArchivedActivities = async (req, res) => {
 // Get ALL global activities grouped by timeline (Upcoming, Ongoing, Past)
 exports.getGlobalActivitiesByTimeline = async (req, res) => {
   try {
-    const activites = await Activite.find({  })
-      .populate("organisateur_id", "fullname email avatar num_tel note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites")
+    const activites = await Activite.find({})
+      .populate(
+        "organisateur_id",
+        "fullname email avatar num_tel note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
       .sort({ date_debut: 1 });
 
     const now = new Date();

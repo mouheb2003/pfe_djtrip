@@ -292,7 +292,17 @@ class AuthService {
         }
 
         await saveUser(user);
-        return {'success': true, 'user': user};
+
+        // 🚀 NEW: Check if email verification is required
+        if (body['emailVerified'] == false) {
+          return {
+            'success': true,
+            'emailVerified': false,
+            'user': user,
+          };
+        }
+
+        return {'success': true, 'emailVerified': true, 'user': user};
       }
 
       if (res.statusCode == 423) {
@@ -687,5 +697,35 @@ class AuthService {
         'message': 'Facebook authentication failed. Please try again.',
       };
     }
+  }
+
+  // ── Language Preferences ──────────────────────────────────────
+  static const _keyLanguage = 'djtrip_language_preference';
+  static const _keyTermsAccepted = 'djtrip_terms_accepted';
+
+  static Future<String?> getLanguagePreference() async {
+    return await _storage.read(key: _keyLanguage);
+  }
+
+  static Future<void> saveLanguagePreference(String language) async {
+    await _storage.write(key: _keyLanguage, value: language);
+  }
+
+  static Future<bool> hasAcceptedTerms() async {
+    final accepted = await _storage.read(key: _keyTermsAccepted);
+    return accepted == 'true';
+  }
+
+  static Future<void> acceptTermsOfUse() async {
+    await _storage.write(key: _keyTermsAccepted, value: 'true');
+  }
+
+  static Future<bool> hasAcceptedPrivacyPolicy() async {
+    final accepted = await _storage.read(key: 'djtrip_privacy_policy_accepted');
+    return accepted == 'true';
+  }
+
+  static Future<void> acceptPrivacyPolicy() async {
+    await _storage.write(key: 'djtrip_privacy_policy_accepted', value: 'true');
   }
 }

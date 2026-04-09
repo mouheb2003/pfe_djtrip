@@ -57,9 +57,14 @@ class _OrganizerBookingDetailScreenState
             prixTotal: _inscription.prixTotal,
             dateDemande: _inscription.dateDemande,
             messageTouriste: _inscription.messageTouriste,
+            messageOrganisateur: _inscription.messageOrganisateur,
             activite: _inscription.activite,
             touriste: _inscription.touriste,
             organisateur: _inscription.organisateur,
+            qrToken: _inscription.qrToken,
+            qrTokenGeneratedAt: _inscription.qrTokenGeneratedAt,
+            qrTokenExpiresAt: _inscription.qrTokenExpiresAt,
+            qrUsedAt: _inscription.qrUsedAt,
           );
         });
 
@@ -95,12 +100,81 @@ class _OrganizerBookingDetailScreenState
     }
   }
 
+  Future<String?> _showRejectReasonDialog() async {
+    final controller = TextEditingController();
+    String? inlineError;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reason for rejection'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Please provide a reason. The tourist will see it in Booking Details.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    maxLines: 4,
+                    minLines: 3,
+                    maxLength: 240,
+                    decoration: InputDecoration(
+                      hintText: 'Example: No seats left for this date.',
+                      errorText: inlineError,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final reason = controller.text.trim();
+                    if (reason.isEmpty) {
+                      setDialogState(() {
+                        inlineError = 'Reason is required';
+                      });
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(reason);
+                  },
+                  child: const Text('Reject booking'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _rejectBooking() async {
+    final reason = await _showRejectReasonDialog();
+    if (reason == null || reason.trim().isEmpty) return;
+
     setState(() => _isUpdating = true);
 
     try {
       final success = await InscriptionService.rejectInscription(
         _inscription.id,
+        message: reason.trim(),
       );
 
       if (success) {
@@ -112,9 +186,14 @@ class _OrganizerBookingDetailScreenState
             prixTotal: _inscription.prixTotal,
             dateDemande: _inscription.dateDemande,
             messageTouriste: _inscription.messageTouriste,
+            messageOrganisateur: reason.trim(),
             activite: _inscription.activite,
             touriste: _inscription.touriste,
             organisateur: _inscription.organisateur,
+            qrToken: _inscription.qrToken,
+            qrTokenGeneratedAt: _inscription.qrTokenGeneratedAt,
+            qrTokenExpiresAt: _inscription.qrTokenExpiresAt,
+            qrUsedAt: _inscription.qrUsedAt,
           );
         });
 
@@ -607,6 +686,41 @@ class _OrganizerBookingDetailScreenState
                 ],
               ),
             ),
+            if (_normalizeStatus(_inscription.statut) == 'refusee' &&
+                (_inscription.organizerReason ?? '').isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F2),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Rejection Reason',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF9F1239),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _inscription.organizerReason!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: Color(0xFF881337),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // Price Details

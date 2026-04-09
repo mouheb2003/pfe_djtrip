@@ -38,7 +38,7 @@ exports.submitActivityReview = async (req, res) => {
   try {
     const { activiteId } = req.params;
     const touristeId = req.user.userId;
-    const { note, commentaire } = req.body;
+    const { note, commentaire, tags } = req.body;
 
     if (!note || note < 1 || note > 5) {
       return res.status(400).json({ message: "Note must be between 1 and 5" });
@@ -64,12 +64,26 @@ exports.submitActivityReview = async (req, res) => {
       type: "activite",
       note,
       commentaire: commentaire?.trim() || null,
+      tags: tags && Array.isArray(tags) ? tags.slice(0, 3) : [], // Max 3 tags
       inscription_id: inscription._id,
     });
 
+    // Mark inscription as reviewed
+    await inscription.marquerCommeReviewed();
+
     await refreshActiviteStats(activiteId);
 
-    res.status(201).json({ message: "Review submitted successfully", avis });
+    res.status(201).json({ 
+      message: "Review submitted successfully", 
+      avis,
+      review: {
+        id: avis._id,
+        rating: note,
+        comment: commentaire,
+        tags: tags || [],
+        createdAt: avis.createdAt
+      }
+    });
   } catch (e) {
     if (e.code === 11000) {
       return res
@@ -86,7 +100,7 @@ exports.submitOrganisateurRating = async (req, res) => {
   try {
     const { organisateurId } = req.params;
     const touristeId = req.user.userId;
-    const { note, commentaire } = req.body;
+    const { note, commentaire, tags } = req.body;
 
     if (!note || note < 1 || note > 5) {
       return res.status(400).json({ message: "Note must be between 1 and 5" });
@@ -111,12 +125,23 @@ exports.submitOrganisateurRating = async (req, res) => {
       type: "organisateur",
       note,
       commentaire: commentaire?.trim() || null,
+      tags: tags && Array.isArray(tags) ? tags.slice(0, 3) : [], // Max 3 tags
       inscription_id: inscription._id,
     });
 
     await refreshOrganisateurStats(organisateurId);
 
-    res.status(201).json({ message: "Rating submitted successfully", avis });
+    res.status(201).json({ 
+      message: "Rating submitted successfully", 
+      avis,
+      review: {
+        id: avis._id,
+        rating: note,
+        comment: commentaire,
+        tags: tags || [],
+        createdAt: avis.createdAt
+      }
+    });
   } catch (e) {
     if (e.code === 11000) {
       return res

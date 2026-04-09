@@ -72,7 +72,10 @@ class _PublicOrganizerProfileScreenState
     if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
     }
-    final serverUrl = ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '');
+    final serverUrl = ApiClient.baseUrl.replaceFirst(
+      RegExp(r'/api(?:/v1)?$'),
+      '',
+    );
     if (value.startsWith('/')) {
       return '$serverUrl$value';
     }
@@ -177,25 +180,31 @@ class _PublicOrganizerProfileScreenState
         : (_activities.fold<int>(0, (p, a) => p + a.nombreAvis));
     final headerImageUrl = _headerImageUrl();
     final specialties = _specialties();
-    final visibleActivities = _showAllActivities
-        ? _activities
-        : _activities.take(2).toList();
-    final bars = _ratingBars(rating);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: const Color(0xFF0F172A),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
-          'Organizer Profile',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          'Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            color: Color(0xFF0F172A),
+          ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert)),
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Color(0xFF0F172A)),
+            onPressed: () {},
+          ),
         ],
       ),
       body: _loading
@@ -207,500 +216,364 @@ class _PublicOrganizerProfileScreenState
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      SizedBox(
-                        height: 238,
-                        width: double.infinity,
-                        child: headerImageUrl.isNotEmpty
-                            ? Image.network(
-                                headerImageUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    Container(color: const Color(0xFFCBD5E1)),
-                              )
-                            : Container(color: const Color(0xFFCBD5E1)),
-                      ),
-                      // Top Avatar (Instagram style with blurred glow)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: -46,
-                        child: Center(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Blurred Glow Background
-                              if (avatarUrl.isNotEmpty)
-                                ImageFiltered(
-                                  imageFilter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                                  child: Container(
-                                    width: 96,
-                                    height: 96,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF0F172A).withOpacity(0.1),
-                                      image: DecorationImage(
-                                        image: NetworkImage(avatarUrl),
-                                        fit: BoxFit.cover,
-                                        opacity: 0.6,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              
-                              // Main Avatar Circle
-                              Container(
-                                width: 92,
-                                height: 92,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.12),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipOval(
-                                  child: avatarUrl.isNotEmpty
-                                      ? Image.network(
-                                          avatarUrl,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => _DefaultAvatar(),
-                                        )
-                                      : _DefaultAvatar(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Cover image
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(color: const Color(0xFFE2E8F0)),
+                    child: headerImageUrl.isNotEmpty
+                        ? Image.network(
+                            headerImageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.expand(),
+                          )
+                        : const SizedBox.expand(),
                   ),
-                  const SizedBox(height: 56),
+                  const SizedBox(height: 16),
+                  // Profile info section
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        // Avatar
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: avatarUrl.isNotEmpty
+                                ? Image.network(
+                                    avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _DefaultAvatar(),
+                                  )
+                                : _DefaultAvatar(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Name
                         Text(
-                          (user['fullname'] ?? '').isEmpty ? 'Organizer' : user['fullname']!,
-                          textAlign: TextAlign.center,
+                          (user['fullname'] ?? '').isEmpty
+                              ? 'Organizer'
+                              : user['fullname']!,
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
+                        // Bio/Quote
+                        Text(
+                          (user['bio'] ?? '').isEmpty
+                              ? 'Travel Expert'
+                              : user['bio']!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            height: 1.4,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 12),
+                        // Stats row: rating / reviews / activities
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            const Icon(
-                              Icons.star,
-                              size: 15,
-                              color: Color(0xFFF59E0B),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              rating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '($reviewsCount reviews)',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '•',
-                              style: TextStyle(color: Color(0xFF94A3B8)),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                _organizerLocation(user),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w500,
+                            Column(
+                              children: [
+                                Text(
+                                  rating.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: List.generate(
+                                    5,
+                                    (i) => Icon(
+                                      i < rating.round()
+                                          ? Icons.star
+                                          : Icons.star_border,
+                                      color: const Color(0xFFF59E0B),
+                                      size: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  reviewsCount.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'REVIEWS',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF94A3B8),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  _activities.length.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'ACTIVITIES',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF94A3B8),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ChatConversationScreen(
-                                        partnerId: user['_id'] ?? '',
-                                        partnerName: (user['fullname'] ?? '').isEmpty
-                                            ? 'Organizer'
-                                            : user['fullname']!,
-                                        partnerAvatar: user['avatar'],
-                                        partnerOnline: user['isOnline'] ?? false,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF97316),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  minimumSize: const Size.fromHeight(48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.chat_bubble, size: 18),
-                                label: const Text(
-                                  'Message',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 20,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  final link = 'djtrip://profile/${user['_id']}?type=organizer';
-                                  Share.share(
-                                    'Profil DJTrip de ${user['fullname']}\n$link\n(ouvre ce lien dans DJTrip)',
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFFD1D5DB),
-                                  ),
-                                  backgroundColor: const Color(0xFFE5E7EB),
-                                  foregroundColor: const Color(0xFF111827),
-                                  minimumSize: const Size.fromHeight(48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.share, size: 18),
-                                label: const Text(
-                                  'Share',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 20,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 26),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'About Us',
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            (user['bio'] ?? '').trim().isNotEmpty
-                                ? user['bio']!.trim()
-                                : 'No organizer description yet.',
-                            style: const TextStyle(
-                              color: Color(0xFF334155),
-                              height: 1.6,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'ACTIVITY SPECIALTIES',
-                            style: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: specialties
-                                .map(
-                                  (s) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7ED),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: const Color(0xFFFECBA1),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      s,
-                                      style: const TextStyle(
-                                        color: Color(0xFFF97316),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Our Activities',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            if (_activities.length > 2)
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _showAllActivities = !_showAllActivities;
-                                  });
-                                },
-                                child: Text(
-                                  _showAllActivities ? 'Reduce' : 'View all',
-                                  style: const TextStyle(
-                                    color: Color(0xFFF97316),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (visibleActivities.isEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE5E7EB),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Text(
-                              'No activities found.',
-                              style: TextStyle(color: Color(0xFF64748B)),
-                            ),
-                          )
-                        else
-                          ...visibleActivities.map((activity) {
-                            final imageUrl = _resolveUrl(
-                                activity.photos.isNotEmpty ? activity.photos.first : null,
-                            );
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _ActivityMiniCard(
-                                imageUrl: imageUrl,
-                                title: activity.titre,
-                                price: activity.prixFormatted,
-                                rating: activity.noteMoyenne > 0
-                                    ? activity.noteMoyenne.toStringAsFixed(1)
-                                    : '0.0',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ActivityDetailScreen(
-                                      activityId: activity.id,
-                                      viewOnly: true,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        const SizedBox(height: 24),
-                        Container(
+                        // Contact button
+                        SizedBox(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE5E7EB),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                rating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 50,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: List.generate(
-                                  5,
-                                  (i) => Icon(
-                                    i < rating.round()
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    color: const Color(0xFFF59E0B),
-                                    size: 22,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatConversationScreen(
+                                    partnerId: user['_id'] ?? '',
+                                    partnerName:
+                                        (user['fullname'] ?? '').isEmpty
+                                        ? 'Organizer'
+                                        : user['fullname']!,
+                                    partnerAvatar: user['avatar'],
+                                    partnerOnline: user['isOnline'] ?? false,
                                   ),
                                 ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Global Rating',
-                                style: TextStyle(color: Color(0xFF64748B)),
+                            ),
+                            icon: const Icon(Icons.mail_outline, size: 18),
+                            label: const Text(
+                              'Contact Me',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
-                              const SizedBox(height: 14),
-                              _RatingRow(label: '5', value: bars[0]),
-                              _RatingRow(label: '4', value: bars[1]),
-                              _RatingRow(label: '3', value: bars[2]),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Reviews',
-                            style: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        if (_reviews.isEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE5E7EB),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Text(
-                              'No reviews yet.',
-                              style: TextStyle(color: Color(0xFF64748B)),
-                            ),
-                          )
-                        else
-                          ..._reviews.map((review) {
-                            final reviewerName = _reviewerName(review);
-                            final reviewerAvatar = _reviewerAvatar(review);
-                            final reviewText = _reviewText(review);
-                            final reviewDate = _reviewDate(review);
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundImage: reviewerAvatar.isNotEmpty
-                                            ? NetworkImage(reviewerAvatar)
-                                            : null,
-                                        backgroundColor: Colors.grey[200],
-                                        child: reviewerAvatar.isEmpty
-                                            ? const Icon(
-                                                Icons.person,
-                                                color: Colors.grey,
-                                                size: 20,
-                                              )
-                                            : null,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              reviewerName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              reviewDate,
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      reviewText,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  // Specialties section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SPECIALTIES',
+                          style: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: specialties
+                              .map(
+                                (s) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE0E7FF),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Text(
+                                    s,
+                                    style: const TextStyle(
+                                      color: Color(0xFF5D71FF),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // My Activities section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'My Activities',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (_activities.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              // Navigate to all activities view
+                            },
+                            child: const Text(
+                              'View All',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2563EB),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Activities grid
+                  if (_activities.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'No activities yet.',
+                          style: TextStyle(color: Color(0xFF94A3B8)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 1,
+                            ),
+                        itemCount: _activities.length,
+                        itemBuilder: (ctx, i) {
+                          final activity = _activities[i];
+                          final imageUrl = _resolveUrl(
+                            activity.photos.isNotEmpty
+                                ? activity.photos.first
+                                : null,
+                          );
+                          return GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ActivityDetailScreen(
+                                  activityId: activity.id,
+                                  viewOnly: true,
+                                ),
+                              ),
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: imageUrl.isNotEmpty
+                                    ? Image.network(
+                                        imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: const Color(0xFFF0F0F0),
+                                          child: const Icon(
+                                            Icons.image,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: const Color(0xFFF0F0F0),
+                                        child: const Icon(
+                                          Icons.image,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -785,11 +658,7 @@ class _ActivityMiniCard extends StatelessWidget {
                 color: imageUrl == null ? const Color(0xFFF0F0F0) : null,
               ),
               child: imageUrl == null
-                  ? const Icon(
-                      Icons.image,
-                      color: Colors.grey,
-                      size: 32,
-                    )
+                  ? const Icon(Icons.image, color: Colors.grey, size: 32)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -851,11 +720,7 @@ class _DefaultAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFE2E8F0),
-      child: const Icon(
-        Icons.person,
-        color: Color(0xFF64748B),
-        size: 34,
-      ),
+      child: const Icon(Icons.person, color: Color(0xFF64748B), size: 34),
     );
   }
 }

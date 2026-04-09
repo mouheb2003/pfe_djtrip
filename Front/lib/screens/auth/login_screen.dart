@@ -5,6 +5,8 @@ import '../../config/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'forgot_password_screen.dart';
+import 'email_verification_screen.dart';
+import 'onboarding_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -97,7 +99,34 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result['success'] == true) {
         await _saveRememberedEmail(email);
         final user = result['user'] as Map<String, dynamic>?;
-        final userType = user?['userType'] as String?;
+        final userType = user?['userType'] as String? ?? 'Touriste';
+
+        // 🚀 NEW: Handle email verification flow
+        if (result['emailVerified'] == false) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                email: user?['email'] ?? email,
+                userType: userType,
+              ),
+            ),
+          );
+          return;
+        }
+
+        // 🚀 NEW: Handle onboarding flow
+        final bool is_onboarded = user?['is_onboarded'] ?? true;
+        if (!is_onboarded) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OnboardingScreen(userType: userType),
+            ),
+          );
+          return;
+        }
+
         final route = (userType == 'Organisator' || userType == 'Organizer')
             ? AppRoutes.organizerMain
             : AppRoutes.touristMain;

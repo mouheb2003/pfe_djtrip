@@ -18,6 +18,9 @@ const PublicationsPage = lazy(() => import('src/pages/dashboard/Publications'));
 const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
 const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
+const AppealsPage = lazy(() => import('src/pages/dashboard/Appeals'));
+const ApprovalsPage = lazy(() => import('src/pages/dashboard/Approvals_working'));
+const NotificationsPage = lazy(() => import('src/pages/dashboard/Notifications'));
 
 // ----------------------------------------------------------------------
 
@@ -43,6 +46,9 @@ export const dashboardRoutes = [
       { path: 'messages', element: <MessagesPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'three', element: <UsersPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'appeals', element: <AppealsPage /> },
+      { path: 'approvals', element: <ApprovalsPage /> },
       {
         path: 'group',
         children: [],

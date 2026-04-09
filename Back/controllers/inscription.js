@@ -2,8 +2,179 @@ const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
 const QRCode = require("qrcode");
+const jwt = require("jsonwebtoken");
 const emailService = require("../services/email");
 const { createActivityLog } = require("../services/activityLogService");
+
+const QR_BOOKING_SECRET =
+  process.env.QR_BOOKING_SECRET || process.env.JWT_SECRET;
+
+function normalizeDateValue(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getActivityDeadline(activite) {
+  return (
+    normalizeDateValue(activite?.date_fin) ||
+    normalizeDateValue(activite?.date_debut)
+  );
+}
+
+function createBookingQrToken(inscription, activite) {
+  if (!QR_BOOKING_SECRET) {
+    throw new Error("QR booking secret is not configured");
+  }
+
+  const deadline = getActivityDeadline(activite);
+  const expiresInSeconds = deadline
+    ? Math.max(300, Math.floor((deadline.getTime() - Date.now()) / 1000))
+    : 86400;
+
+  return jwt.sign(
+    {
+      purpose: "booking-checkin",
+      bookingId: inscription._id.toString(),
+      organizerId: inscription.organisateur_id.toString(),
+      activityId: inscription.activite_id.toString(),
+    },
+    QR_BOOKING_SECRET,
+    { expiresIn: expiresInSeconds },
+  );
+}
+
+function parseQrPayload(qrData) {
+  const rawValue = (qrData || "").toString().trim();
+  if (!rawValue) {
+    return { valid: false, reason: "QR code is empty" };
+  }
+
+  const prefix = "DJTRIP_BOOKING:";
+  const payload = rawValue.startsWith(prefix)
+    ? rawValue.slice(prefix.length).trim()
+    : rawValue;
+
+  if (!payload) {
+    return { valid: false, reason: "QR code is invalid" };
+  }
+
+  if (payload.includes(".")) {
+    try {
+      const decoded = jwt.verify(payload, QR_BOOKING_SECRET);
+      if (!decoded || decoded.purpose !== "booking-checkin") {
+        return { valid: false, reason: "QR token is not valid" };
+      }
+
+      return {
+        valid: true,
+        bookingId: decoded.bookingId,
+        tokenType: "signed",
+        tokenPayload: decoded,
+      };
+    } catch (error) {
+      return { valid: false, reason: "QR token is expired or invalid" };
+    }
+  }
+
+  return {
+    valid: true,
+    bookingId: payload,
+    tokenType: "legacy",
+  };
+}
+
+async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
+  if (!QR_BOOKING_SECRET) {
+    return {
+      ok: false,
+      statusCode: 500,
+      code: "QR_SECRET_MISSING",
+      message: "QR booking secret is not configured",
+    };
+  }
+
+  const parsed = parseQrPayload(qrData);
+  if (!parsed.valid) {
+    return {
+      ok: false,
+      statusCode: 400,
+      code: "INVALID_TOKEN",
+      message: parsed.reason,
+    };
+  }
+
+  const inscription = await Inscription.findById(parsed.bookingId)
+    .populate("touriste_id", "fullname email avatar num_tel")
+    .populate("activite_id")
+    .populate("organisateur_id", "fullname email avatar num_tel");
+
+  if (!inscription) {
+    return {
+      ok: false,
+      statusCode: 404,
+      code: "BOOKING_NOT_FOUND",
+      message: "Booking not found",
+    };
+  }
+
+  if (inscription.organisateur_id.toString() !== organiserId) {
+    return {
+      ok: false,
+      statusCode: 403,
+      code: "UNAUTHORIZED",
+      message: "Unauthorized to verify this booking",
+    };
+  }
+
+  const activityDeadline = getActivityDeadline(inscription.activite_id);
+  const now = new Date();
+  if (activityDeadline && now > activityDeadline) {
+    return {
+      ok: false,
+      statusCode: 400,
+      code: "ACTIVITY_EXPIRED",
+      message: "This activity has already passed",
+      booking: inscription,
+    };
+  }
+
+  if (inscription.statut === "verifie" || inscription.qr_used_at) {
+    return {
+      ok: false,
+      statusCode: 400,
+      code: "ALREADY_USED",
+      message: "This booking has already been used",
+      booking: inscription,
+    };
+  }
+
+  if (inscription.statut !== "approuvee") {
+    return {
+      ok: false,
+      statusCode: 400,
+      code: "NOT_CONFIRMED",
+      message: `Booking must be confirmed first. Current status: ${inscription.statut}`,
+      booking: inscription,
+    };
+  }
+
+  if (markUsed) {
+    await inscription.marquerCommeUtilise();
+  }
+
+  return {
+    ok: true,
+    statusCode: 200,
+    code: markUsed ? "MARKED_USED" : "VALID",
+    message: markUsed
+      ? "Booking marked as used"
+      : "Booking is valid for check-in",
+    booking: inscription,
+    tokenType: parsed.tokenType,
+    activityDeadline,
+  };
+}
 
 // Auto-expire pending requests for activities whose start date has passed.
 // Business rule: if organizer did not respond before activity start date,
@@ -338,6 +509,13 @@ exports.approuverInscription = async (req, res) => {
 
     await inscription.approuver(message_organisateur);
 
+    const qrToken = createBookingQrToken(inscription, activite);
+    const activityDeadline = getActivityDeadline(activite);
+    inscription.qr_token = qrToken;
+    inscription.qr_token_generated_at = new Date();
+    inscription.qr_token_expires_at = activityDeadline;
+    await inscription.save();
+
     // Increment the number of reserved spots (number of participants)
     await Activite.findByIdAndUpdate(inscription.activite_id, {
       $inc: { nombre_reservations: inscription.nombre_participants },
@@ -370,7 +548,8 @@ exports.approuverInscription = async (req, res) => {
       inscriptionPopulated?.touriste_id?.fullname || "Traveler";
     const activityTitle =
       inscriptionPopulated?.activite_id?.titre || "Activity";
-    const bookingCode = `DJTRIP_BOOKING:${inscriptionId}`;
+    const bookingCode =
+      inscription.qr_token || `DJTRIP_BOOKING:${inscriptionId}`;
 
     if (touristEmail) {
       const bookingDate = inscriptionPopulated?.activite_id?.date_debut
@@ -601,45 +780,84 @@ exports.getTouristStats = async (req, res) => {
 };
 
 // Verify/confirm booking via QR code scan (Organizer only)
+exports.validateQrBooking = async (req, res) => {
+  try {
+    const organiserId = req.user.userId;
+    const { qrData } = req.body || {};
+
+    const result = await inspectBookingForQr({
+      qrData,
+      organiserId,
+      markUsed: false,
+    });
+
+    if (!result.ok) {
+      return res.status(result.statusCode).json({
+        success: false,
+        code: result.code,
+        message: result.message,
+        booking: result.booking || null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      code: result.code,
+      message: result.message,
+      booking: result.booking,
+      canMarkUsed: true,
+      tokenType: result.tokenType,
+      activityDeadline: result.activityDeadline,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error validating booking QR",
+      error: error.message,
+    });
+  }
+};
+
 exports.verifyInscription = async (req, res) => {
   try {
     const { inscriptionId } = req.params;
     const organisateurId = req.user.userId;
 
-    // Find the inscription
-    const inscription = await Inscription.findById(inscriptionId);
+    const booking = await Inscription.findById(inscriptionId)
+      .populate("touriste_id", "fullname email avatar num_tel")
+      .populate("activite_id")
+      .populate("organisateur_id", "fullname email avatar num_tel");
 
-    if (!inscription) {
+    if (!booking) {
       return res.status(404).json({ message: "Registration not found" });
     }
 
-    // Verify the booking belongs to the organizer
-    if (inscription.organisateur_id.toString() !== organisateurId) {
+    if (booking.organisateur_id.toString() !== organisateurId) {
       return res.status(403).json({
         message: "Unauthorized to verify this booking",
       });
     }
 
-    // Check if already verified
-    if (inscription.statut === "verifie" || inscription.statut === "verified") {
+    if (booking.statut === "verifie" || booking.qr_used_at) {
       return res.status(400).json({
         message: "This booking has already been verified",
       });
     }
 
-    // Check if booking is approved
-    if (
-      inscription.statut !== "approuvee" &&
-      inscription.statut !== "approved"
-    ) {
+    if (booking.statut !== "approuvee") {
       return res.status(400).json({
-        message: `Booking must be approved. Current status: ${inscription.statut}`,
+        message: `Booking must be approved. Current status: ${booking.statut}`,
       });
     }
 
-    // Update inscription status to verified
-    inscription.statut = "verifie";
-    await inscription.save();
+    const activityDeadline = getActivityDeadline(booking.activite_id);
+    if (activityDeadline && new Date() > activityDeadline) {
+      return res.status(400).json({
+        message: "This activity has already passed",
+      });
+    }
+
+    await booking.marquerCommeUtilise();
 
     // Log activity
     try {
@@ -651,8 +869,8 @@ exports.verifyInscription = async (req, res) => {
         targetId: inscriptionId,
         templateKey: "verify_booking",
         metadata: {
-          targetName: inscription.touriste_id?.fullname || "Touriste",
-          activityTitle: inscription.activite_id?.titre || "Activity",
+          targetName: booking.touriste_id?.fullname || "Touriste",
+          activityTitle: booking.activite_id?.titre || "Activity",
         },
       });
     } catch (logError) {
@@ -664,11 +882,121 @@ exports.verifyInscription = async (req, res) => {
 
     res.status(200).json({
       message: "Booking verified successfully",
-      inscription,
+      inscription: booking,
     });
   } catch (error) {
     res.status(500).json({
       message: "Error verifying booking",
+      error: error.message,
+    });
+  }
+};
+
+// POST /inscriptions/:id/dismiss-review-reminder
+// Dismiss review reminder and schedule next reminder
+exports.dismissReviewReminder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reminderAt } = req.body;
+    
+    const booking = await Inscription.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Calculate next reminder time if not provided
+    let nextReminderAt;
+    if (reminderAt) {
+      nextReminderAt = new Date(reminderAt);
+    } else {
+      const currentCount = booking.reviewReminder?.reminderCount || 0;
+      const now = new Date();
+      
+      switch (currentCount) {
+        case 0:
+          nextReminderAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days
+          break;
+        case 1:
+          nextReminderAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days
+          break;
+        case 2:
+          nextReminderAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days
+          break;
+        default:
+          nextReminderAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year (effectively never)
+          break;
+      }
+    }
+
+    await booking.setReviewReminder(nextReminderAt);
+
+    res.status(200).json({
+      message: "Review reminder dismissed successfully",
+      reminder: booking.reviewReminder,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error dismissing review reminder",
+      error: error.message,
+    });
+  }
+};
+
+// GET /inscriptions/:id/review-reminder
+// Get review reminder data for a booking
+exports.getReviewReminderData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const booking = await Inscription.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Check if reminder should be shown
+    const shouldShow = booking.shouldShowReviewReminder();
+
+    res.status(200).json({
+      shouldShow,
+      reminder: booking.reviewReminder,
+      hasReviewed: booking.hasReviewed,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error getting review reminder data",
+      error: error.message,
+    });
+  }
+};
+
+// GET /inscriptions/review-reminders
+// Get all bookings that should show review reminder for authenticated user
+exports.getPendingReviewReminders = async (req, res) => {
+  try {
+    const touristeId = req.user.userId;
+    
+    // Find all approved bookings for this tourist that are checked in but not reviewed
+    const bookings = await Inscription.find({
+      touriste_id: touristeId,
+      statut: "approuvee",
+      qr_used_at: { $exists: true },
+      hasReviewed: false,
+    })
+    .populate("activite_id", "titre date_fin")
+    .sort({ qr_used_at: -1 });
+
+    // Filter bookings that should show reminders
+    const eligibleBookings = bookings.filter(booking => 
+      booking.shouldShowReviewReminder()
+    );
+
+    res.status(200).json({
+      bookings: eligibleBookings,
+      count: eligibleBookings.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error getting pending review reminders",
       error: error.message,
     });
   }

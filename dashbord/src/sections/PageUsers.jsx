@@ -501,6 +501,13 @@ export function UsersView({ sx }) {
     [currentFilters, table.order, table.orderBy, users]
   );
 
+  useEffect(() => {
+    const totalPages = Math.ceil(dataFiltered.length / table.rowsPerPage);
+    if (table.page > 0 && table.page >= totalPages) {
+      table.onResetPage();
+    }
+  }, [dataFiltered.length, table]);
+
   const dataInPage = rowInPage(dataFiltered, table.page, table.rowsPerPage);
   const notFound = dataFiltered.length === 0;
   const filteredIds = dataFiltered.map((item) => item.id);
@@ -717,33 +724,39 @@ export function UsersView({ sx }) {
                           </TableCell>
                           <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                             <Tooltip title="Voir détails">
-                              <IconButton
-                                color="info"
-                                onClick={() => handleViewDetails(user.id)}
-                                disabled={busyUserId === user.id}
-                              >
-                                <Iconify icon="solar:eye-bold" />
-                              </IconButton>
+                              <span>
+                                <IconButton
+                                  color="info"
+                                  onClick={() => handleViewDetails(user.id)}
+                                  disabled={busyUserId === user.id}
+                                >
+                                  <Iconify icon="solar:eye-bold" />
+                                </IconButton>
+                              </span>
                             </Tooltip>
 
                             <Tooltip title="Envoyer avertissement">
-                              <IconButton
-                                color="warning"
-                                onClick={() => handleOpenWarningDialog(user)}
-                                disabled={busyUserId === user.id || user.role === 'admin'}
-                              >
-                                <Iconify icon="solar:danger-triangle-bold" />
-                              </IconButton>
+                              <span>
+                                <IconButton
+                                  color="warning"
+                                  onClick={() => handleOpenWarningDialog(user)}
+                                  disabled={busyUserId === user.id || user.role === 'admin'}
+                                >
+                                  <Iconify icon="solar:danger-triangle-bold" />
+                                </IconButton>
+                              </span>
                             </Tooltip>
 
                             <Tooltip title="Bannir l'utilisateur">
-                              <IconButton
-                                color="error"
-                                onClick={() => handleOpenBanDialog(user)}
-                                disabled={busyUserId === user.id || user.role === 'admin'}
-                              >
-                                <Iconify icon="solar:forbidden-circle-bold" />
-                              </IconButton>
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleOpenBanDialog(user)}
+                                  disabled={busyUserId === user.id || user.role === 'admin'}
+                                >
+                                  <Iconify icon="solar:forbidden-circle-bold" />
+                                </IconButton>
+                              </span>
                             </Tooltip>
 
                             <Tooltip
@@ -753,29 +766,33 @@ export function UsersView({ sx }) {
                                   : 'Suspendre le compte'
                               }
                             >
-                              <IconButton
-                                color={user.status === 'suspendu' ? 'success' : 'inherit'}
-                                onClick={() => handleOpenSuspendDialog(user)}
-                                disabled={busyUserId === user.id || user.role === 'admin'}
-                              >
-                                <Iconify
-                                  icon={
-                                    user.status === 'suspendu'
-                                      ? 'solar:shield-check-bold'
-                                      : 'solar:forbidden-circle-bold'
-                                  }
-                                />
-                              </IconButton>
+                              <span>
+                                <IconButton
+                                  color={user.status === 'suspendu' ? 'success' : 'inherit'}
+                                  onClick={() => handleOpenSuspendDialog(user)}
+                                  disabled={busyUserId === user.id || user.role === 'admin'}
+                                >
+                                  <Iconify
+                                    icon={
+                                      user.status === 'suspendu'
+                                        ? 'solar:shield-check-bold'
+                                        : 'solar:forbidden-circle-bold'
+                                    }
+                                  />
+                                </IconButton>
+                              </span>
                             </Tooltip>
 
                             <Tooltip title="Supprimer">
-                              <IconButton
-                                color="error"
-                                onClick={() => handleDeleteUser(user)}
-                                disabled={busyUserId === user.id || user.role === 'admin'}
-                              >
-                                <Iconify icon="solar:trash-bin-trash-bold" />
-                              </IconButton>
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDeleteUser(user)}
+                                  disabled={busyUserId === user.id || user.role === 'admin'}
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" />
+                                </IconButton>
+                              </span>
                             </Tooltip>
                           </TableCell>
                         </TableRow>

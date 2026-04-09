@@ -42,13 +42,13 @@ export const BACKEND_MODES = [
 
 export function getBackendMode() {
   if (typeof window === 'undefined') {
-    return normalizeMode(import.meta.env.VITE_BACKEND_MODE ?? 'prod');
+    return normalizeMode(import.meta.env.VITE_BACKEND_MODE ?? 'dev');
   }
 
   return normalizeMode(
     window.localStorage.getItem(BACKEND_MODE_STORAGE_KEY) ??
       import.meta.env.VITE_BACKEND_MODE ??
-      'prod'
+      'dev'
   );
 }
 

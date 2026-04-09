@@ -99,6 +99,22 @@ const userSchema = new mongoose.Schema(
     specialites_activites: [{ type: String }],
     // 🚀 NEW: Languages offered by organizers (also available for all users)
     langues_proposees: [{ type: String }],
+    // 🚀 NEW: Onboarding and approval fields
+    is_onboarded: { type: Boolean, default: false },
+    is_approved: { type: Boolean, default: true }, // Only for organizers
+    signup_method: { 
+      type: String, 
+      enum: ["google", "email", "facebook"], 
+      default: "email" 
+    },
+    profile_completed: { type: Boolean, default: false },
+    onboarding_step: { type: Number, default: 0 },
+    onboarding_data: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Approval tracking
+    submitted_for_approval: { type: Date },
+    approved_at: { type: Date },
+    approved_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    rejection_reason: { type: String },
   },
   {
     discriminatorKey: "userType",
@@ -114,5 +130,10 @@ userSchema.index({ userType: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ favorites: 1 });
 userSchema.index({ accountStatus: 1, userType: 1 });
+// 🚀 NEW: Onboarding and approval indexes
+userSchema.index({ is_onboarded: 1 });
+userSchema.index({ is_approved: 1, userType: 1 });
+userSchema.index({ signup_method: 1 });
+userSchema.index({ submitted_for_approval: 1 });
 
 module.exports = User;

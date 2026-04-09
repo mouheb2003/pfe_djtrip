@@ -39,6 +39,17 @@ const avisSchema = new mongoose.Schema(
       maxlength: [1000, "Comment cannot exceed 1000 characters"],
       default: null,
     },
+    // Optional tags (max 3)
+    tags: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function(tags) {
+          return tags.length <= 3;
+        },
+        message: "Maximum 3 tags allowed",
+      },
+    },
     // Link to the inscription that qualifies the tourist to review
     inscription_id: {
       type: mongoose.Schema.Types.ObjectId,

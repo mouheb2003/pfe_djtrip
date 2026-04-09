@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
-import '../../services/user_service.dart';
-import 'privacy_details_screen.dart';
-import 'delete_account_screen.dart';
+import '../../../theme/app_theme.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/user_service.dart';
+import 'privacy_policy_screen.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   const PrivacySettingsScreen({super.key});
@@ -12,370 +12,380 @@ class PrivacySettingsScreen extends StatefulWidget {
 }
 
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
-  bool _isLoading = true;
-  Map<String, bool> _privacySettings = {
-    'profileVisibility': true,
-    'showOnlineStatus': true,
-    'showLastSeen': false,
-    'allowDirectMessages': true,
-    'showPhone': false,
-    'showEmail': false,
-    'allowLocationSharing': false,
-    'allowDataAnalytics': false,
-  };
+  bool _isLoading = false;
+  
+  // Privacy settings state
+  bool _profileVisibility = true;
+  bool _showOnlineStatus = true;
+  bool _showLastSeen = false;
+  bool _allowDirectMessages = true;
+  bool _showPhone = false;
+  bool _showEmail = false;
+  bool _allowLocationSharing = false;
+  bool _allowDataAnalytics = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrivacySettings();
-    // Timeout safety - stop loading after 5 seconds max
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _isLoading) {
-        setState(() => _isLoading = false);
-      }
-    });
   }
 
   Future<void> _loadPrivacySettings() async {
-    print('🔄 Loading privacy settings...');
     try {
       final user = await UserService.getProfile();
-      print('✅ User loaded: ${user != null ? 'yes' : 'null'}');
-      
-      if (!mounted) return;
-      
-      if (user != null) {
-        // Debug: print all user keys
-        print('📋 User keys: ${user.keys.toList()}');
-        
-        setState(() {
-          _privacySettings['profileVisibility'] = user['profileVisibility'] ?? true;
-          _privacySettings['showOnlineStatus'] = user['showOnlineStatus'] ?? true;
-          _privacySettings['showLastSeen'] = user['showLastSeen'] ?? false;
-          _privacySettings['allowDirectMessages'] = user['allowDirectMessages'] ?? true;
-          _privacySettings['showPhone'] = user['showPhone'] ?? false;
-          _privacySettings['showEmail'] = user['showEmail'] ?? false;
-          _privacySettings['allowLocationSharing'] = user['allowLocationSharing'] ?? false;
-          _privacySettings['allowDataAnalytics'] = user['allowDataAnalytics'] ?? false;
-          _isLoading = false;
-        });
-        print('✅ Privacy settings loaded successfully');
-      } else {
-        print('⚠️ User is null, showing default settings');
-        setState(() => _isLoading = false);
+      if (user != null && mounted) {
+        final settings = user['privacy_settings'] as Map<String, dynamic>?;
+        if (settings != null) {
+          setState(() {
+            _profileVisibility = settings['profile_visibility'] ?? true;
+            _showOnlineStatus = settings['show_online_status'] ?? true;
+            _showLastSeen = settings['show_last_seen'] ?? false;
+            _allowDirectMessages = settings['allow_direct_messages'] ?? true;
+            _showPhone = settings['show_phone'] ?? false;
+            _showEmail = settings['show_email'] ?? false;
+            _allowLocationSharing = settings['allow_location_sharing'] ?? false;
+            _allowDataAnalytics = settings['allow_data_analytics'] ?? false;
+          });
+        }
       }
-    } catch (e, stackTrace) {
-      print('❌ Error loading privacy settings: $e');
-      print('📍 Stack trace: $stackTrace');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    } catch (e) {
+      print('Error loading privacy settings: $e');
     }
   }
 
   Future<void> _updatePrivacySetting(String key, bool value) async {
-    setState(() {
-      _privacySettings[key] = value;
-    });
-
     try {
-      await UserService.updatePrivacySettings({key: value});
-    } catch (e) {
-      // Revert on error
       setState(() {
-        _privacySettings[key] = !value;
+        switch (key) {
+          case 'profile_visibility':
+            _profileVisibility = value;
+            break;
+          case 'show_online_status':
+            _showOnlineStatus = value;
+            break;
+          case 'show_last_seen':
+            _showLastSeen = value;
+            break;
+          case 'allow_direct_messages':
+            _allowDirectMessages = value;
+            break;
+          case 'show_phone':
+            _showPhone = value;
+            break;
+          case 'show_email':
+            _showEmail = value;
+            break;
+          case 'allow_location_sharing':
+            _allowLocationSharing = value;
+            break;
+          case 'allow_data_analytics':
+            _allowDataAnalytics = value;
+            break;
+        }
       });
-      if (mounted) {
+
+      final success = await UserService.updatePrivacySettingsNew({key: value});
+      if (!success && mounted) {
+        // Revert on failure
+        setState(() {
+          switch (key) {
+            case 'profile_visibility':
+              _profileVisibility = !value;
+              break;
+            case 'show_online_status':
+              _showOnlineStatus = !value;
+              break;
+            case 'show_last_seen':
+              _showLastSeen = !value;
+              break;
+            case 'allow_direct_messages':
+              _allowDirectMessages = !value;
+              break;
+            case 'show_phone':
+              _showPhone = !value;
+              break;
+            case 'show_email':
+              _showEmail = !value;
+              break;
+            case 'allow_location_sharing':
+              _allowLocationSharing = !value;
+              break;
+            case 'allow_data_analytics':
+              _allowDataAnalytics = !value;
+              break;
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating privacy settings'),
+          const SnackBar(
+            content: Text('Failed to update privacy setting'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    } catch (e) {
+      print('Error updating privacy setting: $e');
     }
-  }
-
-  Widget _buildSettingTile({
-    required String title,
-    required String subtitle,
-    required String key,
-    required bool value,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(subtitle),
-      trailing: Switch(
-        value: value,
-        onChanged: (newValue) {
-          _updatePrivacySetting(key, newValue);
-        },
-        activeColor: AppColors.primary,
-      ),
-      onTap: onTap,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FF),
       appBar: AppBar(
-        title: const Text('Privacy Settings'),
-        backgroundColor: AppColors.card,
+        backgroundColor: Colors.white,
         elevation: 0,
-        foregroundColor: AppColors.textPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Privacy Settings',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
       ),
-      backgroundColor: AppColors.background,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Visibility Section
+            _buildSectionHeader('Profile Visibility'),
+            const SizedBox(height: 12),
+            _buildPrivacyCard(
+              icon: Icons.visibility,
+              title: 'Profile Visibility',
+              subtitle: 'Make your profile visible to other users',
+              value: _profileVisibility,
+              onChanged: (value) => _updatePrivacySetting('profile_visibility', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.online_prediction,
+              title: 'Show Online Status',
+              subtitle: 'Let others see when you\'re online',
+              value: _showOnlineStatus,
+              onChanged: (value) => _updatePrivacySetting('show_online_status', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.access_time,
+              title: 'Show Last Seen',
+              subtitle: 'Show when you were last active',
+              value: _showLastSeen,
+              onChanged: (value) => _updatePrivacySetting('show_last_seen', value),
+            ),
+
+            const SizedBox(height: 24),
+            
+            // Communication Section
+            _buildSectionHeader('Communication'),
+            const SizedBox(height: 12),
+            _buildPrivacyCard(
+              icon: Icons.message,
+              title: 'Allow Direct Messages',
+              subtitle: 'Let users send you messages directly',
+              value: _allowDirectMessages,
+              onChanged: (value) => _updatePrivacySetting('allow_direct_messages', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.phone,
+              title: 'Show Phone Number',
+              subtitle: 'Display your phone number on your profile',
+              value: _showPhone,
+              onChanged: (value) => _updatePrivacySetting('show_phone', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.email,
+              title: 'Show Email',
+              subtitle: 'Display your email on your profile',
+              value: _showEmail,
+              onChanged: (value) => _updatePrivacySetting('show_email', value),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Data & Location Section
+            _buildSectionHeader('Data & Location'),
+            const SizedBox(height: 12),
+            _buildPrivacyCard(
+              icon: Icons.location_on,
+              title: 'Location Sharing',
+              subtitle: 'Share your location for better recommendations',
+              value: _allowLocationSharing,
+              onChanged: (value) => _updatePrivacySetting('allow_location_sharing', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.analytics,
+              title: 'Data Analytics',
+              subtitle: 'Help us improve with anonymous usage data',
+              value: _allowDataAnalytics,
+              onChanged: (value) => _updatePrivacySetting('allow_data_analytics', value),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Action Buttons
+            _buildActionButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1E225E),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E5FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF4B63FF),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profile Section
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'PROFILE PRIVACY',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.0,
-                    ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E225E),
                   ),
                 ),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        title: 'Profile Visibility',
-                        subtitle: 'Control who can see your profile',
-                        key: 'profileVisibility',
-                        value: _privacySettings['profileVisibility']!,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacyDetailsScreen(
-                                title: 'Profile Visibility',
-                                description: 'Choose who can see your profile information',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildSettingTile(
-                        title: 'Show Online Status',
-                        subtitle: 'Let others see when you\'re online',
-                        key: 'showOnlineStatus',
-                        value: _privacySettings['showOnlineStatus']!,
-                      ),
-                      const Divider(height: 1),
-                      _buildSettingTile(
-                        title: 'Show Last Seen',
-                        subtitle: 'Let others see when you were last active',
-                        key: 'showLastSeen',
-                        value: _privacySettings['showLastSeen']!,
-                      ),
-                    ],
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    height: 1.3,
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                // Communication Section
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'COMMUNICATION',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        title: 'Allow Direct Messages',
-                        subtitle: 'Let people send you messages directly',
-                        key: 'allowDirectMessages',
-                        value: _privacySettings['allowDirectMessages']!,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacyDetailsScreen(
-                                title: 'Direct Messages',
-                                description: 'Control who can send you direct messages',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Contact Information Section
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'CONTACT INFORMATION',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        title: 'Show Phone Number',
-                        subtitle: 'Display your phone number on your profile',
-                        key: 'showPhone',
-                        value: _privacySettings['showPhone']!,
-                      ),
-                      const Divider(height: 1),
-                      _buildSettingTile(
-                        title: 'Show Email Address',
-                        subtitle: 'Display your email address on your profile',
-                        key: 'showEmail',
-                        value: _privacySettings['showEmail']!,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Data & Analytics Section
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'DATA & ANALYTICS',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        title: 'Location Sharing',
-                        subtitle: 'Share your location for better recommendations',
-                        key: 'allowLocationSharing',
-                        value: _privacySettings['allowLocationSharing']!,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacyDetailsScreen(
-                                title: 'Location Sharing',
-                                description: 'Control how your location data is used',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildSettingTile(
-                        title: 'Data Analytics',
-                        subtitle: 'Help us improve DJTrip with usage data',
-                        key: 'allowDataAnalytics',
-                        value: _privacySettings['allowDataAnalytics']!,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacyDetailsScreen(
-                                title: 'Data Analytics',
-                                description: 'Learn how we use your data to improve our services',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Danger Zone - Delete Account
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'DANGER ZONE',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  color: Colors.red.withOpacity(0.05),
-                  child: ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.delete_forever,
-                        color: Colors.red,
-                      ),
-                    ),
-                    title: const Text(
-                      'Delete Account',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Permanently delete your account and all data',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    trailing: const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.red,
-                      size: 16,
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const DeleteAccountScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 32),
               ],
             ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF4B63FF),
+            activeTrackColor: const Color(0xFFE8E5FF),
+            inactiveThumbColor: Colors.grey[400],
+            inactiveTrackColor: Colors.grey[300],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        // View Privacy Policy Button
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.privacy_tip, size: 20),
+            label: const Text(
+              'View Privacy Policy',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4B63FF),
+              side: const BorderSide(color: Color(0xFF4B63FF), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Delete Account Button
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              // Navigate to delete account screen
+            },
+            icon: const Icon(Icons.delete_forever, size: 20),
+            label: const Text(
+              'Delete Account',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.red, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

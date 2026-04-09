@@ -199,6 +199,16 @@ class ActivityModel {
 
   String get languesFormatted => languesDisponibles.join(' / ');
 
+  // English getters for compatibility
+  String get title => titre;
+  String get category => categorie;
+  String get location => lieu;
+  String get duration => '${duree.toInt()}h';
+  double? get price => prix;
+  double? get rating => noteMoyenne;
+  DateTime get createdDate => createdAt ?? DateTime.now();
+  String get imageUrl => photos.isNotEmpty ? photos.first : '';
+
   // Activity timeline status logic
   String get timelineStatus {
     final now = DateTime.now();

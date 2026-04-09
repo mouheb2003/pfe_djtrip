@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 import '../config/app_routes.dart';
+import '../screens/shared/appeal_form_screen.dart';
+import '../models/user_model.dart';
+import '../screens/auth/onboarding_screen.dart';
 
 class NavigationService {
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -41,6 +45,35 @@ class NavigationService {
     navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
     _isRedirecting = false;
   }
+
+  static void navigateToOnboarding({String userType = 'Touriste'}) {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OnboardingScreen(userType: userType),
+      ),
+    );
+  }
+
+  static void navigateToWaitingApproval() {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    // Use welcome as a temporary fallback or a dedicated screen if available
+    navigator.pushReplacementNamed(AppRoutes.welcome);
+  }
+
+  static void navigateToHome({String? userType}) {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    final route = (userType == 'Organisator' || userType == 'Organizer')
+        ? AppRoutes.organizerMain
+        : AppRoutes.touristMain;
+    navigator.pushNamedAndRemoveUntil(route, (route) => false);
+  }
 }
 
 class _RestrictionPayload {
@@ -60,6 +93,12 @@ class _RestrictionPayload {
 
   bool get isBanned => type == 'banned';
   bool get isSuspended => type == 'suspended';
+
+  UserStatus get toUserStatus {
+    if (isBanned) return UserStatus.banned;
+    if (isSuspended) return UserStatus.suspended;
+    return UserStatus.active;
+  }
 
   static _RestrictionPayload from({
     String? message,
@@ -148,148 +187,196 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
   }
 
   String _formatRemaining(Duration d) {
-    final days = d.inDays;
-    final hours = d.inHours.remainder(24);
+    final hours = d.inHours;
     final mins = d.inMinutes.remainder(60);
     final secs = d.inSeconds.remainder(60);
 
-    if (days > 0) {
-      return '${days}d ${hours}h ${mins}m ${secs}s';
-    }
-    if (hours > 0) {
-      return '${hours}h ${mins}m ${secs}s';
-    }
-    return '${mins}m ${secs}s';
+    return '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final isBanned = widget.payload.isBanned;
     final isSuspended = widget.payload.isSuspended;
+    
     final themeColor = isBanned
         ? const Color(0xFFDC2626)
-        : isSuspended
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF4F46E5);
+        : const Color(0xFF2563EB); // Use Blue for suspension as per image
 
     final title = isBanned
-        ? 'Your account is banned'
-        : isSuspended
-        ? 'Your account is suspended'
-        : 'Account restricted';
+        ? 'Account banned'
+        : 'Account suspended';
 
     final subtitle = isBanned
-        ? 'Your DJTrip account has been banned. You cannot access the app.'
-        : isSuspended
-        ? 'Your DJTrip account is temporarily suspended. Sign in again later.'
-        : (widget.payload.message.isNotEmpty
-              ? widget.payload.message
-              : 'Your account access is currently restricted.');
+        ? 'Your account has been permanently banned. Please contact support if you believe this is an error.'
+        : 'Your access has been restricted. Please contact support if you believe this is an error.';
 
     final iconData = isBanned
-        ? Icons.gpp_bad_rounded
-        : isSuspended
-        ? Icons.hourglass_top_rounded
-        : Icons.lock_outline_rounded;
+        ? Icons.block_flipped
+        : Icons.block_flipped;
+    
     final iconColor = themeColor;
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      backgroundColor: const Color(0xFFF8FAFC),
-      titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-      contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-      title: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(iconData, color: iconColor, size: 28),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 30 / 1.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF475569), height: 1.35),
-          ),
-          if (widget.payload.reason.isNotEmpty) ...[
-            const SizedBox(height: 12),
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                color: themeColor.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: themeColor.withOpacity(0.32)),
+                color: iconColor.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: Text(
-                'Reason: ${widget.payload.reason}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
+              child: Icon(iconData, color: iconColor, size: 36),
             ),
-          ],
-          if (isSuspended) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
+            
+            // Title
             Text(
-              'Remaining suspension time: ${_formatRemaining(_remaining)}',
-              style: TextStyle(fontWeight: FontWeight.w700, color: themeColor),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _remaining > Duration.zero
-                  ? 'Sign in again later when the timer reaches zero.'
-                  : 'You can reconnect now.',
+              title,
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.w600,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
               ),
             ),
-          ],
-          if (isBanned) ...[
             const SizedBox(height: 12),
-            const Text(
-              'Ban status is permanent until the admin restores your account.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.w600,
+            
+            // Subtitle
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 15,
+                height: 1.4,
               ),
             ),
-          ],
-        ],
-      ),
-      actions: [
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: themeColor,
-              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            const SizedBox(height: 24),
+
+            // Suspension Timer Card
+            if (isSuspended) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Reconnect in:',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: themeColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatRemaining(_remaining),
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: themeColor,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Progress bar placeholder
+                    Container(
+                      height: 6,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: 0.6, // Static placeholder for visual consistency
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: themeColor.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Action Buttons
+            Column(
+              children: [
+                // Appeal Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AppealFormScreen(
+                            userStatus: widget.payload.toUserStatus,
+                            banReason: isBanned ? widget.payload.reason : null,
+                            suspensionReason: isSuspended ? widget.payload.reason : null,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Submit Appeal',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Back to Login Button
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      'Go back to login',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Go back to login'),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

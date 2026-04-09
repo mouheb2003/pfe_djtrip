@@ -3,6 +3,8 @@ import 'dart:async';
 import 'config/app_routes.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
+import 'screens/auth/email_verification_screen.dart';
+import 'screens/auth/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -76,7 +78,35 @@ class _SplashScreenState extends State<SplashScreen>
       // User logged in - retrieve info and go to Main
       final user = await AuthService.getUser();
       if (user != null) {
-        final String? userType = user['userType'];
+        final String userType = user['userType'] as String? ?? 'Touriste';
+        final bool emailVerified = user['emailVerified'] ?? true;
+        final bool isOnboarded = user['is_onboarded'] ?? true;
+
+        // 🚀 NEW: Handle email verification flow
+        if (!emailVerified) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                email: user['email'] ?? '',
+                userType: userType,
+              ),
+            ),
+          );
+          return;
+        }
+
+        // 🚀 NEW: Handle onboarding flow
+        if (!isOnboarded) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OnboardingScreen(userType: userType),
+            ),
+          );
+          return;
+        }
+
         final route = (userType == 'Organisator' || userType == 'Organizer')
             ? AppRoutes.organizerMain
             : AppRoutes.touristMain;

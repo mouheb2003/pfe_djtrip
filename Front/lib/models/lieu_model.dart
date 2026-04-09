@@ -14,6 +14,18 @@ class LieuModel {
   final double? latitude;
   final double? longitude;
   final String? activiteLieeId;
+  final String? video;
+  final List<String> amenities;
+  final List<String> activities;
+  final String? openingHours;
+  final String? closingHours;
+  final bool? bookingRequired;
+
+  String get displayImage {
+    if (imagePortrait.isNotEmpty) return imagePortrait;
+    if (images.isNotEmpty) return images.first;
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80';
+  }
 
   const LieuModel({
     required this.id,
@@ -31,6 +43,12 @@ class LieuModel {
     this.latitude,
     this.longitude,
     this.activiteLieeId,
+    this.video,
+    this.amenities = const [],
+    this.activities = const [],
+    this.openingHours,
+    this.closingHours,
+    this.bookingRequired,
   });
 
   factory LieuModel.fromJson(Map<String, dynamic> json) {
@@ -45,23 +63,24 @@ class LieuModel {
       activiteId = activiteLiee['_id'] as String?;
     }
 
-    final rawTitre = (json['titre'] ?? json['title'] ?? json['nom'] ?? '')
+    final rawTitre = (json['name'] ?? json['titre'] ?? json['title'] ?? json['nom'] ?? '')
         .toString();
     final rawSousTitre =
-        (json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'] ?? '')
+        (json['short_description'] ?? json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'] ?? '')
             .toString()
             .trim()
             .isNotEmpty
-        ? (json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'])
+        ? (json['short_description'] ?? json['sousTitre'] ?? json['subtitle'] ?? json['sous_titre'])
               .toString()
-        : (position?['description'] ?? '').toString();
+        : (json['city'] ?? 'Djerba').toString();
     final rawDescription =
-        (json['description'] ?? json['desc'] ?? position?['description'] ?? '')
+        (json['long_description'] ?? json['description'] ?? json['desc'] ?? position?['description'] ?? '')
             .toString();
     final rawImagePortrait =
-        (json['imagePortrait'] ??
+        (json['main_image'] ??
+                json['imagePortrait'] ??
                 json['image'] ??
-                (json['images'] as List?)
+                (json['gallery'] as List?)
                     ?.whereType<String>()
                     .cast<String?>()
                     .firstWhere(
@@ -71,7 +90,7 @@ class LieuModel {
                 '')
             .toString();
     final rawCategorie = _normalizeCategory(
-      (json['categorie'] ?? json['category'] ?? json['type'] ?? 'Other')
+      (json['type'] ?? json['categorie'] ?? json['category'] ?? 'Other')
           .toString(),
     );
     final rawTopDestination =
@@ -84,18 +103,18 @@ class LieuModel {
       description: rawDescription,
       imagePortrait: rawImagePortrait,
       imagePaysage: json['imagePaysage'] as String?,
-      images: (json['images'] as List? ?? []).whereType<String>().toList(
+      images: (json['gallery'] as List? ?? json['images'] as List? ?? []).whereType<String>().toList(
         growable: false,
       ),
       noteMoyenne:
-          (json['noteMoyenne'] as num? ?? json['note_moyenne'] as num? ?? 0)
+          (json['rating'] as num? ?? json['noteMoyenne'] as num? ?? json['note_moyenne'] as num? ?? 0)
               .toDouble(),
       nombreAvis:
-          (json['nombreAvis'] as num? ?? json['nombre_avis'] as num? ?? 0)
+          (json['review_count'] as num? ?? json['nombreAvis'] as num? ?? json['nombre_avis'] as num? ?? 0)
               .toInt(),
       categorie: rawCategorie,
       topDestination: rawTopDestination,
-      prix: json['prix'] as String? ?? 'FREE',
+      prix: (json['price_range'] as String? ?? json['prix'] as String? ?? 'FREE'),
       latitude:
           (coords?['latitude'] as num? ??
                   coords?['lat'] as num? ??
@@ -108,6 +127,12 @@ class LieuModel {
                   position?['lng'] as num?)
               ?.toDouble(),
       activiteLieeId: activiteId,
+      video: json['video'] as String?,
+      amenities: (json['amenities'] as List? ?? []).whereType<String>().toList(),
+      activities: (json['activities'] as List? ?? []).whereType<String>().toList(),
+      openingHours: json['opening_hours'] as String?,
+      closingHours: json['closing_hours'] as String?,
+      bookingRequired: json['booking_required'] as bool?,
     );
   }
 
@@ -124,13 +149,7 @@ class LieuModel {
     return raw;
   }
 
-  String get displayImage {
-    if (imagePortrait.isNotEmpty) return imagePortrait;
-    if (imagePaysage != null && imagePaysage!.isNotEmpty) return imagePaysage!;
-    if (images.isNotEmpty) return images.first;
-    return '';
-  }
-
+  
   String get categoryLabelFr {
     switch (categorie) {
       case 'Beaches':

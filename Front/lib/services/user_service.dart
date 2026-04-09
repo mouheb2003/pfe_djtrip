@@ -413,6 +413,54 @@ class UserService {
     CacheManager.instance.removeByPattern('GET:/users/me*');
   }
 
+  /// Update privacy settings
+  static Future<bool> updatePrivacySettingsNew(Map<String, bool> settings) async {
+    try {
+      _devLog('Updating privacy settings...');
+      
+      final response = await ApiClient.patch(
+        '/users/privacy-settings',
+        settings,
+      );
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _devLog('Privacy settings updated successfully');
+        _invalidateProfileCache();
+        return true;
+      } else {
+        _devLog('Failed to update privacy settings: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _devLog('Error updating privacy settings: $e');
+      return false;
+    }
+  }
+
+  /// Update notification settings
+  static Future<bool> updateNotificationSettings(Map<String, bool> settings) async {
+    try {
+      _devLog('Updating notification settings...');
+      
+      final response = await ApiClient.patch(
+        '/users/notification-settings',
+        settings,
+      );
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _devLog('Notification settings updated successfully');
+        _invalidateProfileCache();
+        return true;
+      } else {
+        _devLog('Failed to update notification settings: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _devLog('Error updating notification settings: $e');
+      return false;
+    }
+  }
+
   /// Development logging with TAG prefix
   static void _devLog(String message) {
     if (kDebugMode) {

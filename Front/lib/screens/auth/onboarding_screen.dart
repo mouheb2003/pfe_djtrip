@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
+import '../../services/onboarding_service.dart';
+import '../../services/auth_service.dart';
 import '../tourist/tourist_main_screen.dart';
 import '../organizer/organizer_main_screen.dart';
 
@@ -75,6 +77,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _selectedLanguage = 'French';
 
   // Step 3
+  final _bioCtrl = TextEditingController();
+
+  // Step 4 (Tourist Only)
+  final List<String> _selectedInterests = [];
+
+  // Step 4 (Organizer Only)
+  final List<String> _selectedSpokenLanguages = ['French'];
+
+  // Step 5 (Organizer Only)
+  final List<String> _selectedSpecialties = [];
+
+  // Step 6 (Final)
   File? _profilePhoto;
   bool _isUploading = false;
 
@@ -82,6 +96,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _pageCtrl.dispose();
     _searchCtrl.dispose();
+    _bioCtrl.dispose();
     super.dispose();
   }
 
@@ -112,20 +127,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _finish({bool skip = false}) async {
-    if (!skip && _profilePhoto != null) {
-      setState(() => _isUploading = true);
-      await UserService.updateAvatar(_profilePhoto!);
-      if (!mounted) return;
-      setState(() => _isUploading = false);
+    final Map<String, dynamic> updateData = {
+      'pays_origine': _selectedCountry,
+      'langue_preferee': _selectedLanguage,
+      'bio': _bioCtrl.text.trim(),
+    };
+
+    if (widget.userType == 'Touriste') {
+      updateData['centres_interet'] = _selectedInterests;
+    } else {
+      updateData['langues_proposees'] = _selectedSpokenLanguages;
+      updateData['specialites_activites'] = _selectedSpecialties;
+      updateData['is_approved'] = false; // 🚀 Set to false for new organizers
     }
-    final dest = widget.userType == 'Organisator'
-        ? const OrganizerMainScreen()
-        : const TouristMainScreen();
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
+
+    setState(() => _isUploading = true);
+
+    try {
+      // Update profile info
+      await UserService.updateProfile(updateData);
+
+      // Update avatar if provided
+      if (!skip && _profilePhoto != null) {
+        await UserService.updateAvatar(_profilePhoto!);
+      }
+
+      // Mark as onboarded
+      await OnboardingService.completeOnboarding();
+    } catch (e) {
+      print('Error completing onboarding: $e');
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+
+    if (widget.userType == 'Organisator' || widget.userType == 'Organizer') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const TouristMainScreen()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isTourist = widget.userType == 'Touriste';
+    final int totalSteps = isTourist ? 5 : 6;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -148,6 +200,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   selectedCountry: _selectedCountry,
                   searchCtrl: _searchCtrl,
                   searchQuery: _searchQuery,
+                  totalSteps: totalSteps,
                   onSearchChanged: (v) => setState(() => _searchQuery = v),
                   onCountrySelected: (c) => setState(() => _selectedCountry = c),
                   onNext: _nextPage,
@@ -155,13 +208,71 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 _Step2(
                   selectedLanguage: _selectedLanguage,
+                  totalSteps: totalSteps,
                   onLanguageSelected: (l) => setState(() => _selectedLanguage = l),
                   onNext: _nextPage,
                   onBack: _prevPage,
                 ),
-                _Step3(
+                _StepBio(
+                  controller: _bioCtrl,
+                  totalSteps: totalSteps,
+                  onNext: _nextPage,
+                  onBack: _prevPage,
+                ),
+                if (isTourist)
+                  _StepInterests(
+                    selectedInterests: _selectedInterests,
+                    totalSteps: totalSteps,
+                    onToggleInterest: (interest) {
+                      setState(() {
+                        if (_selectedInterests.contains(interest)) {
+                          _selectedInterests.remove(interest);
+                        } else {
+                          _selectedInterests.add(interest);
+                        }
+                      });
+                    },
+                    onNext: _nextPage,
+                    onBack: _prevPage,
+                  )
+                else ...[
+                  _StepSpokenLanguages(
+                    selectedLanguages: _selectedSpokenLanguages,
+                    totalSteps: totalSteps,
+                    onToggleLanguage: (lang) {
+                      setState(() {
+                        if (_selectedSpokenLanguages.contains(lang)) {
+                          if (_selectedSpokenLanguages.length > 1) {
+                            _selectedSpokenLanguages.remove(lang);
+                          }
+                        } else {
+                          _selectedSpokenLanguages.add(lang);
+                        }
+                      });
+                    },
+                    onNext: _nextPage,
+                    onBack: _prevPage,
+                  ),
+                  _StepSpecialties(
+                    selectedSpecialties: _selectedSpecialties,
+                    totalSteps: totalSteps,
+                    onToggleSpecialty: (spec) {
+                      setState(() {
+                        if (_selectedSpecialties.contains(spec)) {
+                          _selectedSpecialties.remove(spec);
+                        } else {
+                          _selectedSpecialties.add(spec);
+                        }
+                      });
+                    },
+                    onNext: _nextPage,
+                    onBack: _prevPage,
+                  ),
+                ],
+                _StepPhoto(
                   profilePhoto: _profilePhoto,
                   isUploading: _isUploading,
+                  totalSteps: totalSteps,
                   onPickPhoto: _pickPhoto,
                   onUpload: () => _finish(skip: false),
                   onSkip: () => _finish(skip: true),
@@ -298,6 +409,7 @@ class _Step1 extends StatelessWidget {
   final String? selectedCountry;
   final TextEditingController searchCtrl;
   final String searchQuery;
+  final int totalSteps;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onCountrySelected;
   final VoidCallback onNext;
@@ -307,6 +419,7 @@ class _Step1 extends StatelessWidget {
     required this.selectedCountry,
     required this.searchCtrl,
     required this.searchQuery,
+    required this.totalSteps,
     required this.onSearchChanged,
     required this.onCountrySelected,
     required this.onNext,
@@ -329,7 +442,7 @@ class _Step1 extends StatelessWidget {
             title: 'Where are you from?',
             subtitle: 'Select your country to personalize your experience and discover nearby places.',
             currentStep: 1,
-            totalSteps: 3,
+            totalSteps: totalSteps,
             onBack: onBack,
           ),
           const SizedBox(height: 30),
@@ -478,12 +591,14 @@ class _CountryTile extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _Step2 extends StatelessWidget {
   final String selectedLanguage;
+  final int totalSteps;
   final ValueChanged<String> onLanguageSelected;
   final VoidCallback onNext;
   final VoidCallback onBack;
 
   const _Step2({
     required this.selectedLanguage,
+    required this.totalSteps,
     required this.onLanguageSelected,
     required this.onNext,
     required this.onBack,
@@ -498,10 +613,10 @@ class _Step2 extends StatelessWidget {
         children: [
           const SizedBox(height: 10),
           _PremiumStepHeader(
-            title: 'What language do you prefer?',
+            title: 'Preferred language?',
             subtitle: 'Choose your language to navigate DJTrip comfortably.',
             currentStep: 2,
-            totalSteps: 3,
+            totalSteps: totalSteps,
             onBack: onBack,
           ),
           const SizedBox(height: 40),
@@ -624,17 +739,19 @@ class _LanguageTile extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Step 3: Add Profile Photo
 // ─────────────────────────────────────────────────────────────────────────────
-class _Step3 extends StatelessWidget {
+class _StepPhoto extends StatelessWidget {
   final File? profilePhoto;
   final bool isUploading;
+  final int totalSteps;
   final VoidCallback onPickPhoto;
   final VoidCallback onUpload;
   final VoidCallback onSkip;
   final VoidCallback onBack;
 
-  const _Step3({
+  const _StepPhoto({
     required this.profilePhoto,
     required this.isUploading,
+    required this.totalSteps,
     required this.onPickPhoto,
     required this.onUpload,
     required this.onSkip,
@@ -652,8 +769,8 @@ class _Step3 extends StatelessWidget {
           _PremiumStepHeader(
             title: 'Profile Picture',
             subtitle: 'Add a photo to be recognized by other community members.',
-            currentStep: 3,
-            totalSteps: 3,
+            currentStep: totalSteps,
+            totalSteps: totalSteps,
             onBack: onBack,
           ),
           const SizedBox(height: 40),
@@ -762,6 +879,757 @@ class _Step3 extends StatelessWidget {
           ),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step Bio
+// ─────────────────────────────────────────────────────────────────────────────
+class _StepBio extends StatelessWidget {
+  final TextEditingController controller;
+  final int totalSteps;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _StepBio({
+    required this.controller,
+    required this.totalSteps,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          _PremiumStepHeader(
+            title: 'Tell us about you',
+            subtitle: 'Write a short bio to introduce yourself to the community.',
+            currentStep: 3,
+            totalSteps: totalSteps,
+            onBack: onBack,
+          ),
+          const SizedBox(height: 30),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: controller,
+              maxLines: 5,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                hintText: 'I love traveling and discovering new cultures...',
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: _NextButton(onPressed: onNext),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step Interests (Tourist Only)
+// ─────────────────────────────────────────────────────────────────────────────
+class _StepInterests extends StatefulWidget {
+  final List<String> selectedInterests;
+  final int totalSteps;
+  final Function(String) onToggleInterest;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _StepInterests({
+    required this.selectedInterests,
+    required this.totalSteps,
+    required this.onToggleInterest,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  @override
+  State<_StepInterests> createState() => _StepInterestsState();
+}
+
+class _StepInterestsState extends State<_StepInterests> {
+  final List<String> _baseInterests = [
+    'Beach', 'Adventure', 'Culture', 'Food', 'History',
+    'Shopping', 'Nightlife', 'Nature', 'Photography', 'Sports'
+  ];
+
+  void _showAddCustomDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Custom Interest'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Enter your interest...'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final val = ctrl.text.trim();
+              if (val.isNotEmpty) {
+                widget.onToggleInterest(val);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          _PremiumStepHeader(
+            title: 'Your interests',
+            subtitle: 'Select topics you are interested in to see personalized content.',
+            currentStep: 4,
+            totalSteps: widget.totalSteps,
+            onBack: widget.onBack,
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ...widget.selectedInterests
+                      .where((i) => !_baseInterests.contains(i))
+                      .map((interest) => _ChoiceChip(
+                            label: interest,
+                            isSelected: true,
+                            onTap: () => widget.onToggleInterest(interest),
+                          )),
+                  ..._baseInterests.map((interest) {
+                    final isSelected = widget.selectedInterests.contains(interest);
+                    return _ChoiceChip(
+                      label: interest,
+                      isSelected: isSelected,
+                      onTap: () => widget.onToggleInterest(interest),
+                    );
+                  }),
+                  _ChoiceChip(
+                    label: '+ Other',
+                    isSelected: false,
+                    onTap: _showAddCustomDialog,
+                    isOutline: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: _NextButton(onPressed: widget.onNext),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step Spoken Languages (Organizer Only)
+// ─────────────────────────────────────────────────────────────────────────────
+class _StepSpokenLanguages extends StatefulWidget {
+  final List<String> selectedLanguages;
+  final int totalSteps;
+  final Function(String) onToggleLanguage;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _StepSpokenLanguages({
+    required this.selectedLanguages,
+    required this.totalSteps,
+    required this.onToggleLanguage,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  @override
+  State<_StepSpokenLanguages> createState() => _StepSpokenLanguagesState();
+}
+
+class _StepSpokenLanguagesState extends State<_StepSpokenLanguages> {
+  final List<String> _baseLanguages = ['French', 'English', 'Arabic', 'German', 'Italian', 'Spanish'];
+
+  void _showAddCustomDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Spoken Language'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Enter language...'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final val = ctrl.text.trim();
+              if (val.isNotEmpty) {
+                widget.onToggleLanguage(val);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          _PremiumStepHeader(
+            title: 'Languages you speak',
+            subtitle: 'List the languages you can use to interact with tourists.',
+            currentStep: 4,
+            totalSteps: widget.totalSteps,
+            onBack: widget.onBack,
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ...widget.selectedLanguages
+                      .where((l) => !_baseLanguages.contains(l))
+                      .map((lang) => _ChoiceChip(
+                            label: lang,
+                            isSelected: true,
+                            onTap: () => widget.onToggleLanguage(lang),
+                          )),
+                  ..._baseLanguages.map((lang) {
+                    final isSelected = widget.selectedLanguages.contains(lang);
+                    return _ChoiceChip(
+                      label: lang,
+                      isSelected: isSelected,
+                      onTap: () => widget.onToggleLanguage(lang),
+                    );
+                  }),
+                  _ChoiceChip(
+                    label: '+ Other',
+                    isSelected: false,
+                    onTap: _showAddCustomDialog,
+                    isOutline: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: _NextButton(onPressed: widget.onNext),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step Specialties (Organizer Only)
+// ─────────────────────────────────────────────────────────────────────────────
+class _StepSpecialties extends StatefulWidget {
+  final List<String> selectedSpecialties;
+  final int totalSteps;
+  final Function(String) onToggleSpecialty;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _StepSpecialties({
+    required this.selectedSpecialties,
+    required this.totalSteps,
+    required this.onToggleSpecialty,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  @override
+  State<_StepSpecialties> createState() => _StepSpecialtiesState();
+}
+
+class _StepSpecialtiesState extends State<_StepSpecialties> {
+  final List<String> _baseSpecialties = [
+    'Excursions', 'Gastronomy', 'Diving', 'Photography', 'History',
+    'Traditional Arts', 'Local Crafts', 'Sports', 'Wellness'
+  ];
+
+  void _showAddCustomDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Specialty'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Enter specialty...'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final val = ctrl.text.trim();
+              if (val.isNotEmpty) {
+                widget.onToggleSpecialty(val);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          _PremiumStepHeader(
+            title: 'Your specialties',
+            subtitle: 'Select the types of activities you specialize in.',
+            currentStep: 5,
+            totalSteps: widget.totalSteps,
+            onBack: widget.onBack,
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ...widget.selectedSpecialties
+                      .where((s) => !_baseSpecialties.contains(s))
+                      .map((spec) => _ChoiceChip(
+                            label: spec,
+                            isSelected: true,
+                            onTap: () => widget.onToggleSpecialty(spec),
+                          )),
+                  ..._baseSpecialties.map((spec) {
+                    final isSelected = widget.selectedSpecialties.contains(spec);
+                    return _ChoiceChip(
+                      label: spec,
+                      isSelected: isSelected,
+                      onTap: () => widget.onToggleSpecialty(spec),
+                    );
+                  }),
+                  _ChoiceChip(
+                    label: '+ Other',
+                    isSelected: false,
+                    onTap: _showAddCustomDialog,
+                    isOutline: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: _NextButton(onPressed: widget.onNext),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isOutline;
+
+  const _ChoiceChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.isOutline = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : (isOutline ? Colors.transparent : Colors.white),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.primary.withOpacity(isOutline ? 0.6 : 0.2),
+            width: isOutline ? 1.5 : 1,
+            style: isOutline ? BorderStyle.solid : BorderStyle.solid,
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : (isOutline ? AppColors.primary : AppColors.textPrimary),
+            fontWeight: isSelected || isOutline ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Waiting Approval Screen
+// ─────────────────────────────────────────────────────────────────────────────
+class WaitingApprovalScreen extends StatelessWidget {
+  const WaitingApprovalScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E225E)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Verification Status',
+          style: TextStyle(color: Color(0xFF1E225E), fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              // Top Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4B63FF).withOpacity(0.08),
+                      blurRadius: 40,
+                      offset: const Offset(0, 20),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.hourglass_empty_rounded,
+                      size: 80,
+                      color: Color(0xFF4B63FF),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4B63FF).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'FINAL STEP',
+                        style: TextStyle(
+                          color: Color(0xFF4B63FF),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Under Review',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF6C757D),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+              
+              // Badge
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4B63FF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'PENDING APPROVAL',
+                    style: TextStyle(
+                      color: Color(0xFF4B63FF),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Your application is\nbeing ',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E225E),
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'reviewed',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF4B63FF),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              const Text(
+                'Our team is currently verifying your organizer profile to ensure the highest quality of events on DJTrip. This process typically takes 24-48 hours. We\'ll notify you via email once your account is ready.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF6C757D),
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Status Items
+              _StatusItem(
+                icon: Icons.check_circle_outline,
+                title: 'Profile Submitted',
+                subtitle: 'Your documents and portfolio have been received.',
+                isDone: true,
+              ),
+              const SizedBox(height: 16),
+              _StatusItem(
+                icon: Icons.verified_user_outlined,
+                title: 'Manual Verification',
+                subtitle: 'An admin is currently cross-referencing your event credentials.',
+                isDone: false,
+              ),
+              
+              const Spacer(),
+              
+              // Logout Button
+              SizedBox(
+                width: 140,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => AuthService.signOut(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4B63FF).withOpacity(0.7),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                  ),
+                  child: const Text(
+                    'Logout',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isDone;
+
+  const _StatusItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F4FF).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDone ? Colors.white : const Color(0xFF4B63FF),
+              shape: BoxShape.circle,
+              boxShadow: isDone ? [] : [
+                BoxShadow(
+                  color: const Color(0xFF4B63FF).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: isDone ? const Color(0xFF4B63FF) : Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E225E),
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF6C757D),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+  final String label;
+
+  const _NextButton({this.onPressed, this.label = 'Continue'});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: onPressed != null
+              ? [AppColors.accent, AppColors.accentSoft]
+              : [Colors.grey.shade300, Colors.grey.shade400],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: onPressed != null
+            ? [
+                BoxShadow(
+                  color: AppColors.accent.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : [],
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
       ),
     );
   }

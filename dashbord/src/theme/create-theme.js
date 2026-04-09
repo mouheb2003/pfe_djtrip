@@ -47,5 +47,16 @@ export function createTheme({ settingsState, themeOverrides = {}, localeComponen
   // Create and return the final theme
   const theme = createMuiTheme(updatedCore, updatedComponents, localeComponents, themeOverrides);
 
+// Add vars for backward compatibility
+theme.vars = {
+  palette: updatedCore.palette,
+  spacing: updatedCore.spacing,
+  breakpoints: updatedCore.breakpoints,
+  typography: updatedCore.typography,
+  shadows: updatedCore.shadows,
+  shape: updatedCore.shape,
+  cssVariables: updatedCore.cssVariables,
+};
+
   return theme;
 }

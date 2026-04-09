@@ -127,6 +127,15 @@ router.delete(
   userController.deleteAccount,
 );
 
+// DELETE /:id - Delete user account (Admin only)
+router.delete(
+  "/:id",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["users", "touristes", "organisators", "posts"]),
+  userController.deleteUser,
+);
+
 // PUT /:id/status - Update account status (Admin only)
 router.put(
   "/:id/status",

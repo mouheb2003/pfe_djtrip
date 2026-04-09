@@ -397,7 +397,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     ),
                   ),
 
-                // Bouton Continue (S'affiche quand le panneau itinéraire est ouvert)
+                /* Bouton Continue (S'affiche quand le panneau itinéraire est ouvert)
                 if (_showItineraryPanel)
                   SizedBox(
                     width: double.infinity,
@@ -420,7 +420,7 @@ class _ExploreTabState extends State<ExploreTab> {
                         ),
                       ),
                     ),
-                  ),
+                  ),*/
               ],
             ),
           ),
@@ -545,79 +545,259 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Widget _buildItineraryPanel() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black26,
-            blurRadius: 15,
-            offset: Offset(0, 5),
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+            spreadRadius: 0,
           ),
         ],
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header avec titre et bouton fermer
           Row(
             children: [
-              const SizedBox(width: 6),
               Container(
-                width: 12,
-                height: 12,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF2878FF),
-                  shape: BoxShape.circle,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2158F6).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.directions,
+                  color: Color(0xFF2158F6),
+                  size: 20,
                 ),
               ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Votre position',
+                  'Itinéraire',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF245CF7),
+                    color: Color(0xFF1A1A1A),
                   ),
                 ),
               ),
               GestureDetector(
                 onTap: () => setState(() => _showItineraryPanel = false),
-                child: const Icon(Icons.more_vert, color: Color(0xFF222B45)),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Color(0xFF666666),
+                    size: 20,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade300, height: 1),
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
+          
+          // Section Point de départ
+          _buildRouteSection(
+            title: 'Point de départ',
+            icon: Icons.my_location,
+            iconColor: const Color(0xFF2158F6),
+            controller: _originCtrl,
+            isOrigin: true,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Ligne de connexion
+          Container(
+            height: 2,
+            margin: const EdgeInsets.only(left: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2158F6).withOpacity(0.3),
+                  const Color(0xFF2158F6).withOpacity(0.1),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Section Destination
+          _buildRouteSection(
+            title: 'Destination',
+            icon: Icons.place,
+            iconColor: Colors.redAccent,
+            controller: _destinationCtrl,
+            isOrigin: false,
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Bouton d'action
+          Container(
+            width: double.infinity,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2158F6), Color(0xFF1976D2)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2158F6).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(15),
+                onTap: _continueInGoogleMaps,
+                child: const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.navigation,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Naviguer avec Google Maps',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteSection({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required TextEditingController controller,
+    required bool isOrigin,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF666666),
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.location_on, color: Colors.redAccent, size: 24),
-              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: _buildRouteInput(
-                  _originCtrl,
-                  Icons.my_location,
-                  'Ma position actuelle',
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: controller,
+                    readOnly: true,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                    decoration: InputDecoration(
+                      hintText: isOrigin ? 'Ma position actuelle' : 'Destination sélectionnée',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: _refreshCurrentPosition,
-                child: const Icon(
-                  Icons.swap_vert,
-                  color: Color(0xFF222B45),
-                  size: 28,
+              if (isOrigin) ...[
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: _refreshCurrentPosition,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2158F6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.refresh,
+                      color: Color(0xFF2158F6),
+                      size: 18,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ),
-          const SizedBox(height: 12),
-          _buildRouteInput(
-            _destinationCtrl,
-            Icons.place,
-            'Destination',
-            isDisabled: true,
           ),
         ],
       ),
@@ -647,16 +827,16 @@ class _ExploreTabState extends State<ExploreTab> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
-                color: const Color(0xFF2D3B5F),
+                color: isDisabled ? Colors.grey : Colors.black87,
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                border: InputBorder.none,
-                isDense: true,
-                hintStyle: const TextStyle(
-                  color: Color(0xFF8A93A8),
-                  fontSize: 12,
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 13,
                 ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),

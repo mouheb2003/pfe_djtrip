@@ -5,10 +5,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/activity_model.dart';
+import '../../models/inscription_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/inscription_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
+import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_organizer_profile_screen.dart';
@@ -37,6 +40,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   String _currentUserType = '';
   bool _loadingActivity = true;
   bool _isBooking = false;
+  InscriptionModel? _bookingForActivity;
 
   final _images = const [
     'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1600&auto=format&fit=crop',
@@ -91,6 +95,71 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   bool get _isTouristUser {
     final role = _currentUserType.trim().toLowerCase();
     return role == 'touriste' || role == 'tourist';
+  }
+
+  bool get _isOrganizerUser {
+    final role = _currentUserType.trim().toLowerCase();
+    return role == 'organisator' || role == 'organisateur' || role == 'organizer';
+  }
+
+  bool get _isActivityOrganizer {
+    if (_activity == null || _currentUserId.isEmpty) return false;
+    final organizer = _activity?.organisateur;
+    final organizerId = (organizer?['_id'] ?? organizer?['id'] ?? '').toString().trim();
+    return organizerId == _currentUserId;
+  }
+
+  bool get _hasBookingForActivity => _bookingForActivity != null;
+
+  InscriptionModel? _latestBookingForActivity(
+    String activityId,
+    Map<String, List<InscriptionModel>> bookings,
+  ) {
+    InscriptionModel? latest;
+
+    void collect(List<InscriptionModel> items) {
+      for (final item in items) {
+        final itemActivityId = (item.activite?['_id'] ?? '').toString();
+        if (itemActivityId != activityId) continue;
+
+        if (latest == null) {
+          latest = item;
+          continue;
+        }
+
+        final currentDate = item.dateDemande;
+        final previousDate = latest!.dateDemande;
+
+        if (currentDate == null && previousDate != null) continue;
+        if (currentDate != null && previousDate == null) {
+          latest = item;
+          continue;
+        }
+        if (currentDate != null &&
+            previousDate != null &&
+            currentDate.isAfter(previousDate)) {
+          latest = item;
+        }
+      }
+    }
+
+    collect(bookings['pending'] ?? const <InscriptionModel>[]);
+    collect(bookings['confirmed'] ?? const <InscriptionModel>[]);
+    collect(bookings['cancelled'] ?? const <InscriptionModel>[]);
+
+    return latest;
+  }
+
+  Future<void> _openBookingStatus() async {
+    final booking = _bookingForActivity;
+    if (booking == null) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingDetailScreen(inscription: booking),
+      ),
+    );
   }
 
   String _getDateRangeLabel(ActivityModel a) {
@@ -169,10 +238,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         AuthService.getUserType(),
       ]);
       if (!mounted) return;
+
+      final userType = (results[2] as String? ?? '').trim();
+      InscriptionModel? booking;
+      final role = userType.toLowerCase();
+      if (role == 'touriste' || role == 'tourist') {
+        final bookings = await InscriptionService.getMyBookings();
+        if (!mounted) return;
+        booking = _latestBookingForActivity(widget.activityId, bookings);
+      }
+
       setState(() {
         _activity = results[0] as ActivityModel?;
         _currentUserId = (results[1] as String? ?? '').trim();
-        _currentUserType = (results[2] as String? ?? '').trim();
+        _currentUserType = userType;
+        _bookingForActivity = booking;
         _loadingActivity = false;
       });
     } catch (e) {
@@ -347,14 +427,22 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               ),
             ],
           ),
-          if (!widget.viewOnly)
+          if (!widget.viewOnly && !_isActivityOrganizer)
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: _StickyBottomBar(
                 price: activity.prixFormatted,
-                onBook: _isBooking ? null : _bookActivity,
+                showPrice: !_hasBookingForActivity,
+                buttonLabel: _hasBookingForActivity
+                    ? 'Check Booking Status'
+                    : 'Book Now',
+                onBook: _isBooking
+                    ? null
+                    : (_hasBookingForActivity
+                          ? _openBookingStatus
+                          : _bookActivity),
                 isLoading: _isBooking,
               ),
             ),
@@ -903,10 +991,14 @@ class _OrganizerCard extends StatelessWidget {
 
 class _StickyBottomBar extends StatelessWidget {
   final String price;
+  final bool showPrice;
+  final String buttonLabel;
   final VoidCallback? onBook;
   final bool isLoading;
   const _StickyBottomBar({
     required this.price,
+    required this.showPrice,
+    required this.buttonLabel,
     required this.onBook,
     required this.isLoading,
   });
@@ -927,29 +1019,31 @@ class _StickyBottomBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'TOTAL PRICE',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
+          if (showPrice) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'TOTAL PRICE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Text(
-                price,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1B2452),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1B2452),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 20),
+              ],
+            ),
+            const SizedBox(width: 20),
+          ],
           Expanded(
             child: SizedBox(
               height: 56,
@@ -963,8 +1057,8 @@ class _StickyBottomBar extends StatelessWidget {
                 ),
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Book Now',
+                    : Text(
+                        buttonLabel,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,

@@ -78,6 +78,17 @@ exports.signUp = async (req, res) => {
   try {
     const userData = req.body;
 
+    // Set signup method to email for email/password signup
+    userData.signup_method = 'email';
+    
+    // For email signup, set is_onboarded to false initially
+    userData.is_onboarded = false;
+    
+    // For organizers, set is_approved to false initially
+    if (userData.userType === 'Organisator') {
+      userData.is_approved = false;
+    }
+
     // Create user using UserService
     const user = await UserService.createUser(userData);
 
@@ -100,6 +111,8 @@ exports.signUp = async (req, res) => {
       accessToken,
       refreshToken,
       user: userResponse,
+      requires_onboarding: true,
+      skip_user_type_selection: true // Email signup skips user type selection
     });
   } catch (err) {
     // Handle specific errors
@@ -281,6 +294,30 @@ exports.signIn = async (req, res) => {
     user.loginAttempts = 0;
     user.lockUntil = undefined;
 
+    // 🚀 NEW: Check if email is verified
+    if (!user.emailVerified) {
+      // Generate tokens so they can access the verification route if protected
+      const { accessToken, refreshToken } = generateTokens(
+        user._id,
+        user.email,
+        user.userType,
+        user.tokenVersion || 0,
+      );
+
+      const userResponse = user.toObject();
+      delete userResponse.mot_de_passe;
+      delete userResponse.verificationCode;
+      delete userResponse.verificationCodeExpiry;
+
+      return res.status(200).json({
+        message: "Email verification required",
+        emailVerified: false,
+        accessToken,
+        refreshToken,
+        user: userResponse,
+      });
+    }
+
     // 🚀 NEW: Force cleanup before login - mark all users as offline except this one
     console.log(
       `🧹 [LOGIN] Forcing cleanup before login for user ${user._id}...`,
@@ -383,7 +420,9 @@ exports.googleAuth = async (req, res) => {
         googleId,
         avatar,
         emailVerified: isEmailVerified,
-        userType: "Touriste",
+        userType: "Touriste", // Default for Google signup, will be updated during onboarding
+        signup_method: "google",
+        is_onboarded: false, // Google signup requires onboarding
         accountStatus: "active",
         derniere_connexion: new Date(),
       });
@@ -411,6 +450,9 @@ exports.googleAuth = async (req, res) => {
       accessToken,
       refreshToken,
       user: userResponse,
+      requires_onboarding: !user.is_onboarded,
+      skip_user_type_selection: false, // Google signup shows user type selection
+      is_new_user: !isExistingUser
     });
   } catch (err) {
     return res.status(500).json({
@@ -980,6 +1022,54 @@ exports.updateAccountStatus = async (req, res) => {
       { new: true },
     ).select("-mot_de_passe");
 
+    // Send email notifications BEFORE sending response
+    if (accountStatus === "suspended") {
+      try {
+        console.log(`[SUSPENSION] Sending email to ${user.email} for user ${user.fullname}`);
+        await emailService.sendSuspensionNotification(
+          user.email,
+          user.fullname,
+          updatePayload.suspendReason,
+          updatePayload.suspendedUntil,
+        );
+        console.log(`[SUSPENSION] Email sent successfully to ${user.email}`);
+      } catch (emailErr) {
+        console.error("[SUSPENSION] Error sending suspension notification email:", emailErr);
+      }
+    }
+
+    if (accountStatus === "banned") {
+      try {
+        console.log(`[BAN] Sending email to ${user.email} for user ${user.fullname}`);
+        await emailService.sendBanNotification(
+          user.email,
+          user.fullname,
+          updatePayload.banReason,
+        );
+        console.log(`[BAN] Email sent successfully to ${user.email}`);
+      } catch (emailErr) {
+        console.error("[BAN] Error sending ban notification email:", emailErr);
+      }
+    }
+
+    if (
+      accountStatus === "active" &&
+      ["suspended", "banned"].includes(previousStatus)
+    ) {
+      try {
+        console.log(`[RESTORED] Sending email to ${user.email} for user ${user.fullname}`);
+        await emailService.sendAccountRestoredEmail(
+          user.email,
+          user.fullname,
+          previousStatus,
+          previousReason,
+        );
+        console.log(`[RESTORED] Email sent successfully to ${user.email}`);
+      } catch (emailErr) {
+        console.error("[RESTORED] Error sending account restored email:", emailErr);
+      }
+    }
+
     res.status(200).json({
       message: "Account status updated successfully",
       user: user,
@@ -1015,47 +1105,7 @@ exports.updateAccountStatus = async (req, res) => {
       }
     }
 
-    if (accountStatus === "suspended") {
-      try {
-        await emailService.sendSuspensionNotification(
-          user.email,
-          user.fullname,
-          updatePayload.suspendReason,
-          updatePayload.suspendedUntil,
-        );
-      } catch (emailErr) {
-        console.error("Error sending suspension notification email:", emailErr);
-      }
-    }
-
-    if (accountStatus === "banned") {
-      try {
-        await emailService.sendBanNotification(
-          user.email,
-          user.fullname,
-          updatePayload.banReason,
-        );
-      } catch (emailErr) {
-        console.error("Error sending ban notification email:", emailErr);
-      }
-    }
-
-    if (
-      accountStatus === "active" &&
-      ["suspended", "banned"].includes(previousStatus)
-    ) {
-      try {
-        await emailService.sendAccountRestoredEmail(
-          user.email,
-          user.fullname,
-          previousStatus,
-          previousReason,
-        );
-      } catch (emailErr) {
-        console.error("Error sending account restored email:", emailErr);
-      }
-    }
-
+    
     try {
       await createActivityLog({
         actorId: adminId,
@@ -1427,6 +1477,34 @@ exports.deleteAccount = async (req, res) => {
     console.error("❌ Error deleting account:", err);
     res.status(500).json({
       message: "Error deleting account",
+      error: err.message,
+    });
+  }
+};
+
+// Delete user by ID (Admin only) (DELETE /users/:id)
+exports.deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    console.log("🗑️ Admin request to delete user:", userId);
+
+    // Find and delete user
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      console.log("❌ User not found:", userId);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ User deleted successfully by admin:", userId);
+    res.status(200).json({
+      message: "User deleted successfully",
+      success: true,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting user:", err);
+    res.status(500).json({
+      message: "Error deleting user",
       error: err.message,
     });
   }

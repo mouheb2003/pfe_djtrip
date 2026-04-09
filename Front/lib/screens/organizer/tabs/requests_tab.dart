@@ -201,8 +201,79 @@ class _RequestsTabState extends State<RequestsTab> {
     if (ok && mounted) _loadRequests();
   }
 
+  Future<String?> _showRejectReasonDialog() async {
+    final controller = TextEditingController();
+    String? inlineError;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Reason for rejection'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Please provide a reason. This will be visible in booking details.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    maxLines: 4,
+                    minLines: 3,
+                    maxLength: 240,
+                    decoration: InputDecoration(
+                      hintText: 'Example: Activity is full for this date.',
+                      errorText: inlineError,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final reason = controller.text.trim();
+                    if (reason.isEmpty) {
+                      setDialogState(() {
+                        inlineError = 'Reason is required';
+                      });
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(reason);
+                  },
+                  child: const Text('Reject booking'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _reject(String id) async {
-    final ok = await InscriptionService.rejectInscription(id);
+    final reason = await _showRejectReasonDialog();
+    if (reason == null || reason.trim().isEmpty) return;
+
+    final ok = await InscriptionService.rejectInscription(
+      id,
+      message: reason.trim(),
+    );
     if (ok && mounted) _loadRequests();
   }
 

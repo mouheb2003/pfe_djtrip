@@ -21,6 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioCtrl = TextEditingController();
   final _customInterestCtrl = TextEditingController();
   final _customSpecialtyCtrl = TextEditingController();
+  final _customLanguageCtrl = TextEditingController();
   String _country = 'FR'; // 🚀 Country code for phone number
   String _originCountry =
       'FR'; // 🚀 FIX: Separate country of origin (completely independent)
@@ -94,11 +95,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // 🚀 NEW: Détecter si c'est un organisateur
   bool get _isOrganizer {
-    return _userType == 'Organisator';
+    final role = _userType.trim().toLowerCase();
+    return role == 'organisator' ||
+        role == 'organisateur' ||
+        role == 'organizer';
   }
 
   bool get _isTourist {
-    return _userType == 'Touriste';
+    final role = _userType.trim().toLowerCase();
+    return role == 'touriste' || role == 'tourist';
   }
 
   static const List<String> _countries = [
@@ -118,12 +123,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'RU', // Russie
     'SA', // Arabie Saoudite
     'AE', // Émirats Arabes Unis
+    'US', // Etats-Unis
+    'BR', // Bresil
+    'PT', // Portugal
+    'NL', // Pays-Bas
+    'SE', // Suede
+    'TR', // Turquie
+    'JP', // Japon
+    'IN', // Inde
+    'AU', // Australie
+    'MX', // Mexique
+    'CN', // Chine
   ];
   static const List<String> _languages = [
     'French',
     'English',
     'العربية',
     'Deutsch',
+    'Español',
+    'Português',
+    'Italiano',
+    'Nederlands',
+    'Türkçe',
+    'Русский',
+    '日本語',
+    'हिन्दी',
+    '中文',
   ];
 
   @override
@@ -303,6 +328,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (v == 'russie' || v == 'ru') return 'RU';
     if (v == 'arabie saoudite' || v == 'sa') return 'SA';
     if (v == 'émirats arabes unis' || v == 'emirates' || v == 'ae') return 'AE';
+    if (v == 'etats-unis' || v == 'états-unis' || v == 'usa' || v == 'us') {
+      return 'US';
+    }
+    if (v == 'bresil' || v == 'brésil' || v == 'br') return 'BR';
+    if (v == 'portugal' || v == 'pt') return 'PT';
+    if (v == 'pays-bas' || v == 'netherlands' || v == 'nl') return 'NL';
+    if (v == 'suede' || v == 'suède' || v == 'sweden' || v == 'se') {
+      return 'SE';
+    }
+    if (v == 'turquie' || v == 'turkey' || v == 'tr') return 'TR';
+    if (v == 'japon' || v == 'japan' || v == 'jp') return 'JP';
+    if (v == 'inde' || v == 'india' || v == 'in') return 'IN';
+    if (v == 'australie' || v == 'australia' || v == 'au') return 'AU';
+    if (v == 'mexique' || v == 'mexico' || v == 'mx') return 'MX';
+    if (v == 'chine' || v == 'china' || v == 'cn') return 'CN';
     return 'FR'; // Default to France
   }
 
@@ -316,6 +356,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (v == 'german' || v == 'deutsch' || v == 'de' || v == 'allemand') {
       return 'Deutsch';
     }
+    if (v == 'spanish' || v == 'español' || v == 'es') return 'Español';
+    if (v == 'portuguese' || v == 'português' || v == 'pt') {
+      return 'Português';
+    }
+    if (v == 'italian' || v == 'italiano' || v == 'it') return 'Italiano';
+    if (v == 'dutch' || v == 'nederlands' || v == 'nl') return 'Nederlands';
+    if (v == 'turkish' || v == 'türkçe' || v == 'tr') return 'Türkçe';
+    if (v == 'russian' || v == 'русский' || v == 'ru') return 'Русский';
+    if (v == 'japanese' || v == '日本語' || v == 'ja') return '日本語';
+    if (v == 'hindi' || v == 'हिन्दी' || v == 'hi') return 'हिन्दी';
+    if (v == 'chinese' || v == '中文' || v == 'zh') return '中文';
     return raw;
   }
 
@@ -345,6 +396,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       '+41',
       '+1',
       '+20',
+      '+55',
+      '+351',
+      '+31',
+      '+46',
+      '+90',
+      '+81',
+      '+91',
+      '+61',
+      '+52',
+      '+86',
     ];
     for (final code in countryCodes) {
       if (cleanPhone.startsWith(code)) {
@@ -417,6 +478,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': '+7',
       'SA': '+966',
       'AE': '+971',
+      'US': '+1',
+      'BR': '+55',
+      'PT': '+351',
+      'NL': '+31',
+      'SE': '+46',
+      'TR': '+90',
+      'JP': '+81',
+      'IN': '+91',
+      'AU': '+61',
+      'MX': '+52',
+      'CN': '+86',
     };
     return codes[countryKey] ?? '+33';
   }
@@ -440,6 +512,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': '🇷🇺',
       'SA': '🇸🇦',
       'AE': '🇦🇪',
+      'US': '🇺🇸',
+      'BR': '🇧🇷',
+      'PT': '🇵🇹',
+      'NL': '🇳🇱',
+      'SE': '🇸🇪',
+      'TR': '🇹🇷',
+      'JP': '🇯🇵',
+      'IN': '🇮🇳',
+      'AU': '🇦🇺',
+      'MX': '🇲🇽',
+      'CN': '🇨🇳',
     };
     return flags[countryKey] ?? '🇫🇷';
   }
@@ -463,8 +546,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': 'Russie',
       'SA': 'Arabie Saoudite',
       'AE': 'Émirats Arabes Unis',
+      'US': 'États-Unis',
+      'BR': 'Brésil',
+      'PT': 'Portugal',
+      'NL': 'Pays-Bas',
+      'SE': 'Suède',
+      'TR': 'Turquie',
+      'JP': 'Japon',
+      'IN': 'Inde',
+      'AU': 'Australie',
+      'MX': 'Mexique',
+      'CN': 'Chine',
     };
     return names[countryKey] ?? 'France';
+  }
+
+  String _getLanguageFlag(String language) {
+    const flags = {
+      'French': '🇫🇷',
+      'English': '🇬🇧',
+      'العربية': '🇸🇦',
+      'Deutsch': '🇩🇪',
+      'Español': '🇪🇸',
+      'Português': '🇵🇹',
+      'Italiano': '🇮🇹',
+      'Nederlands': '🇳🇱',
+      'Türkçe': '🇹🇷',
+      'Русский': '🇷🇺',
+      '日本語': '🇯🇵',
+      'हिन्दी': '🇮🇳',
+      '中文': '🇨🇳',
+    };
+    return flags[language] ?? '🌐';
   }
 
   // 🚀 NEW: Get maximum digits allowed for each country
@@ -486,6 +599,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': 11,
       'SA': 9,
       'AE': 9,
+      'US': 10,
+      'BR': 11,
+      'PT': 9,
+      'NL': 9,
+      'SE': 9,
+      'TR': 10,
+      'JP': 10,
+      'IN': 10,
+      'AU': 9,
+      'MX': 10,
+      'CN': 11,
     };
     return maxDigits[countryKey] ?? 8;
   }
@@ -508,6 +632,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': '916 123 45 67',
       'SA': '050 123 4567',
       'AE': '050 123 4567',
+      'US': '202 555 0143',
+      'BR': '11 98765 4321',
+      'PT': '912 345 678',
+      'NL': '06 12345678',
+      'SE': '070 123 45 67',
+      'TR': '532 123 4567',
+      'JP': '090 1234 5678',
+      'IN': '98765 43210',
+      'AU': '0412 345 678',
+      'MX': '55 1234 5678',
+      'CN': '138 1234 5678',
     };
     return examples[countryKey] ?? 'Enter phone number';
   }
@@ -610,6 +745,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'RU': 11,
       'SA': 9,
       'AE': 9,
+      'US': 10,
+      'BR': 10,
+      'PT': 9,
+      'NL': 9,
+      'SE': 9,
+      'TR': 10,
+      'JP': 10,
+      'IN': 10,
+      'AU': 9,
+      'MX': 10,
+      'CN': 11,
     };
     return minDigits[countryKey] ?? 8;
   }
@@ -759,6 +905,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _bioCtrl.dispose();
     _customInterestCtrl.dispose();
     _customSpecialtyCtrl.dispose();
+    _customLanguageCtrl.dispose();
     _phoneSaveTimer?.cancel();
     super.dispose();
   }
@@ -804,6 +951,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  void _addCustomSpokenLanguage() {
+    final custom = _customLanguageCtrl.text.trim();
+    if (custom.isEmpty) return;
+    if (_spokenLanguages.any((l) => l.toLowerCase() == custom.toLowerCase())) {
+      _customLanguageCtrl.clear();
+      return;
+    }
+    setState(() {
+      _spokenLanguages.add(custom);
+      _customLanguageCtrl.clear();
+    });
+  }
+
   void _toggleInterest(String interest) {
     setState(() {
       if (_interests.contains(interest)) {
@@ -847,8 +1007,684 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Widget _touristSectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          letterSpacing: 0.9,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF8A91B8),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _touristInputDecoration({String? hint, Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFFA3A8C3), fontSize: 14),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE5E7F3)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE5E7F3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF5A7BFF), width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildTouristScaffold() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F3FE),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Edit Profile',
+          style: TextStyle(
+            color: Color(0xFF4C4F86),
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : _saveProfile,
+            child: const Text(
+              'Save',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: SizedBox(
+            height: 50,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1D4ED8), Color(0xFF6C8BFF)],
+                ),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF335BFF).withOpacity(0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _saveProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Text(
+                        'SAVE PROFILE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Column(
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 46,
+                        backgroundColor: const Color(0xFFE4E8FF),
+                        child: CircleAvatar(
+                          radius: 42,
+                          backgroundColor: Colors.white,
+                          backgroundImage:
+                              (_avatarUrl != null &&
+                                  _avatarUrl!.isNotEmpty &&
+                                  !_hasNetworkError)
+                              ? NetworkImage(_avatarUrl!)
+                              : null,
+                          child:
+                              (_avatarUrl == null ||
+                                  _avatarUrl!.isEmpty ||
+                                  _hasNetworkError)
+                              ? const Icon(
+                                  Icons.person,
+                                  color: Color(0xFFA5ACC8),
+                                  size: 40,
+                                )
+                              : null,
+                        ),
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: GestureDetector(
+                          onTap: _isAvatarUploading
+                              ? null
+                              : _pickAndUploadAvatar,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: _isAvatarUploading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _isAvatarUploading ? null : _pickAndUploadAvatar,
+                    child: const Text(
+                      'CHANGE AVATAR',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _touristSectionLabel('FULL NAME'),
+            TextFormField(
+              controller: _nameCtrl,
+              decoration: _touristInputDecoration(hint: 'Your full name'),
+            ),
+            const SizedBox(height: 14),
+            _touristSectionLabel('PHONE NUMBER'),
+            if (_storedPhone(_userData).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: Color(0xFFD1D5E8)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Current: ${_storedPhone(_userData)}',
+                      style: const TextStyle(
+                        color: Color(0xFF98A2B3),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Row(
+              children: [
+                SizedBox(
+                  width: 71,
+                  child: DropdownButtonFormField<String>(
+                    value: _country,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    decoration: _touristInputDecoration(),
+                    items: _countries
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                                _getCountryFlag(c),
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _country = v);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    onChanged: (_) {
+                      _formatPhoneNumber();
+                      _validatePhone();
+                      _savePhoneChange();
+                    },
+                    decoration: _touristInputDecoration(
+                      hint: _getPhoneExample(_country),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _touristSectionLabel('COUNTRY'),
+            DropdownButtonFormField<String>(
+              value: _originCountry,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              decoration: _touristInputDecoration(),
+              items: _countries
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Row(
+                        children: [
+                          Text(
+                            _getCountryFlag(c),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _getCountryName(c),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _originCountry = v);
+              },
+            ),
+            const SizedBox(height: 14),
+            _touristSectionLabel('PREFERRED LANGUAGE'),
+            DropdownButtonFormField<String>(
+              value: _language,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              decoration: _touristInputDecoration(),
+              items: _languages
+                  .map(
+                    (l) => DropdownMenuItem(
+                      value: l,
+                      child: Row(
+                        children: [
+                          Text(
+                            _getLanguageFlag(l),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(l, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _language = v);
+              },
+            ),
+            const SizedBox(height: 14),
+            _touristSectionLabel('BIO'),
+            TextFormField(
+              controller: _bioCtrl,
+              maxLines: 4,
+              decoration: _touristInputDecoration(
+                hint: 'Tell us about your travel style...',
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (_isTourist) ...[
+              Row(
+                children: [
+                  _touristSectionLabel('INTERESTS & HOBBIES'),
+                  const Spacer(),
+                  Text(
+                    '${_interests.length} SELECTED',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _availableInterests.map((interest) {
+                    final selected = _interests.contains(interest);
+                    return InkWell(
+                      onTap: () => _toggleInterest(interest),
+                      borderRadius: BorderRadius.circular(999),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFF2B63EA)
+                              : const Color(0xFFE9ECFF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          interest,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF5B6190),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (_interests.any((i) => !_availableInterests.contains(i))) ...[
+                const SizedBox(height: 10),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 80),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _interests
+                        .where((i) => !_availableInterests.contains(i))
+                        .map(
+                          (interest) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5FF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: const Color(0xFF4B63FF).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: Color(0xFF4B63FF),
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    interest,
+                                    style: const TextStyle(
+                                      color: Color(0xFF4B63FF),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: () => _removeInterest(interest),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color: Color(0xFF4B63FF),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customInterestCtrl,
+                      enabled: _interests.length < _maxInterests,
+                      decoration: _touristInputDecoration(
+                        hint: 'Add custom interest',
+                      ),
+                      onSubmitted: (_) => _addCustomInterest(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _interests.length >= _maxInterests
+                          ? null
+                          : _addCustomInterest,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCFD5FF),
+                        foregroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (_isOrganizer) ...[
+              Row(
+                children: [
+                  _touristSectionLabel('SPECIALIZED ACTIVITIES'),
+                  const Spacer(),
+                  Text(
+                    '${_specialties.length} SELECTED',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _availableSpecialties.map((item) {
+                    final name = item['name']!;
+                    final selected = _specialties.contains(name);
+                    return InkWell(
+                      onTap: () => _toggleSpecialty(name),
+                      borderRadius: BorderRadius.circular(999),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        constraints: const BoxConstraints(maxWidth: 140),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFF2B63EA)
+                              : const Color(0xFFE9ECFF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${item['emoji']} $name',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF5B6190),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customSpecialtyCtrl,
+                      decoration: _touristInputDecoration(
+                        hint: 'Add custom specialties',
+                      ),
+                      onSubmitted: (_) => _addCustomSpecialty(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _addCustomSpecialty,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCFD5FF),
+                        foregroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _touristSectionLabel('SPOKEN LANGUAGES'),
+                  const Spacer(),
+                  Text(
+                    '${_spokenLanguages.length} SELECTED',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 100),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _availableSpokenLanguages.map((lang) {
+                    final selected = _spokenLanguages.contains(lang);
+                    return InkWell(
+                      onTap: () => _toggleSpokenLanguage(lang),
+                      borderRadius: BorderRadius.circular(999),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        constraints: const BoxConstraints(maxWidth: 100),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFF2B63EA)
+                              : const Color(0xFFE9ECFF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          lang,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF5B6190),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customLanguageCtrl,
+                      decoration: _touristInputDecoration(
+                        hint: 'Add custom languages',
+                      ),
+                      onSubmitted: (_) => _addCustomSpokenLanguage(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _addCustomSpokenLanguage,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCFD5FF),
+                        foregroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Add'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 90),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return _buildTouristScaffold();
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -1249,10 +2085,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               prefixText: '${_getCountryCode(_country)} ',
                               prefixStyle: const TextStyle(
                                 color: Colors.black87,
-                                fontSize: 14,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
-                              hintText: 'Enter new phone number',
+                              hintText: 'Phone number',
                               hintStyle: TextStyle(
                                 color: Colors.grey[400],
                                 fontSize: 14,
@@ -1261,7 +2097,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                                horizontal: 4,
                                 vertical: 16,
                               ),
                               suffixIcon: _isPhoneValid
@@ -1675,15 +2511,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      interest,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF1E3A8A),
+                                    Flexible(
+                                      child: Text(
+                                        interest,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1E3A8A),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 4),
                                     GestureDetector(
                                       onTap: () => _removeInterest(interest),
                                       child: const Icon(
@@ -1869,21 +2709,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               children: [
                                 if (isSelected)
                                   const Padding(
-                                    padding: EdgeInsets.only(right: 6),
+                                    padding: EdgeInsets.only(right: 4),
                                     child: Icon(
                                       Icons.check_circle,
                                       size: 16,
                                       color: Colors.white,
                                     ),
                                   ),
-                                Text(
-                                  lang,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF374151),
+                                Flexible(
+                                  child: Text(
+                                    lang,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xFF374151),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                                 ),
                               ],
@@ -1975,21 +2819,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               children: [
                                 if (isSelected)
                                   const Padding(
-                                    padding: EdgeInsets.only(right: 6),
+                                    padding: EdgeInsets.only(right: 4),
                                     child: Icon(
                                       Icons.check_circle,
                                       size: 16,
                                       color: Colors.white,
                                     ),
                                   ),
-                                Text(
-                                  '$emoji $name',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF9A3412),
+                                Flexible(
+                                  child: Text(
+                                    '$emoji $name',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xFF9A3412),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                                 ),
                               ],
@@ -2139,35 +2987,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(
-                                          0.1,
-                                        ),
+                                        color: const Color(0xFFE8F5FF),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: AppColors.primary.withOpacity(
-                                            0.3,
-                                          ),
+                                          color: const Color(0xFF4B63FF).withOpacity(0.3),
                                         ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            custom,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.primary,
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            size: 12,
+                                            color: Color(0xFF4B63FF),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Flexible(
+                                            child: Text(
+                                              custom,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF4B63FF),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
+                                          const SizedBox(width: 2),
                                           GestureDetector(
                                             onTap: () =>
                                                 _toggleSpecialty(custom),
                                             child: const Icon(
                                               Icons.close,
                                               size: 14,
-                                              color: AppColors.primary,
+                                              color: Color(0xFF4B63FF),
                                             ),
                                           ),
                                         ],

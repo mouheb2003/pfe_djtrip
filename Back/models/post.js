@@ -24,6 +24,26 @@ const postCommentSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    // Reactions system
+    reactions: {
+      type: Map,
+      of: {
+        users: [{
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        }],
+        count: {
+          type: Number,
+          default: 0,
+        },
+      },
+      default: new Map(),
+    },
+    total_reactions: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,

@@ -7,6 +7,13 @@ import { styled } from '@mui/material/styles';
 export const LabelRoot = styled('span', {
   shouldForwardProp: (prop) => !['color', 'variant', 'disabled', 'sx'].includes(prop),
 })(({ color, variant, disabled, theme }) => {
+  // Helper function to safely get color properties
+  const getColor = (colorProp, property) => {
+    const colorPalette = theme.vars.palette[colorProp];
+    if (!colorPalette) return theme.vars.palette.grey[800];
+    return colorPalette[property] || theme.vars.palette.grey[800];
+  };
+
   const defaultStyles = {
     ...(color === 'default' && {
       /**
@@ -16,7 +23,7 @@ export const LabelRoot = styled('span', {
         color: theme.vars.palette.common.white,
         backgroundColor: theme.vars.palette.text.primary,
         ...theme.applyStyles('dark', {
-          color: theme.vars.palette.grey[800],
+          color: theme.vars.palette[color]?.dark || theme.vars.palette.grey[800],
         }),
       }),
       /**
@@ -51,33 +58,33 @@ export const LabelRoot = styled('span', {
          * @variant filled
          */
         ...(variant === 'filled' && {
-          color: theme.vars.palette[color].contrastText,
-          backgroundColor: theme.vars.palette[color].main,
+          color: getColor(color, 'contrastText'),
+          backgroundColor: getColor(color, 'main'),
         }),
         /**
          * @variant outlined
          */
         ...(variant === 'outlined' && {
           backgroundColor: 'transparent',
-          color: theme.vars.palette[color].main,
-          border: `2px solid ${theme.vars.palette[color].main}`,
+          color: getColor(color, 'main'),
+          border: `2px solid ${getColor(color, 'main')}`,
         }),
         /**
          * @variant soft
          */
         ...(variant === 'soft' && {
-          color: theme.vars.palette[color].dark,
-          backgroundColor: varAlpha(theme.vars.palette[color].mainChannel, 0.16),
+          color: getColor(color, 'dark'),
+          backgroundColor: varAlpha(theme.vars.palette[color]?.mainChannel || theme.vars.palette.grey['500Channel'], 0.16),
           ...theme.applyStyles('dark', {
-            color: theme.vars.palette[color].light,
+            color: getColor(color, 'light'),
           }),
         }),
         /**
          * @variant inverted
          */
         ...(variant === 'inverted' && {
-          color: theme.vars.palette[color].darker,
-          backgroundColor: theme.vars.palette[color].lighter,
+          color: getColor(color, 'darker'),
+          backgroundColor: getColor(color, 'lighter'),
         }),
       }),
   };

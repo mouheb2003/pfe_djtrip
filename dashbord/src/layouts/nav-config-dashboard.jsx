@@ -91,6 +91,24 @@ export const navData = [
         icon: ICONS.user,
       },
       {
+        title: 'Notifications',
+        path: paths.dashboard.notifications,
+        icon: ICONS.mail,
+        info: <Label color="error">5</Label>,
+      },
+      {
+        title: 'Appeals',
+        path: paths.dashboard.appeals,
+        icon: ICONS.file,
+        info: <Label color="warning">2</Label>,
+      },
+      {
+        title: 'Approvals',
+        path: paths.dashboard.approvals,
+        icon: ICONS.user,
+        info: <Label color="orange">5</Label>,
+      },
+      {
         title: 'Demandes',
         path: paths.dashboard.group.root,
         icon: ICONS.mail,

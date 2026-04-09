@@ -51,6 +51,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       HomeTab(
         onExploreTap: () => _goToTab(1),
         onMessagesTap: () => _goToTab(5),
+        onActivitiesTap: () => _goToTab(2),
         showMessagesDot: _showMessagesDot,
       ),
       const ExploreTab(),
@@ -163,6 +164,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         _pages[0] = HomeTab(
           onExploreTap: () => _goToTab(1),
           onMessagesTap: () => _goToTab(5),
+          onActivitiesTap: () => _goToTab(2),
           showMessagesDot: _showMessagesDot,
         );
       });
@@ -199,6 +201,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       _pages[0] = HomeTab(
         onExploreTap: () => _goToTab(1),
         onMessagesTap: () => _goToTab(5),
+        onActivitiesTap: () => _goToTab(2),
         showMessagesDot: _showMessagesDot,
       );
     });

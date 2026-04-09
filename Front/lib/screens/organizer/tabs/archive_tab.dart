@@ -3,9 +3,14 @@ import 'package:intl/intl.dart';
 
 import '../../../models/activity_model.dart';
 import '../../../models/inscription_model.dart';
+import '../../../models/conversation_model.dart';
 import '../../shared/activity_detail_screen.dart';
+import '../../shared/chat_conversation_screen.dart';
+import '../../shared/public_tourist_profile_screen.dart';
 import '../../../services/activity_service.dart';
 import '../../../services/inscription_service.dart';
+import '../../../services/message_service.dart';
+import '../../../widgets/auto_image_carousel.dart';
 
 class ArchiveTab extends StatefulWidget {
   const ArchiveTab({super.key});
@@ -18,7 +23,11 @@ class _ArchiveTabState extends State<ArchiveTab> {
   final TextEditingController _searchController = TextEditingController();
   List<_ArchivedActivityBundle> _activities = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMoreActivities = true;
   String _query = '';
+  int _currentOffset = 0;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -32,13 +41,22 @@ class _ArchiveTabState extends State<ArchiveTab> {
     super.dispose();
   }
 
-  Future<void> _fetchArchives() async {
+  Future<void> _fetchArchives({bool isLoadMore = false}) async {
     if (mounted) {
-      setState(() => _isLoading = true);
+      if (isLoadMore) {
+        setState(() => _isLoadingMore = true);
+      } else {
+        setState(() => _isLoading = true);
+        _currentOffset = 0;
+        _hasMoreActivities = true;
+      }
     }
 
     try {
-      final activities = await ActivityService.getArchivedActivities();
+      final activities = await ActivityService.getArchivedActivities(
+        offset: isLoadMore ? _currentOffset : null,
+        limit: _pageSize,
+      );
       final participantLists = await Future.wait(
         activities.map(
           (activity) => InscriptionService.getOrganizerInscriptions(
@@ -50,18 +68,36 @@ class _ArchiveTabState extends State<ArchiveTab> {
 
       if (!mounted) return;
       setState(() {
-        _activities = [
-          for (var i = 0; i < activities.length; i++)
-            _ArchivedActivityBundle(
-              activity: activities[i],
-              participants: participantLists[i],
-            ),
-        ];
+        if (isLoadMore) {
+          _activities.addAll([
+            for (var i = 0; i < activities.length; i++)
+              _ArchivedActivityBundle(
+                activity: activities[i],
+                participants: participantLists[i],
+              ),
+          ]);
+          _currentOffset += activities.length;
+        } else {
+          _activities = [
+            for (var i = 0; i < activities.length; i++)
+              _ArchivedActivityBundle(
+                activity: activities[i],
+                participants: participantLists[i],
+              ),
+          ];
+          _currentOffset = activities.length;
+        }
+        
+        _hasMoreActivities = activities.length == _pageSize;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
       }
     }
   }
@@ -87,7 +123,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
     });
 
     if (q.isEmpty) {
-      return list.take(10).toList();
+      return list;
     }
 
     list.sort((a, b) {
@@ -170,30 +206,76 @@ class _ArchiveTabState extends State<ArchiveTab> {
   }
 
   Future<void> _deleteActivity(ActivityModel activity) async {
-    final confirmed = await showDialog<bool>(
+    final reasonController = TextEditingController();
+    String? inlineError;
+
+    final reason = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Activity?'),
-        content: Text(
-          'Are you sure you want to delete "${activity.titre}"? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Delete Activity?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Deleting "${activity.titre}" will cancel all related bookings. Please provide a cancellation reason for tourists.',
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 4,
+                  minLines: 3,
+                  maxLength: 280,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Example: Activity removed due to weather conditions.',
+                    errorText: inlineError,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    setDialogState(() {
+                      inlineError = 'Reason is required';
+                    });
+                    return;
+                  }
+                  Navigator.pop(ctx, reason);
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
 
-    if (confirmed != true) return;
+    if (reason == null || reason.trim().isEmpty) return;
 
     setState(() => _isLoading = true);
-    final success = await ActivityService.deleteActivity(activity.id);
+    final success = await ActivityService.deleteActivity(
+      activity.id,
+      cancellationMessage: reason.trim(),
+    );
 
     if (mounted) {
       if (success) {
@@ -295,66 +377,194 @@ class _ArchiveTabState extends State<ArchiveTab> {
                                     color: const Color(0xFFE7E9F7),
                                   ),
                                 ),
-                                child: Row(
+                                child: Column(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: const Color(0xFFE8E5FF),
-                                      backgroundImage: avatar.isNotEmpty
-                                          ? NetworkImage(avatar)
-                                          : null,
-                                      child: avatar.isEmpty
-                                          ? const Icon(
-                                              Icons.person,
-                                              color: Color(0xFF4B63FF),
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            name,
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor: const Color(0xFFE8E5FF),
+                                          backgroundImage: avatar.isNotEmpty
+                                              ? NetworkImage(avatar)
+                                              : null,
+                                          child: avatar.isEmpty
+                                              ? const Icon(
+                                                  Icons.person,
+                                                  color: Color(0xFF4B63FF),
+                                                )
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              if (phone.isNotEmpty) ...[
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  phone,
+                                                  style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFE8E5FF),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${inscription.nombreParticipants} pax',
                                             style: const TextStyle(
-                                              fontSize: 15,
+                                              color: Color(0xFF4B63FF),
+                                              fontSize: 11,
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
-                                          if (phone.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              phone,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              final touristId = tourist['_id']?.toString() ?? tourist['id']?.toString() ?? '';
+                                              if (touristId.isEmpty) return;
+                                              
+                                              // Check if conversation already exists
+                                              final conversations = await MessageService.getConversations();
+                                              final existingConversation = conversations.firstWhere(
+                                                (conv) => conv.partnerId == touristId,
+                                                orElse: () => ConversationModel(
+                                                  partnerId: '',        
+                                                  partnerName: '', 
+                                                  partnerType: 'Tourist',
+                                                  lastMessageContent: '',
+                                                ),
+                                              );
+                                              
+                                              if (existingConversation.partnerId.isNotEmpty) {
+                                                // Open existing conversation
+                                                if (mounted) {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) => ChatConversationScreen(
+                                                        partnerId: touristId,
+                                                        partnerName: name,
+                                                        partnerAvatar: avatar.isNotEmpty ? avatar : null,
+                                                        partnerType: 'Tourist',
+                                                        partnerOnline: false,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              } else {
+                                                // Start new conversation
+                                                try {
+                                                  await MessageService.sendMessage(
+                                                    partnerId: touristId,
+                                                    content: 'Hello! I\'m the organizer of this activity.',
+                                                  );
+                                                  if (mounted) {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) => ChatConversationScreen(
+                                                          partnerId: touristId,
+                                                          partnerName: name,
+                                                          partnerAvatar: avatar.isNotEmpty ? avatar : null,
+                                                          partnerType: 'Tourist',
+                                                          partnerOnline: false,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                } catch (e) {
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('Error starting conversation: $e'),
+                                                        backgroundColor: Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF4B63FF),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                            ),
+                                            child: const Text(
+                                              'Contact',
                                               style: TextStyle(
-                                                color: Colors.grey[600],
                                                 fontSize: 12,
+                                                fontWeight: FontWeight.w600,
                                               ),
                                             ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE8E5FF),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
+                                          ),
                                         ),
-                                      ),
-                                      child: Text(
-                                        '${inscription.nombreParticipants} pax',
-                                        style: const TextStyle(
-                                          color: Color(0xFF4B63FF),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            onPressed: () {
+                                              final touristId = tourist['_id']?.toString() ?? tourist['id']?.toString() ?? '';
+                                              if (touristId.isEmpty) return;
+                                              
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => PublicUserProfileScreen(
+                                                    userId: touristId,
+                                                    canContact: true,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFF4B63FF),
+                                              side: const BorderSide(color: Color(0xFF4B63FF)),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                            ),
+                                            child: const Text(
+                                              'Profile',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -472,7 +682,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
                     ),
                   );
                 }),
-              if (_activities.length > 3)
+              if (_hasMoreActivities && !_isLoading && !_isLoadingMore)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Center(
@@ -480,7 +690,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
                       width: 180,
                       height: 46,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: _isLoadingMore ? null : () => _fetchArchives(isLoadMore: true),
                         style: ElevatedButton.styleFrom(
                           elevation: 0,
                           backgroundColor: const Color(0xFFE3D7FF),
@@ -489,13 +699,22 @@ class _ArchiveTabState extends State<ArchiveTab> {
                             borderRadius: BorderRadius.circular(22),
                           ),
                         ),
-                        child: const Text(
-                          'Show More Records',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: _isLoadingMore
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black87),
+                                ),
+                              )
+                            : const Text(
+                                'Show More Records',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -556,15 +775,7 @@ class _RevenueCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'HISTORICAL PERFORMANCE',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.80),
-                    fontSize: 10,
-                    letterSpacing: 1.1,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                
                 const SizedBox(height: 10),
                 Text(
                   'Total Revenue',
@@ -585,14 +796,7 @@ class _RevenueCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '+12% vs last quarter',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.82),
-                    fontSize: 13,
-                    height: 1.3,
-                  ),
-                ),
+                
               ],
             ),
           ),
@@ -602,7 +806,7 @@ class _RevenueCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '$eventsCount events',
+                '$eventsCount activities',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -611,7 +815,7 @@ class _RevenueCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                participantsText,
+                '$participantsText Participant(s)',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.85),
                   fontSize: 12,
@@ -771,10 +975,17 @@ class _SearchBar extends StatelessWidget {
               controller: controller,
               onChanged: onChanged,
               onSubmitted: onChanged,
+              
               decoration: const InputDecoration(
-                hintText: 'Search archive...',
-                border: InputBorder.none,
-                isDense: true,
+  hintText: 'Search archive...',
+  border: InputBorder.none,
+  enabledBorder: InputBorder.none,
+  focusedBorder: InputBorder.none,
+  disabledBorder: InputBorder.none,
+  errorBorder: InputBorder.none,
+  focusedErrorBorder: InputBorder.none,
+  isDense: true,
+  contentPadding: EdgeInsets.zero, // 🔥 important aussi
               ),
             ),
           ),
@@ -853,7 +1064,18 @@ class _ArchiveActivityCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (imageUrl.isNotEmpty)
+                  if (activity.photos.isNotEmpty)
+                    AutoImageCarousel(
+                      imageUrls: activity.photos,
+                      aspectRatio: 16 / 9,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
+                      fit: BoxFit.cover,
+                      showIndicators: activity.photos.length > 1,
+                      interval: const Duration(seconds: 3),
+                    )
+                  else if (imageUrl.isNotEmpty)
                     Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
@@ -861,26 +1083,6 @@ class _ArchiveActivityCard extends StatelessWidget {
                     )
                   else
                     _heroFallback(),
-                  Positioned(
-                    top: 14,
-                    right: 14,
-                    child: Material(
-                      color: Colors.white.withOpacity(0.92),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onDetailTap,
-                        child: const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Icon(
-                            Icons.open_in_new_rounded,
-                            color: Color(0xFF4B63FF),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

@@ -38,6 +38,18 @@ router.post(
   postController.togglePostLike,
 );
 
+// Comment reactions
+router.post(
+  "/:postId/comments/:commentId/react",
+  verifyToken,
+  invalidateCache(["posts:comments", "posts:feed"]),
+  postController.reactToComment,
+);
+router.get(
+  "/:postId/comments/:commentId/reactions",
+  postController.getCommentReactions,
+);
+
 // Tourist post management
 router.get(
   "/me",

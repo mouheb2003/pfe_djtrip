@@ -1,3 +1,5 @@
+enum UserStatus { active, suspended, banned, inactive }
+
 class UserModel {
   final String id;
   final String fullname;

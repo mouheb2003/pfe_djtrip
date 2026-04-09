@@ -1,17 +1,30 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/lieu_model.dart';
+import '../../../models/place_model.dart';
+import '../../../models/activity_model.dart';
 import '../../../services/lieu_service.dart';
+import '../../../services/place_service.dart';
+import '../../../services/activity_service.dart';
 import '../place_detail_screen.dart';
+import '../place_detail_new_screen.dart';
+import '../view_all_activities_screen.dart';
+import '../view_all_places_screen.dart';
+import '../../shared/activity_card.dart';
+import '../../../widgets/place_card.dart';
+import '../../../theme/app_theme.dart';
 
 class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
+  final VoidCallback? onActivitiesTap;
   final bool showMessagesDot;
 
   const HomeTab({
     super.key,
     required this.onExploreTap,
     required this.onMessagesTap,
+    this.onActivitiesTap,
     this.showMessagesDot = false,
   });
 
@@ -21,42 +34,19 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   List<LieuModel> _lieux = [];
+  List<PlaceModel> _places = [];
+  List<ActivityModel> _activities = [];
+  List<PlaceModel> _filteredPlaces = [];
+  List<ActivityModel> _filteredActivities = [];
+  List<LieuModel> _visibleLieux = [];
+  List<LieuModel> _topDestinations = [];
+  List<ActivityModel> _topActivities = [];
   bool _isLoading = true;
   bool _isFetching = false;
-  String _selectedCategory = 'All';
+    String _searchQuery = '';
+  final _searchController = TextEditingController();
 
-  static const List<_CategoryItem> _categories = [
-    _CategoryItem(
-      keyName: 'All',
-      label: 'Beaches',
-      imageUrl:
-          'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=300&q=80',
-    ),
-    _CategoryItem(
-      keyName: 'Hotels',
-      label: 'Hotels',
-      imageUrl:
-          'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=300&q=80',
-    ),
-    _CategoryItem(
-      keyName: 'Restaurants',
-      label: 'Restaurants',
-      imageUrl:
-          'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=300&q=80',
-    ),
-    _CategoryItem(
-      keyName: 'Activities',
-      label: 'Activities',
-      imageUrl:
-          'https://images.unsplash.com/photo-1531058020387-3be344556be6?auto=format&fit=crop&w=300&q=80',
-    ),
-    _CategoryItem(
-      keyName: 'Excursions',
-      label: 'Excursions',
-      imageUrl:
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80',
-    ),
-  ];
+ 
 
   static const String _heroImage =
       'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
@@ -64,22 +54,55 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _loadLieux();
+    _fetchData();
   }
 
-  Future<void> _loadLieux() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchData() async {
     if (_isFetching) return;
     _isFetching = true;
 
     try {
       final lieux = await LieuService.getLieux();
+      print('[DEBUG] Fetched ${lieux.length} lieux');
+      for (var lieu in lieux.take(3)) {
+        print('[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+      }
+
+      // Fetch top activities from best organizers
+      final activities = await ActivityService.getActivities();
+      print('[DEBUG] Fetched ${activities.length} activities');
+      
+      // Filter upcoming activities and sort by organizer rating
+      final now = DateTime.now();
+      final upcomingActivities = activities.where((activity) {
+        return activity.isUpcoming;
+      }).toList();
+
+      // Sort by rating (highest first) and take top 10
+      upcomingActivities.sort((a, b) {
+        final ratingA = a.noteMoyenne;
+        final ratingB = b.noteMoyenne;
+        return ratingB.compareTo(ratingA);
+      });
+
+      final topActivities = upcomingActivities.take(10).toList();
+      print('[DEBUG] Top activities count: ${topActivities.length}');
+
       if (mounted) {
         setState(() {
           _lieux = lieux;
+          _topActivities = topActivities;
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      print('[DEBUG] Error fetching data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -90,34 +113,56 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  List<LieuModel> get _filteredLieux {
-    if (_selectedCategory == 'All') return _lieux;
-
-    final wanted = _selectedCategory.toLowerCase().trim();
-
-    return _lieux.where((lieu) {
-      final category = lieu.categorie.toLowerCase().trim();
-      final title = lieu.titre.toLowerCase().trim();
-      final subtitle = lieu.sousTitre.toLowerCase().trim();
-      return category.contains(wanted) ||
-          title.contains(wanted) ||
-          subtitle.contains(wanted);
-    }).toList();
+  Future<void> _loadLieux() async {
+    await _fetchData();
   }
 
-  List<LieuModel> get _visibleLieux {
-    final items = _filteredLieux;
-    if (items.isNotEmpty) return items;
+  List<LieuModel> get _filteredLieux {
     return _lieux;
   }
 
-  List<LieuModel> get _topDestinations {
-    final items = [..._visibleLieux];
+  List<LieuModel> get _filteredVisibleLieux {
+    List<LieuModel> items = _lieux;
+    
+    // Apply search filter if search query is not empty
+    if (_searchQuery.isNotEmpty) {
+      items = items.where((lieu) {
+        final title = lieu.titre.toLowerCase();
+        final subtitle = lieu.sousTitre.toLowerCase();
+        final description = lieu.description.toLowerCase();
+        final category = lieu.categorie.toLowerCase();
+        return title.contains(_searchQuery) ||
+               subtitle.contains(_searchQuery) ||
+               description.contains(_searchQuery) ||
+               category.contains(_searchQuery);
+      }).toList();
+    }
+    
+    return items;
+  }
+
+  List<LieuModel> get _topDestinationsList {
+    final items = List<LieuModel>.from(_filteredVisibleLieux);
+    print('[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}');
+    // D'abord prioriser les top destinations, puis trier par rating
     items.sort((a, b) {
-      if (a.topDestination == b.topDestination) return 0;
-      return a.topDestination ? -1 : 1;
+      if (a.topDestination && !b.topDestination) return -1;
+      if (!a.topDestination && b.topDestination) return 1;
+      // Si les deux ont le même statut topDestination, trier par rating
+      return b.noteMoyenne.compareTo(a.noteMoyenne);
     });
-    return items.take(6).toList();
+    final result = items.take(6).toList();
+    print('[DEBUG] _topDestinations count: ${result.length}');
+    for (var lieu in result.take(3)) {
+      print('[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+    }
+    return result;
+  }
+
+  List<LieuModel> get _topRatedPlaces {
+    final items = [..._visibleLieux];
+    items.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
+    return items.take(5).toList();
   }
 
   Map<String, dynamic> _toPlaceMap(LieuModel l) {
@@ -136,6 +181,25 @@ class _HomeTabState extends State<HomeTab> {
       'price': l.prix,
       'categorie': l.categorie,
     };
+  }
+
+  
+  Widget _buildFilterButton(String text, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.primary : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: isSelected ? Colors.white : const Color(0xFF6B7280),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 
   @override
@@ -165,83 +229,64 @@ class _HomeTabState extends State<HomeTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 60,
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8ECF2),
-                              borderRadius: BorderRadius.circular(36),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.search,
-                                  color: Color(0xFF7A8BA6),
-                                  size: 22,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Search beaches, hotels, activities..',
-                                    style: TextStyle(
-                                      color: Color(0xFF7A8BA6),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF167BFF),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF167BFF,
-                                ).withOpacity(0.35),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.tune,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 18),
-                    SizedBox(
-                      height: 116,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 14),
-                        itemBuilder: (context, index) {
-                          final c = _categories[index];
-                          return _CategoryAvatar(
-                            label: c.label,
-                            imageUrl: c.imageUrl,
-                            selected: _selectedCategory == c.keyName,
-                            onTap: () =>
-                                setState(() => _selectedCategory = c.keyName),
-                          );
+                    const SizedBox(height: 20),
+                    // Barre de recherche fonctionnelle
+                    Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase();
+                          });
                         },
+                        decoration: InputDecoration(
+                          hintText: 'Search destinations...',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 14,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Color(0xFF6B7280),
+                            size: 20,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Color(0xFF6B7280),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 15,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     Row(
                       children: [
                         const Expanded(
@@ -255,14 +300,21 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ViewAllPlacesScreen(),
+                              ),
+                            );
+                          },
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFF167BFF),
                           ),
                           iconAlignment: IconAlignment.end,
-                          icon: const Icon(Icons.chevron_right, size: 18),
+                          icon: const Icon(Icons.arrow_forward, size: 18),
                           label: const Text(
-                            'See All',
+                            'View All',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
@@ -277,17 +329,17 @@ class _HomeTabState extends State<HomeTab> {
                             height: 240,
                             child: Center(child: CircularProgressIndicator()),
                           )
-                        : _topDestinations.isEmpty
+                        : _topDestinationsList.isEmpty
                         ? _EmptyDestinations(onRetry: _loadLieux)
                         : SizedBox(
                             height: 280,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _topDestinations.length,
+                              itemCount: _topDestinationsList.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 16),
                               itemBuilder: (context, index) {
-                                final lieu = _topDestinations[index];
+                                final lieu = _topDestinationsList[index];
                                 return _TopDestinationCard(
                                   lieu: lieu,
                                   onTap: () => Navigator.push(
@@ -302,8 +354,186 @@ class _HomeTabState extends State<HomeTab> {
                               },
                             ),
                           ),
-                    const SizedBox(height: 20),
-                    const _PlanTripCard(),
+                    const SizedBox(height: 32),
+                    // Top Activities Section
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Top Activities',
+                            style: TextStyle(
+                              fontSize: 44 / 2,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            // Navigate to activities tab
+                            widget.onActivitiesTap?.call();
+                          },
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(Icons.arrow_forward, size: 18),
+                          label: const Text(
+                            'See all',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF167BFF),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _topActivities.isEmpty
+                        ? Container(
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.event_available,
+                                    size: 48,
+                                    color: Color(0xFF9CA3AF),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'No upcoming activities',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xFF6B7280),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SizedBox(
+                            height: 180,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _topActivities.length > 5 ? 5 : _topActivities.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final activity = _topActivities[index];
+                                return Container(
+                                  width: 160,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.06),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: ClipRRect(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                          child: Stack(
+                                            children: [
+                                              Container(
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                color: const Color(0xFFF3F4F6),
+                                                child: activity.imageUrl.isNotEmpty
+                                                    ? Image.network(
+                                                        activity.imageUrl,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __, ___) => const Center(
+                                                          child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
+                                                        ),
+                                                      )
+                                                    : const Center(
+                                                        child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
+                                                      ),
+                                              ),
+                                              Positioned(
+                                                top: 8,
+                                                right: 8,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withOpacity(0.7),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    '${activity.noteMoyenne.toStringAsFixed(1)}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(10),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                activity.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                activity.organisateur?['name'] ?? 'Unknown',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Color(0xFF64748B),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              Text(
+                                                activity.prixFormatted,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF167BFF),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -592,72 +822,124 @@ class _TopDestinationCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 260,
+        width: 200,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(34),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.16),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(34),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFFD0D9E8)),
-              ),
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x00000000),
-                      Color(0x4D000000),
-                      Color(0xAA000000),
-                    ],
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image section
+            Expanded(
+              flex: 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFD0D9E8),
+                        child: const Center(
+                          child: Icon(Icons.image, color: Color(0xFF7A8BA6)),
+                        ),
+                      ),
+                    ),
+                    // Rating overlay
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star, color: Color(0xFFFFC529), size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${lieu.noteMoyenne.toStringAsFixed(1)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
+            ),
+            // Content section
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
                       lieu.titre,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 2),
+                    Text(
+                      lieu.sousTitre.isNotEmpty ? lieu.sousTitre : 'Djerba',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(
-                          Icons.star,
-                          color: Color(0xFFFFC529),
-                          size: 16,
+                        Flexible(
+                          child: Text(
+                            lieu.prix == 'FREE' ? 'Free' : '${lieu.prix}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF167BFF),
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${lieu.noteMoyenne.toStringAsFixed(1)} (${lieu.nombreAvis})',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: Color(0xFF167BFF),
                           ),
                         ),
                       ],
@@ -665,8 +947,8 @@ class _TopDestinationCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
