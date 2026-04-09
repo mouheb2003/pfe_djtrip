@@ -1496,7 +1496,14 @@ class WaitingApprovalScreen extends StatelessWidget {
                 width: 140,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () => AuthService.signOut(context),
+                  onPressed: () {
+                    AuthService.logout();
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (route) => false,
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4B63FF).withOpacity(0.7),
                     foregroundColor: Colors.white,
