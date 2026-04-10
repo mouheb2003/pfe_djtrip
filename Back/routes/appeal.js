@@ -20,6 +20,13 @@ router.post(
   appealController.submitAppeal,
 );
 
+// Submit appeal without authentication (for suspended/banned users)
+router.post(
+  "/anonymous",
+  invalidateCache(["appeals"]),
+  appealController.submitAnonymousAppeal,
+);
+
 // Get current user's appeals
 router.get(
   "/me",

@@ -19,7 +19,7 @@ const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
 const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
 const AppealsPage = lazy(() => import('src/pages/dashboard/Appeals'));
-const ApprovalsPage = lazy(() => import('src/pages/dashboard/Approvals_working'));
+const ApprovalsPage = lazy(() => import('src/pages/dashboard/Approvals'));
 const NotificationsPage = lazy(() => import('src/pages/dashboard/Notifications'));
 
 // ----------------------------------------------------------------------

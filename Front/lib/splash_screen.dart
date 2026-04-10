@@ -5,6 +5,8 @@ import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'screens/auth/email_verification_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
+import 'services/onboarding_service.dart';
+import 'screens/organizer/waiting_approval_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -80,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (user != null) {
         final String userType = user['userType'] as String? ?? 'Touriste';
         final bool emailVerified = user['emailVerified'] ?? true;
-        final bool isOnboarded = user['is_onboarded'] ?? true;
+        final bool isOnboarded = user['is_onboarded'] ?? false;
 
         // 🚀 NEW: Handle email verification flow
         if (!emailVerified) {
@@ -105,6 +107,28 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           );
           return;
+        }
+
+        // ✅ Organizer gating: if onboarding is complete but approval pending, always show waiting screen
+        if (userType == 'Organisator' || userType == 'Organizer') {
+          try {
+            final status = await OnboardingService.getOnboardingStatus();
+            final isApproved = status['is_approved'] ?? true;
+            if (status['success'] == true && isApproved == false) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+              );
+              return;
+            }
+          } catch (_) {
+            // If status check fails, be safe: keep organizer blocked.
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+            );
+            return;
+          }
         }
 
         final route = (userType == 'Organisator' || userType == 'Organizer')

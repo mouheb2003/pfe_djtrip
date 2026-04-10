@@ -307,6 +307,7 @@ app.use("/api/avis", avisRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/lieux", lieuRoutes);
+app.use("/api/appeals", appealRoutes);
 app.use("/api/system-logs", systemLogRoutes);
 app.use("/api/logs", logRoutes);
 app.post("/api/auth/refresh", authMiddleware.refreshToken);

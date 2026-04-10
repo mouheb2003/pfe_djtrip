@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'api_client.dart';
 import 'navigation_service.dart';
 
 class OnboardingService {
-  static const String _baseUrl = '/api/v1/onboarding';
+  static const String _baseUrl = '/onboarding';
 
   // Get onboarding status
   static Future<Map<String, dynamic>> getOnboardingStatus() async {
@@ -227,6 +226,13 @@ class OnboardingService {
       'description': 'Choose your preferred language',
       'required': true,
       'fields': ['langue_preferee'],
+    },
+    {
+      'id': 'interests',
+      'title': 'Your Interests',
+      'description': 'Pick a few interests to personalize your recommendations',
+      'required': true,
+      'fields': ['interests'],
     },
   ];
 

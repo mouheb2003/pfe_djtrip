@@ -1,6 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../theme/app_theme.dart';
+import '../../services/onboarding_service.dart';
+import '../../config/app_routes.dart';
 import 'tabs/my_activities_tab.dart';
 import 'tabs/archive_tab.dart';
 import 'tabs/organizer_profile_tab.dart';
@@ -56,6 +58,25 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, _pages.length - 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final status = await OnboardingService.getOnboardingStatus();
+        final userType = status['userType'] ?? 'Touriste';
+        final isApproved = status['is_approved'] ?? true;
+        final isOnboarded = status['is_onboarded'] ?? false;
+        if (!mounted) return;
+
+        if (userType == 'Organisator' && isOnboarded == true && isApproved == false) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.waitingApproval,
+            (route) => false,
+          );
+        }
+      } catch (_) {
+        // If status can't be fetched, keep existing UI (best-effort).
+      }
+    });
     _refreshNoveltyBadges();
     _noveltyTimer = Timer.periodic(_noveltyRefreshInterval, (_) {
       _refreshNoveltyBadges();

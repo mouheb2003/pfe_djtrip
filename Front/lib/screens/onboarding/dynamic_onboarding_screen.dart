@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../theme/app_theme.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
 
@@ -34,6 +33,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
   String? _selectedLanguage;
   List<String> _selectedActivities = [];
   List<String> _selectedLanguages = [];
+  List<String> _selectedInterests = [];
 
   @override
   void initState() {
@@ -202,6 +202,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       case 'spoken_languages':
         stepData = {
           'langues_proposees': _selectedLanguages,
+        };
+        break;
+      case 'interests':
+        stepData = {
+          'interests': _selectedInterests,
         };
         break;
     }
@@ -465,9 +470,90 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         return _buildActivitiesStep(step);
       case 'spoken_languages':
         return _buildLanguagesStep(step);
+      case 'interests':
+        return _buildInterestsStep(step);
       default:
         return _buildDefaultStep(step);
     }
+  }
+
+  Widget _buildInterestsStep(Map<String, dynamic> step) {
+    final interests = [
+      'Adventure',
+      'Culture',
+      'Food',
+      'Nature',
+      'History',
+      'Photography',
+      'Shopping',
+      'Nightlife',
+      'Beach',
+      'Sports',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: interests.map((interest) {
+              final isSelected = _selectedInterests.contains(interest);
+              return FilterChip(
+                label: Text(interest),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedInterests.add(interest);
+                    } else {
+                      _selectedInterests.remove(interest);
+                    }
+                  });
+                },
+                backgroundColor: Colors.white,
+                selectedColor: const Color(0xFF4B63FF),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Selected: ${_selectedInterests.length}',
+            style: const TextStyle(
+              color: Color(0xFF6C757D),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPhoneStep(Map<String, dynamic> step) {

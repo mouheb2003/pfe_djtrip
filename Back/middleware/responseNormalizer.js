@@ -51,12 +51,23 @@ module.exports = function responseNormalizer(req, res, next) {
     }
 
     if (statusCode >= 400) {
+      // Preserve account restriction fields for 403 responses
+      const restrictionFields = {};
+      if (statusCode === 403) {
+        if (normalizedBody.type) restrictionFields.type = normalizedBody.type;
+        if (normalizedBody.forceLogout !== undefined) restrictionFields.forceLogout = normalizedBody.forceLogout;
+        if (normalizedBody.reason !== undefined) restrictionFields.reason = normalizedBody.reason;
+        if (normalizedBody.suspendedUntil !== undefined) restrictionFields.suspendedUntil = normalizedBody.suspendedUntil;
+        if (normalizedBody.remainingSeconds !== undefined) restrictionFields.remainingSeconds = normalizedBody.remainingSeconds;
+      }
+
       return originalJson({
         success: false,
         message: normalizedBody.message || "Request failed",
         ...(normalizedBody.error || normalizedBody.errors
           ? { error: normalizedBody.error || normalizedBody.errors }
           : {}),
+        ...restrictionFields,
       });
     }
 

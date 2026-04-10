@@ -236,6 +236,15 @@ exports.signIn = async (req, res) => {
           )
         : null;
 
+      const suspendedUntilISO = user.suspendedUntil
+        ? new Date(user.suspendedUntil).toISOString()
+        : null;
+
+      console.log('[SIGNIN SUSPENSION] user.suspendedUntil:', user.suspendedUntil, 'type:', typeof user.suspendedUntil);
+      console.log('[SIGNIN SUSPENSION] suspendedUntilISO:', suspendedUntilISO);
+      console.log('[SIGNIN SUSPENSION] remainingSeconds:', remainingSeconds);
+      console.log('[SIGNIN SUSPENSION] suspendReason:', user.suspendReason);
+
       return res.status(403).json({
         type: "suspended",
         forceLogout: true,
@@ -243,7 +252,7 @@ exports.signIn = async (req, res) => {
           ? `Account is suspended: ${user.suspendReason}`
           : "Account is suspended. Please contact support.",
         reason: user.suspendReason || null,
-        suspendedUntil: user.suspendedUntil || null,
+        suspendedUntil: suspendedUntilISO,
         remainingSeconds,
       });
     }
@@ -1091,6 +1100,17 @@ exports.updateAccountStatus = async (req, res) => {
           suspendedUntil:
             restrictionType === "suspended"
               ? updatePayload.suspendedUntil || null
+              : null,
+          remainingSeconds:
+            restrictionType === "suspended" && updatePayload.suspendedUntil
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (new Date(updatePayload.suspendedUntil).getTime() -
+                      Date.now()) /
+                      1000,
+                  ),
+                )
               : null,
           message:
             restrictionType === "banned"

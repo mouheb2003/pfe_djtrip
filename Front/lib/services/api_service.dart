@@ -241,6 +241,11 @@ class ApiService {
         if (response.statusCode == 403 && auth) {
           try {
             final body = jsonDecode(response.body);
+            print('[API 403] Full response body: $body');
+            print('[API 403] forceLogout: ${body['forceLogout']}');
+            print('[API 403] type: ${body['type']}');
+            print('[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})');
+            print('[API 403] remainingSeconds: ${body['remainingSeconds']}');
             if (body is Map && body['forceLogout'] == true) {
               final restriction = <String, dynamic>{};
               final type = body['type']?.toString().trim() ?? '';
@@ -248,6 +253,8 @@ class ApiService {
               final fromReason = body['reason']?.toString().trim() ?? '';
               final suspendedUntil = body['suspendedUntil'];
               final remainingSeconds = body['remainingSeconds'];
+
+              print('[API 403] Extracted - type: $type, suspendedUntil: $suspendedUntil, remainingSeconds: $remainingSeconds');
 
               if (type.isNotEmpty) restriction['type'] = type;
               if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
@@ -268,7 +275,11 @@ class ApiService {
                 restriction['message'] = popupMessage;
               }
 
+              print('[API 403] Final restriction map: $restriction');
               await AuthService.clearLocalSession();
+              _devLog('[RESTRICT] type=' + (restriction['type']?.toString() ?? '-') +
+                  ' remaining=' + (restriction['remainingSeconds']?.toString() ?? '-') +
+                  ' until=' + (restriction['suspendedUntil']?.toString() ?? '-'));
               await NavigationService.forceLogoutToLogin(
                 message: popupMessage,
                 restriction: restriction,
@@ -420,6 +431,7 @@ class ApiService {
     final uri = Uri.parse(
       '${ApiConfig.baseUrl}$path',
     ).replace(queryParameters: query);
+    _devLog('[API CALL] GET FULL URL: ${uri.toString()}');
     final key = _cacheKey('GET', uri);
 
     if (cacheFirst) {
@@ -497,9 +509,10 @@ class ApiService {
     if (!online) return _offlineResponse();
 
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    _devLog('[API CALL] POST FULL URL: ${uri.toString()}');
     final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
 
-    final response = await _sendWithRetry(
+    http.Response response = await _sendWithRetry(
       label: 'POST $path',
       timeout: timeout,
       auth: auth,
@@ -508,6 +521,32 @@ class ApiService {
       retryOriginal: () =>
           post(path, body, auth: auth, headers: headers, timeout: timeout),
     );
+
+    // Fallback automatique entre /api et /api/v1 si route introuvable (404)
+    if (response.statusCode == 404) {
+      try {
+        final bodyJson = safeDecodeObject(response.body);
+        final msg = bodyJson['message']?.toString() ?? '';
+        if (msg.toLowerCase().contains('route not found')) {
+          final original = uri;
+          Uri? alt;
+          final p = original.path;
+          if (p.startsWith('/api/v1/')) {
+            alt = original.replace(path: p.replaceFirst('/api/v1/', '/api/'));
+          } else if (p.startsWith('/api/')) {
+            alt = original.replace(path: p.replaceFirst('/api/', '/api/v1/'));
+          }
+          if (alt != null) {
+            _devLog('[API FALLBACK] Retrying with: ${alt.toString()}');
+            response = await _client.post(
+              alt,
+              headers: requestHeaders,
+              body: jsonEncode(body),
+            );
+          }
+        }
+      } catch (_) {}
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       await _invalidateByMutationPath(path);
@@ -529,6 +568,7 @@ class ApiService {
     if (!online) return _offlineResponse();
 
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    _devLog('[API CALL] PUT FULL URL: ${uri.toString()}');
     final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
 
     final response = await _sendWithRetry(
@@ -561,6 +601,7 @@ class ApiService {
     if (!online) return _offlineResponse();
 
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    _devLog('[API CALL] PATCH FULL URL: ${uri.toString()}');
     final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
 
     final response = await _sendWithRetry(
@@ -592,6 +633,7 @@ class ApiService {
     if (!online) return _offlineResponse();
 
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    _devLog('[API CALL] DELETE FULL URL: ${uri.toString()}');
     final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
 
     final response = await _sendWithRetry(

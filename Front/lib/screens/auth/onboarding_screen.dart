@@ -6,7 +6,6 @@ import '../../services/user_service.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
 import '../tourist/tourist_main_screen.dart';
-import '../organizer/organizer_main_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Country data
@@ -68,12 +67,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _pageCtrl = PageController();
   int _page = 0;
 
-  // Step 1
+  // Step 1: Phone
+  final _phoneCtrl = TextEditingController();
+
+  // Step 2: Country
   String? _selectedCountry;
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
-  // Step 2
+  // Step 3: Language
   String _selectedLanguage = 'French';
 
   // Step 3
@@ -95,6 +97,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _pageCtrl.dispose();
+    _phoneCtrl.dispose();
     _searchCtrl.dispose();
     _bioCtrl.dispose();
     super.dispose();
@@ -128,6 +131,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _finish({bool skip = false}) async {
     final Map<String, dynamic> updateData = {
+      'num_tel': _phoneCtrl.text.trim(),
       'pays_origine': _selectedCountry,
       'langue_preferee': _selectedLanguage,
       'bio': _bioCtrl.text.trim(),
@@ -153,7 +157,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
 
       // Mark as onboarded
-      await OnboardingService.completeOnboarding();
+      final result = await OnboardingService.completeOnboarding();
+      if (!result['success']) {
+        throw Exception(result['message'] ?? 'Failed to complete onboarding');
+      }
     } catch (e) {
       print('Error completing onboarding: $e');
     } finally {
@@ -163,7 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (widget.userType == 'Organisator' || widget.userType == 'Organizer') {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+        MaterialPageRoute(builder: (_) => const WaitingApprovalLegacyScreen()),
       );
     } else {
       Navigator.pushReplacement(
@@ -176,7 +183,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isTourist = widget.userType == 'Touriste';
-    final int totalSteps = isTourist ? 5 : 6;
+    final int totalSteps = isTourist ? 6 : 7;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -196,6 +203,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               controller: _pageCtrl,
               physics: const NeverScrollableScrollPhysics(),
               children: [
+                _StepPhone(
+                  controller: _phoneCtrl,
+                  totalSteps: totalSteps,
+                  onNext: _nextPage,
+                  onBack: () => Navigator.pop(context),
+                ),
                 _Step1(
                   selectedCountry: _selectedCountry,
                   searchCtrl: _searchCtrl,
@@ -204,7 +217,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onSearchChanged: (v) => setState(() => _searchQuery = v),
                   onCountrySelected: (c) => setState(() => _selectedCountry = c),
                   onNext: _nextPage,
-                  onBack: () => Navigator.pop(context),
+                  onBack: _prevPage,
                 ),
                 _Step2(
                   selectedLanguage: _selectedLanguage,
@@ -403,7 +416,73 @@ class _DotsIndicator extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 1: Where are you from?
+// Step 1: Phone Number
+// ─────────────────────────────────────────────────────────────────────────────
+class _StepPhone extends StatelessWidget {
+  final TextEditingController controller;
+  final int totalSteps;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _StepPhone({
+    required this.controller,
+    required this.totalSteps,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          _PremiumStepHeader(
+            title: 'Phone Number',
+            subtitle: 'Enter your phone number for account verification.',
+            currentStep: 1,
+            totalSteps: totalSteps,
+            onBack: onBack,
+          ),
+          const SizedBox(height: 30),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                hintText: '+216 XX XXX XXX',
+                prefixIcon: Icon(Icons.phone, color: AppColors.primary),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: _NextButton(onPressed: onNext),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2: Where are you from?
 // ─────────────────────────────────────────────────────────────────────────────
 class _Step1 extends StatelessWidget {
   final String? selectedCountry;
@@ -441,7 +520,7 @@ class _Step1 extends StatelessWidget {
           _PremiumStepHeader(
             title: 'Where are you from?',
             subtitle: 'Select your country to personalize your experience and discover nearby places.',
-            currentStep: 1,
+            currentStep: 2,
             totalSteps: totalSteps,
             onBack: onBack,
           ),
@@ -615,7 +694,7 @@ class _Step2 extends StatelessWidget {
           _PremiumStepHeader(
             title: 'Preferred language?',
             subtitle: 'Choose your language to navigate DJTrip comfortably.',
-            currentStep: 2,
+            currentStep: 3,
             totalSteps: totalSteps,
             onBack: onBack,
           ),
@@ -909,9 +988,9 @@ class _StepBio extends StatelessWidget {
         children: [
           const SizedBox(height: 10),
           _PremiumStepHeader(
-            title: 'Tell us about you',
+            title: 'Tell us about yourself',
             subtitle: 'Write a short bio to introduce yourself to the community.',
-            currentStep: 3,
+            currentStep: 4,
             totalSteps: totalSteps,
             onBack: onBack,
           ),
@@ -1017,7 +1096,7 @@ class _StepInterestsState extends State<_StepInterests> {
           _PremiumStepHeader(
             title: 'Your interests',
             subtitle: 'Select topics you are interested in to see personalized content.',
-            currentStep: 4,
+            currentStep: 5,
             totalSteps: widget.totalSteps,
             onBack: widget.onBack,
           ),
@@ -1127,7 +1206,7 @@ class _StepSpokenLanguagesState extends State<_StepSpokenLanguages> {
           _PremiumStepHeader(
             title: 'Languages you speak',
             subtitle: 'List the languages you can use to interact with tourists.',
-            currentStep: 4,
+            currentStep: 5,
             totalSteps: widget.totalSteps,
             onBack: widget.onBack,
           ),
@@ -1240,7 +1319,7 @@ class _StepSpecialtiesState extends State<_StepSpecialties> {
           _PremiumStepHeader(
             title: 'Your specialties',
             subtitle: 'Select the types of activities you specialize in.',
-            currentStep: 5,
+            currentStep: 6,
             totalSteps: widget.totalSteps,
             onBack: widget.onBack,
           ),
@@ -1338,8 +1417,8 @@ class _ChoiceChip extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Waiting Approval Screen
 // ─────────────────────────────────────────────────────────────────────────────
-class WaitingApprovalScreen extends StatelessWidget {
-  const WaitingApprovalScreen({super.key});
+class WaitingApprovalLegacyScreen extends StatelessWidget {
+  const WaitingApprovalLegacyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1360,8 +1439,10 @@ class WaitingApprovalScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // Top Card
               Container(
                 width: double.infinity,
@@ -1488,9 +1569,9 @@ class WaitingApprovalScreen extends StatelessWidget {
                 subtitle: 'An admin is currently cross-referencing your event credentials.',
                 isDone: false,
               ),
-              
-              const Spacer(),
-              
+
+              const SizedBox(height: 32),
+
               // Logout Button
               SizedBox(
                 width: 140,
@@ -1520,6 +1601,7 @@ class WaitingApprovalScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
             ],
+            ),
           ),
         ),
       ),

@@ -13,7 +13,7 @@ const appealSchema = new mongoose.Schema(
     subject: {
       type: String,
       required: true,
-      enum: ["Ban Appeal", "Suspension Appeal", "Other"],
+      enum: ["Ban Appeal", "Suspension Appeal", "Reclamation", "Other"],
     },
     // Appeal message content
     message: {

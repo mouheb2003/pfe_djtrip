@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert';
 
 import '../config/app_routes.dart';
 import '../screens/shared/appeal_form_screen.dart';
 import '../models/user_model.dart';
 import '../screens/auth/onboarding_screen.dart';
+import 'auth_service.dart';
 
 class NavigationService {
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -42,6 +44,7 @@ class NavigationService {
       }
     } catch (_) {}
 
+    await AuthService.clearLocalSession();
     navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
     _isRedirecting = false;
   }
@@ -51,9 +54,7 @@ class NavigationService {
     if (navigator == null) return;
 
     navigator.pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => OnboardingScreen(userType: userType),
-      ),
+      MaterialPageRoute(builder: (_) => OnboardingScreen(userType: userType)),
     );
   }
 
@@ -61,8 +62,7 @@ class NavigationService {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
-    // Use welcome as a temporary fallback or a dedicated screen if available
-    navigator.pushReplacementNamed(AppRoutes.welcome);
+    navigator.pushNamedAndRemoveUntil(AppRoutes.waitingApproval, (route) => false);
   }
 
   static void navigateToHome({String? userType}) {
@@ -107,12 +107,71 @@ class _RestrictionPayload {
     var type = (raw?['type'] ?? '').toString().trim().toLowerCase();
     final reason = (raw?['reason'] ?? '').toString().trim();
     final msg = (raw?['message'] ?? message ?? '').toString().trim();
-    final suspendedUntilRaw = (raw?['suspendedUntil'] ?? '').toString().trim();
-    final suspendedUntil = DateTime.tryParse(suspendedUntilRaw);
+    DateTime? suspendedUntil;
+    final suspendedUntilValue = raw?['suspendedUntil'];
+    final suspendedUntilRaw = (suspendedUntilValue ?? '').toString().trim();
+
+    // Debug logging
+    print('[RESTRICT] suspendedUntilValue: $suspendedUntilValue (${suspendedUntilValue.runtimeType})');
+    print('[RESTRICT] suspendedUntilRaw: "$suspendedUntilRaw"');
+
+    // Accept common formats:
+    // - ISO string: "2026-04-10T12:34:56.000Z"
+    // - epoch millis / seconds
+    // - Mongo Extended JSON: {"$date":"..."} or {"$date":{"$numberLong":"..."}}
+    suspendedUntil = DateTime.tryParse(suspendedUntilRaw);
+    print('[RESTRICT] After ISO parse: $suspendedUntil');
+
+    if (suspendedUntil == null && suspendedUntilValue is int) {
+      // Heuristic: > 10^12 is millis, else seconds.
+      suspendedUntil = DateTime.fromMillisecondsSinceEpoch(
+        suspendedUntilValue > 1000000000000 ? suspendedUntilValue : suspendedUntilValue * 1000,
+      );
+      print('[RESTRICT] After int parse: $suspendedUntil');
+    }
+    if (suspendedUntil == null) {
+      final asNum = num.tryParse(suspendedUntilRaw);
+      if (asNum != null) {
+        final asInt = asNum.toInt();
+        suspendedUntil = DateTime.fromMillisecondsSinceEpoch(
+          asInt > 1000000000000 ? asInt : asInt * 1000,
+        );
+        print('[RESTRICT] After num parse: $suspendedUntil');
+      }
+    }
+    if (suspendedUntil == null && suspendedUntilRaw.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(suspendedUntilRaw);
+        print('[RESTRICT] Decoded JSON: $decoded');
+        if (decoded is Map) {
+          final dateVal = decoded[r'$date'];
+          print('[RESTRICT] dateVal: $dateVal (${dateVal.runtimeType})');
+          if (dateVal is String) {
+            suspendedUntil = DateTime.tryParse(dateVal);
+            print('[RESTRICT] After dateVal string parse: $suspendedUntil');
+          } else if (dateVal is Map) {
+            final numberLong = dateVal[r'$numberLong']?.toString();
+            final ms = int.tryParse(numberLong ?? '');
+            if (ms != null) {
+              suspendedUntil = DateTime.fromMillisecondsSinceEpoch(ms);
+              print('[RESTRICT] After numberLong parse: $suspendedUntil');
+            }
+          } else if (dateVal is int) {
+            suspendedUntil = DateTime.fromMillisecondsSinceEpoch(dateVal);
+            print('[RESTRICT] After dateVal int parse: $suspendedUntil');
+          }
+        }
+      } catch (e) {
+        print('[RESTRICT] JSON decode error: $e');
+      }
+    }
+    print('[RESTRICT] Final suspendedUntil: $suspendedUntil');
+
     final remainingRaw = raw?['remainingSeconds'];
     final remainingSeconds = remainingRaw is int
         ? remainingRaw
         : int.tryParse(remainingRaw?.toString() ?? '');
+    print('[RESTRICT] remainingSeconds: $remainingSeconds');
 
     // Fallback inference when backend does not include explicit type.
     if (type.isEmpty) {
@@ -150,14 +209,24 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
   Timer? _ticker;
   Duration _remaining = Duration.zero;
   DateTime? _fallbackUntil;
+  Duration? _initial;
+
+  DateTime? get _until => widget.payload.suspendedUntil ?? _fallbackUntil;
 
   @override
   void initState() {
     super.initState();
-    if (widget.payload.isSuspended && widget.payload.suspendedUntil == null) {
-      final seconds = widget.payload.remainingSeconds ?? 0;
-      if (seconds > 0) {
-        _fallbackUntil = DateTime.now().add(Duration(seconds: seconds));
+    if (widget.payload.isSuspended) {
+      if (widget.payload.suspendedUntil != null) {
+        final until = widget.payload.suspendedUntil!;
+        final diff = until.difference(DateTime.now());
+        _initial = diff.isNegative ? const Duration(seconds: 1) : diff;
+      } else {
+        final seconds = widget.payload.remainingSeconds ?? 0;
+        if (seconds > 0) {
+          _initial = Duration(seconds: seconds);
+          _fallbackUntil = DateTime.now().add(_initial!);
+        }
       }
     }
     _updateRemaining();
@@ -198,33 +267,30 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
   Widget build(BuildContext context) {
     final isBanned = widget.payload.isBanned;
     final isSuspended = widget.payload.isSuspended;
-    
-    final themeColor = isBanned
-        ? const Color(0xFFDC2626)
-        : const Color(0xFF2563EB); // Use Blue for suspension as per image
 
-    final title = isBanned
-        ? 'Account banned'
-        : 'Account suspended';
+    final themeColor = isBanned
+        ? const Color(0xFFDC2626) // Red for banned
+        : const Color(0xFFF97316); // Orange for suspension
+
+    final title = isBanned ? 'Account banned' : 'Account suspended';
 
     final subtitle = isBanned
         ? 'Your account has been permanently banned. Please contact support if you believe this is an error.'
         : 'Your access has been restricted. Please contact support if you believe this is an error.';
 
-    final iconData = isBanned
-        ? Icons.block_flipped
-        : Icons.block_flipped;
-    
+    final iconData = isBanned ? Icons.block_flipped : Icons.block_flipped;
+
     final iconColor = themeColor;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // Icon
             Container(
               width: 72,
@@ -236,7 +302,7 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
               child: Icon(iconData, color: iconColor, size: 36),
             ),
             const SizedBox(height: 24),
-            
+
             // Title
             Text(
               title,
@@ -248,7 +314,7 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Subtitle
             Text(
               subtitle,
@@ -265,52 +331,91 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
             if (isSuspended) ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 20,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: themeColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: themeColor.withOpacity(0.3),
+                    width: 2,
+                  ),
                 ),
                 child: Column(
                   children: [
-                    Text(
-                      'Reconnect in:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: themeColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _formatRemaining(_remaining),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: themeColor,
-                        fontFamily: 'monospace',
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Progress bar placeholder
-                    Container(
-                      height: 6,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: 0.6, // Static placeholder for visual consistency
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: themeColor.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(3),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          color: themeColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Temps restant:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: themeColor,
                           ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 24,
+                      ),
+                      decoration: BoxDecoration(
+                        color: themeColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        (_initial == null && _until == null)
+                            ? 'Indéfini'
+                            : _formatRemaining(_remaining),
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          fontFamily: 'monospace',
+                          letterSpacing: 2,
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    // Dynamic progress based on remaining time
+                    if (_initial != null && _initial!.inMilliseconds > 0) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: (1.0 -
+                                  (_remaining.inMilliseconds /
+                                          _initial!.inMilliseconds)
+                                      .clamp(0.0, 1.0)),
+                          minHeight: 8,
+                          color: themeColor,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (_until != null)
+                      Text(
+                        'Réactivation automatique à: '
+                        '${_until!.toLocal().day}/${_until!.toLocal().month}/${_until!.toLocal().year} '
+                        '${_until!.toLocal().hour.toString().padLeft(2, '0')}:${_until!.toLocal().minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                   ],
                 ),
               ),
@@ -333,7 +438,9 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
                           builder: (_) => AppealFormScreen(
                             userStatus: widget.payload.toUserStatus,
                             banReason: isBanned ? widget.payload.reason : null,
-                            suspensionReason: isSuspended ? widget.payload.reason : null,
+                            suspensionReason: isSuspended
+                                ? widget.payload.reason
+                                : null,
                           ),
                         ),
                       );
@@ -348,12 +455,15 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
                     ),
                     child: const Text(
                       'Submit Appeal',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Back to Login Button
                 SizedBox(
                   width: double.infinity,
@@ -375,6 +485,7 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

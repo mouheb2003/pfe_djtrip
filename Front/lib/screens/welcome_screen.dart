@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../config/app_routes.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import 'onboarding/user_type_selection_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -47,7 +48,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       if (result['success'] == true) {
         final user = result['user'] as Map<String, dynamic>?;
-        final userType = user?['userType'] as String?;
+        final userType = (user?['userType'] as String?)?.trim();
+
+        // If Google auth created a user without a type, ask once.
+        if (userType == null || userType.isEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const UserTypeSelectionScreen()),
+          );
+          return;
+        }
+
         final route = (userType == 'Organisator' || userType == 'Organizer')
             ? AppRoutes.organizerMain
             : AppRoutes.touristMain;

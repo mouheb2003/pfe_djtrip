@@ -315,13 +315,22 @@ class AuthService {
       }
 
       if (res.statusCode == 403) {
-        final restriction = <String, dynamic>{};
+        print('[AUTH SIGNIN 403] Full response body: $body');
+        print('[AUTH SIGNIN 403] type: ${body['type']}');
+        print('[AUTH SIGNIN 403] message: ${body['message']}');
+        print('[AUTH SIGNIN 403] reason: ${body['reason']}');
+        print('[AUTH SIGNIN 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})');
+        print('[AUTH SIGNIN 403] remainingSeconds: ${body['remainingSeconds']}');
+
         final type = body['type']?.toString().trim() ?? '';
         final fromMessage = body['message']?.toString().trim() ?? '';
         final fromReason = body['reason']?.toString().trim() ?? '';
         final suspendedUntil = body['suspendedUntil'];
         final remainingSeconds = body['remainingSeconds'];
 
+        print('[AUTH SIGNIN 403] Extracted - type: $type, suspendedUntil: $suspendedUntil, remainingSeconds: $remainingSeconds');
+
+        final restriction = <String, dynamic>{};
         if (type.isNotEmpty) restriction['type'] = type;
         if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
         if (suspendedUntil != null) {
@@ -337,6 +346,8 @@ class AuthService {
                   ? fromReason
                   : 'Your account is restricted.');
         restriction['message'] = popupMessage;
+
+        print('[AUTH SIGNIN 403] Final restriction map: $restriction');
 
         await NavigationService.forceLogoutToLogin(
           message: popupMessage,

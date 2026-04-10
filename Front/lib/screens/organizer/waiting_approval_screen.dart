@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_theme.dart';
+import '../../services/onboarding_service.dart';
+import '../../config/app_routes.dart';
 
 class WaitingApprovalScreen extends StatefulWidget {
   const WaitingApprovalScreen({super.key});
@@ -76,8 +77,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
 
   void _refreshStatus() {
     HapticFeedback.lightImpact();
-    
-    // Simulate status check
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
@@ -102,6 +102,50 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
         duration: const Duration(seconds: 2),
       ),
     );
+
+    _checkApprovalAndNavigate();
+  }
+
+  Future<void> _checkApprovalAndNavigate() async {
+    try {
+      final status = await OnboardingService.getOnboardingStatus();
+      final isApproved = status['is_approved'] ?? true;
+      final isOnboarded = status['is_onboarded'] ?? false;
+      final userType = status['userType'] ?? 'Touriste';
+
+      if (!mounted) return;
+
+      if (status['success'] == true &&
+          userType == 'Organisator' &&
+          isOnboarded == true &&
+          isApproved == true) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.organizerMain,
+          (route) => false,
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Still pending. We will notify you once approved.'),
+          backgroundColor: const Color(0xFFFFA502),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Unable to check status right now. Please try again.'),
+          backgroundColor: const Color(0xFFFF4757),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   void _contactSupport() {

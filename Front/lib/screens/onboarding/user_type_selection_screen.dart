@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_theme.dart';
+import '../../services/onboarding_service.dart';
+import '../../services/navigation_service.dart';
 
 class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key});
@@ -59,13 +60,37 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
 
   void _onUserTypeSelected(String userType) {
     HapticFeedback.lightImpact();
-    
-    // Navigate to email verification
-    Navigator.pushNamed(
-      context,
-      '/email_verification',
-      arguments: {'userType': userType},
-    );
+
+    _persistTypeAndContinue(userType);
+  }
+
+  String _mapToBackendUserType(String raw) {
+    final v = raw.trim().toLowerCase();
+    if (v == 'organizer' || v == 'organisator') return 'Organisator';
+    if (v == 'business') return 'Business';
+    return 'Touriste';
+  }
+
+  Future<void> _persistTypeAndContinue(String raw) async {
+    final backendType = _mapToBackendUserType(raw);
+    try {
+      final res = await OnboardingService.updateUserType(backendType);
+      if (!mounted) return;
+
+      if (res['success'] == true) {
+        NavigationService.navigateToOnboarding(userType: backendType);
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Unable to save account type')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save account type right now')),
+      );
+    }
   }
 
   @override

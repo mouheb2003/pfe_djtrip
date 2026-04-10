@@ -118,12 +118,21 @@ exports.verifyToken = async (req, res, next) => {
           )
         : null;
 
+      const suspendedUntilISO = user.suspendedUntil
+        ? new Date(user.suspendedUntil).toISOString()
+        : null;
+
+      console.log('[AUTH SUSPENSION] user.suspendedUntil:', user.suspendedUntil, 'type:', typeof user.suspendedUntil);
+      console.log('[AUTH SUSPENSION] suspendedUntilISO:', suspendedUntilISO);
+      console.log('[AUTH SUSPENSION] remainingSeconds:', remainingSeconds);
+      console.log('[AUTH SUSPENSION] suspendReason:', user.suspendReason);
+
       return res.status(403).json({
         success: false,
         forceLogout: true,
         type: "suspended",
         reason: user.suspendReason || null,
-        suspendedUntil: user.suspendedUntil || null,
+        suspendedUntil: suspendedUntilISO,
         remainingSeconds,
         message: user.suspendReason
           ? `Compte suspendu: ${user.suspendReason}`

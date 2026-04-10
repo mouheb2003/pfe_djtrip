@@ -32,6 +32,37 @@ class AppealService {
     }
   }
 
+  static Future<Map<String, dynamic>> submitAnonymousAppeal({
+    required String email,
+    required String subject,
+    required String message,
+    List<String>? attachments,
+  }) async {
+    try {
+      final response = await ApiClient.post('/appeals/anonymous', {
+        'email': email,
+        'subject': subject,
+        'message': message,
+        'attachments': attachments ?? [],
+      }, auth: false);
+
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(response.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': response.statusCode == 201,
+        'message': body['message'] ?? 'Unable to submit appeal',
+        'appeal': body['appeal'],
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to submit appeal right now.'};
+    }
+  }
+
   static Future<Map<String, dynamic>> getUserAppeals({
     String? status,
     int limit = 10,

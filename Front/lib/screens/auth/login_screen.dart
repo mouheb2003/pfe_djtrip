@@ -4,9 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/onboarding_service.dart';
 import 'forgot_password_screen.dart';
 import 'email_verification_screen.dart';
 import 'onboarding_screen.dart';
+import '../organizer/waiting_approval_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -125,6 +127,27 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
           return;
+        }
+
+        // ✅ Organizer gating: still pending admin approval
+        if (userType == 'Organisator' || userType == 'Organizer') {
+          try {
+            final status = await OnboardingService.getOnboardingStatus();
+            final isApproved = status['is_approved'] ?? true;
+            if (status['success'] == true && isApproved == false) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+              );
+              return;
+            }
+          } catch (_) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+            );
+            return;
+          }
         }
 
         final route = (userType == 'Organisator' || userType == 'Organizer')

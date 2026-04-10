@@ -1,18 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const onboardingController = require('../controllers/onboarding');
+const { verifyToken, verifyAdmin } = require('../middleware/auth');
 
 // User onboarding routes
-router.get('/status', onboardingController.getOnboardingStatus);
-router.post('/step', onboardingController.updateOnboardingStep);
-router.post('/complete', onboardingController.completeOnboarding);
+router.get('/status', verifyToken, onboardingController.getOnboardingStatus);
+router.post('/step', verifyToken, onboardingController.updateOnboardingStep);
+router.post('/complete', verifyToken, onboardingController.completeOnboarding);
 
 // Admin approval routes
-router.get('/approvals/pending', onboardingController.getPendingApprovals);
-router.post('/approvals/:organizerId/approve', onboardingController.approveOrganizer);
-router.post('/approvals/:organizerId/reject', onboardingController.rejectOrganizer);
+router.get(
+  '/approvals/pending',
+  verifyToken,
+  verifyAdmin,
+  onboardingController.getPendingApprovals
+);
+router.post(
+  '/approvals/:organizerId/approve',
+  verifyToken,
+  verifyAdmin,
+  onboardingController.approveOrganizer
+);
+router.post(
+  '/approvals/:organizerId/reject',
+  verifyToken,
+  verifyAdmin,
+  onboardingController.rejectOrganizer
+);
 
 // Admin statistics
-router.get('/stats', onboardingController.getOnboardingStats);
+router.get('/stats', verifyToken, verifyAdmin, onboardingController.getOnboardingStats);
 
 module.exports = router;

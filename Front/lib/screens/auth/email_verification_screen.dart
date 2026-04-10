@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'onboarding_screen.dart';
+import '../../config/app_routes.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -16,11 +17,15 @@ class EmailVerificationScreen extends StatefulWidget {
   });
 
   @override
-  State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
+  State<EmailVerificationScreen> createState() =>
+      _EmailVerificationScreenState();
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  final List<TextEditingController> _ctrl = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _ctrl = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focus = List.generate(6, (_) => FocusNode());
 
   Timer? _timer;
@@ -76,10 +81,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (result['success'] == true) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => OnboardingScreen(userType: widget.userType)),
+          MaterialPageRoute(
+            builder: (_) => OnboardingScreen(userType: widget.userType),
+          ),
         );
       } else {
-        setState(() => _errorMsg = result['message'] ?? 'Invalid or expired code.');
+        setState(
+          () => _errorMsg = result['message'] ?? 'Invalid or expired code.',
+        );
       }
     } catch (_) {
       if (mounted) setState(() => _errorMsg = 'An error occurred.');
@@ -120,7 +129,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           Positioned(
             top: -100,
             left: -100,
-            child: CircleAvatar(radius: 200, backgroundColor: AppColors.primary.withOpacity(0.05)),
+            child: CircleAvatar(
+              radius: 200,
+              backgroundColor: AppColors.primary.withOpacity(0.05),
+            ),
           ),
           SafeArea(
             child: Column(
@@ -132,11 +144,25 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: AppColors.textPrimary,
+                        ),
+                        onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          AppRoutes.login,
+                          (route) => false,
+                        ),
                       ),
                       const Spacer(),
-                      const Text('DJTrip', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 24)),
+                      const Text(
+                        'DJTrip',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24,
+                        ),
+                      ),
                       const Spacer(),
                       const SizedBox(width: 48),
                     ],
@@ -154,28 +180,52 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 30, offset: const Offset(0, 10))],
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.1),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          child: const Icon(Icons.mark_email_read_outlined, size: 48, color: AppColors.primary),
+                          child: const Icon(
+                            Icons.mark_email_read_outlined,
+                            size: 48,
+                            color: AppColors.primary,
+                          ),
                         ),
                         const SizedBox(height: 40),
                         // Title
                         const Text(
                           'Verify your email',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -1),
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -1,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         // Subtitle with email address
                         RichText(
                           textAlign: TextAlign.center,
                           text: TextSpan(
-                            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
                             children: [
-                              const TextSpan(text: 'We sent a 6-digit code to\n'),
+                              const TextSpan(
+                                text: 'We sent a 6-digit code to\n',
+                              ),
                               TextSpan(
                                 text: widget.email,
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ],
                           ),
@@ -196,7 +246,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                             _buildTimerUnit(_mm, 'MIN'),
                             const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 10),
-                              child: Text(':', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                ':',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                             _buildTimerUnit(_ss, 'SEC'),
                           ],
@@ -207,15 +263,26 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text("Didn't receive a code? ", style: TextStyle(color: AppColors.textSecondary)),
+                            const Text(
+                              "Didn't receive a code? ",
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                             GestureDetector(
                               onTap: _canResend ? _resend : null,
                               child: _isResending
-                                  ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                  ? const SizedBox(
+                                      height: 14,
+                                      width: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
                                   : Text(
                                       'Resend',
                                       style: TextStyle(
-                                        color: _canResend ? AppColors.primary : AppColors.textLight,
+                                        color: _canResend
+                                            ? AppColors.primary
+                                            : AppColors.textLight,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -232,7 +299,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                             child: Text(
                               _errorMsg!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
 
@@ -241,20 +312,44 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           height: 56,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [AppColors.accent, AppColors.accentSoft]),
+                            gradient: const LinearGradient(
+                              colors: [AppColors.accent, AppColors.accentSoft],
+                            ),
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: [BoxShadow(color: AppColors.accent.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.accent.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
                           ),
                           child: ElevatedButton(
                             onPressed: _isVerifying ? null : _verify,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.transparent,
                               shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
                             ),
                             child: _isVerifying
-                                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('Verify', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Verify',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 40),
@@ -271,65 +366,77 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   }
 
   Widget _buildOtpBox(int index) {
-  return Container(
-    width: 50,
-    height: 60,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 8,
-          offset: const Offset(0, 3),
+    return Container(
+      width: 50,
+      height: 60,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _ctrl[index],
+        focusNode: _focus[index],
+        textAlign: TextAlign.center,
+        textAlignVertical: TextAlignVertical.center,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        maxLength: 1,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+          height: 1.0,
         ),
-      ],
-    ),
-    child: TextField(
-      controller: _ctrl[index],
-      focusNode: _focus[index],
-      textAlign: TextAlign.center,
-      textAlignVertical: TextAlignVertical.center,
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-      ],
-      maxLength: 1,
-      style: const TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
-        color: Colors.black,
-        height: 1.0,
+        decoration: const InputDecoration(
+          counterText: '',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          filled: false,
+          contentPadding: EdgeInsets.zero,
+          isCollapsed: true,
+        ),
+        onChanged: (v) {
+          if (v.isNotEmpty && index < 5) {
+            _focus[index + 1].requestFocus();
+          } else if (v.isEmpty && index > 0) {
+            _focus[index - 1].requestFocus();
+          }
+        },
       ),
-      decoration: const InputDecoration(
-        counterText: '',
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        focusedErrorBorder: InputBorder.none,
-        filled: false,
-        contentPadding: EdgeInsets.zero,
-        isCollapsed: true,
-      ),
-      onChanged: (v) {
-        if (v.isNotEmpty && index < 5) {
-          _focus[index + 1].requestFocus();
-        } else if (v.isEmpty && index > 0) {
-          _focus[index - 1].requestFocus();
-        }
-      },
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildTimerUnit(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textLight, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.textLight,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }

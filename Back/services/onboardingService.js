@@ -236,6 +236,9 @@ class OnboardingService {
     organizer.is_approved = false;
     organizer.rejection_reason = rejectionReason;
     organizer.approved_by = adminId;
+    organizer.rejected_at = new Date();
+    // Remove submitted_for_approval to remove from pending list
+    organizer.submitted_for_approval = undefined;
 
     await organizer.save();
 

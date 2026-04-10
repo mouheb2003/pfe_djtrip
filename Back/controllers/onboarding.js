@@ -1,35 +1,10 @@
 const OnboardingService = require("../services/onboardingService");
 const User = require("../models/user");
-const jwt = require("jsonwebtoken");
-
-// Authentication middleware helper
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access token required'
-    });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-    req.user = user;
-    next();
-  });
-};
 
 // Get user's onboarding status
-exports.getOnboardingStatus = [authenticateToken, async (req, res) => {
+exports.getOnboardingStatus = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.userId || req.user?.id;
     const status = await OnboardingService.getOnboardingStatus(userId);
     
     res.json({
@@ -43,12 +18,12 @@ exports.getOnboardingStatus = [authenticateToken, async (req, res) => {
       message: 'Failed to get onboarding status'
     });
   }
-}];
+};
 
 // Update onboarding step
-exports.updateOnboardingStep = [authenticateToken, async (req, res) => {
+exports.updateOnboardingStep = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.userId || req.user?.id;
     const stepData = req.body;
     
     const result = await OnboardingService.updateOnboardingStep(userId, stepData);
@@ -64,12 +39,12 @@ exports.updateOnboardingStep = [authenticateToken, async (req, res) => {
       message: 'Failed to update onboarding step'
     });
   }
-}];
+};
 
 // Complete onboarding
-exports.completeOnboarding = [authenticateToken, async (req, res) => {
+exports.completeOnboarding = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.userId || req.user?.id;
     const result = await OnboardingService.completeOnboarding(userId);
     
     res.json({
@@ -83,10 +58,10 @@ exports.completeOnboarding = [authenticateToken, async (req, res) => {
       message: 'Failed to complete onboarding'
     });
   }
-}];
+};
 
 // Get pending approvals (Admin only)
-exports.getPendingApprovals = [authenticateToken, async (req, res) => {
+exports.getPendingApprovals = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -95,12 +70,16 @@ exports.getPendingApprovals = [authenticateToken, async (req, res) => {
       date_from: req.query.date_from,
       date_to: req.query.date_to
     };
-    
+
+    console.log('[ONBOARDING] getPendingApprovals called with page:', page, 'limit:', limit, 'filters:', filters);
+
     // Remove undefined filters
     Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
-    
+
     const result = await OnboardingService.getPendingApprovals(page, limit, filters);
-    
+
+    console.log('[ONBOARDING] getPendingApprovals result:', JSON.stringify(result, null, 2));
+
     res.json({
       success: true,
       ...result
@@ -112,42 +91,53 @@ exports.getPendingApprovals = [authenticateToken, async (req, res) => {
       message: 'Failed to get pending approvals'
     });
   }
-}];
+};
 
 // Approve organizer (Admin only)
-exports.approveOrganizer = [authenticateToken, async (req, res) => {
+exports.approveOrganizer = async (req, res) => {
   try {
     const { organizerId } = req.params;
-    const adminId = req.user.id;
-    
+    const adminId = req.user?.userId || req.user?.id;
+
+    console.log('[ONBOARDING] approveOrganizer called with organizerId:', organizerId, 'adminId:', adminId);
+
     const result = await OnboardingService.approveOrganizer(organizerId, adminId);
-    
-    res.json(result);
+
+    console.log('[ONBOARDING] approveOrganizer result:', JSON.stringify(result, null, 2));
+
+    res.json({
+      success: true,
+      ...result
+    });
   } catch (error) {
     console.error('Error approving organizer:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
       message: error.message || 'Failed to approve organizer'
     });
   }
-}];
+};
 
 // Reject organizer (Admin only)
-exports.rejectOrganizer = [authenticateToken, async (req, res) => {
+exports.rejectOrganizer = async (req, res) => {
   try {
     const { organizerId } = req.params;
-    const adminId = req.user.id;
+    const adminId = req.user?.userId || req.user?.id;
     const { rejection_reason } = req.body;
-    
+
+    console.log('[ONBOARDING] rejectOrganizer called with organizerId:', organizerId, 'reason:', rejection_reason, 'adminId:', adminId);
+
     if (!rejection_reason || rejection_reason.trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Rejection reason is required'
       });
     }
-    
+
     const result = await OnboardingService.rejectOrganizer(organizerId, adminId, rejection_reason);
-    
+
+    console.log('[ONBOARDING] rejectOrganizer result:', JSON.stringify(result, null, 2));
+
     res.json(result);
   } catch (error) {
     console.error('Error rejecting organizer:', error);
@@ -156,10 +146,10 @@ exports.rejectOrganizer = [authenticateToken, async (req, res) => {
       message: error.message || 'Failed to reject organizer'
     });
   }
-}];
+};
 
 // Get onboarding statistics (Admin only)
-exports.getOnboardingStats = [authenticateToken, async (req, res) => {
+exports.getOnboardingStats = async (req, res) => {
   try {
     const stats = await OnboardingService.getOnboardingStats();
     
@@ -174,7 +164,7 @@ exports.getOnboardingStats = [authenticateToken, async (req, res) => {
       message: 'Failed to get onboarding statistics'
     });
   }
-}];
+};
 
 // Middleware to check if user is onboarded
 exports.checkOnboarding = async (req, res, next) => {

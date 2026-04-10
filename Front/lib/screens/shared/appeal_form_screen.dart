@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/appeal_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../models/user_model.dart';
 
 class AppealFormScreen extends StatefulWidget {
@@ -26,6 +27,7 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _messageController = TextEditingController();
   final _subjectController = TextEditingController();
+  final _emailController = TextEditingController();
   
   String _selectedSubject = 'Ban Appeal';
   bool _isSubmitting = false;
@@ -35,6 +37,7 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
   final List<String> _subjectOptions = [
     'Ban Appeal',
     'Suspension Appeal',
+    'Reclamation',
     'Other',
   ];
 
@@ -47,6 +50,8 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
       _selectedSubject = 'Suspension Appeal';
     } else if (widget.userStatus == UserStatus.banned) {
       _selectedSubject = 'Ban Appeal';
+    } else {
+      _selectedSubject = 'Reclamation';
     }
     
     _subjectController.text = _selectedSubject;
@@ -56,6 +61,7 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
   void dispose() {
     _messageController.dispose();
     _subjectController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -100,7 +106,9 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final result = await AppealService.submitAppeal(
+      // Always use anonymous submission - no authentication required
+      final result = await AppealService.submitAnonymousAppeal(
+        email: _emailController.text.trim(),
         subject: _selectedSubject,
         message: _messageController.text.trim(),
         attachments: _attachments.map((file) => file.path).toList(),
@@ -271,6 +279,29 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
                         color: Color(0xFF1E225E),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    
+                    // Email Field
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email Address',
+                        hintText: 'Enter your email address',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value!.trim().isEmpty) {
+                          return 'Email address is required';
+                        }
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                          return 'Please enter a valid email address';
+                        }
+                        return null;
+                      },
+                    ),
+                    
                     const SizedBox(height: 20),
                     
                     // Subject Dropdown
