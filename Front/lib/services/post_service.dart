@@ -257,4 +257,84 @@ class PostService {
       return {'success': false, 'message': 'Unable to update reaction right now.'};
     }
   }
+
+  // ✅ NEW: Update comment (only owner)
+  static Future<Map<String, dynamic>> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    try {
+      final res = await ApiClient.patch('/comments/$commentId', {
+        'content': content,
+      });
+
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update comment',
+        'comment': body['comment'],
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update comment right now.'};
+    }
+  }
+
+  // ✅ NEW: Delete comment (owner or post owner or admin)
+  static Future<Map<String, dynamic>> deleteComment(String commentId) async {
+    try {
+      final res = await ApiClient.delete('/comments/$commentId');
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to delete comment',
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to delete comment right now.'};
+    }
+  }
+
+  // ✅ NEW: Get comments with pagination
+  static Future<Map<String, dynamic>> getPostCommentsPaginated({
+    required String postId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await ApiClient.get(
+        '/posts/$postId/comments',
+        query: {'page': page.toString(), 'limit': limit.toString()},
+      );
+      if (res.statusCode != 200) {
+        return {
+          'success': false,
+          'comments': <dynamic>[],
+          'pagination': null,
+        };
+      }
+      final body = _safeObject(res.body);
+      return {
+        'success': true,
+        'comments': body['comments'] ?? <dynamic>[],
+        'pagination': body['pagination'],
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'comments': <dynamic>[],
+        'pagination': null,
+      };
+    }
+  }
 }

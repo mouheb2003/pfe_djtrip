@@ -1,56 +1,5 @@
 const mongoose = require("mongoose");
 
-const postCommentSchema = new mongoose.Schema(
-  {
-    author_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    content: {
-      type: String,
-      trim: true,
-      maxlength: 1200,
-      required: true,
-    },
-    parent_comment_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-      index: true,
-    },
-    is_active: {
-      type: Boolean,
-      default: true,
-      index: true,
-    },
-    // Reactions system
-    reactions: {
-      type: Map,
-      of: {
-        users: [{
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        }],
-        count: {
-          type: Number,
-          default: 0,
-        },
-      },
-      default: new Map(),
-    },
-    total_reactions: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-  },
-  {
-    timestamps: true,
-    _id: true,
-  },
-);
-
 const postSchema = new mongoose.Schema(
   {
     author_id: {
@@ -119,10 +68,6 @@ const postSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    comments: {
-      type: [postCommentSchema],
-      default: [],
-    },
     is_active: {
       type: Boolean,
       default: true,
@@ -132,10 +77,16 @@ const postSchema = new mongoose.Schema(
   {
     timestamps: true,
     collection: "posts",
-  },
+  }
 );
 
 postSchema.index({ createdAt: -1 });
 postSchema.index({ author_id: 1, createdAt: -1 });
+
+// Instance method to get comments count from Comment collection
+postSchema.methods.getCommentsCount = async function () {
+  const Comment = mongoose.model("Comment");
+  return Comment.countDocuments({ post_id: this._id, is_active: true });
+};
 
 module.exports = mongoose.model("Post", postSchema);

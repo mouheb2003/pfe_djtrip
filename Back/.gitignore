@@ -13,3 +13,7 @@ build/
 
 # Uploaded files (temporary storage before Cloudinary)
 uploads/
+
+
+#firebase private key 
+Back/config/firebase-service-account.json

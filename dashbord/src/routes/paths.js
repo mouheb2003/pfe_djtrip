@@ -49,6 +49,7 @@ export const paths = {
     },
     activites: `${ROOTS.DASHBOARD}/activites`,
     publications: `${ROOTS.DASHBOARD}/publications`,
+    comments: `${ROOTS.DASHBOARD}/comments`,
     messages: `${ROOTS.DASHBOARD}/messages`,
     logs: `${ROOTS.DASHBOARD}/logs`,
     notifications: `${ROOTS.DASHBOARD}/notifications`,

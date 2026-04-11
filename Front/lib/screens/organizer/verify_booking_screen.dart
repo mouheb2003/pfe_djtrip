@@ -170,6 +170,9 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       builder: (context) {
         return Container(
           decoration: const BoxDecoration(
@@ -295,101 +298,108 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
     final booking = payload.booking;
     final title = _invalidTitle(payload.status);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 42,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDDE3F6),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Center(
-          child: Container(
-            width: 94,
-            height: 94,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFFEE2E2),
-              border: Border.all(color: const Color(0xFFFECACA), width: 2),
-            ),
-            child: const Icon(
-              Icons.close_rounded,
-              color: Color(0xFFDC2626),
-              size: 48,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFEF4444),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Center(
-          child: Text(
-            payload.message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF667085),
-              height: 1.4,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _detailsPanel(booking, payload.scannedCode),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _openManualEntry(prefill: payload.scannedCode);
-            },
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try Again'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDE3F6),
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _resetScanner();
-            },
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Back to Scanner'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF475467),
-              side: const BorderSide(color: Color(0xFFD5DDF5)),
+          const SizedBox(height: 18),
+          Center(
+            child: Container(
+              width: 94,
+              height: 94,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFFEE2E2),
+                border: Border.all(color: const Color(0xFFFECACA), width: 2),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                color: Color(0xFFDC2626),
+                size: 48,
+              ),
             ),
           ),
-        ),
-      ],
-    );
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEF4444),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              payload.message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF667085),
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _detailsPanel(booking, payload.scannedCode),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _openManualEntry(prefill: payload.scannedCode);
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetScanner();
+              },
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Back to Scanner'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF475467),
+                side: const BorderSide(color: Color(0xFFD5DDF5)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
   }
 
   Widget _detailsPanel(InscriptionModel? booking, String code) {

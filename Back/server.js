@@ -33,11 +33,13 @@ const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
 const postRoutes = require("./routes/post");
+const commentRoutes = require("./routes/comment");
 const systemLogRoutes = require("./routes/systemLog");
 const logRoutes = require("./routes/logRoutes");
 const appealRoutes = require("./routes/appeal");
 const notificationRoutes = require("./routes/notification");
 const onboardingRoutes = require("./routes/onboarding");
+const checkinLogRoutes = require("./routes/checkinLog");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
@@ -202,6 +204,7 @@ app.get("/", (req, res) => {
       inscriptions: "/api/v1/inscriptions",
       avis: "/api/v1/avis",
       posts: "/api/v1/posts",
+      comments: "/api/v1/comments",
       messages: "/api/v1/messages",
       lieux: "/api/v1/lieux",
       systemLogs: "/api/v1/system-logs",
@@ -221,6 +224,7 @@ app.use("/api/v1/activites", activiteRoutes);
 app.use("/api/v1/inscriptions", inscriptionRoutes);
 app.use("/api/v1/avis", avisRoutes);
 app.use("/api/v1/posts", postRoutes);
+app.use("/api/v1/comments", commentRoutes);
 app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/lieux", lieuRoutes);
 app.use("/api/v1/system-logs", systemLogRoutes);
@@ -228,6 +232,7 @@ app.use("/api/v1/logs", logRoutes);
 app.use("/api/v1/appeals", appealRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
+app.use("/api/v1/checkin-logs", checkinLogRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);
@@ -305,6 +310,7 @@ app.use("/api/activites", activiteRoutes);
 app.use("/api/inscriptions", inscriptionRoutes);
 app.use("/api/avis", avisRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/comments", commentRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/lieux", lieuRoutes);
 app.use("/api/appeals", appealRoutes);

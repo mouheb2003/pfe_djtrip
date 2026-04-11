@@ -77,6 +77,11 @@ export const navData = [
         path: paths.dashboard.publications,
         icon: ICONS.blog,
       },
+      {
+        title: 'Commentaires',
+        path: paths.dashboard.comments,
+        icon: ICONS.chat,
+      },
     ],
   },
   /**

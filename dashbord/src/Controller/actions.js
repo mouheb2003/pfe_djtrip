@@ -251,3 +251,32 @@ export async function getSystemLogs(filters = {}) {
     limit: Number(data?.pagination?.limit ?? data?.limit ?? filters.limit ?? 100),
   };
 }
+
+export async function getAdminComments(filters = {}) {
+  try {
+    const params = {};
+    if (filters.page) params.page = filters.page;
+    if (filters.limit) params.limit = filters.limit;
+    if (filters.postId) params.postId = filters.postId;
+    if (filters.search) params.search = filters.search;
+
+    console.log('Fetching admin comments from:', END_POINT.adminComments, 'with params:', params);
+    const data = await Get(END_POINT.adminComments, { params });
+    console.log('Admin comments response:', data);
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.comments)) return data.comments;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error in getAdminComments:', error);
+    throw error;
+  }
+}
+
+export async function adminDeleteComment(id) {
+  if (!id) return null;
+  return Delete(END_POINT.adminCommentById(id));
+}

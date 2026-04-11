@@ -4,19 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/date_symbol_data_local.dart'; // 👈 IMPORTANT
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart'; // 🔥 AJOUT IMPORTANT
+
 import 'config/app_routes.dart';
 import 'services/theme_service.dart';
 import 'services/api_service.dart';
 import 'services/navigation_service.dart';
+import 'services/fcm_notification_service.dart';
 import 'providers/user_provider.dart';
 import 'theme/app_theme.dart';
 
-// ✅ ADDED
+// ✅ GLOBAL SNACKBAR KEY
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
-// ✅ ADDED
 void _showGlobalError(String message) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final messenger = rootScaffoldMessengerKey.currentState;
@@ -31,17 +33,27 @@ void _showGlobalError(String message) {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 👇 Initialisation des locales (corrige ton erreur)
-  await initializeDateFormatting();
+  try {
+    // 🔥 1. INITIALISER FIREBASE (OBLIGATOIRE)
+    await Firebase.initializeApp();
 
-  // 👇 Ton service de thème
-  await ThemeService.init();
+    // 🌍 Locales
+    await initializeDateFormatting();
 
-  // ✅ ADDED
-  await ApiService.instance.initialize();
-  await ApiService.instance.warmUp();
+    // 🎨 Theme
+    await ThemeService.init();
 
-  // Ensure debug paint overlays stay off (prevents yellow baseline lines).
+    // 🌐 API
+    await ApiService.instance.initialize();
+    await ApiService.instance.warmUp();
+
+    // 🔔 FCM (APRÈS Firebase)
+    await FcmNotificationService().initialize();
+  } catch (e) {
+    debugPrint("❌ Init error: $e");
+  }
+
+  // 🔧 Disable debug overlays
   assert(() {
     debugPaintBaselinesEnabled = false;
     debugPaintSizeEnabled = false;
@@ -93,6 +105,7 @@ class _MyAppState extends State<MyApp> {
           navigatorKey: NavigationService.navigatorKey,
           scaffoldMessengerKey: rootScaffoldMessengerKey,
           debugShowCheckedModeBanner: false,
+
           builder: (context, child) {
             _disableDebugOverlays();
             return DefaultTextStyle.merge(
@@ -104,9 +117,11 @@ class _MyAppState extends State<MyApp> {
               child: child ?? const SizedBox.shrink(),
             );
           },
+
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: mode,
+
           initialRoute: AppRoutes.splash,
           onGenerateRoute: AppRoutes.onGenerateRoute,
         ),

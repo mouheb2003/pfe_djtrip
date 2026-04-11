@@ -1,6 +1,7 @@
 const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
+const CheckinLog = require("../models/checkinLog");
 const QRCode = require("qrcode");
 const jwt = require("jsonwebtoken");
 const emailService = require("../services/email");
@@ -118,7 +119,12 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
     };
   }
 
-  if (inscription.organisateur_id.toString() !== organiserId) {
+  // organisateur_id is populated, so we need to compare _id
+  const bookingOrganizerId = inscription.organisateur_id._id
+    ? inscription.organisateur_id._id.toString()
+    : inscription.organisateur_id.toString();
+
+  if (bookingOrganizerId !== organiserId) {
     return {
       ok: false,
       statusCode: 403,
@@ -462,7 +468,7 @@ exports.getInscriptionsEnAttente = async (req, res) => {
   }
 };
 
-// Approve a registration (Organizer)
+// Approve a registration (Organizer) - FIXED: Atomic operation to prevent overbooking
 exports.approuverInscription = async (req, res) => {
   try {
     await expirePendingInscriptionsForEndedActivities();
@@ -471,6 +477,7 @@ exports.approuverInscription = async (req, res) => {
     const { inscriptionId } = req.params;
     const { message_organisateur } = req.body;
 
+    // Fetch booking first for validation
     const inscription = await Inscription.findById(inscriptionId);
     if (!inscription) {
       return res.status(404).json({ message: "Registration not found" });
@@ -499,27 +506,43 @@ exports.approuverInscription = async (req, res) => {
       });
     }
 
-    const placesDisponibles =
-      activite.capacite_max - activite.nombre_reservations;
-    if (inscription.nombre_participants > placesDisponibles) {
+    // CRITICAL FIX: Atomic capacity check and increment to prevent overbooking
+    // This ensures that between the capacity check and the increment, no other request can interfere
+    const updatedActivite = await Activite.findOneAndUpdate(
+      {
+        _id: inscription.activite_id,
+        $expr: {
+          $gte: [
+            "$capacite_max",
+            { $add: ["$nombre_reservations", inscription.nombre_participants] }
+          ]
+        }
+      },
+      {
+        $inc: { nombre_reservations: inscription.nombre_participants }
+      },
+      { new: true }
+    );
+
+    if (!updatedActivite) {
+      // Capacity was exceeded by a concurrent request
+      const currentActivite = await Activite.findById(inscription.activite_id);
+      const available = currentActivite.capacite_max - currentActivite.nombre_reservations;
       return res.status(400).json({
-        message: `Cannot approve: only ${Math.max(placesDisponibles, 0)} place${placesDisponibles > 1 ? "s" : ""} left`,
+        message: `Cannot approve: only ${Math.max(available, 0)} place${available > 1 ? "s" : ""} left (overbooking protection)`,
+        available: Math.max(available, 0),
+        requested: inscription.nombre_participants
       });
     }
 
     await inscription.approuver(message_organisateur);
 
-    const qrToken = createBookingQrToken(inscription, activite);
-    const activityDeadline = getActivityDeadline(activite);
+    const qrToken = createBookingQrToken(inscription, updatedActivite);
+    const activityDeadline = getActivityDeadline(updatedActivite);
     inscription.qr_token = qrToken;
     inscription.qr_token_generated_at = new Date();
     inscription.qr_token_expires_at = activityDeadline;
     await inscription.save();
-
-    // Increment the number of reserved spots (number of participants)
-    await Activite.findByIdAndUpdate(inscription.activite_id, {
-      $inc: { nombre_reservations: inscription.nombre_participants },
-    });
 
     const inscriptionPopulated = await Inscription.findById(inscriptionId)
       .populate("touriste_id", "fullname email")
@@ -654,50 +677,31 @@ exports.refuserInscription = async (req, res) => {
   }
 };
 
-// Cancel a registration (Tourist)
+// Cancel a registration (Tourist) - FIXED: MongoDB transaction + Cancellation Policy
 exports.annulerInscription = async (req, res) => {
   try {
     const touristeId = req.user.userId;
     const { inscriptionId } = req.params;
+    const { reason } = req.body || {};
 
-    const inscription = await Inscription.findById(inscriptionId);
-    if (!inscription) {
-      return res.status(404).json({ message: "Registration not found" });
-    }
-
-    // Verify the tourist is the owner
-    if (inscription.touriste_id.toString() !== touristeId) {
-      return res.status(403).json({
-        message: "You are not authorized to cancel this registration",
-      });
-    }
-
-    if (inscription.statut === "annulee") {
-      return res.status(400).json({
-        message: "This registration is already canceled",
-      });
-    }
-
-    // Decrement the number of reserved spots if registration was approved
-    // (must be done BEFORE cancelling to check the status)
-    const wasApproved = inscription.statut === "approuvee";
-    const nombreParticipants = inscription.nombre_participants;
-
-    await inscription.annuler();
-
-    if (wasApproved) {
-      await Activite.findByIdAndUpdate(inscription.activite_id, {
-        $inc: { nombre_reservations: -nombreParticipants },
-      });
-    }
-
+    const CancellationPolicy = require('../services/cancellationPolicy');
+    
+    const result = await CancellationPolicy.cancelBooking(inscriptionId, touristeId, reason);
+    
     res.status(200).json({
+      success: true,
       message: "Registration canceled successfully",
+      booking: result.booking,
+      refund: result.refund
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error canceling registration",
-      error: error.message,
+    const statusCode = error.message.includes('not found') ? 404 :
+                      error.message.includes('Unauthorized') ? 403 :
+                      error.message.includes('already') ? 400 : 500;
+    
+    res.status(statusCode).json({
+      success: false,
+      message: error.message || "Error canceling registration",
     });
   }
 };
@@ -779,11 +783,25 @@ exports.getTouristStats = async (req, res) => {
   }
 };
 
-// Verify/confirm booking via QR code scan (Organizer only)
+/**
+ * Validate QR code without marking as used (Organizer only)
+ * PRODUCTION READY avec format de réponse standardisé
+ */
 exports.validateQrBooking = async (req, res) => {
+  const startTime = Date.now();
+  const organiserId = req.user.userId;
+  const { qrData } = req.body || {};
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const userAgent = req.get('user-agent');
+
   try {
-    const organiserId = req.user.userId;
-    const { qrData } = req.body || {};
+    if (!qrData) {
+      return res.status(400).json({
+        success: false,
+        message: "QR data is required",
+        code: 'MISSING_QR_DATA',
+      });
+    }
 
     const result = await inspectBookingForQr({
       qrData,
@@ -792,74 +810,259 @@ exports.validateQrBooking = async (req, res) => {
     });
 
     if (!result.ok) {
+      // Log de validation échouée
+      try {
+        await CheckinLog.createLog({
+          bookingId: result.booking?._id || null,
+          organiserId,
+          touristId: result.booking?.touriste_id?._id || null,
+          activityId: result.booking?.activite_id?._id || null,
+          status: result.code === 'ALREADY_USED' ? 'already_verified' : 'failed',
+          failureReason: result.message,
+          qrData,
+          ipAddress,
+          userAgent,
+          duration: Date.now() - startTime,
+        });
+      } catch (logError) {
+        console.warn("Failed to create validation log:", logError.message);
+      }
+
       return res.status(result.statusCode).json({
         success: false,
         code: result.code,
         message: result.message,
-        booking: result.booking || null,
+        data: {
+          booking: result.booking || null,
+        },
       });
+    }
+
+    // Log de validation réussie
+    try {
+      await CheckinLog.createLog({
+        bookingId: result.booking._id,
+        organiserId,
+        touristId: result.booking.touriste_id?._id,
+        activityId: result.booking.activite_id?._id,
+        status: 'success',
+        qrData,
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+    } catch (logError) {
+      console.warn("Failed to create validation log:", logError.message);
     }
 
     return res.status(200).json({
       success: true,
       code: result.code,
       message: result.message,
-      booking: result.booking,
-      canMarkUsed: true,
-      tokenType: result.tokenType,
-      activityDeadline: result.activityDeadline,
+      data: {
+        booking: result.booking,
+        canMarkUsed: true,
+        tokenType: result.tokenType,
+        activityDeadline: result.activityDeadline,
+      },
     });
   } catch (error) {
+    console.error("Error validating booking QR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Error validating booking QR",
-      error: error.message,
+      code: 'INTERNAL_ERROR',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
 
+/**
+ * Verify/confirm booking via QR code scan (Organizer only)
+ * PRODUCTION READY avec race condition handling
+ */
 exports.verifyInscription = async (req, res) => {
-  try {
-    const { inscriptionId } = req.params;
-    const organisateurId = req.user.userId;
+  const startTime = Date.now();
+  const { inscriptionId } = req.params;
+  const organisateurId = req.user.userId;
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const userAgent = req.get('user-agent');
 
+  try {
+    // Récupérer d'abord le booking pour les validations préliminaires
     const booking = await Inscription.findById(inscriptionId)
       .populate("touriste_id", "fullname email avatar num_tel")
       .populate("activite_id")
       .populate("organisateur_id", "fullname email avatar num_tel");
 
     if (!booking) {
-      return res.status(404).json({ message: "Registration not found" });
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: null,
+        activityId: null,
+        status: 'failed',
+        failureReason: 'Booking not found',
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "Registration not found",
+        code: 'BOOKING_NOT_FOUND',
+      });
     }
 
-    if (booking.organisateur_id.toString() !== organisateurId) {
+    // Vérifier l'autorisation - organisateur_id is populated, so we need to compare _id
+    const bookingOrganizerId = booking.organisateur_id._id
+      ? booking.organisateur_id._id.toString()
+      : booking.organisateur_id.toString();
+
+    if (bookingOrganizerId !== organisateurId) {
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: booking.touriste_id?._id,
+        activityId: booking.activite_id?._id,
+        status: 'unauthorized',
+        failureReason: 'Organizer not authorized',
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+
       return res.status(403).json({
+        success: false,
         message: "Unauthorized to verify this booking",
+        code: 'UNAUTHORIZED',
       });
     }
 
-    if (booking.statut === "verifie" || booking.qr_used_at) {
-      return res.status(400).json({
-        message: "This booking has already been verified",
-      });
-    }
-
+    // Vérifier le statut du booking
     if (booking.statut !== "approuvee") {
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: booking.touriste_id?._id,
+        activityId: booking.activite_id?._id,
+        status: 'not_approved',
+        failureReason: `Booking not approved. Current status: ${booking.statut}`,
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+
       return res.status(400).json({
-        message: `Booking must be approved. Current status: ${booking.statut}`,
+        success: false,
+        message: `Booking must be approved first. Current status: ${booking.statut}`,
+        code: 'NOT_APPROVED',
       });
     }
 
+    // Vérifier l'expiration de l'activité
     const activityDeadline = getActivityDeadline(booking.activite_id);
     if (activityDeadline && new Date() > activityDeadline) {
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: booking.touriste_id?._id,
+        activityId: booking.activite_id?._id,
+        status: 'expired',
+        failureReason: 'Activity has expired',
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+
       return res.status(400).json({
+        success: false,
         message: "This activity has already passed",
+        code: 'ACTIVITY_EXPIRED',
       });
     }
 
-    await booking.marquerCommeUtilise();
+    // MISE À JOUR ATOMIQUE pour éviter les race conditions
+    // findOneAndUpdate avec condition statut != verifie
+    const updatedBooking = await Inscription.findOneAndUpdate(
+      {
+        _id: inscriptionId,
+        statut: 'approuvee',
+        qr_used_at: { $exists: false },
+      },
+      {
+        $set: {
+          statut: 'verifie',
+          qr_used_at: new Date(),
+        },
+      },
+      {
+        new: true,
+      }
+    ).populate("touriste_id", "fullname email avatar num_tel")
+     .populate("activite_id")
+     .populate("organisateur_id", "fullname email avatar num_tel");
 
-    // Log activity
+    // Si updatedBooking est null, c'est que la condition n'est plus remplie (déjà vérifié)
+    if (!updatedBooking) {
+      // Vérifier si déjà vérifié
+      const alreadyVerified = await Inscription.findById(inscriptionId);
+      
+      if (alreadyVerified?.statut === 'verifie' || alreadyVerified?.qr_used_at) {
+        await CheckinLog.createLog({
+          bookingId: inscriptionId,
+          organiserId: organisateurId,
+          touristId: alreadyVerified.touriste_id?._id,
+          activityId: alreadyVerified.activite_id?._id,
+          status: 'already_verified',
+          failureReason: 'Booking already verified',
+          ipAddress,
+          userAgent,
+          duration: Date.now() - startTime,
+        });
+
+        return res.status(400).json({
+          success: false,
+          message: "This booking has already been verified",
+          code: 'ALREADY_VERIFIED',
+        });
+      }
+
+      // Autre raison
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: alreadyVerified?.touriste_id?._id,
+        activityId: alreadyVerified?.activite_id?._id,
+        status: 'failed',
+        failureReason: 'Race condition or status changed',
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: "Could not verify booking. Status may have changed.",
+        code: 'STATUS_CHANGED',
+      });
+    }
+
+    // Log de succès
+    await CheckinLog.createLog({
+      bookingId: inscriptionId,
+      organiserId: organisateurId,
+      touristId: updatedBooking.touriste_id?._id,
+      activityId: updatedBooking.activite_id?._id,
+      status: 'success',
+      ipAddress,
+      userAgent,
+      duration: Date.now() - startTime,
+    });
+
+    // Log activity (ancien système)
     try {
       const { createActivityLog } = require("../services/activityLogService");
       await createActivityLog({
@@ -869,25 +1072,63 @@ exports.verifyInscription = async (req, res) => {
         targetId: inscriptionId,
         templateKey: "verify_booking",
         metadata: {
-          targetName: booking.touriste_id?.fullname || "Touriste",
-          activityTitle: booking.activite_id?.titre || "Activity",
+          targetName: updatedBooking.touriste_id?.fullname || "Touriste",
+          activityTitle: updatedBooking.activite_id?.titre || "Activity",
         },
       });
     } catch (logError) {
-      console.warn(
-        "Activity log failed for verifyInscription:",
-        logError.message,
-      );
+      console.warn("Activity log failed for verifyInscription:", logError.message);
     }
 
-    res.status(200).json({
+    // Envoyer notification push au touriste
+    try {
+      const { sendCheckInConfirmation } = require("../services/notificationService");
+      await sendCheckInConfirmation({
+        touristId: updatedBooking.touriste_id?._id,
+        activityTitle: updatedBooking.activite_id?.titre || "Activity",
+        bookingId: inscriptionId,
+        activityId: updatedBooking.activite_id?._id,
+      });
+    } catch (notifError) {
+      console.warn("Failed to send check-in notification:", notifError.message);
+      // Ne pas échouer la requête si la notification échoue
+    }
+
+    return res.status(200).json({
+      success: true,
       message: "Booking verified successfully",
-      inscription: booking,
+      code: 'VERIFIED',
+      data: {
+        inscription: updatedBooking,
+        checkedInAt: updatedBooking.qr_used_at,
+      },
     });
+
   } catch (error) {
-    res.status(500).json({
+    console.error("Error verifying booking:", error);
+
+    // Log d'erreur
+    try {
+      await CheckinLog.createLog({
+        bookingId: inscriptionId,
+        organiserId: organisateurId,
+        touristId: null,
+        activityId: null,
+        status: 'failed',
+        failureReason: error.message,
+        ipAddress,
+        userAgent,
+        duration: Date.now() - startTime,
+      });
+    } catch (logError) {
+      console.error("Failed to create error log:", logError);
+    }
+
+    return res.status(500).json({
+      success: false,
       message: "Error verifying booking",
-      error: error.message,
+      code: 'INTERNAL_ERROR',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

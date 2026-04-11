@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/api_client.dart';
 import '../tourist/tourist_main_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,6 +162,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final result = await OnboardingService.completeOnboarding();
       if (!result['success']) {
         throw Exception(result['message'] ?? 'Failed to complete onboarding');
+      }
+
+      // 🚀 Refresh user data from backend to get updated is_onboarded flag
+      final userRes = await ApiClient.get('/users/me');
+      if (userRes.statusCode == 200) {
+        final body = jsonDecode(userRes.body);
+        if (body['user'] is Map<String, dynamic>) {
+          await AuthService.saveUser(body['user'] as Map<String, dynamic>);
+        }
       }
     } catch (e) {
       print('Error completing onboarding: $e');

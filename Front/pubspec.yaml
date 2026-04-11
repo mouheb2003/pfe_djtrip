@@ -92,6 +92,11 @@ dependencies:
   # QR Code Scanner
   mobile_scanner: ^5.1.0
 
+  # Review System
+  equatable: ^2.0.5
+  firebase_messaging: ^14.6.0
+  flutter_local_notifications: ^17.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

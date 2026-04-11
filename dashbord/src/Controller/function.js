@@ -12,12 +12,15 @@ apiClient.interceptors.request.use((config) => {
   config.baseURL = getBackendUrl();
 
   const token = sessionStorage.getItem(JWT_STORAGE_KEY);
+  console.log('[API] Request to:', config.url, 'Token present:', !!token);
 
   if (token) {
     config.headers = {
       ...config.headers,
       Authorization: `Bearer ${token}`,
     };
+  } else {
+    console.warn('[API] No token found in sessionStorage');
   }
 
   return config;

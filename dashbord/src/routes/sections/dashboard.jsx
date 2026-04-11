@@ -15,6 +15,7 @@ const IndexPage = lazy(() => import('src/pages/dashboard/Page1'));
 const LieuxDetailsPage = lazy(() => import('src/pages/dashboard/LieuxDetails'));
 const ActivitiesPage = lazy(() => import('src/pages/dashboard/Activities'));
 const PublicationsPage = lazy(() => import('src/pages/dashboard/Publications'));
+const CommentsPage = lazy(() => import('src/sections/PageComments'));
 const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
 const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
@@ -43,6 +44,7 @@ export const dashboardRoutes = [
       { path: 'activites', element: <ActivitiesPage /> },
       { path: 'two', element: <ActivitiesPage /> },
       { path: 'publications', element: <PublicationsPage /> },
+      { path: 'comments', element: <CommentsPage /> },
       { path: 'messages', element: <MessagesPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'three', element: <UsersPage /> },
