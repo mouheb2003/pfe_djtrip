@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DJTrip</string>
+    
+    <!-- Facebook App ID - À CONFIGURER DANS FACEBOOK DEVELOPERS -->
+    <!-- 1. Aller sur https://developers.facebook.com/ -->
+    <!-- 2. Créer une app "DJTrip" -->
+    <!-- 3. Copier l'App ID ci-dessous -->
+    <!-- 4. Activer "Facebook Login" dans les produits -->
+    <string name="facebook_app_id">936181482292143</string>
+    
+    <!-- Facebook Client Token - À OBTENIR DANS LES PARAMÈTRES DE L'APP -->
+    <!-- Paramètres > Avancé > Token client -->
+    <string name="facebook_client_token">8207c3c728fdafac620cba7f5a7c13f0</string>
+    
+    <!-- fb:// suivi de votre App ID (remplacer VOTRE_FACEBOOK_APP_ID) -->
+    <string name="fb_login_protocol_scheme">fb936181482292143</string>
+</resources>

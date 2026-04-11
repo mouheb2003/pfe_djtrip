@@ -1,0 +1,1 @@
+{"timestamp":"2026-04-11 12:32:38","level":"info","message":"Booking cancelled","service":"djtrip-api","bookingId":"69da3126e2c4842bc6418edd","touristId":"69ab6710f3c2a4172e14a6f0","refundAmount":4696.5,"refundPercent":25,"environment":"development"}
