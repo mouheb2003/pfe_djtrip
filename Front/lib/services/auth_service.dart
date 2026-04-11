@@ -7,6 +7,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'api_client.dart';
 import 'api_service.dart';
 import 'navigation_service.dart';
+import '../config/app_routes.dart';
 import '../config/oauth_config.dart';
 
 class AuthService {
@@ -66,40 +67,73 @@ class AuthService {
     if (_handlingRestriction) return;
     _handlingRestriction = true;
 
-    String message = 'Your account is restricted. Please sign in again.';
-    final restriction = <String, dynamic>{};
-    if (data is Map) {
-      final type = data['type']?.toString().trim() ?? '';
-      final fromMessage = data['message']?.toString().trim() ?? '';
-      final fromReason = data['reason']?.toString().trim() ?? '';
-      final suspendedUntil = data['suspendedUntil'];
-      final remainingSeconds = data['remainingSeconds'];
+    try {
+      // Safely parse the payload
+      final restriction = <String, dynamic>{};
+      String message = 'Your account is restricted. Please sign in again.';
 
-      if (type.isNotEmpty) restriction['type'] = type;
-      if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
-      if (suspendedUntil != null) {
-        restriction['suspendedUntil'] = suspendedUntil.toString();
-      }
-      if (remainingSeconds != null) {
-        restriction['remainingSeconds'] = remainingSeconds;
+      if (data is Map) {
+        // STRICT CHECK: Only process if type is 'ACCOUNT_RESTRICTED' or valid restriction type
+        final type = data['type']?.toString().trim().toUpperCase() ?? '';
+        
+        // Only accept explicit restriction types from backend
+        if (type != 'ACCOUNT_RESTRICTED' && 
+            type != 'BANNED' && 
+            type != 'SUSPENDED') {
+          // Not a valid restriction type, ignore
+          return;
+        }
+
+        final fromMessage = data['message']?.toString().trim() ?? '';
+        final fromReason = data['reason']?.toString().trim() ?? '';
+        final suspendedUntil = data['suspendedUntil'];
+        final remainingSeconds = data['remainingSeconds'];
+
+        if (type.isNotEmpty) restriction['type'] = type.toLowerCase();
+        if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
+        if (suspendedUntil != null) {
+          restriction['suspendedUntil'] = suspendedUntil.toString();
+        }
+        if (remainingSeconds != null) {
+          restriction['remainingSeconds'] = remainingSeconds;
+        }
+
+        if (fromMessage.isNotEmpty) {
+          message = fromMessage;
+        } else if (fromReason.isNotEmpty) {
+          message = fromReason;
+        }
+
+        if (message.isNotEmpty) restriction['message'] = message;
       }
 
-      if (fromMessage.isNotEmpty) {
-        message = fromMessage;
-      } else if (fromReason.isNotEmpty) {
-        message = fromReason;
-      }
-
-      if (message.isNotEmpty) restriction['message'] = message;
+      await clearLocalSession();
+      await NavigationService.forceLogoutToLogin(
+        message: message,
+        restriction: restriction.isEmpty ? null : restriction,
+      );
+    } catch (e) {
+      // Log error but don't crash
+      print('[AuthService] Error handling account restriction: $e');
+    } finally {
+      _handlingRestriction = false;
     }
+  }
 
-    await clearLocalSession();
-    await NavigationService.forceLogoutToLogin(
-      message: message,
-      restriction: restriction.isEmpty ? null : restriction,
-    );
-
-    _handlingRestriction = false;
+  static Future<void> _handleSessionExpiration() async {
+    // Handle session expiration separately - normal logout without restriction popup
+    try {
+      await clearLocalSession();
+      final navigator = NavigationService.navigatorKey.currentState;
+      if (navigator != null) {
+        navigator.pushNamedAndRemoveUntil(
+          AppRoutes.login, 
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('[AuthService] Error handling session expiration: $e');
+    }
   }
 
   static void _startAccountGuardSocket(String accessToken) {
@@ -125,60 +159,29 @@ class AuthService {
           .build(),
     );
 
-    socket.on('connect', (_) {});
-    socket.on('disconnect', (_) {});
+    // Handle successful connection
+    socket.on('connect', (_) {
+      print('[AuthService] Account guard socket connected');
+    });
 
+    // Handle disconnection
+    socket.on('disconnect', (_) {
+      print('[AuthService] Account guard socket disconnected');
+    });
+
+    // ONLY handle explicit account restrictions from backend
+    // This is the ONLY reliable source of real restrictions
     socket.on('account_restricted', (data) async {
+      print('[AuthService] Received account_restricted event: $data');
       await _handleAccountRestriction(data);
     });
 
+    // Handle connection errors - DO NOT trigger restriction logic
+    // Only log for debugging and let socket reconnection handle it
     socket.on('connect_error', (error) async {
-      final msg = error?.toString() ?? '';
-      final msgLower = msg.toLowerCase();
-
-      final payload = <String, dynamic>{};
-      if (error is Map) {
-        final data = error['data'];
-        if (data is Map) {
-          payload.addAll(Map<String, dynamic>.from(data));
-        }
-        final mapMessage = error['message']?.toString().trim() ?? '';
-        if (mapMessage.isNotEmpty) {
-          payload['message'] = mapMessage;
-        }
-      } else {
-        try {
-          final data = (error as dynamic).data;
-          if (data is Map) {
-            payload.addAll(Map<String, dynamic>.from(data));
-          }
-        } catch (_) {}
-      }
-
-      if ((payload['message'] ?? '').toString().trim().isEmpty &&
-          msg.trim().isNotEmpty) {
-        payload['message'] = msg;
-      }
-
-      final probe = '${payload['message'] ?? ''} ${payload['type'] ?? ''}'
-          .toString()
-          .toLowerCase();
-      final isRestriction =
-          probe.contains('restricted') ||
-          probe.contains('suspended') ||
-          probe.contains('banned') ||
-          msgLower.contains('account restricted');
-      final isSessionExpired =
-          probe.contains('session expired') ||
-          msgLower.contains('session expired');
-
-      if (isRestriction || isSessionExpired) {
-        if (payload.isEmpty) {
-          payload['message'] =
-              'Your session was interrupted: account suspended or banned.';
-        }
-        await _handleAccountRestriction(payload);
-      }
+      print('[AuthService] Socket connection error: $error');
+      // Socket will automatically reconnect due to enableReconnection()
+      // Do NOT call _handleAccountRestriction here to avoid false positives
     });
 
     socket.connect();

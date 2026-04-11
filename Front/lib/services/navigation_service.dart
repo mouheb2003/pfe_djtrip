@@ -14,7 +14,6 @@ class NavigationService {
       GlobalKey<NavigatorState>();
 
   static bool _isRedirecting = false;
-
   static Future<void> forceLogoutToLogin({
     String? message,
     Map<String, dynamic>? restriction,
@@ -32,7 +31,10 @@ class NavigationService {
         raw: restriction,
       );
 
-      if (payload.message.isNotEmpty || payload.reason.isNotEmpty) {
+      // Only show restriction dialog if there's a valid restriction type
+      // This prevents false positives from generic error messages
+      if (payload.type.isNotEmpty && 
+          (payload.isBanned || payload.isSuspended)) {
         final dialogContext = navigator.overlay?.context;
         if (dialogContext != null) {
           await showDialog<void>(
@@ -173,17 +175,9 @@ class _RestrictionPayload {
         : int.tryParse(remainingRaw?.toString() ?? '');
     print('[RESTRICT] remainingSeconds: $remainingSeconds');
 
-    // Fallback inference when backend does not include explicit type.
-    if (type.isEmpty) {
-      final probe = '${msg.toLowerCase()} ${reason.toLowerCase()}';
-      if (probe.contains('banned') || probe.contains('banni')) {
-        type = 'banned';
-      } else if (probe.contains('suspended') ||
-          probe.contains('suspendu') ||
-          probe.contains('suspendu')) {
-        type = 'suspended';
-      }
-    }
+    // STRICT: No fallback inference based on message text
+    // Only accept explicit type values from backend to prevent false positives
+    // If type is empty, treat as no restriction (will be handled by caller)
 
     return _RestrictionPayload(
       type: type,
