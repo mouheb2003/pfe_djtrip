@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const { initializeFirebase: initFirebase, getFirebaseAdmin, isInitialized } = require('../config/firebase');
 const User = require('../models/user');
 
 /**
@@ -6,25 +6,14 @@ const User = require('../models/user');
  * Production-ready avec gestion d'erreurs et retry
  */
 
-// Initialisation de Firebase Admin SDK
-let firebaseInitialized = false;
-
 /**
  * Initialise Firebase Admin SDK
  * Doit être appelé au démarrage de l'application
+ * Utilise FIREBASE_KEY_BASE64 environment variable
  */
 function initializeFirebase() {
-  if (firebaseInitialized) return;
-
   try {
-    const serviceAccount = require('../config/firebase-service-account.json');
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-
-    firebaseInitialized = true;
-    console.log('✅ Firebase Admin SDK initialized successfully');
+    initFirebase();
   } catch (error) {
     console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
     // Ne pas crasher l'app si Firebase n'est pas configuré
@@ -72,7 +61,7 @@ async function updateUserFcmToken(userId, fcmToken) {
  * @returns {Promise<Object>} Résultat de l'envoi
  */
 async function sendPushNotification({ userId, title, body, data = {} }) {
-  if (!firebaseInitialized) {
+  if (!isInitialized()) {
     console.warn('⚠️ Firebase not initialized, skipping notification');
     return { success: false, reason: 'Firebase not initialized' };
   }
@@ -115,6 +104,7 @@ async function sendPushNotification({ userId, title, body, data = {} }) {
       },
     };
 
+    const admin = getFirebaseAdmin();
     const response = await admin.messaging().send(message);
 
     console.log('✅ Push notification sent successfully:', response);
@@ -141,7 +131,7 @@ async function sendPushNotification({ userId, title, body, data = {} }) {
  * @returns {Promise<Object>} Résultat de l'envoi
  */
 async function sendBulkNotification({ userIds, title, body, data = {} }) {
-  if (!firebaseInitialized) {
+  if (!isInitialized()) {
     return { success: false, reason: 'Firebase not initialized' };
   }
 
