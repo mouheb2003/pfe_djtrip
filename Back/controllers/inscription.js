@@ -6,6 +6,7 @@ const QRCode = require("qrcode");
 const jwt = require("jsonwebtoken");
 const emailService = require("../services/email");
 const { createActivityLog } = require("../services/activityLogService");
+const { sendNewBookingNotification } = require("../services/notificationService");
 
 const QR_BOOKING_SECRET =
   process.env.QR_BOOKING_SECRET || process.env.JWT_SECRET;
@@ -292,6 +293,19 @@ exports.createInscription = async (req, res) => {
     });
 
     await inscription.save();
+
+    // Send push notification to organizer
+    try {
+      await sendNewBookingNotification({
+        organizerId: activite.organisateur_id,
+        touristName: touriste.fullname || 'Un touriste',
+        activityTitle: activite.titre,
+        bookingId: inscription._id.toString(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to send new booking notification:', notifError.message);
+      // Don't fail the booking if notification fails
+    }
 
     try {
       await createActivityLog({

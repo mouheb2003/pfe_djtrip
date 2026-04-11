@@ -1,8 +1,10 @@
 const nodemailer = require("nodemailer");
 
 // Email transporter configuration
+const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
 const EMAIL_PORT = Number(process.env.EMAIL_PORT) || 465;
 const EMAIL_SECURE = process.env.EMAIL_SECURE === "true" || EMAIL_PORT === 465;
+const isProduction = NODE_ENV === "production";
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || "smtp.gmail.com",
@@ -11,6 +13,15 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
+  },
+  // Force IPv4 to avoid IPv6 connection errors (ENETUNREACH)
+  family: 4,
+  connectionTimeout: isProduction ? 15000 : 10000,
+  greetingTimeout: isProduction ? 15000 : 10000,
+  socketTimeout: isProduction ? 15000 : 10000,
+  // Add DNS options to prioritize IPv4
+  dns: {
+    family: 4,
   },
 });
 

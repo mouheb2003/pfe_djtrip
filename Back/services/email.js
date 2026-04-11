@@ -50,6 +50,8 @@ function getFromAddress() {
 }
 
 function buildTransportConfig() {
+  const isProduction = NODE_ENV === "production";
+  
   return {
     host: EMAIL_HOST || "smtp.gmail.com",
     port: EMAIL_PORT,
@@ -59,9 +61,15 @@ function buildTransportConfig() {
       user: EMAIL_USER,
       pass: EMAIL_PASSWORD,
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    // Force IPv4 to avoid IPv6 connection errors (ENETUNREACH)
+    family: 4,
+    connectionTimeout: isProduction ? 15000 : 10000,
+    greetingTimeout: isProduction ? 15000 : 10000,
+    socketTimeout: isProduction ? 15000 : 10000,
+    // Add DNS options to prioritize IPv4
+    dns: {
+      family: 4,
+    },
   };
 }
 
