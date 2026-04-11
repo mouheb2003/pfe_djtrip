@@ -24,6 +24,8 @@ systemLogStore.installConsoleCapture();
 const connectDB = require("./config/db");
 connectDB();
 
+const notificationService = require("./services/notificationService");
+
 // Initialize Firebase for push notifications
 notificationService.initializeFirebase();
 const userRoutes = require("./routes/user");
