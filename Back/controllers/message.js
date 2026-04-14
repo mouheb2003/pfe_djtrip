@@ -1,5 +1,6 @@
 const Message = require("../models/message");
 const User = require("../models/user");
+const notificationEventBus = require("../services/notificationEventBus");
 const cloudinary = require("../config/cloudinary");
 
 const uploadMediaBuffer = (buffer, folder, resourceType = "video") =>
@@ -45,15 +46,42 @@ exports.getConversations = async (req, res) => {
       ],
     }).sort({ createdAt: -1 });
 
+    // Check for new messages from deleted partners and restore conversations
+    const partnersToRestore = [];
+    const userIdString = String(userId).trim();
+    for (const msg of messages) {
+      const partnerId =
+        msg.sender_id.toString().trim() === userIdString
+          ? msg.receiver_id.toString().trim()
+          : msg.sender_id.toString().trim();
+      if (partnerId === userIdString) continue;
+      if (deletedPartners.has(partnerId)) {
+        partnersToRestore.push(partnerId);
+      }
+    }
+
+    // Remove restored partners from deletedConversationPartners
+    if (partnersToRestore.length > 0) {
+      await User.findByIdAndUpdate(userId, {
+        $pull: {
+          deletedConversationPartners: { $in: partnersToRestore },
+        },
+      });
+      // Update deletedPartners set for the rest of the function
+      for (const partnerId of partnersToRestore) {
+        deletedPartners.delete(partnerId);
+      }
+    }
+
     // Collect last message per unique partner
     const partnerMap = new Map(); // partnerId → lastMessage
     for (const msg of messages) {
       const partnerId =
-        msg.sender_id.toString() === userId
-          ? msg.receiver_id.toString()
-          : msg.sender_id.toString();
+        msg.sender_id.toString().trim() === userIdString
+          ? msg.receiver_id.toString().trim()
+          : msg.sender_id.toString().trim();
       // Skip messages sent to yourself
-      if (partnerId === userId) continue;
+      if (partnerId === userIdString) continue;
       if (deletedPartners.has(partnerId)) continue;
       if (!partnerMap.has(partnerId)) {
         partnerMap.set(partnerId, msg);
@@ -63,7 +91,7 @@ exports.getConversations = async (req, res) => {
     const conversations = await Promise.all(
       Array.from(partnerMap.entries()).map(async ([partnerId, lastMsg]) => {
         const partner = await User.findById(partnerId).select(
-          "fullname avatar userType isOnline",
+          "_id fullname avatar userType isOnline",
         );
         const unreadCount = await Message.countDocuments({
           sender_id: partnerId,
@@ -78,7 +106,7 @@ exports.getConversations = async (req, res) => {
           payload.content = "🎬 Video message";
         }
         return {
-          partner,
+          partner: partner?.toObject() || {},
           lastMessage: payload,
           unreadCount,
           archived: archivedPartners.has(partnerId),
@@ -208,6 +236,23 @@ exports.sendMessage = async (req, res) => {
     });
 
     await msg.save();
+
+    // Emit event for message notification
+    try {
+      const sender = await User.findById(senderId).select('fullname');
+      await notificationEventBus.emitMessageReceived({
+        recipientId: partnerId,
+        senderId: senderId,
+        senderName: sender?.fullname || 'Someone',
+        conversationId: null,
+        messageId: msg._id.toString(),
+        content: content.trim(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit message received event:', notifError.message);
+      // Don't fail the message send if notification fails
+    }
+
     res.status(201).json({ message: msg });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -240,6 +285,23 @@ exports.sendImageMessage = async (req, res) => {
     });
 
     await msg.save();
+
+    // Emit event for message notification
+    try {
+      const sender = await User.findById(senderId).select('fullname');
+      await notificationEventBus.emitMessageReceived({
+        recipientId: partnerId,
+        senderId: senderId,
+        senderName: sender?.fullname || 'Someone',
+        conversationId: null,
+        messageId: msg._id.toString(),
+        content: "🖼️ Image message",
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit message received event:', notifError.message);
+      // Don't fail the message send if notification fails
+    }
+
     res.status(201).json({ message: msg });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -272,6 +334,23 @@ exports.sendAudioMessage = async (req, res) => {
     });
 
     await msg.save();
+
+    // Emit event for message notification
+    try {
+      const sender = await User.findById(senderId).select('fullname');
+      await notificationEventBus.emitMessageReceived({
+        recipientId: partnerId,
+        senderId: senderId,
+        senderName: sender?.fullname || 'Someone',
+        conversationId: null,
+        messageId: msg._id.toString(),
+        content: "🎤 Voice message",
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit message received event:', notifError.message);
+      // Don't fail the message send if notification fails
+    }
+
     res.status(201).json({ message: msg });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -303,6 +382,23 @@ exports.sendVideoMessage = async (req, res) => {
     });
 
     await msg.save();
+
+    // Emit event for message notification
+    try {
+      const sender = await User.findById(senderId).select('fullname');
+      await notificationEventBus.emitMessageReceived({
+        recipientId: partnerId,
+        senderId: senderId,
+        senderName: sender?.fullname || 'Someone',
+        conversationId: null,
+        messageId: msg._id.toString(),
+        content: "🎬 Video message",
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit message received event:', notifError.message);
+      // Don't fail the message send if notification fails
+    }
+
     res.status(201).json({ message: msg });
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -293,7 +293,10 @@ exports.updateActivite = async (req, res) => {
     }
 
     // Verify the user owns the activity
-    if (activite.organisateur_id.toString() !== userId) {
+    const activityOrganizerId = activite.organisateur_id.toString().trim();
+    const userIdString = String(userId).trim();
+    
+    if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to modify this activity",
       });
@@ -452,7 +455,10 @@ exports.deleteActivite = async (req, res) => {
     }
 
     // Verify the user owns the activity
-    if (activite.organisateur_id.toString() !== userId) {
+    const activityOrganizerId = activite.organisateur_id.toString().trim();
+    const userIdString = String(userId).trim();
+    
+    if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to delete this activity",
       });

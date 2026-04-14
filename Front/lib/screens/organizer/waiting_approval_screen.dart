@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/onboarding_service.dart';
+import '../../services/auth_service.dart';
 import '../../config/app_routes.dart';
 
 class WaitingApprovalScreen extends StatefulWidget {
@@ -119,6 +120,9 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
           userType == 'Organisator' &&
           isOnboarded == true &&
           isApproved == true) {
+        // Refresh user data from backend to get latest approval status
+        await AuthService.refreshCurrentUser();
+        
         Navigator.pushNamedAndRemoveUntil(
           context,
           AppRoutes.organizerMain,
@@ -155,64 +159,72 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE1E4E8),
-                borderRadius: BorderRadius.circular(2),
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE1E4E8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Contact Support',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1E225E),
+              const SizedBox(height: 20),
+              Text(
+                'Contact Support',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E225E),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            _ContactOption(
-              icon: Icons.email,
-              title: 'Email Support',
-              subtitle: 'support@djtrip.com',
-              onTap: () {
-                Navigator.pop(context);
-                // Handle email
-              },
-            ),
-            const SizedBox(height: 16),
-            _ContactOption(
-              icon: Icons.phone,
-              title: 'Phone Support',
-              subtitle: '+1 234 567 8900',
-              onTap: () {
-                Navigator.pop(context);
-                // Handle phone
-              },
-            ),
-            const SizedBox(height: 16),
-            _ContactOption(
-              icon: Icons.chat,
-              title: 'Live Chat',
-              subtitle: 'Available 24/7',
-              onTap: () {
-                Navigator.pop(context);
-                // Handle chat
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+              _ContactOption(
+                icon: Icons.email,
+                title: 'Email Support',
+                subtitle: 'support@djtrip.com',
+                onTap: () {
+                  Navigator.pop(context);
+                  // Handle email
+                },
+              ),
+              const SizedBox(height: 16),
+              _ContactOption(
+                icon: Icons.phone,
+                title: 'Phone Support',
+                subtitle: '+1 234 567 8900',
+                onTap: () {
+                  Navigator.pop(context);
+                  // Handle phone
+                },
+              ),
+              const SizedBox(height: 16),
+              _ContactOption(
+                icon: Icons.chat,
+                title: 'Live Chat',
+                subtitle: 'Available 24/7',
+                onTap: () {
+                  Navigator.pop(context);
+                  // Handle chat
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -223,47 +235,52 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              
-              // Header
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    Text(
-                      'Account Under Review',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E225E),
-                        height: 1.2,
-                      ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - 
+                         MediaQuery.of(context).padding.top - 
+                         MediaQuery.of(context).padding.bottom,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 32),
+                  
+                  // Header
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      children: [
+                        Text(
+                          'Account Under Review',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1E225E),
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Your organizer account is being reviewed',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF6C757D),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Your organizer account is being reviewed',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF6C757D),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 60),
-              
-              // Status Icon with Animation
-              Expanded(
-                flex: 2,
-                child: Center(
-                  child: FadeTransition(
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Status Icon with Animation
+                  FadeTransition(
                     opacity: _fadeAnimation,
                     child: AnimatedBuilder(
                       animation: _pulseAnimation,
@@ -271,8 +288,8 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                         return Transform.scale(
                           scale: _pulseAnimation.value,
                           child: Container(
-                            width: 200,
-                            height: 200,
+                            width: 160,
+                            height: 160,
                             decoration: BoxDecoration(
                               color: const Color(0xFF4B63FF).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(100),
@@ -291,14 +308,14 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                                     return Transform.rotate(
                                       angle: _rotateAnimation.value * 2 * 3.14159,
                                       child: Container(
-                                        width: 180,
-                                        height: 180,
+                                        width: 140,
+                                        height: 140,
                                         decoration: BoxDecoration(
                                           border: Border.all(
                                             color: const Color(0xFF4B63FF).withOpacity(0.3),
                                             width: 2,
                                           ),
-                                          borderRadius: BorderRadius.circular(90),
+                                          borderRadius: BorderRadius.circular(70),
                                         ),
                                       ),
                                     );
@@ -308,7 +325,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                                 // Clock icon
                                 Icon(
                                   Icons.hourglass_empty,
-                                  size: 60,
+                                  size: 50,
                                   color: const Color(0xFF4B63FF),
                                 ),
                               ],
@@ -318,156 +335,156 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                       },
                     ),
                   ),
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Status Information
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFFA502),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Pending Approval',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1E225E),
-                            ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Status Information
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'We\'re reviewing your organizer application. This process typically takes 1-3 business days.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: const Color(0xFF6C757D),
-                          height: 1.5,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFFA502),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Pending Approval',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E225E),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'We\'re reviewing your organizer application. This process typically takes 1-3 business days.',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: const Color(0xFF6C757D),
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'What happens next?',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1E225E),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _StatusStep(
+                            number: '1',
+                            title: 'Document Verification',
+                            description: 'We verify your business documents and credentials',
+                            isCompleted: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _StatusStep(
+                            number: '2',
+                            title: 'Background Check',
+                            description: 'We perform a background verification',
+                            isCompleted: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _StatusStep(
+                            number: '3',
+                            title: 'Account Approval',
+                            description: 'Your account will be approved and activated',
+                            isCompleted: false,
+                            isActive: true,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'What happens next?',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1E225E),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _StatusStep(
-                        number: '1',
-                        title: 'Document Verification',
-                        description: 'We verify your business documents and credentials',
-                        isCompleted: true,
-                      ),
-                      const SizedBox(height: 12),
-                      _StatusStep(
-                        number: '2',
-                        title: 'Background Check',
-                        description: 'We perform a background verification',
-                        isCompleted: true,
-                      ),
-                      const SizedBox(height: 12),
-                      _StatusStep(
-                        number: '3',
-                        title: 'Account Approval',
-                        description: 'Your account will be approved and activated',
-                        isCompleted: false,
-                        isActive: true,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Action Buttons
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _refreshStatus,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4B63FF),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Action Buttons
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _refreshStatus,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4B63FF),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'Check Status',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
-                        child: const Text(
-                          'Check Status',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                        
+                        const SizedBox(height: 16),
+                        
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: _contactSupport,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF4B63FF),
+                              side: const BorderSide(color: Color(0xFF4B63FF)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'Contact Support',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: OutlinedButton(
-                        onPressed: _contactSupport,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF4B63FF),
-                          side: const BorderSide(color: Color(0xFF4B63FF)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Contact Support',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                ],
               ),
-              
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
         ),
       ),

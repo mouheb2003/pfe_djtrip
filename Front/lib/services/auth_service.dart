@@ -7,6 +7,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'api_client.dart';
 import 'api_service.dart';
 import 'navigation_service.dart';
+import 'fcm_notification_service.dart';
 import '../config/app_routes.dart';
 import '../config/oauth_config.dart';
 
@@ -219,6 +220,25 @@ class AuthService {
   }
 
   static Map<String, dynamic>? get currentUser => _cachedUser;
+
+  /// Refresh current user data from backend and update cache
+  static Future<Map<String, dynamic>?> refreshCurrentUser() async {
+    try {
+      final res = await ApiClient.get('/users/me');
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        if (body['user'] is Map<String, dynamic>) {
+          final user = body['user'] as Map<String, dynamic>;
+          await saveUser(user);
+          return user;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('[AuthService] Error refreshing current user: $e');
+      return null;
+    }
+  }
 
   // ── Convenience ──────────────────────────────────────────────
   static Future<bool> isLoggedIn() async {
@@ -551,6 +571,12 @@ class AuthService {
     try {
       await FacebookAuth.instance.logOut();
     } catch (_) {}
+    // 📱 Remove FCM token on logout
+    try {
+      await FcmNotificationService().deleteToken();
+    } catch (e) {
+      print('[AuthService] Error removing FCM token: $e');
+    }
     await clearLocalSession();
   }
 
@@ -572,6 +598,9 @@ class AuthService {
         };
       }
 
+      // Sign out first to ensure account selection is shown
+      await _googleSignIn.signOut();
+
       final account = await _googleSignIn.signIn();
       if (account == null) {
         return {'success': false, 'message': 'Google sign-in was cancelled.'};
@@ -586,7 +615,7 @@ class AuthService {
         };
       }
 
-      final res = await ApiClient.post('/users/auth/google', {
+      final res = await ApiClient.post('/auth/google', {
         'idToken': idToken,
       }, auth: false);
 
@@ -598,6 +627,49 @@ class AuthService {
       }
 
       if (res.statusCode != 200) {
+        // Handle account status errors (suspended, banned, inactive)
+        if (res.statusCode == 403) {
+          final type = body['type']?.toString().trim() ?? '';
+          final fromMessage = body['message']?.toString().trim() ?? '';
+          final fromReason = body['reason']?.toString().trim() ?? '';
+          final suspendedUntil = body['suspendedUntil'];
+          final remainingSeconds = body['remainingSeconds'];
+
+          final restriction = <String, dynamic>{};
+          if (type.isNotEmpty) restriction['type'] = type;
+          if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
+          if (suspendedUntil != null) {
+            restriction['suspendedUntil'] = suspendedUntil.toString();
+          }
+          if (remainingSeconds != null) {
+            restriction['remainingSeconds'] = remainingSeconds;
+          }
+
+          final popupMessage = fromMessage.isNotEmpty
+              ? fromMessage
+              : (fromReason.isNotEmpty
+                    ? fromReason
+                    : 'Your account is restricted.');
+          restriction['message'] = popupMessage;
+
+          await NavigationService.forceLogoutToLogin(
+            message: popupMessage,
+            restriction: restriction,
+          );
+
+          return {'success': false, 'handledRestriction': true, 'message': null};
+        }
+
+        // Handle lockout (423)
+        if (res.statusCode == 423) {
+          return {
+            'success': false,
+            'locked': true,
+            'message': body['message'] ?? 'Account temporarily locked.',
+            'remainingSeconds': body['remainingSeconds'] ?? 60,
+          };
+        }
+
         return {
           'success': false,
           'message': body['message'] ?? 'Google authentication failed',
@@ -617,7 +689,24 @@ class AuthService {
 
       await _saveTokens(accessToken, refreshToken);
       await saveUser(user);
-      return {'success': true, 'user': user};
+
+      // Send FCM token to backend after successful login
+      try {
+        await FcmNotificationService().sendTokenToBackend();
+      } catch (_) {
+        // FCM token send failure should not block login
+      }
+
+      // Handle onboarding requirement for new Google users
+      final requiresOnboarding = body['requires_onboarding'] as bool? ?? false;
+      final isNewUser = body['is_new_user'] as bool? ?? false;
+
+      return {
+        'success': true,
+        'user': user,
+        'requires_onboarding': requiresOnboarding,
+        'is_new_user': isNewUser,
+      };
     } on PlatformException catch (error) {
       final details = (error.message ?? error.details?.toString() ?? error.code)
           .toLowerCase();
@@ -704,6 +793,14 @@ class AuthService {
 
       await _saveTokens(accessToken, refreshToken);
       await saveUser(user);
+
+      // Send FCM token to backend after successful login
+      try {
+        await FcmNotificationService().sendTokenToBackend();
+      } catch (_) {
+        // FCM token send failure should not block login
+      }
+
       return {'success': true, 'user': user};
     } catch (_) {
       return {

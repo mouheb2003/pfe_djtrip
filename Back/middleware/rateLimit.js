@@ -1,5 +1,6 @@
 const rateLimit = require("express-rate-limit");
 const { redisClient } = require("../config/redis");
+const { ipKeyGenerator } = require("express-rate-limit");
 
 // Check if Redis is available for distributed rate limiting
 // Disabled for development as Redis may not be installed locally
@@ -38,7 +39,9 @@ const bookingLimiter = rateLimit({
   message: { message: "Too many booking attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "booking_limit:"
@@ -52,7 +55,9 @@ const approvalLimiter = rateLimit({
   message: { message: "Too many approval attempts. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "approval_limit:"
@@ -66,7 +71,9 @@ const checkinLimiter = rateLimit({
   message: { message: "Too many check-in attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "checkin_limit:"
@@ -80,7 +87,9 @@ const cancellationLimiter = rateLimit({
   message: { message: "Too many cancellation attempts. Please contact support." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "cancellation_limit:"
@@ -94,7 +103,9 @@ const activityCreationLimiter = rateLimit({
   message: { message: "Too many activity creation attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "activity_limit:"
@@ -108,7 +119,9 @@ const reviewLimiter = rateLimit({
   message: { message: "Too many review attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+  return req.user?.userId || ipKeyGenerator(req.ip);
+},
   store: useRedis ? new RedisStore({
     client: redisClient,
     prefix: "review_limit:"

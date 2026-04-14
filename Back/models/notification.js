@@ -115,7 +115,25 @@ notificationSchema.statics.createNotification = async function (notificationData
   try {
     const notification = new this(notificationData);
     await notification.save();
-    
+
+    console.log('📝 Notification created in DB:', notification._id, 'for user:', notification.user_id);
+
+    // Send FCM push notification
+    try {
+      const notificationService = require("../services/notificationService");
+      console.log('🔔 Attempting to send FCM push notification to user:', notification.user_id.toString());
+      const result = await notificationService.sendPushNotification({
+        userId: notification.user_id.toString(),
+        title: notification.title,
+        body: notification.message,
+        data: notification.data || {},
+      });
+      console.log('✅ FCM push notification result:', result);
+    } catch (fcmError) {
+      console.error("❌ Error sending FCM notification:", fcmError);
+      // Don't throw - notification is already saved in DB
+    }
+
     // Emit real-time event
     const EventEmitter = require("events");
     const emitter = new EventEmitter();
@@ -123,7 +141,7 @@ notificationSchema.statics.createNotification = async function (notificationData
       notification: notification.populate("user_id"),
       userId: notification.user_id,
     });
-    
+
     return notification;
   } catch (error) {
     console.error("Error creating notification:", error);

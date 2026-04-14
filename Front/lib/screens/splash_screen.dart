@@ -39,6 +39,9 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (isLoggedIn) {
+      // Refresh user data from backend to get latest userType
+      await AuthService.refreshCurrentUser();
+      
       final userType = await AuthService.getUserType();
       final dest = userType == 'Organisator'
           ? const OrganizerMainScreen()

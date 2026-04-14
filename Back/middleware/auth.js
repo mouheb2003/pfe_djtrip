@@ -61,7 +61,7 @@ exports.verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const user = await User.findById(decoded.userId).select(
-      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion",
+      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion userType",
     );
 
     if (!user) {
@@ -79,6 +79,14 @@ exports.verifyToken = async (req, res, next) => {
         message: "Session expired. Please log in again.",
       });
     }
+
+    // Use userType from database instead of token to handle userType changes
+    req.user = {
+      userId: user._id,
+      email: user.email,
+      userType: user.userType,
+      tokenVersion: user.tokenVersion,
+    };
 
     // Auto-reactivate when suspension is expired
     if (user.accountStatus === "suspended" && user.suspendedUntil) {
@@ -160,7 +168,6 @@ exports.verifyToken = async (req, res, next) => {
       });
     }
 
-    req.user = decoded;
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
@@ -179,9 +186,12 @@ exports.verifyToken = async (req, res, next) => {
 // Middleware to verify Organisator userType
 exports.verifyOrganisator = (req, res, next) => {
   if (req.user.userType !== "Organisator") {
+    // Only return requires_onboarding if user has no userType at all
+    const needsOnboarding = !req.user.userType || req.user.userType === null;
     return res.status(403).json({
       success: false,
       message: "Access denied. Organisator access required.",
+      requires_onboarding: needsOnboarding,
     });
   }
   next();
@@ -190,9 +200,12 @@ exports.verifyOrganisator = (req, res, next) => {
 // Middleware to verify Touriste userType
 exports.verifyTouriste = (req, res, next) => {
   if (req.user.userType !== "Touriste") {
+    // Only return requires_onboarding if user has no userType at all
+    const needsOnboarding = !req.user.userType || req.user.userType === null;
     return res.status(403).json({
       success: false,
       message: "Access denied. Touriste access required.",
+      requires_onboarding: needsOnboarding,
     });
   }
   next();

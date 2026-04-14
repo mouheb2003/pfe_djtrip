@@ -27,11 +27,17 @@ function initializeFirebase() {
  */
 async function getUserFcmToken(userId) {
   try {
-    const user = await User.findById(userId).select('fcmToken');
-    return user?.fcmToken || null;
+    const user = await User.findById(userId).select('fcmTokens accountStatus');
+    const activeTokens = (user?.fcmTokens || [])
+      .filter(t => t.isActive)
+      .map(t => t.token);
+    return {
+      tokens: activeTokens,
+      accountStatus: user?.accountStatus || 'active',
+    };
   } catch (error) {
     console.error('Error fetching user FCM token:', error);
-    return null;
+    return { tokens: [], accountStatus: 'inactive' };
   }
 }
 
@@ -52,6 +58,27 @@ async function updateUserFcmToken(userId, fcmToken) {
 }
 
 /**
+ * Remove invalid FCM token from user's tokens array
+ */
+async function removeInvalidToken(userId, invalidToken) {
+  try {
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: {
+          fcmTokens: { token: invalidToken }
+        }
+      }
+    );
+    console.log(`🗑️ Removed invalid token for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('Error removing invalid token:', error);
+    return false;
+  }
+}
+
+/**
  * Envoie une notification push à un utilisateur
  * @param {Object} payload - Payload de la notification
  * @param {string} payload.userId - ID de l'utilisateur destinataire
@@ -67,56 +94,71 @@ async function sendPushNotification({ userId, title, body, data = {} }) {
   }
 
   try {
-    const fcmToken = await getUserFcmToken(userId);
+    const { tokens, accountStatus } = await getUserFcmToken(userId);
 
-    if (!fcmToken) {
-      return { success: false, reason: 'No FCM token found for user' };
+    if (!tokens || tokens.length === 0) {
+      return { success: false, reason: 'No FCM tokens found for user' };
     }
 
-    const message = {
-      notification: {
-        title,
-        body,
-      },
-      data: {
-        ...data,
-        timestamp: new Date().toISOString(),
-      },
-      token: fcmToken,
-      android: {
-        priority: 'high',
-        notification: {
-          channelId: 'djtrip_notifications',
-          sound: 'default',
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            alert: {
-              title,
-              body,
-            },
-            sound: 'default',
-            badge: 1,
-          },
-        },
-      },
-    };
+    // Skip FCM push if account is not active (suspended, banned, or inactive)
+    if (accountStatus !== 'active') {
+      console.log(`⏭️ Skipping FCM push for user ${userId} - account status is ${accountStatus}`);
+      return { success: false, reason: `Account is ${accountStatus} - skipping push notification` };
+    }
 
+    console.log(`📱 Sending FCM push to user ${userId} with ${tokens.length} active tokens`);
+
+    // Convert all data values to strings for Firebase (Firebase requires string values only)
+    const stringData = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== null && value !== undefined) {
+        stringData[key] = String(value);
+      }
+    }
+
+    // Send to all active tokens (multi-device support)
+    const results = [];
     const admin = getFirebaseAdmin();
-    const response = await admin.messaging().send(message);
 
-    console.log('✅ Push notification sent successfully:', response);
-    return { success: true, messageId: response };
-  } catch (error) {
-    // Gérer les tokens invalides
-    if (error.code === 'messaging/registration-token-not-registered') {
-      console.warn('⚠️ Invalid FCM token, removing from user:', userId);
-      await updateUserFcmToken(userId, null);
-      return { success: false, reason: 'Invalid token removed' };
+    for (const fcmToken of tokens) {
+      try {
+        const message = {
+          notification: {
+            title,
+            body,
+          },
+          data: {
+            ...stringData,
+            timestamp: new Date().toISOString(),
+          },
+          token: fcmToken,
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log(`✅ Push notification sent successfully to token ${fcmToken.substring(0, 10)}...:`, response);
+        results.push({ success: true, token: fcmToken, messageId: response });
+      } catch (error) {
+        // Handle invalid tokens - remove them from user's tokens
+        if (error.code === 'messaging/registration-token-not-registered') {
+          console.warn(`⚠️ Invalid FCM token ${fcmToken.substring(0, 10)}..., removing from user:`, userId);
+          await removeInvalidToken(userId, fcmToken);
+          results.push({ success: false, token: fcmToken, reason: 'Invalid token removed' });
+        } else {
+          console.error(`❌ Error sending push notification to token ${fcmToken.substring(0, 10)}...:`, error);
+          results.push({ success: false, token: fcmToken, reason: error.message });
+        }
+      }
     }
 
+    const successCount = results.filter(r => r.success).length;
+    console.log(`📊 FCM push results: ${successCount}/${tokens.length} successful for user ${userId}`);
+
+    return {
+      success: successCount > 0,
+      results,
+      message: `Sent to ${successCount}/${tokens.length} devices`
+    };
+  } catch (error) {
     console.error('❌ Error sending push notification:', error);
     return { success: false, reason: error.message };
   }
@@ -194,6 +236,8 @@ async function sendNewBookingNotification({ organizerId, touristName, activityTi
     data: {
       type: 'new_booking',
       bookingId,
+      screen: 'requests_tab',
+      action: 'view_pending',
     },
   });
 }
@@ -255,6 +299,18 @@ async function sendReviewReminder({ touristId, activityTitle, bookingId }) {
   });
 }
 
+/**
+ * Notification pour nouvelle activité créée par un organisateur
+ * @param {string} organizerName - Nom de l'organisateur
+ * @param {string} activityTitle - Titre de l'activité
+ * @returns {Promise<Object>}
+ */
+async function sendNewActivityNotification({ organizerName, activityTitle }) {
+  // Pour l'instant, nous n'envoyons pas de notification globale pour les nouvelles activités
+  // Cela pourrait être implémenté plus tard avec un système de followers
+  return { success: true, message: 'Activity notification not implemented yet' };
+}
+
 module.exports = {
   initializeFirebase,
   sendPushNotification,
@@ -266,4 +322,5 @@ module.exports = {
   sendBookingApprovedNotification,
   sendBookingRejectedNotification,
   sendReviewReminder,
+  sendNewActivityNotification,
 };

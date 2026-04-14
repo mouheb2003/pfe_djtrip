@@ -8,6 +8,7 @@ import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_client.dart';
 import '../tourist/tourist_main_screen.dart';
+import '../organizer/waiting_approval_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Country data
@@ -164,26 +165,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         throw Exception(result['message'] ?? 'Failed to complete onboarding');
       }
 
+      print('[ONBOARDING] Completion result: $result');
+
       // 🚀 Refresh user data from backend to get updated is_onboarded flag
       final userRes = await ApiClient.get('/users/me');
       if (userRes.statusCode == 200) {
         final body = jsonDecode(userRes.body);
         if (body['user'] is Map<String, dynamic>) {
-          await AuthService.saveUser(body['user'] as Map<String, dynamic>);
+          final user = body['user'] as Map<String, dynamic>;
+          await AuthService.saveUser(user);
+          print('[ONBOARDING] Saved user data: is_onboarded=${user['is_onboarded']}, userType=${user['userType']}, is_approved=${user['is_approved']}');
         }
       }
     } catch (e) {
       print('Error completing onboarding: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error completing onboarding: $e')),
+        );
+      }
+      return;
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
 
+    // Navigate to appropriate screen
     if (widget.userType == 'Organisator' || widget.userType == 'Organizer') {
+      print('[ONBOARDING] Navigating to WaitingApprovalScreen');
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const WaitingApprovalLegacyScreen()),
+        MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
       );
     } else {
+      print('[ONBOARDING] Navigating to TouristMainScreen');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const TouristMainScreen()),

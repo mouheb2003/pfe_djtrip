@@ -24,10 +24,15 @@ systemLogStore.installConsoleCapture();
 const connectDB = require("./config/db");
 connectDB();
 
-const notificationService = require("./services/notificationService");
+const notificationServiceV2 = require("./services/notificationServiceV2");
+const { startWorker: startNotificationWorker } = require("./workers/notificationWorkerV2");
+const { closeQueues } = require("./config/bullmq");
 
-// Initialize Firebase for push notifications
-notificationService.initializeFirebase();
+// Initialize Firebase for push notifications (V2)
+notificationServiceV2.initializeFirebase();
+
+// Start notification worker (event-driven)
+startNotificationWorker();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");
@@ -43,6 +48,8 @@ const systemLogRoutes = require("./routes/systemLog");
 const logRoutes = require("./routes/logRoutes");
 const appealRoutes = require("./routes/appeal");
 const notificationRoutes = require("./routes/notification");
+const notificationPreferencesRoutes = require("./routes/notificationPreferences");
+const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
 const Message = require("./models/message");
@@ -236,6 +243,8 @@ app.use("/api/v1/system-logs", systemLogRoutes);
 app.use("/api/v1/logs", logRoutes);
 app.use("/api/v1/appeals", appealRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/notifications", notificationPreferencesRoutes);
+app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
 
@@ -640,6 +649,19 @@ process.on("unhandledRejection", (reason) => {
 
 process.on("uncaughtException", (error) => {
   console.error("❌ Uncaught Exception:", error);
+});
+
+// Graceful shutdown for notification queues
+process.on("SIGTERM", async () => {
+  console.log("🔒 SIGTERM received, closing notification queues...");
+  await closeQueues();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("🔒 SIGINT received, closing notification queues...");
+  await closeQueues();
+  process.exit(0);
 });
 
 const PORT = process.env.PORT || 3000;

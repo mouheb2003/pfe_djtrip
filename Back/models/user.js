@@ -95,6 +95,16 @@ const userSchema = new mongoose.Schema(
     deletedConversationPartners: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ],
+    // FCM tokens for push notifications (multi-device support)
+    fcmTokens: [
+      {
+        token: String,
+        deviceId: String,
+        isActive: { type: Boolean, default: true },
+        createdAt: { type: Date, default: Date.now },
+        lastUsedAt: Date,
+      },
+    ],
     // 🚀 NEW: Activity specialties for organizers
     specialites_activites: [{ type: String }],
     // 🚀 NEW: Languages offered by organizers (also available for all users)

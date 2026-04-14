@@ -49,6 +49,39 @@ class OnboardingService {
     };
   }
 
+  // Update user type during onboarding
+  static async updateUserType(userId, userType) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Validate user type
+    const validTypes = ['Touriste', 'Organisator', 'Business'];
+    if (!validTypes.includes(userType)) {
+      throw new Error('Invalid user type');
+    }
+
+    // Update user type
+    user.userType = userType;
+
+    // For organizers, set initial approval status
+    if (userType === 'Organisator') {
+      user.is_approved = false;
+    }
+
+    await user.save();
+
+    return {
+      success: true,
+      user: {
+        id: user._id,
+        userType: user.userType,
+        is_approved: user.is_approved
+      }
+    };
+  }
+
   // Complete onboarding
   static async completeOnboarding(userId) {
     const user = await User.findById(userId);

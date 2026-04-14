@@ -6,7 +6,8 @@ const QRCode = require("qrcode");
 const jwt = require("jsonwebtoken");
 const emailService = require("../services/email");
 const { createActivityLog } = require("../services/activityLogService");
-const { sendNewBookingNotification } = require("../services/notificationService");
+const notificationEventBus = require("../services/notificationEventBus");
+const Message = require("../models/message");
 
 const QR_BOOKING_SECRET =
   process.env.QR_BOOKING_SECRET || process.env.JWT_SECRET;
@@ -294,16 +295,33 @@ exports.createInscription = async (req, res) => {
 
     await inscription.save();
 
-    // Send push notification to organizer
+    // Create message in Message collection if message_touriste is provided
+    if (message_touriste && message_touriste.trim()) {
+      try {
+        await Message.create({
+          sender_id: touristeId,
+          receiver_id: activite.organisateur_id,
+          content: message_touriste,
+          message_type: "text",
+        });
+        console.log('Message created for booking:', inscription._id);
+      } catch (msgError) {
+        console.error('Error creating message for booking:', msgError);
+        // Don't fail the booking if message creation fails
+      }
+    }
+
+    // Emit event for new booking notification
     try {
-      await sendNewBookingNotification({
+      notificationEventBus.emitBookingCreated({
         organizerId: activite.organisateur_id,
+        touristId: touriste._id,
         touristName: touriste.fullname || 'Un touriste',
         activityTitle: activite.titre,
         bookingId: inscription._id.toString(),
       });
     } catch (notifError) {
-      console.warn('Failed to send new booking notification:', notifError.message);
+      console.warn('Failed to emit booking created event:', notifError.message);
       // Don't fail the booking if notification fails
     }
 
@@ -498,15 +516,12 @@ exports.approuverInscription = async (req, res) => {
     }
 
     // Verify the organizer is the owner
-    if (inscription.organisateur_id.toString() !== organisateurId) {
+    const inscriptionOrganizerId = inscription.organisateur_id.toString().trim();
+    const organizerIdString = String(organisateurId).trim();
+    
+    if (inscriptionOrganizerId !== organizerIdString) {
       return res.status(403).json({
         message: "You are not authorized to approve this registration",
-      });
-    }
-
-    if (inscription.statut !== "en_attente") {
-      return res.status(400).json({
-        message: "This registration has already been processed",
       });
     }
 
@@ -550,6 +565,22 @@ exports.approuverInscription = async (req, res) => {
     }
 
     await inscription.approuver(message_organisateur);
+
+    // Create message in Message collection if message_organisateur is provided
+    if (message_organisateur && message_organisateur.trim()) {
+      try {
+        await Message.create({
+          sender_id: organisateurId,
+          receiver_id: inscription.touriste_id,
+          content: message_organisateur,
+          message_type: "text",
+        });
+        console.log('Message created for approved booking:', inscriptionId);
+      } catch (msgError) {
+        console.error('Error creating message for approved booking:', msgError);
+        // Don't fail the approval if message creation fails
+      }
+    }
 
     const qrToken = createBookingQrToken(inscription, updatedActivite);
     const activityDeadline = getActivityDeadline(updatedActivite);
@@ -631,6 +662,17 @@ exports.approuverInscription = async (req, res) => {
       }
     }
 
+    // Emit event for booking approved notification
+    try {
+      notificationEventBus.emitBookingApproved({
+        touristId: inscription.touriste_id,
+        activityTitle,
+        bookingId: inscription._id.toString(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit booking approved event:', notifError.message);
+    }
+
     res.status(200).json({
       message: "Registration approved successfully",
       inscription: inscriptionPopulated,
@@ -658,7 +700,10 @@ exports.refuserInscription = async (req, res) => {
     }
 
     // Verify the organizer is the owner
-    if (inscription.organisateur_id.toString() !== organisateurId) {
+    const inscriptionOrganizerId = inscription.organisateur_id.toString().trim();
+    const organizerIdString = String(organisateurId).trim();
+    
+    if (inscriptionOrganizerId !== organizerIdString) {
       return res.status(403).json({
         message: "You are not authorized to reject this registration",
       });
@@ -672,12 +717,41 @@ exports.refuserInscription = async (req, res) => {
 
     await inscription.refuser(message_organisateur);
 
+    // Create message in Message collection if message_organisateur is provided
+    if (message_organisateur && message_organisateur.trim()) {
+      try {
+        await Message.create({
+          sender_id: organisateurId,
+          receiver_id: inscription.touriste_id,
+          content: message_organisateur,
+          message_type: "text",
+        });
+        console.log('Message created for rejected booking:', inscriptionId);
+      } catch (msgError) {
+        console.error('Error creating message for rejected booking:', msgError);
+        // Don't fail the rejection if message creation fails
+      }
+    }
+
     // Note: no need to decrement nombre_reservations as it was not yet incremented
     // (only approved registrations are counted)
 
     const inscriptionPopulated = await Inscription.findById(inscriptionId)
       .populate("touriste_id", "fullname email")
       .populate("activite_id", "titre date_debut");
+
+    const activityTitle = inscriptionPopulated?.activite_id?.titre || "Activity";
+
+    // Emit event for booking rejected notification
+    try {
+      notificationEventBus.emitBookingRejected({
+        touristId: inscription.touriste_id,
+        activityTitle,
+        bookingId: inscription._id.toString(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit booking rejected event:', notifError.message);
+    }
 
     res.status(200).json({
       message: "Registration rejected",

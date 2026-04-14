@@ -1,6 +1,6 @@
 const Comment = require("../models/comment");
 const Post = require("../models/post");
-const { sendPushNotification } = require("../services/notificationService");
+const notificationEventBus = require("../services/notificationEventBus");
 const { createActivityLog } = require("../services/activityLogService");
 
 // Helper function to get user reaction type
@@ -100,49 +100,33 @@ exports.createComment = async (req, res) => {
       .populate("parent_comment_id", "user_id content")
       .lean();
 
-    // SEND PUSH NOTIFICATIONS
+    // EMIT NOTIFICATION EVENTS
     try {
-      const notificationPromises = [];
-
       // Notify post owner
       if (String(post.author_id) !== String(userId)) {
-        notificationPromises.push(
-          sendPushNotification({
-            userId: post.author_id,
-            title: "Nouveau commentaire",
-            body: `${populatedComment.user_id.fullname} a commenté votre publication`,
-            data: {
-              type: "new_comment",
-              postId: String(post._id),
-              commentId: String(comment._id),
-            },
-          })
-        );
+        notificationEventBus.emitCommentCreated({
+          postOwnerId: post.author_id,
+          commenterName: populatedComment.user_id.fullname,
+          postId: String(post._id),
+          commentId: String(comment._id),
+        });
       }
 
       // Notify parent comment author if it's a reply
       if (parentCommentId) {
         const parentComment = await Comment.findById(parentCommentId).lean();
         if (parentComment && String(parentComment.user_id) !== String(userId)) {
-          notificationPromises.push(
-            sendPushNotification({
-              userId: parentComment.user_id,
-              title: "Réponse à votre commentaire",
-              body: `${populatedComment.user_id.fullname} a répondu à votre commentaire`,
-              data: {
-                type: "comment_reply",
-                postId: String(post._id),
-                commentId: String(comment._id),
-                parentCommentId: String(parentCommentId),
-              },
-            })
-          );
+          notificationEventBus.emitCommentReply({
+            parentCommentAuthorId: parentComment.user_id,
+            replierName: populatedComment.user_id.fullname,
+            postId: String(post._id),
+            commentId: String(comment._id),
+            parentCommentId: String(parentCommentId),
+          });
         }
       }
-
-      await Promise.allSettled(notificationPromises);
     } catch (notifError) {
-      console.warn("Push notification failed for comment:", notifError.message);
+      console.warn("Notification event emission failed for comment:", notifError.message);
     }
 
     // Log activity
