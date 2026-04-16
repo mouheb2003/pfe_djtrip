@@ -27,12 +27,13 @@ function initializeFirebase() {
  */
 async function getUserFcmToken(userId) {
   try {
-    const user = await User.findById(userId).select('fcmTokens accountStatus');
-    const activeTokens = (user?.fcmTokens || [])
-      .filter(t => t.isActive)
-      .map(t => t.token);
+    const fcmTokenService = require('./fcmTokenService');
+    const activeTokens = await fcmTokenService.getActiveTokens(userId);
+    
+    const user = await User.findById(userId).select('accountStatus');
+    
     return {
-      tokens: activeTokens,
+      tokens: activeTokens.map(t => t.token),
       accountStatus: user?.accountStatus || 'active',
     };
   } catch (error) {

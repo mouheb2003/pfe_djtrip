@@ -2,12 +2,12 @@ const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const Touriste = require("../models/touriste");
 const CheckinLog = require("../models/checkinLog");
+const Avis = require("../models/avis");
 const QRCode = require("qrcode");
 const jwt = require("jsonwebtoken");
 const emailService = require("../services/email");
 const { createActivityLog } = require("../services/activityLogService");
 const notificationEventBus = require("../services/notificationEventBus");
-const Message = require("../models/message");
 
 const QR_BOOKING_SECRET =
   process.env.QR_BOOKING_SECRET || process.env.JWT_SECRET;
@@ -88,7 +88,13 @@ function parseQrPayload(qrData) {
 }
 
 async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
+  console.log('[INSPECT BOOKING] Function called');
+  console.log('[INSPECT BOOKING] QR Data:', qrData);
+  console.log('[INSPECT BOOKING] Organiser ID:', organiserId);
+  console.log('[INSPECT BOOKING] Mark used:', markUsed);
+
   if (!QR_BOOKING_SECRET) {
+    console.log('[INSPECT BOOKING] QR secret missing');
     return {
       ok: false,
       statusCode: 500,
@@ -98,6 +104,7 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
   }
 
   const parsed = parseQrPayload(qrData);
+  console.log('[INSPECT BOOKING] Parsed result:', parsed);
   if (!parsed.valid) {
     return {
       ok: false,
@@ -126,7 +133,13 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
     ? inscription.organisateur_id._id.toString()
     : inscription.organisateur_id.toString();
 
-  if (bookingOrganizerId !== organiserId) {
+  const organiserIdString = organiserId.toString().trim();
+
+  console.log('[QR VALIDATION] Booking organizer ID:', bookingOrganizerId);
+  console.log('[QR VALIDATION] Request organizer ID:', organiserIdString);
+  console.log('[QR VALIDATION] Match:', bookingOrganizerId === organiserIdString);
+
+  if (bookingOrganizerId !== organiserIdString) {
     return {
       ok: false,
       statusCode: 403,
@@ -135,8 +148,16 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
     };
   }
 
+  console.log('[QR VALIDATION] Organizer ID check passed');
+  console.log('[QR VALIDATION] Booking status:', inscription.statut);
+  console.log('[QR VALIDATION] QR used at:', inscription.qr_used_at);
+
   const activityDeadline = getActivityDeadline(inscription.activite_id);
   const now = new Date();
+  console.log('[QR VALIDATION] Activity deadline:', activityDeadline);
+  console.log('[QR VALIDATION] Current time:', now);
+  console.log('[QR VALIDATION] Is expired:', activityDeadline && now > activityDeadline);
+
   if (activityDeadline && now > activityDeadline) {
     return {
       ok: false,
@@ -158,6 +179,7 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
   }
 
   if (inscription.statut !== "approuvee") {
+    console.log('[QR VALIDATION] Status check failed - not approved');
     return {
       ok: false,
       statusCode: 400,
@@ -166,6 +188,8 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
       booking: inscription,
     };
   }
+
+  console.log('[QR VALIDATION] All checks passed');
 
   if (markUsed) {
     await inscription.marquerCommeUtilise();
@@ -294,22 +318,6 @@ exports.createInscription = async (req, res) => {
     });
 
     await inscription.save();
-
-    // Create message in Message collection if message_touriste is provided
-    if (message_touriste && message_touriste.trim()) {
-      try {
-        await Message.create({
-          sender_id: touristeId,
-          receiver_id: activite.organisateur_id,
-          content: message_touriste,
-          message_type: "text",
-        });
-        console.log('Message created for booking:', inscription._id);
-      } catch (msgError) {
-        console.error('Error creating message for booking:', msgError);
-        // Don't fail the booking if message creation fails
-      }
-    }
 
     // Emit event for new booking notification
     try {
@@ -566,22 +574,6 @@ exports.approuverInscription = async (req, res) => {
 
     await inscription.approuver(message_organisateur);
 
-    // Create message in Message collection if message_organisateur is provided
-    if (message_organisateur && message_organisateur.trim()) {
-      try {
-        await Message.create({
-          sender_id: organisateurId,
-          receiver_id: inscription.touriste_id,
-          content: message_organisateur,
-          message_type: "text",
-        });
-        console.log('Message created for approved booking:', inscriptionId);
-      } catch (msgError) {
-        console.error('Error creating message for approved booking:', msgError);
-        // Don't fail the approval if message creation fails
-      }
-    }
-
     const qrToken = createBookingQrToken(inscription, updatedActivite);
     const activityDeadline = getActivityDeadline(updatedActivite);
     inscription.qr_token = qrToken;
@@ -634,15 +626,34 @@ exports.approuverInscription = async (req, res) => {
           })
         : "--:--";
 
-      let qrDataUrl = null;
+      let qrPublicUrl = null;
       try {
-        qrDataUrl = await QRCode.toDataURL(bookingCode, {
+        const cloudinary = require("../config/cloudinary");
+        const qrBuffer = await QRCode.toBuffer(bookingCode, {
           errorCorrectionLevel: "M",
           margin: 1,
           width: 280,
         });
+        
+        const uploadResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream(
+            {
+              folder: "djtrip/booking-qr",
+              public_id: `booking-qr-${inscription._id}`,
+              resource_type: "image",
+              format: "png",
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          ).end(qrBuffer);
+        });
+        
+        qrPublicUrl = uploadResult.secure_url;
+        console.log('QR code uploaded to Cloudinary:', qrPublicUrl);
       } catch (qrError) {
-        console.error("Error generating booking QR code:", qrError);
+        console.error("Error generating or uploading booking QR code:", qrError);
       }
 
       try {
@@ -655,7 +666,7 @@ exports.approuverInscription = async (req, res) => {
           bookingTime,
           participants: inscription.nombre_participants,
           totalPrice: `${inscription.prix_total.toFixed(2)} TND`,
-          qrDataUrl,
+          qrPublicUrl,
         });
       } catch (emailError) {
         console.error("Error sending booking confirmation email:", emailError);
@@ -716,22 +727,6 @@ exports.refuserInscription = async (req, res) => {
     }
 
     await inscription.refuser(message_organisateur);
-
-    // Create message in Message collection if message_organisateur is provided
-    if (message_organisateur && message_organisateur.trim()) {
-      try {
-        await Message.create({
-          sender_id: organisateurId,
-          receiver_id: inscription.touriste_id,
-          content: message_organisateur,
-          message_type: "text",
-        });
-        console.log('Message created for rejected booking:', inscriptionId);
-      } catch (msgError) {
-        console.error('Error creating message for rejected booking:', msgError);
-        // Don't fail the rejection if message creation fails
-      }
-    }
 
     // Note: no need to decrement nombre_reservations as it was not yet incremented
     // (only approved registrations are counted)
@@ -858,11 +853,12 @@ exports.getTouristStats = async (req, res) => {
   try {
     const touristeId = req.user.userId;
 
-    const [totalBookings] = await Promise.all([
+    const [totalBookings, totalReviews] = await Promise.all([
       Inscription.countDocuments({ touriste_id: touristeId }),
+      Avis.countDocuments({ touriste_id: touristeId }),
     ]);
 
-    res.status(200).json({ totalBookings });
+    res.status(200).json({ totalBookings, totalReviews });
   } catch (error) {
     res.status(500).json({
       message: "Error retrieving statistics",
@@ -882,8 +878,14 @@ exports.validateQrBooking = async (req, res) => {
   const ipAddress = req.ip || req.connection.remoteAddress;
   const userAgent = req.get('user-agent');
 
+  console.log('[QR VALIDATION CONTROLLER] Request received');
+  console.log('[QR VALIDATION CONTROLLER] Organiser ID:', organiserId);
+  console.log('[QR VALIDATION CONTROLLER] QR Data:', qrData);
+  console.log('[QR VALIDATION CONTROLLER] Request body:', req.body);
+
   try {
     if (!qrData) {
+      console.log('[QR VALIDATION CONTROLLER] QR data is missing');
       return res.status(400).json({
         success: false,
         message: "QR data is required",
@@ -898,22 +900,24 @@ exports.validateQrBooking = async (req, res) => {
     });
 
     if (!result.ok) {
-      // Log de validation échouée
-      try {
-        await CheckinLog.createLog({
-          bookingId: result.booking?._id || null,
-          organiserId,
-          touristId: result.booking?.touriste_id?._id || null,
-          activityId: result.booking?.activite_id?._id || null,
-          status: result.code === 'ALREADY_USED' ? 'already_verified' : 'failed',
-          failureReason: result.message,
-          qrData,
-          ipAddress,
-          userAgent,
-          duration: Date.now() - startTime,
-        });
-      } catch (logError) {
-        console.warn("Failed to create validation log:", logError.message);
+      // Log de validation échouée - seulement si la réservation existe
+      if (result.booking) {
+        try {
+          await CheckinLog.createLog({
+            bookingId: result.booking._id,
+            organiserId,
+            touristId: result.booking.touriste_id?._id || result.booking.touriste_id,
+            activityId: result.booking.activite_id?._id || result.booking.activite_id,
+            status: result.code === 'ALREADY_USED' ? 'already_verified' : 'failed',
+            failureReason: result.message,
+            qrData,
+            ipAddress,
+            userAgent,
+            duration: Date.now() - startTime,
+          });
+        } catch (logError) {
+          console.warn("Failed to create validation log:", logError.message);
+        }
       }
 
       return res.status(result.statusCode).json({
@@ -1009,7 +1013,20 @@ exports.verifyInscription = async (req, res) => {
       ? booking.organisateur_id._id.toString()
       : booking.organisateur_id.toString();
 
-    if (bookingOrganizerId !== organisateurId) {
+    // Convert organisateurId to string for comparison
+    const organisateurIdString = organisateurId.toString();
+
+    console.log('[VERIFIER INSCRIPTION] Authorization check:');
+    console.log('- Booking organizer_id:', booking.organisateur_id);
+    console.log('- Booking organizer_id._id:', booking.organisateur_id._id);
+    console.log('- Booking organizer_id type:', typeof booking.organisateur_id);
+    console.log('- Extracted bookingOrganizerId:', bookingOrganizerId);
+    console.log('- Request organisateurId:', organisateurId);
+    console.log('- Request organisateurId type:', typeof organisateurId);
+    console.log('- Converted organisateurIdString:', organisateurIdString);
+    console.log('- Match:', bookingOrganizerId === organisateurIdString);
+
+    if (bookingOrganizerId !== organisateurIdString) {
       await CheckinLog.createLog({
         bookingId: inscriptionId,
         organiserId: organisateurId,
@@ -1264,8 +1281,40 @@ exports.dismissReviewReminder = async (req, res) => {
       reminder: booking.reviewReminder,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error dismissing review reminder",
+      error: error.message,
+    });
+  }
+};
+
+// PATCH /inscriptions/:id/reviewed
+// Mark booking as reviewed (Tourist only)
+exports.markAsReviewed = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const booking = await Inscription.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Verify the booking belongs to the authenticated tourist
+    if (booking.touriste_id.toString() !== req.user.userId) {
+      return res.status(403).json({ message: "You can only mark your own bookings as reviewed" });
+    }
+
+    // Mark as reviewed using the model method
+    await booking.marquerCommeReviewed();
+
+    res.status(200).json({
+      message: "Booking marked as reviewed successfully",
+      hasReviewed: booking.hasReviewed,
+      reviewDate: booking.reviewDate,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error marking booking as reviewed",
       error: error.message,
     });
   }
@@ -1283,7 +1332,7 @@ exports.getReviewReminderData = async (req, res) => {
     }
 
     // Check if reminder should be shown
-    const shouldShow = booking.shouldShowReviewReminder();
+    const shouldShow = await booking.shouldShowReviewReminder();
 
     res.status(200).json({
       shouldShow,
@@ -1291,7 +1340,7 @@ exports.getReviewReminderData = async (req, res) => {
       hasReviewed: booking.hasReviewed,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error getting review reminder data",
       error: error.message,
     });
@@ -1303,7 +1352,7 @@ exports.getReviewReminderData = async (req, res) => {
 exports.getPendingReviewReminders = async (req, res) => {
   try {
     const touristeId = req.user.userId;
-    
+
     // Find all approved bookings for this tourist that are checked in but not reviewed
     const bookings = await Inscription.find({
       touriste_id: touristeId,
@@ -1314,10 +1363,14 @@ exports.getPendingReviewReminders = async (req, res) => {
     .populate("activite_id", "titre date_fin")
     .sort({ qr_used_at: -1 });
 
-    // Filter bookings that should show reminders
-    const eligibleBookings = bookings.filter(booking => 
-      booking.shouldShowReviewReminder()
-    );
+    // Filter bookings that should show reminders (async check)
+    const eligibleBookings = [];
+    for (const booking of bookings) {
+      const shouldShow = await booking.shouldShowReviewReminder();
+      if (shouldShow) {
+        eligibleBookings.push(booking);
+      }
+    }
 
     res.status(200).json({
       bookings: eligibleBookings,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
 
 class OrganizerReviewScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
   final _commentController = TextEditingController();
   final List<String> _selectedTags = [];
   bool _isSubmitting = false;
+  Map<String, dynamic>? _organizerData;
 
   static const List<String> _availableTags = [
     'Punctual',
@@ -40,9 +42,31 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _fetchOrganizerData();
+  }
+
+  @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchOrganizerData() async {
+    try {
+      final organizerId = widget.booking.organisateurId;
+      if (organizerId.isNotEmpty) {
+        final organizer = await UserService.getUserById(organizerId);
+        if (mounted && organizer != null) {
+          setState(() {
+            _organizerData = organizer;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching organizer data: $e');
+    }
   }
 
   Future<void> _submitReview() async {
@@ -59,9 +83,21 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final organizerId = widget.booking.organisateurId;
+      if (organizerId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Organizer information not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
       final result = await BookingService.submitOrganizerReview(
         bookingId: widget.booking.id,
-        organizerId: widget.activity.organisateurId,
+        organizerId: organizerId,
         rating: _rating,
         comment: _commentController.text.trim(),
         tags: _selectedTags,
@@ -115,11 +151,11 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Review Participant',
+          'Review Organizer',
           style: TextStyle(
             color: Colors.black87,
             fontSize: 18,
@@ -170,9 +206,12 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
   }
 
   Widget _buildParticipantInfo() {
-    final participant = widget.booking.touriste ?? {};
-    final participantName = participant['fullname']?.toString() ?? 'Participant';
-    final participantAvatar = participant['avatar']?.toString();
+    // Use fetched organizer data if available, otherwise try activity or booking
+    final organizer = _organizerData ?? 
+                      widget.activity.organisateur ?? {};
+    
+    final organizerName = organizer['fullname']?.toString() ?? 'Organizer';
+    final organizerAvatar = organizer['avatar']?.toString();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -189,14 +228,14 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
       ),
       child: Row(
         children: [
-          // Participant Avatar
+          // Organizer Avatar
           CircleAvatar(
             radius: 40,
             backgroundColor: const Color(0xFFE8E5FF),
-            backgroundImage: participantAvatar?.isNotEmpty == true
-                ? NetworkImage(participantAvatar!)
+            backgroundImage: organizerAvatar?.isNotEmpty == true
+                ? NetworkImage(organizerAvatar!)
                 : null,
-            child: participantAvatar?.isEmpty != false
+            child: organizerAvatar?.isEmpty != false
                 ? const Icon(
                     Icons.person,
                     color: Color(0xFF4B63FF),
@@ -206,13 +245,13 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
           ),
           const SizedBox(width: 16),
           
-          // Participant Details
+          // Organizer Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  participantName,
+                  organizerName,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -221,7 +260,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Participant in ${widget.activity.titre}',
+                  'Organizer of ${widget.activity.titre}',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,
@@ -257,7 +296,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Participant rated your activity',
+            'You rated this activity',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -293,7 +332,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'How was this participant?',
+          'How was this organizer?',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
@@ -366,7 +405,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
         TextFormField(
           controller: _commentController,
           decoration: InputDecoration(
-            hintText: 'How was this participant\'s behavior during the activity?',
+            hintText: 'How was your experience with this organizer?',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
@@ -386,7 +425,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
           maxLines: 4,
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please share your experience with this participant';
+              return 'Please share your experience with this organizer';
             }
             if (value.trim().length < 10) {
               return 'Comment must be at least 10 characters';
@@ -403,7 +442,7 @@ class _OrganizerReviewScreenState extends State<OrganizerReviewScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Participant qualities (optional)',
+          'Organizer qualities (optional)',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
@@ -569,7 +608,7 @@ class ThankYouScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 isOrganizerReview 
-                    ? 'Your participant review has been submitted successfully'
+                    ? 'Your organizer review has been submitted successfully'
                     : 'Your review has been submitted successfully',
                 style: TextStyle(
                   fontSize: 16,

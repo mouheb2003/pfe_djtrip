@@ -13,6 +13,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.15.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.73.4",
     "cloudinary": "^2.9.0",

@@ -61,7 +61,6 @@ class PostService {
     try {
       final res = await ApiClient.get(
         '/posts/feed',
-        auth: false,
         cacheFirst: false,
       );
       if (res.statusCode != 200) return [];
@@ -168,7 +167,13 @@ class PostService {
     String postId,
   ) async {
     try {
-      final res = await ApiClient.get('/posts/$postId/comments');
+      // Use paginated API with default parameters (page 1, limit 10)
+      // Disable frontend caching to prevent stale data
+      final res = await ApiClient.get(
+        '/comments/$postId/comments',
+        query: {'page': '1', 'limit': '10'},
+        cacheFirst: false,
+      );
       if (res.statusCode != 200) return [];
       final body = _safeObject(res.body);
       if (body['comments'] is List) {
@@ -186,7 +191,7 @@ class PostService {
     String? parentCommentId,
   }) async {
     try {
-      final res = await ApiClient.post('/posts/$postId/comments', {
+      final res = await ApiClient.post('/comments/$postId/comments', {
         'content': content,
         if (parentCommentId != null && parentCommentId.isNotEmpty)
           'parentCommentId': parentCommentId,
@@ -210,9 +215,11 @@ class PostService {
     }
   }
 
-  static Future<Map<String, dynamic>> togglePostLike(String postId) async {
+  static Future<Map<String, dynamic>> togglePostLike(String postId, {String reactionType = 'like'}) async {
     try {
-      final res = await ApiClient.post('/posts/$postId/like', const {});
+      final res = await ApiClient.post('/posts/$postId/like', {
+        'reactionType': reactionType,
+      });
 
       Map<String, dynamic> body = {};
       try {
@@ -226,6 +233,9 @@ class PostService {
         'message': body['message'] ?? 'Unable to update like',
         'liked': body['liked'] == true,
         'likesCount': (body['likesCount'] as num?)?.toInt() ?? 0,
+        'totalReactions': (body['totalReactions'] as num?)?.toInt() ?? 0,
+        'reactionCounts': body['reaction_counts'] ?? {},
+        'userReaction': body['userReaction'],
         'postId': body['postId']?.toString() ?? postId,
       };
     } catch (_) {
@@ -233,9 +243,9 @@ class PostService {
     }
   }
 
-  static Future<Map<String, dynamic>> reactToComment(String postId, String commentId, String reactionType) async {
+  static Future<Map<String, dynamic>> reactToComment(String commentId, String reactionType) async {
     try {
-      final res = await ApiClient.post('/posts/$postId/comments/$commentId/react', {
+      final res = await ApiClient.post('/comments/$commentId/react', {
         'reactionType': reactionType,
       });
 
@@ -249,20 +259,16 @@ class PostService {
       return {
         'success': res.statusCode == 200,
         'message': body['message'] ?? 'Unable to update reaction',
-        'userReaction': body['userReaction']?.toString(),
-        'totalReactions': (body['totalReactions'] as num?)?.toInt() ?? 0,
-        'reactionCounts': body['reactionCounts'] as Map<String, dynamic>? ?? {},
+        'user_reaction': body['user_reaction'],
+        'total_reactions': (body['total_reactions'] as num?)?.toInt() ?? 0,
+        'reaction_counts': body['reaction_counts'] ?? {},
       };
     } catch (_) {
       return {'success': false, 'message': 'Unable to update reaction right now.'};
     }
   }
 
-  // ✅ NEW: Update comment (only owner)
-  static Future<Map<String, dynamic>> updateComment({
-    required String commentId,
-    required String content,
-  }) async {
+  static Future<Map<String, dynamic>> updateComment(String commentId, String content) async {
     try {
       final res = await ApiClient.patch('/comments/$commentId', {
         'content': content,
@@ -305,15 +311,50 @@ class PostService {
     }
   }
 
+  // ✅ NEW: Get comment replies with pagination (Facebook/Instagram style)
+  static Future<Map<String, dynamic>> getCommentReplies({
+    required String commentId,
+    int page = 1,
+    int limit = 5, // Default to 5 replies per page
+  }) async {
+    try {
+      // Disable frontend caching to prevent stale data
+      final res = await ApiClient.get(
+        '/comments/$commentId/replies',
+        query: {'page': page.toString(), 'limit': limit.toString()},
+        cacheFirst: false,
+      );
+      if (res.statusCode != 200) {
+        return {
+          'success': false,
+          'replies': <dynamic>[],
+          'pagination': null,
+        };
+      }
+      final body = _safeObject(res.body);
+      return {
+        'success': true,
+        'replies': body['replies'] ?? <dynamic>[],
+        'pagination': body['pagination'],
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'replies': <dynamic>[],
+        'pagination': null,
+      };
+    }
+  }
+
   // ✅ NEW: Get comments with pagination
   static Future<Map<String, dynamic>> getPostCommentsPaginated({
     required String postId,
     int page = 1,
-    int limit = 20,
+    int limit = 10, // Default to 10 for Facebook/Instagram style
   }) async {
     try {
       final res = await ApiClient.get(
-        '/posts/$postId/comments',
+        '/comments/$postId/comments',
         query: {'page': page.toString(), 'limit': limit.toString()},
       );
       if (res.statusCode != 200) {

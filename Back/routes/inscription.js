@@ -171,4 +171,14 @@ router.get(
   inscriptionController.getPendingReviewReminders,
 );
 
+// PATCH /inscriptions/:id/reviewed
+// Mark booking as reviewed (Tourist only)
+router.patch(
+  "/:id/reviewed",
+  verifyToken,
+  verifyTouriste,
+  invalidateCache(["inscriptions", "activites"]),
+  inscriptionController.markAsReviewed,
+);
+
 module.exports = wrapRouter(router);

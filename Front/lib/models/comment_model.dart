@@ -5,10 +5,14 @@ class CommentModel {
   final String authorName;
   final String? authorAvatar;
   final String? authorUserType;
+  final String? authorUsername;
   final String content;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? parentCommentId;
+  final int depth;
+  final int repliesCount;
+  final List<String> mentions;
   final String? userReaction;
   final int totalReactions;
   final List<dynamic> reactions;
@@ -22,10 +26,14 @@ class CommentModel {
     required this.authorName,
     this.authorAvatar,
     this.authorUserType,
+    this.authorUsername,
     required this.content,
     required this.createdAt,
     this.updatedAt,
     this.parentCommentId,
+    this.depth = 0,
+    this.repliesCount = 0,
+    this.mentions = const [],
     this.userReaction,
     this.totalReactions = 0,
     this.reactions = const [],
@@ -48,6 +56,16 @@ class CommentModel {
       }
     }
 
+    // Parse mentions array
+    List<String> mentionsList = [];
+    if (json['mentions'] != null) {
+      if (json['mentions'] is List) {
+        mentionsList = (json['mentions'] as List)
+            .map((e) => e.toString())
+            .toList();
+      }
+    }
+
     return CommentModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       postId: json['post_id']?.toString() ?? '',
@@ -55,10 +73,14 @@ class CommentModel {
       authorName: author['fullname']?.toString() ?? 'Anonymous',
       authorAvatar: author['avatar']?.toString(),
       authorUserType: author['userType']?.toString(),
+      authorUsername: author['username']?.toString(),
       content: json['content']?.toString() ?? '',
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? json['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? json['updatedAt']?.toString() ?? ''),
       parentCommentId: json['parent_comment_id']?.toString(),
+      depth: (json['depth'] as num?)?.toInt() ?? 0,
+      repliesCount: (json['replies_count'] as num?)?.toInt() ?? 0,
+      mentions: mentionsList,
       userReaction: json['user_reaction']?.toString(),
       totalReactions: (json['total_reactions'] as num?)?.toInt() ?? 0,
       reactions: json['reactions'] ?? [],
@@ -87,10 +109,14 @@ class CommentModel {
     String? authorName,
     String? authorAvatar,
     String? authorUserType,
+    String? authorUsername,
     String? content,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? parentCommentId,
+    int? depth,
+    int? repliesCount,
+    List<String>? mentions,
     String? userReaction,
     int? totalReactions,
     List<dynamic>? reactions,
@@ -104,10 +130,14 @@ class CommentModel {
       authorName: authorName ?? this.authorName,
       authorAvatar: authorAvatar ?? this.authorAvatar,
       authorUserType: authorUserType ?? this.authorUserType,
+      authorUsername: authorUsername ?? this.authorUsername,
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       parentCommentId: parentCommentId ?? this.parentCommentId,
+      depth: depth ?? this.depth,
+      repliesCount: repliesCount ?? this.repliesCount,
+      mentions: mentions ?? this.mentions,
       userReaction: userReaction ?? this.userReaction,
       totalReactions: totalReactions ?? this.totalReactions,
       reactions: reactions ?? this.reactions,

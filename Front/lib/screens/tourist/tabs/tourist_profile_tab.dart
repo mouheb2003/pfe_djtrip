@@ -465,6 +465,10 @@ List<Map<String, dynamic>> _featuredPlaces = [];
     final comments = await PostService.getPostComments(postId);
     if (!mounted) return;
 
+    // Get current user ID
+    final currentUser = AuthService.currentUser;
+    final currentUserId = (currentUser?['_id'] ?? '').toString();
+
     final inputCtrl = TextEditingController();
     String? replyToId;
     String replyToName = '';
@@ -516,8 +520,8 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                 workingComments = latest;
                 replyToId = null;
                 replyToName = '';
-                inputCtrl.clear();
               });
+              inputCtrl.clear();
               await _loadAll();
             }
 
@@ -578,6 +582,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                                   });
                                 },
                                 replies: tree(c['_id']?.toString() ?? ''),
+                                currentUserId: currentUserId,
                               ),
                             ),
                           ],
@@ -1674,12 +1679,14 @@ class _CommentTile extends StatelessWidget {
   final List<Map<String, dynamic>> replies;
   final String Function(DateTime?) timeAgo;
   final void Function(String id, String authorName) onReply;
+  final String currentUserId;
 
   const _CommentTile({
     required this.comment,
     required this.replies,
     required this.timeAgo,
     required this.onReply,
+    required this.currentUserId,
   });
 
   @override
@@ -1688,6 +1695,7 @@ class _CommentTile extends StatelessWidget {
         ? comment['author_id'] as Map<String, dynamic>
         : <String, dynamic>{};
     final authorName = (author['fullname'] as String?) ?? 'Traveler';
+    final authorId = (author['_id'] ?? author['id'] ?? '').toString();
     final authorAvatar = (author['avatar'] as String?) ?? '';
     final content = (comment['content'] as String?)?.trim() ?? '';
     final id = (comment['_id'] ?? '').toString();
@@ -1724,7 +1732,7 @@ class _CommentTile extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              authorName,
+                              authorId == currentUserId ? 'You' : authorName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF1D245D),
@@ -1747,7 +1755,7 @@ class _CommentTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       GestureDetector(
-                        onTap: () => onReply(id, authorName),
+                        onTap: () => onReply(id, authorId == currentUserId ? 'You' : authorName),
                         child: const Text(
                           'Reply',
                           style: TextStyle(
@@ -1773,6 +1781,7 @@ class _CommentTile extends StatelessWidget {
                         replies: const [],
                         timeAgo: timeAgo,
                         onReply: onReply,
+                        currentUserId: currentUserId,
                       ),
                     )
                     .toList(),

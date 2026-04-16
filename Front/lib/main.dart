@@ -17,7 +17,7 @@ import 'services/auth_service.dart';
 import 'providers/user_provider.dart';
 import 'theme/app_theme.dart';
 
-// ✅ GLOBAL SNACKBAR KEY
+// GLOBAL SNACKBAR KEY
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 

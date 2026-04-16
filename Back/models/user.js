@@ -102,7 +102,7 @@ const userSchema = new mongoose.Schema(
         deviceId: String,
         isActive: { type: Boolean, default: true },
         createdAt: { type: Date, default: Date.now },
-        lastUsedAt: Date,
+        lastUsed: { type: Date, default: Date.now },
       },
     ],
     // 🚀 NEW: Activity specialties for organizers

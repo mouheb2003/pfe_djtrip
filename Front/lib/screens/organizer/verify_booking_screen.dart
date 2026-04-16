@@ -21,6 +21,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   final TextEditingController _manualCodeController = TextEditingController();
 
   bool _isLoading = false;
+  bool _userPressedButton = false;
   String? _lastScannedCode;
   _VerifyView _view = _VerifyView.scanner;
   _VerificationPayload? _lastResult;
@@ -128,6 +129,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
 
       setState(() {
         _lastResult = resolved;
+        _isLoading = false;
       });
 
       if (source == VerificationSource.scanner) {
@@ -151,16 +153,13 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
       );
       setState(() {
         _lastResult = fallback;
+        _isLoading = false;
         if (source == VerificationSource.manual) {
           _view = _VerifyView.manualFailure;
         }
       });
       if (source == VerificationSource.scanner) {
         await _showScannerOutcomeSheet(fallback);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
@@ -249,10 +248,13 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: (_isLoading || booking == null)
+            onPressed: _isLoading || booking == null
                 ? null
                 : () async {
-                    await _confirmAdmission(booking, fromManualFlow: false);
+                    print('[VERIFY] Confirm Admission button pressed by user');
+                    setState(() => _userPressedButton = true);
+                    await _confirmAdmission(booking!, fromManualFlow: false);
+                    setState(() => _userPressedButton = false);
                     if (!mounted) return;
                     Navigator.of(context).pop();
                   },
@@ -473,6 +475,10 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
     required bool fromManualFlow,
   }) async {
     if (_isLoading) return;
+    if (!fromManualFlow && !_userPressedButton) {
+      print('[VERIFY] WARNING: _confirmAdmission called without user button press');
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {

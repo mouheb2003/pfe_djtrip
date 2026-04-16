@@ -12,25 +12,14 @@ const {
 const {
   verifyToken,
   verifyTouriste,
+  verifyOrganisator,
+  verifyTouristeOrOrganisator,
   verifyAdmin,
 } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
-// Public feed
-router.get("/feed", cacheGet("posts:feed", 60), postController.getFeedPosts);
-router.get(
-  "/:postId/comments",
-  verifyToken,
-  cacheGet("posts:comments", 60),
-  postController.getPostComments,
-);
-router.post(
-  "/:postId/comments",
-  verifyToken,
-  validate(commentSchema),
-  invalidateCache(["posts:comments", "posts:feed", "posts:me"]),
-  postController.addPostComment,
-);
+// Public feed (authenticated to show like status)
+router.get("/feed", verifyToken, cacheGet("posts:feed", 60), postController.getFeedPosts);
 router.post(
   "/:postId/like",
   verifyToken,
@@ -38,30 +27,18 @@ router.post(
   postController.togglePostLike,
 );
 
-// Comment reactions
-router.post(
-  "/:postId/comments/:commentId/react",
-  verifyToken,
-  invalidateCache(["posts:comments", "posts:feed"]),
-  postController.reactToComment,
-);
-router.get(
-  "/:postId/comments/:commentId/reactions",
-  postController.getCommentReactions,
-);
-
-// Tourist post management
+// Tourist and Organizer post management
 router.get(
   "/me",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   cacheGet("posts:me", 60),
   postController.getMyPosts,
 );
 router.post(
   "/upload-image",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   upload.single("image"),
   invalidateCache(["posts:feed", "posts:me"]),
   postController.uploadPostImage,
@@ -69,7 +46,7 @@ router.post(
 router.post(
   "/",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   validate(createPostSchema),
   invalidateCache(["posts:feed", "posts:me", "posts:comments"]),
   postController.createPost,
@@ -77,7 +54,7 @@ router.post(
 router.put(
   "/:postId",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   validate(updatePostSchema),
   invalidateCache(["posts:feed", "posts:me", "posts:comments"]),
   postController.updateMyPost,
@@ -85,7 +62,7 @@ router.put(
 router.delete(
   "/:postId",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   invalidateCache(["posts:feed", "posts:me", "posts:comments"]),
   postController.deleteMyPost,
 );

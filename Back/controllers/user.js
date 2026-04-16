@@ -1675,56 +1675,15 @@ exports.addFcmToken = async (req, res) => {
       return res.status(400).json({ message: "Token and deviceId are required" });
     }
 
-    console.log("📱 Adding FCM token for user:", userId, "deviceId:", deviceId);
+    const fcmTokenService = require('../services/fcmTokenService');
+    const result = await fcmTokenService.addFcmToken(userId, token, deviceId);
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Initialize fcmTokens array if it doesn't exist
-    if (!user.fcmTokens) {
-      user.fcmTokens = [];
-    }
-
-    // Check if token with same deviceId already exists
-    const existingTokenIndex = user.fcmTokens.findIndex(
-      (t) => t.deviceId === deviceId
-    );
-
-    const wasPreviouslyDeleted = existingTokenIndex === -1;
-
-    if (existingTokenIndex !== -1) {
-      // Update existing token
-      user.fcmTokens[existingTokenIndex] = {
-        token,
-        deviceId,
-        isActive: true,
-        createdAt: user.fcmTokens[existingTokenIndex].createdAt,
-        lastUsedAt: new Date(),
-      };
-      console.log("🔄 Updated existing FCM token for deviceId:", deviceId);
-    } else {
-      // Add new token
-      user.fcmTokens.push({
-        token,
-        deviceId,
-        isActive: true,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-      });
-      console.log("➕ Added new FCM token for deviceId:", deviceId);
-    }
-
-    await user.save();
-
-    // If this is a re-login (token was previously deleted), check for unread messages
-    if (wasPreviouslyDeleted) {
+    // Check for unread messages after re-login
+    if (result.success) {
       try {
         const Message = require("../models/message");
         const notificationService = require("../services/notificationServiceV2");
 
-        // Check for unread messages
         const unreadMessages = await Message.find({
           receiver_id: userId,
           is_read: false,
@@ -1733,7 +1692,6 @@ exports.addFcmToken = async (req, res) => {
         if (unreadMessages.length > 0) {
           console.log(`📬 Found ${unreadMessages.length} unread messages for user ${userId} after re-login`);
 
-          // Send notification for the most recent unread message
           const mostRecent = unreadMessages[0];
           const sender = await User.findById(mostRecent.sender_id).select("fullname");
 
@@ -1751,14 +1709,10 @@ exports.addFcmToken = async (req, res) => {
         }
       } catch (notifError) {
         console.error("❌ Error checking/sending unread message notifications:", notifError);
-        // Don't fail the token save if notification fails
       }
     }
 
-    res.status(200).json({
-      message: "FCM token saved successfully",
-      success: true,
-    });
+    res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error adding FCM token:", err);
     res.status(500).json({
@@ -1778,36 +1732,10 @@ exports.removeFcmToken = async (req, res) => {
       return res.status(400).json({ message: "DeviceId is required" });
     }
 
-    console.log("🗑️ Removing FCM token for user:", userId, "deviceId:", deviceId);
+    const fcmTokenService = require('../services/fcmTokenService');
+    const result = await fcmTokenService.logout(userId, deviceId);
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (!user.fcmTokens || user.fcmTokens.length === 0) {
-      return res.status(404).json({ message: "No FCM tokens found" });
-    }
-
-    // Remove or deactivate the token for this deviceId
-    const tokenIndex = user.fcmTokens.findIndex(
-      (t) => t.deviceId === deviceId
-    );
-
-    if (tokenIndex === -1) {
-      return res.status(404).json({ message: "FCM token not found for this device" });
-    }
-
-    // Remove the token
-    user.fcmTokens.splice(tokenIndex, 1);
-    await user.save();
-
-    console.log("✅ FCM token removed for deviceId:", deviceId);
-
-    res.status(200).json({
-      message: "FCM token removed successfully",
-      success: true,
-    });
+    res.status(200).json(result);
   } catch (err) {
     console.error("❌ Error removing FCM token:", err);
     res.status(500).json({

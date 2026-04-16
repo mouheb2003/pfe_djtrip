@@ -295,7 +295,7 @@ class _RequestsTabState extends State<RequestsTab> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFE),
+      backgroundColor: const Color(0xFFF2F1FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

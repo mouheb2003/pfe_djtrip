@@ -43,7 +43,17 @@ const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
 const postRoutes = require("./routes/post");
-const commentRoutes = require("./routes/comment");
+let commentRoutes;
+try {
+  console.log('[SERVER] Loading comment routes...');
+  commentRoutes = require("./routes/comment");
+  console.log('[SERVER] Comment routes loaded successfully');
+} catch (error) {
+  console.error('[SERVER] ERROR loading comment routes:', error.message);
+  console.error('[SERVER] ERROR stack:', error.stack);
+  commentRoutes = express.Router(); // Fallback to empty router
+}
+
 const systemLogRoutes = require("./routes/systemLog");
 const logRoutes = require("./routes/logRoutes");
 const appealRoutes = require("./routes/appeal");
@@ -79,6 +89,13 @@ const io = new Server(server, {
 
 // 🚀 NEW: Store io instance globally for logout access
 app.set("io", io);
+
+// Initialize Socket.io in comment controller
+const commentController = require("./controllers/comment");
+if (commentController.initSocketIO) {
+  commentController.initSocketIO(io);
+  console.log('[SERVER] Socket.io initialized in comment controller');
+}
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
@@ -584,6 +601,21 @@ io.on("connection", (socket) => {
       io.to(`user_${receiverId}`).emit("partner_typing_stop", {
         partnerId: socket.userId,
       });
+  });
+
+  // ─── Comment Events ─────────────────────────────────────────────────────
+  socket.on("comment:subscribe", ({ postId }) => {
+    if (postId) {
+      socket.join(`post:${postId}`);
+      socket.emit("comment:subscribed", { postId });
+    }
+  });
+
+  socket.on("comment:unsubscribe", ({ postId }) => {
+    if (postId) {
+      socket.leave(`post:${postId}`);
+      socket.emit("comment:unsubscribed", { postId });
+    }
   });
 
   // ─── Audio/Video Calls (WebRTC Signaling) ─────────────────────────────────

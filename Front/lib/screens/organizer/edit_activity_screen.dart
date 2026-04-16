@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
+import '../../widgets/ai_image_generator_widget.dart';
 import 'map_picker_screen.dart';
 import 'activity_preview_screen.dart';
 
@@ -39,6 +40,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   late List<String> _existingPhotoUrls;
   final List<XFile> _newPhotos = [];
+  String? _aiGeneratedImageUrl;
 
   bool _isLoading = false;
 
@@ -88,50 +90,60 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
     // Clean up stringified JSON for lists
     void cleanList(List<String> source, List<String> target) {
-      for (var l in source) {
-        if (l.startsWith('[') && l.endsWith(']')) {
-          final clean = l
-              .replaceAll('[', '')
-              .replaceAll(']', '')
-              .replaceAll('"', '')
-              .trim();
-          if (clean.isNotEmpty) {
-            target.addAll(clean.split(',').map((s) => s.trim()));
-          }
+      for (var item in source) {
+        if (item.startsWith('[') || item.startsWith('{')) {
+          try {
+            final parsed = item.replaceAll(RegExp(r"[\[\]']"), '').split(',');
+            for (var p in parsed) {
+              if (p.trim().isNotEmpty) target.add(p.trim());
+            }
+          } catch (_) {}
         } else {
-          target.add(l);
+          target.add(item);
         }
       }
     }
-
-    cleanList(a.languesDisponibles, _languages);
-    cleanList(a.equipementsInclus, _includedEquipment);
-    cleanList(a.aApporter, _itemsToBring);
-
+    cleanList(a.equipementsInclus ?? [], _includedEquipment);
+    cleanList(a.aApporter ?? [], _itemsToBring);
+    cleanList(a.languesDisponibles ?? [], _languages);
     _difficultyLevel = _difficultyLevels.contains(a.niveauDifficulte)
         ? a.niveauDifficulte
-        : 'Moderate';
+        : 'Intermediate';
 
-    // Map duration to selection
-    if (a.duree > 0) {
-      final preset = [
-        0.5,
-        1.0,
-        1.5,
-        2.0,
-        3.0,
-        4.0,
-      ].firstWhere((p) => (p - a.duree).abs() < 0.01, orElse: () => -1.0);
-      if (preset != -1.0) {
-        _selectedDuration = preset;
-      } else {
-        _selectedDuration = -1.0; // Custom
-        _customHours = a.duree.floor();
-        _customMinutes = ((a.duree - _customHours) * 60).round();
-      }
+    // Duration handling
+    final durationPresets = [1.0, 2.0, 3.0, 4.0];
+    final preset = durationPresets.firstWhere((p) => (p - a.duree).abs() < 0.01, orElse: () => -1.0);
+    if (preset != -1.0) {
+      _selectedDuration = preset;
+    } else {
+      _selectedDuration = -1.0; // Custom
+      _customHours = a.duree.floor();
+      _customMinutes = ((a.duree - _customHours) * 60).round();
     }
 
     _recalcEndDate();
+  }
+
+  void _onAIImageGenerated(String imageUrl) {
+    setState(() {
+      _aiGeneratedImageUrl = imageUrl;
+      _existingPhotoUrls.add(imageUrl); // Add to existing photos so it appears in gallery
+      print('🤖 AI image generated in edit screen: $imageUrl');
+      print('🤖 _existingPhotoUrls after adding: $_existingPhotoUrls');
+    });
+  }
+
+  void _onImageDeleted(String imageUrl) {
+    setState(() {
+      _existingPhotoUrls.remove(imageUrl);
+      // Also clear _aiGeneratedImageUrl if the deleted image matches
+      if (_aiGeneratedImageUrl == imageUrl) {
+        _aiGeneratedImageUrl = null;
+      }
+      print('🗑️ Image deleted: $imageUrl');
+      print('🗑️ _existingPhotoUrls after delete: $_existingPhotoUrls');
+      print('🗑️ _aiGeneratedImageUrl after delete: $_aiGeneratedImageUrl');
+    });
   }
 
   @override
@@ -219,6 +231,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       dateDebut: _startDateTime ?? DateTime.now(),
       dateFin: endDateTime,
       newPhotos: _newPhotos.map((x) => File(x.path)).toList(),
+      aiGeneratedImageUrl: _aiGeneratedImageUrl,
+      existingPhotoUrls: _existingPhotoUrls,
       languesDisponibles: _languages,
       equipementsInclus: _includedEquipment,
       aApporter: _itemsToBring,
@@ -286,6 +300,16 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       _buildLabel('DIFFICULTY LEVEL'),
                       _buildDifficultySegment(),
                     ]),
+                    const SizedBox(height: 20),
+                    AIImageGeneratorWidget(
+                      titleController: _titleCtrl,
+                      descriptionController: _descCtrl,
+                      onImageGenerated: _onAIImageGenerated,
+                      onImageDeleted: _onImageDeleted,
+                      existingImageUrls: _existingPhotoUrls,
+                      category: _category,
+                      showDebugInfo: false,
+                    ),
                     const SizedBox(height: 32),
                     _buildSectionTitle(
                       'Media Gallery',

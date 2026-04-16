@@ -26,7 +26,6 @@ router.get(
   "/my-review/activite/:activiteId",
   verifyToken,
   verifyTouriste,
-  cacheGet("avis:my-review", 60),
   avisController.getMyActivityReview,
 );
 
@@ -55,6 +54,15 @@ router.post(
   verifyTouriste,
   invalidateCache(["avis", "activites", "organisators"]),
   avisController.submitOrganisateurRating,
+);
+
+// Update own review/rating (tourist only)
+router.put(
+  "/:avisId",
+  verifyToken,
+  verifyTouriste,
+  invalidateCache(["avis", "activites", "organisators"]),
+  avisController.updateAvis,
 );
 
 // Delete own review/rating (tourist only)

@@ -57,6 +57,18 @@ exports.submitActivityReview = async (req, res) => {
       });
     }
 
+    // Check if organizer exists and is active
+    const User = require("../models/user");
+    const organizer = await User.findById(inscription.organisateur_id);
+    if (!organizer) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+    if (organizer.accountStatus !== "active") {
+      return res.status(403).json({
+        message: "Cannot review activities from inactive organizers",
+      });
+    }
+
     const avis = await Avis.create({
       touriste_id: touristeId,
       activite_id: activiteId,
@@ -73,8 +85,8 @@ exports.submitActivityReview = async (req, res) => {
 
     await refreshActiviteStats(activiteId);
 
-    res.status(201).json({ 
-      message: "Review submitted successfully", 
+    res.status(201).json({
+      message: "Review submitted successfully",
       avis,
       review: {
         id: avis._id,
@@ -106,6 +118,18 @@ exports.submitOrganisateurRating = async (req, res) => {
       return res.status(400).json({ message: "Note must be between 1 and 5" });
     }
 
+    // Check if organizer exists and is active
+    const User = require("../models/user");
+    const organizer = await User.findById(organisateurId);
+    if (!organizer) {
+      return res.status(404).json({ message: "Organizer not found" });
+    }
+    if (organizer.accountStatus !== "active") {
+      return res.status(403).json({
+        message: "Cannot rate inactive organizers",
+      });
+    }
+
     // Verify the tourist has an approved inscription for at least one of this organizer's activities
     const inscription = await Inscription.findOne({
       touriste_id: touristeId,
@@ -131,8 +155,8 @@ exports.submitOrganisateurRating = async (req, res) => {
 
     await refreshOrganisateurStats(organisateurId);
 
-    res.status(201).json({ 
-      message: "Rating submitted successfully", 
+    res.status(201).json({
+      message: "Rating submitted successfully",
       avis,
       review: {
         id: avis._id,
@@ -212,6 +236,80 @@ exports.getMyOrganisateurRating = async (req, res) => {
       type: "organisateur",
     });
     res.json({ hasRated: !!avis, avis: avis || null });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+};
+
+// ─── PUT /avis/:avisId ───────────────────────────────────────────────────────
+// Tourist updates their own review/rating
+exports.updateAvis = async (req, res) => {
+  try {
+    const { avisId } = req.params;
+    const touristeId = req.user.userId;
+    const { note, commentaire, tags } = req.body;
+
+    if (!note || note < 1 || note > 5) {
+      return res.status(400).json({ message: "Note must be between 1 and 5" });
+    }
+
+    const avis = await Avis.findOne({ _id: avisId, touriste_id: touristeId });
+    if (!avis) {
+      return res
+        .status(404)
+        .json({ message: "Review not found or not yours to update" });
+    }
+
+    // Check if organizer is still active before allowing update
+    const User = require("../models/user");
+    if (avis.type === "activite" && avis.activite_id) {
+      const inscription = await Inscription.findOne({
+        touriste_id: touristeId,
+        activite_id: avis.activite_id,
+        statut: "approuvee",
+      });
+      if (inscription) {
+        const organizer = await User.findById(inscription.organisateur_id);
+        if (organizer && organizer.accountStatus !== "active") {
+          return res.status(403).json({
+            message: "Cannot update review for inactive organizers",
+          });
+        }
+      }
+    } else if (avis.type === "organisateur" && avis.organisateur_id) {
+      const organizer = await User.findById(avis.organisateur_id);
+      if (organizer && organizer.accountStatus !== "active") {
+        return res.status(403).json({
+          message: "Cannot update rating for inactive organizers",
+        });
+      }
+    }
+
+    // Update the review
+    avis.note = note;
+    avis.commentaire = commentaire?.trim() || null;
+    avis.tags = tags && Array.isArray(tags) ? tags.slice(0, 3) : [];
+    await avis.save();
+
+    // Refresh stats
+    const { type, activite_id, organisateur_id } = avis;
+    if (type === "activite" && activite_id) {
+      await refreshActiviteStats(activite_id);
+    } else if (type === "organisateur" && organisateur_id) {
+      await refreshOrganisateurStats(organisateur_id);
+    }
+
+    res.json({
+      message: "Review updated successfully",
+      avis,
+      review: {
+        id: avis._id,
+        rating: note,
+        comment: avis.commentaire,
+        tags: avis.tags,
+        updatedAt: avis.updatedAt
+      }
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

@@ -75,11 +75,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Future<void> _cancelBooking() async {
-    if (!_inscription.canBeCancelled) {
+    if (!_inscription.canBeCancelledWithTime) {
+      final hoursRemaining = _inscription.hoursUntilCancellationDeadline;
+      String message;
+      
+      if (hoursRemaining <= 0) {
+        message = 'This booking cannot be cancelled - the activity has already started or passed.';
+      } else if (hoursRemaining < 24) {
+        message = 'Cancellation is not allowed within 24 hours of the activity start. '
+                  'Current time remaining: $hoursRemaining hour${hoursRemaining != 1 ? 's' : ''}.';
+      } else {
+        message = 'This booking cannot be cancelled.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This booking cannot be cancelled'),
+        SnackBar(
+          content: Text(message),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
       return;
@@ -91,7 +104,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         title: const Text('Cancel Booking'),
         content: Text(
           'Are you sure you want to cancel this booking? This action cannot be undone.\n\n'
-          'Refund policy may apply based on the organizer\'s terms.',
+          'Note: Cancellation is only allowed 24+ hours before the activity start.',
         ),
         actions: [
           TextButton(
@@ -293,7 +306,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           ),
                         ),
                       )
-                    : _inscription.canBeCancelled
+                    : _inscription.canBeCancelledWithTime
                     ? ElevatedButton.icon(
                         onPressed: _isCancelling ? null : _cancelBooking,
                         icon: _isCancelling

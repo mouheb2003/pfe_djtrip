@@ -8,6 +8,7 @@ import 'tabs/archive_tab.dart';
 import 'tabs/organizer_profile_tab.dart';
 import '../tourist/tabs/screen_network.dart';
 import '../shared/messages_screen.dart';
+import '../notifications_screen.dart';
 import '../../services/activity_service.dart';
 import '../../services/inscription_service.dart';
 import '../../services/message_service.dart';
@@ -212,153 +213,120 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const navBg = Color(0xFFE9ECFB);
+    const navBg = Color(0xFFF2F1FA);
     const navActive = AppColors.primary;
     const navInactive = Color(0xFF7B82A8);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF2F1FA),
       body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 88,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.topCenter,
+      bottomNavigationBar: Container(
+        color: const Color(0xFFF2F1FA),
+        padding: const EdgeInsets.only(bottom: 20),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 8,
-                child: Container(
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: navBg,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.14),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.calendar_today_outlined,
-                          activeIcon: Icons.calendar_today,
-                          label: 'Activities',
-                          index: 0,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                          showDot: _showActivitiesDot || _showRequestsDot,
-                        ),
-                      ),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.inventory_2_outlined,
-                          activeIcon: Icons.inventory_2,
-                          label: 'Archive',
-                          index: 1,
-                          currentIndex: _currentIndex,
-                          onTap: (i) => setState(() => _currentIndex = i),
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                        ),
-                      ),
-                      const SizedBox(width: 56),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.chat_bubble_outline,
-                          activeIcon: Icons.chat_bubble,
-                          label: 'Messages',
-                          index: 3,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                          showDot: _showMessagesDot,
-                        ),
-                      ),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.person_outline,
-                          activeIcon: Icons.person,
-                          label: 'Profile',
-                          index: 4,
-                          currentIndex: _currentIndex,
-                          onTap: (i) => setState(() => _currentIndex = i),
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: -8,
-                child: GestureDetector(
-                  onTap: () => _goToTab(2),
-                  child: Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      color: navBg,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.2),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.calendar_today_outlined,
+                      activeIcon: Icons.calendar_today,
+                      label: 'Activities',
+                      index: 0,
+                      currentIndex: _currentIndex,
+                      onTap: _goToTab,
+                      activeColor: navActive,
+                      inactiveColor: navInactive,
+                      showDot: _showActivitiesDot || _showRequestsDot,
                     ),
-                    child: Center(
-                      child: Stack(
-                        clipBehavior: Clip.none,
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.inventory_2_outlined,
+                      activeIcon: Icons.inventory_2,
+                      label: 'Archive',
+                      index: 1,
+                      currentIndex: _currentIndex,
+                      onTap: (i) => setState(() => _currentIndex = i),
+                      activeColor: navActive,
+                      inactiveColor: navInactive,
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _goToTab(2),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: _currentIndex == 2
-                                  ? AppColors.primaryDark
-                                  : AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.public,
-                              color: Colors.white,
-                              size: 18,
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: _currentIndex == 2
+                                      ? AppColors.primaryDark
+                                      : AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.public,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              if (_showNetworkDot)
+                                const Positioned(
+                                  top: -2,
+                                  right: -2,
+                                  child: _RedDot(),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Network',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: _currentIndex == 2 ? AppColors.primary : navInactive,
                             ),
                           ),
-                          if (_showNetworkDot)
-                            const Positioned(
-                              top: -2,
-                              right: -2,
-                              child: _RedDot(),
-                            ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ),
-              Positioned(
-                top: 57,
-                child: Text(
-                  'Network',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: _currentIndex == 2 ? AppColors.primary : navInactive,
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.chat_bubble_outline,
+                      activeIcon: Icons.chat_bubble,
+                      label: 'Messages',
+                      index: 3,
+                      currentIndex: _currentIndex,
+                      onTap: _goToTab,
+                      activeColor: navActive,
+                      inactiveColor: navInactive,
+                      showDot: _showMessagesDot,
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.person_outline,
+                      activeIcon: Icons.person,
+                      label: 'Profile',
+                      index: 4,
+                      currentIndex: _currentIndex,
+                      onTap: (i) => setState(() => _currentIndex = i),
+                      activeColor: navActive,
+                      inactiveColor: navInactive,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

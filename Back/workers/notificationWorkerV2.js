@@ -264,7 +264,7 @@ async function initializeEventListeners() {
       // Create DB notification
       await Notification.createNotification({
         user_id: data.postOwnerId,
-        type: 'system',
+        type: 'comment',
         title: 'Nouveau commentaire',
         message: `${commenterName} a commenté votre publication`,
         data: {
@@ -304,7 +304,7 @@ async function initializeEventListeners() {
       // Create DB notification
       await Notification.createNotification({
         user_id: data.parentCommentAuthorId,
-        type: 'system',
+        type: 'reply',
         title: 'Réponse à votre commentaire',
         message: `${replierName} a répondu à votre commentaire`,
         data: {

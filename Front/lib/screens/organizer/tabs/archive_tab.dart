@@ -588,7 +588,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
     final heroImages = _heroImages;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F1FF),
+      backgroundColor: const Color(0xFFF2F1FA),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchArchives,

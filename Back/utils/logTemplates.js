@@ -1,5 +1,8 @@
 const logTemplates = {
   create_post: '{actor} a publie "{title}" le {date}',
+  create_comment: "{actor} a ajoute un commentaire le {date}",
+  update_comment: "{actor} a modifie un commentaire le {date}",
+  delete_comment: "{actor} a supprime un commentaire le {date}",
   book_activity: "{actor} a reserve {count} places le {date}",
   approve_request: "{actor} a approuve une demande le {date}",
   reject_request: "{actor} a refuse une demande le {date}",

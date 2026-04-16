@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const activiteController = require("../controllers/activite");
+const aiImageGenerator = require("../controllers/aiImageGenerator");
 const wrapRouter = require("../middleware/wrapRouter");
 const { cacheGet, invalidateCache } = require("../middleware/cache");
 const {
@@ -137,6 +138,14 @@ router.delete(
   verifyOrganisator,
   invalidateCache(["activites"]),
   activiteController.deleteActivite,
+);
+
+// Generate AI image for activity (organizers only)
+router.post(
+  "/generate-image",
+  verifyToken,
+  verifyOrganisator,
+  aiImageGenerator.generateActivityImage,
 );
 
 module.exports = wrapRouter(router);

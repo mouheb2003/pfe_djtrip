@@ -408,20 +408,33 @@ class InscriptionService {
   /// Organizer: validate a scanned QR code and get the booking state.
   static Future<Map<String, dynamic>> validateQrBooking(String qrData) async {
     try {
+      print('[QR SERVICE OLD] Starting validation for QR: $qrData');
+      
       final res = await ApiClient.post('/inscriptions/qr/validate', {
         'qrData': qrData,
       });
+      
+      print('[QR SERVICE OLD] Status code: ${res.statusCode}');
+      print('[QR SERVICE OLD] Response body: ${res.body}');
+      
       final body = _decodeObject(res.body);
+      final data = _decodeObject(body['data']);
+      
+      print('[QR SERVICE OLD] Parsed body: $body');
+      print('[QR SERVICE OLD] Parsed data: $data');
+      print('[QR SERVICE OLD] Success: ${body['success']}');
+      
       return {
-        'success': res.statusCode == 200,
+        'success': body['success'] == true || res.statusCode == 200,
         'statusCode': res.statusCode,
         'message': body['message'] ?? 'Unknown validation result',
         'code': body['code'],
-        'booking': body['booking'],
-        'canMarkUsed': body['canMarkUsed'] == true,
-        'tokenType': body['tokenType'],
+        'booking': data['booking'] ?? body['booking'],
+        'canMarkUsed': data['canMarkUsed'] == true || body['canMarkUsed'] == true,
+        'tokenType': data['tokenType'] ?? body['tokenType'],
       };
     } catch (e) {
+      print('[QR SERVICE OLD] Exception: $e');
       return {
         'success': false,
         'statusCode': 500,

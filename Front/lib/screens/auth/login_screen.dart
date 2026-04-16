@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
@@ -38,10 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadRememberedEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('remembered_email');
+    final storage = FlutterSecureStorage();
+    final savedEmail = await storage.read(key: 'remembered_email');
     if (savedEmail != null && savedEmail.isNotEmpty) {
-      final storage = FlutterSecureStorage();
       final savedPassword = await storage.read(key: 'remembered_password');
       setState(() {
         _emailCtrl.text = savedEmail;
@@ -50,17 +48,20 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         _rememberMe = true;
       });
+    } else {
+      setState(() {
+        _rememberMe = false;
+      });
     }
   }
 
   Future<void> _saveRememberedEmail(String email, String password) async {
-    final prefs = await SharedPreferences.getInstance();
     final storage = FlutterSecureStorage();
     if (_rememberMe) {
-      await prefs.setString('remembered_email', email);
+      await storage.write(key: 'remembered_email', value: email);
       await storage.write(key: 'remembered_password', value: password);
     } else {
-      await prefs.remove('remembered_email');
+      await storage.delete(key: 'remembered_email');
       await storage.delete(key: 'remembered_password');
     }
   }

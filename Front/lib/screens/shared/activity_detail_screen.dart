@@ -9,12 +9,14 @@ import '../../models/inscription_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/inscription_service.dart';
+import '../../services/review_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_organizer_profile_screen.dart';
+import 'edit_review_modal.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final String activityId;
@@ -41,6 +43,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   bool _loadingActivity = true;
   bool _isBooking = false;
   InscriptionModel? _bookingForActivity;
+  List<Map<String, dynamic>> _reviews = [];
+  bool _loadingReviews = false;
 
   final _images = const [
     'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1600&auto=format&fit=crop',
@@ -229,8 +233,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _loadActivity() async {
+  Future<void> _loadActivity({bool isRefresh = false}) async {
     try {
+      print('🔍 Loading activity with ID: ${widget.activityId} (isRefresh: $isRefresh)');
       if (widget.activityId.isEmpty) throw Exception('Activity ID is empty');
       final results = await Future.wait([
         ActivityService.getActivityById(widget.activityId),
@@ -249,14 +254,39 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       }
 
       setState(() {
-        _activity = results[0] as ActivityModel?;
+        // Preserve existing activity data on refresh if API returns null
+        final newActivity = results[0] as ActivityModel?;
+        print('🔍 New activity data: ${newActivity?.titre ?? 'null'}, Existing activity: ${_activity?.titre ?? 'null'}');
+        if (!isRefresh || newActivity != null) {
+          _activity = newActivity;
+          print('✅ Updated activity to: ${_activity?.titre ?? 'null'}');
+        } else {
+          print('🔒 Preserving existing activity data during refresh');
+        }
         _currentUserId = (results[1] as String? ?? '').trim();
         _currentUserType = userType;
         _bookingForActivity = booking;
         _loadingActivity = false;
       });
+
+      print('✅ Activity loaded successfully: ${_activity?.titre ?? 'null'}');
+
+      // Load reviews after activity is loaded
+      _loadReviews();
     } catch (e) {
-      if (mounted) setState(() => _loadingActivity = false);
+      print('❌ Error loading activity: $e');
+      if (mounted) {
+        setState(() {
+          _loadingActivity = false;
+          // Only set activity to null on initial load error, preserve data on refresh error
+          if (!isRefresh) {
+            _activity = null;
+            print('❌ Set activity to null (initial load error)');
+          } else {
+            print('🔒 Preserving existing activity data on refresh error');
+          }
+        });
+      }
     }
   }
 
@@ -275,6 +305,29 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
   }
 
+  Future<void> _loadReviews() async {
+    setState(() => _loadingReviews = true);
+    try {
+      print('🔍 Loading reviews for activity: ${widget.activityId}');
+      final reviews = await ReviewService.getActivityReviews(widget.activityId);
+      print('🔍 Reviews loaded: ${reviews.length} reviews');
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          _loadingReviews = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading reviews: $e');
+      if (mounted) setState(() => _loadingReviews = false);
+    }
+  }
+
+  Future<void> _refreshData() async {
+    await _loadActivity(isRefresh: true);
+    await _loadReviews();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingActivity) {
@@ -289,8 +342,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       backgroundColor: const Color(0xFFF3F2FA),
       body: Stack(
         children: [
-          CustomScrollView(
-            slivers: [
+          RefreshIndicator(
+            onRefresh: _refreshData,
+            child: CustomScrollView(
+              slivers: [
               SliverToBoxAdapter(
                 child: Stack(
                   clipBehavior: Clip.none,
@@ -421,11 +476,38 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                           }
                         },
                       ),
+                      const SizedBox(height: 24),
+                      _SectionTitle('Reviews'),
+                      if (_loadingReviews)
+                        const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      else if (_reviews.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Text(
+                            'No reviews yet. Be the first to review!',
+                            style: TextStyle(color: Color(0xFF6B7280)),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      else
+                        ..._reviews.map((review) => _ReviewCard(
+                          review: review,
+                          currentUserId: _currentUserId,
+                          onReviewUpdated: _loadReviews,
+                        )).toList(),
                     ],
                   ),
                 ),
               ),
             ],
+          ),
           ),
           if (!widget.viewOnly && !_isActivityOrganizer)
             Positioned(
@@ -1069,6 +1151,277 @@ class _StickyBottomBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final Map<String, dynamic> review;
+  final String currentUserId;
+  final VoidCallback? onReviewUpdated;
+  const _ReviewCard({
+    required this.review,
+    required this.currentUserId,
+    this.onReviewUpdated,
+  });
+
+  String _reviewerName() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      final name = (touriste['fullname'] ?? '').toString().trim();
+      if (name.isNotEmpty) return name;
+    }
+    return 'Tourist';
+  }
+
+  String _reviewerAvatar() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      return (touriste['avatar'] ?? '').toString();
+    }
+    return '';
+  }
+
+  String _reviewText() {
+    final text = (review['commentaire'] ?? '').toString().trim();
+    if (text.isEmpty) return 'No comment provided.';
+    return text;
+  }
+
+  String _reviewDate() {
+    final raw = (review['createdAt'] ?? '').toString();
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return '';
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
+  }
+
+  bool _isMyReview() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      final touristeId = (touriste['_id'] ?? '').toString().trim();
+      return touristeId == currentUserId;
+    }
+    return false;
+  }
+
+  void _showEditDeleteOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: Color(0xFF4B63FF)),
+              title: const Text('Edit Review'),
+              onTap: () {
+                Navigator.pop(context);
+                _openEditModal(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete Review'),
+              onTap: () {
+                Navigator.pop(context);
+                _openDeleteConfirmation(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openEditModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => EditReviewModal(
+        avisId: review['_id'].toString(),
+        type: 'activite',
+        initialRating: (review['note'] ?? 0).toDouble(),
+        initialComment: review['commentaire']?.toString(),
+        initialTags: review['tags'] is List ? List<String>.from(review['tags'] as List) : null,
+        onReviewUpdated: onReviewUpdated,
+        onReviewDeleted: onReviewUpdated,
+      ),
+    );
+  }
+
+  void _openDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Review'),
+        content: const Text('Are you sure you want to delete this review?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final avisId = review['_id'].toString();
+              final success = await ReviewService.deleteReview(avisId);
+              if (success && onReviewUpdated != null) {
+                onReviewUpdated!();
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = (review['note'] ?? 0).toInt();
+    final avatar = _reviewerAvatar();
+    final isMyReview = _isMyReview();
+
+    return InkWell(
+      onLongPress: isMyReview ? () => _showEditDeleteOptions(context) : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isMyReview ? const Color(0xFF4B63FF) : const Color(0xFFE5E7EB),
+            width: isMyReview ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundImage: avatar.isNotEmpty
+                      ? NetworkImage(avatar)
+                      : null,
+                  child: avatar.isEmpty ? const Icon(Icons.person, size: 20) : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _reviewerName(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                          if (isMyReview) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4B63FF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'You',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.edit,
+                              size: 14,
+                              color: Color(0xFF4B63FF),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          ...List.generate(5, (i) => Icon(
+                            i < rating ? Icons.star : Icons.star_border,
+                            color: const Color(0xFFF59E0B),
+                            size: 14,
+                          )),
+                          const SizedBox(width: 8),
+                          Text(
+                            _reviewDate(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _reviewText(),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF4B5563),
+                height: 1.4,
+              ),
+            ),
+            if (review['tags'] != null && review['tags'] is List && (review['tags'] as List).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: (review['tags'] as List)
+                      .map<Widget>((tag) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE9E8F7),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              tag.toString(),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF3049D9),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            if (isMyReview)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Long press to edit or delete your review',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF4B63FF),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

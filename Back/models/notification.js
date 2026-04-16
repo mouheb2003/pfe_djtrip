@@ -24,6 +24,10 @@ const notificationSchema = new mongoose.Schema(
         "follow",          // Both: new follower
         "payment",         // Tourist: payment confirmations
         "profile",         // Both: profile updates
+        "publication",     // Both: new publication/post from followed user
+        "reaction",        // Both: someone reacted to user's post/comment
+        "comment",         // Both: someone commented on user's post
+        "reply",           // Both: someone replied to user's comment
       ],
       index: true,
     },
@@ -78,7 +82,7 @@ const notificationSchema = new mongoose.Schema(
     // Related entities
     related_entity_type: {
       type: String,
-      enum: ["booking", "activity", "message", "review", "appeal", "user"],
+      enum: ["booking", "activity", "message", "review", "appeal", "user", "post", "comment"],
       default: null,
     },
     related_entity_id: {
@@ -116,12 +120,12 @@ notificationSchema.statics.createNotification = async function (notificationData
     const notification = new this(notificationData);
     await notification.save();
 
-    console.log('📝 Notification created in DB:', notification._id, 'for user:', notification.user_id);
+    console.log('📝 Notification created in DB:', notification._id, 'for user:', notification.user_id, 'type:', notification.type, 'title:', notification.title);
 
     // Send FCM push notification
     try {
       const notificationService = require("../services/notificationService");
-      console.log('🔔 Attempting to send FCM push notification to user:', notification.user_id.toString());
+      console.log('🔔 Attempting to send FCM push notification to user:', notification.user_id.toString(), 'type:', notification.type);
       const result = await notificationService.sendPushNotification({
         userId: notification.user_id.toString(),
         title: notification.title,
@@ -152,19 +156,18 @@ notificationSchema.statics.createNotification = async function (notificationData
 // Static method to get user notifications
 notificationSchema.statics.getUserNotifications = function (userId, options = {}) {
   const query = { user_id: userId };
-  
+
   // Filter by unread if requested
   if (options.unread_only) {
     query.is_read = false;
   }
-  
+
   // Filter by type if requested
   if (options.type) {
     query.type = options.type;
   }
-  
+
   return this.find(query)
-    .populate("related_entity_id", "titre")
     .sort({ created_at: -1 })
     .limit(options.limit || 50)
     .skip(options.skip || 0);

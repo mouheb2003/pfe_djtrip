@@ -1,6 +1,7 @@
 const Post = require("../models/post");
 const cloudinary = require("../config/cloudinary");
 const { createActivityLog } = require("../services/activityLogService");
+const { triggerPublicationNotification } = require("../controllers/notification");
 
 const basePopulate = {
   path: "author_id",
@@ -158,6 +159,31 @@ exports.createPost = async (req, res) => {
       console.warn("Activity log failed for createPost:", logError.message);
     }
 
+    // Notify followers about new publication
+    try {
+      const User = require("../models/user");
+      const author = await User.findById(authorId).select("fullname blockedUsers");
+      
+      if (author) {
+        // Get users who follow this author (this would need to be implemented based on your follow system)
+        // For now, this is a placeholder - you'll need to implement the actual follower logic
+        // based on your database structure for followers/following
+        
+        // Example: Get followers and notify them
+        // const followers = await User.find({ following: authorId }).select("_id");
+        // for (const follower of followers) {
+        //   await triggerPublicationNotification(
+        //     follower._id,
+        //     author.fullname,
+        //     post._id,
+        //     trimmedContent
+        //   );
+        // }
+      }
+    } catch (notifError) {
+      console.warn("Notification failed for createPost:", notifError.message);
+    }
+
     return res.status(201).json({
       message: "Post created successfully",
       post: populated,
@@ -170,15 +196,22 @@ exports.createPost = async (req, res) => {
   }
 };
 
-exports.getFeedPosts = async (_req, res) => {
+exports.getFeedPosts = async (req, res) => {
   try {
+    const currentUserId = req.user?.userId || null;
     const posts = await Post.find({ is_active: true })
       .sort({ createdAt: -1 })
       .limit(100)
       .populate(basePopulate)
       .lean();
 
-    return res.status(200).json({ posts });
+    // Add isLiked field for current user
+    const postsWithLikeStatus = posts.map(post => ({
+      ...post,
+      isLiked: currentUserId && post.liked_by ? post.liked_by.some(id => id.toString() === currentUserId.toString()) : false,
+    }));
+
+    return res.status(200).json({ posts: postsWithLikeStatus });
   } catch (error) {
     return res.status(500).json({
       message: "Error loading posts feed",
@@ -196,7 +229,13 @@ exports.getMyPosts = async (req, res) => {
       .populate(basePopulate)
       .lean();
 
-    return res.status(200).json({ posts });
+    // Add isLiked field for current user
+    const postsWithLikeStatus = posts.map(post => ({
+      ...post,
+      isLiked: post.liked_by ? post.liked_by.some(id => id.toString() === userId.toString()) : false,
+    }));
+
+    return res.status(200).json({ posts: postsWithLikeStatus });
   } catch (error) {
     return res.status(500).json({
       message: "Error loading my posts",
@@ -482,6 +521,7 @@ exports.togglePostLike = async (req, res) => {
   try {
     const userId = String(req.user.userId || "");
     const { postId } = req.params;
+    const { reactionType = 'like' } = req.body;
 
     if (!userId) {
       return res.status(401).json({ message: "Authentication required" });
@@ -492,31 +532,94 @@ exports.togglePostLike = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
+    // Valid reaction types
+    const validReactions = ["like", "love", "laugh", "wow", "sad", "angry"];
+    if (!validReactions.includes(reactionType)) {
+      return res.status(400).json({ message: "Invalid reaction type" });
+    }
+
     const likedBy = Array.isArray(post.liked_by)
       ? post.liked_by.map((id) => String(id))
       : [];
     const alreadyLiked = likedBy.includes(userId);
 
-    if (alreadyLiked) {
+    // ATOMIC REACTION TOGGLE
+    // Remove user's existing reaction if any
+    await Post.findByIdAndUpdate(
+      postId,
+      {
+        $pull: { reactions: { user_id: userId } },
+      },
+      { new: false }
+    );
+
+    // Check if user is removing their reaction (same type)
+    const existingReaction = post.reactions?.find(
+      (r) => String(r.user_id) === String(userId)
+    );
+    const isRemoving = existingReaction && existingReaction.type === reactionType;
+
+    if (!isRemoving) {
+      // Add new reaction
+      await Post.findByIdAndUpdate(
+        postId,
+        {
+          $push: {
+            reactions: {
+              user_id: userId,
+              type: reactionType,
+              created_at: new Date(),
+            },
+          },
+          $inc: { total_reactions: 1 },
+        },
+        { new: true }
+      );
+
+      // Update liked_by array for backward compatibility
+      if (!alreadyLiked) {
+        post.liked_by = [...(post.liked_by || []), userId];
+        post.likes_count = post.liked_by.length;
+        await post.save();
+      }
+    } else {
+      // User removed their reaction, decrement count
+      await Post.findByIdAndUpdate(
+        postId,
+        {
+          $inc: { total_reactions: -1 },
+        },
+        { new: true }
+      );
+
+      // Update liked_by array for backward compatibility
       post.liked_by = (post.liked_by || []).filter(
         (id) => String(id) !== userId,
       );
-    } else {
-      post.liked_by = [...(post.liked_by || []), userId];
+      post.likes_count = post.liked_by.length;
+      await post.save();
     }
 
-    post.likes_count = (post.liked_by || []).length;
-    await post.save();
+    // Get reaction counts
+    const reactionCounts = {};
+    if (post.reactions && Array.isArray(post.reactions)) {
+      post.reactions.forEach((r) => {
+        reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+      });
+    }
 
     return res.status(200).json({
-      message: alreadyLiked ? "Like removed" : "Post liked",
-      liked: !alreadyLiked,
+      message: isRemoving ? "Reaction removed" : "Reaction added",
+      liked: !isRemoving,
       likesCount: post.likes_count,
+      totalReactions: post.total_reactions,
+      reactionCounts,
+      userReaction: isRemoving ? null : reactionType,
       postId: String(post._id),
     });
   } catch (error) {
     return res.status(500).json({
-      message: "Error updating like",
+      message: "Error updating reaction",
       error: error.message,
     });
   }

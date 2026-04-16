@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
 import 'activity_review_screen.dart';
 
@@ -65,10 +66,20 @@ class _ReviewPromptModalState extends State<ReviewPromptModal> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    final isVerySmallScreen = screenHeight < 600;
+
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isVerySmallScreen ? 12 : 20,
+        vertical: isVerySmallScreen ? 12 : 20,
+      ),
       child: Container(
-        margin: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.9,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
@@ -86,7 +97,7 @@ class _ReviewPromptModalState extends State<ReviewPromptModal> {
             // Header
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF4B63FF), Color(0xFF6B7FFF)],
@@ -122,7 +133,7 @@ class _ReviewPromptModalState extends State<ReviewPromptModal> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isSmallScreen ? 8 : 16),
                   
                   // Rating Stars
                   Row(
@@ -133,31 +144,31 @@ class _ReviewPromptModalState extends State<ReviewPromptModal> {
                         child: Icon(
                           Icons.star,
                           color: Colors.white,
-                          size: 32,
+                          size: isSmallScreen ? 24 : 32,
                         ),
                       );
                     }),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isSmallScreen ? 8 : 16),
                   
                   // Title
-                  const Text(
+                  Text(
                     'How was your experience?',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 22,
+                      fontSize: isSmallScreen ? 18 : 22,
                       fontWeight: FontWeight.w800,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isSmallScreen ? 4 : 8),
                   
                   // Subtitle
                   Text(
                     'Your feedback helps ${widget.activity.titre} improve',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
+                      fontSize: isSmallScreen ? 12 : 14,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,
@@ -167,225 +178,228 @@ class _ReviewPromptModalState extends State<ReviewPromptModal> {
               ),
             ),
             
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Activity Info
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F9FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE7E9F7)),
-                    ),
-                    child: Row(
-                      children: [
-                        // Activity Image
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            image: widget.activity.thumbnailUrl?.isNotEmpty == true
-                                ? DecorationImage(
-                                    image: NetworkImage(widget.activity.thumbnailUrl!),
-                                    fit: BoxFit.cover,
+            // Scrollable Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+                child: Column(
+                  children: [
+                    // Activity Info
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F9FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE7E9F7)),
+                      ),
+                      child: Row(
+                        children: [
+                          // Activity Image
+                          Container(
+                            width: isSmallScreen ? 50 : 60,
+                            height: isSmallScreen ? 50 : 60,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              image: widget.activity.thumbnailUrl?.isNotEmpty == true
+                                  ? DecorationImage(
+                                      image: NetworkImage(widget.activity.thumbnailUrl!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                              color: const Color(0xFFE8E5FF),
+                            ),
+                            child: widget.activity.thumbnailUrl?.isEmpty != false
+                                ? Icon(
+                                    Icons.image,
+                                    color: const Color(0xFF4B63FF),
+                                    size: isSmallScreen ? 20 : 24,
                                   )
                                 : null,
-                            color: const Color(0xFFE8E5FF),
                           ),
-                          child: widget.activity.thumbnailUrl?.isEmpty != false
-                              ? const Icon(
-                                  Icons.image,
-                                  color: Color(0xFF4B63FF),
-                                  size: 24,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        
-                        // Activity Details
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.activity.titre,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E225E),
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: Colors.grey[600],
-                                    size: 14,
+                          SizedBox(width: isSmallScreen ? 8 : 12),
+                          
+                          // Activity Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.activity.titre,
+                                  style: TextStyle(
+                                    fontSize: isSmallScreen ? 14 : 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1E225E),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      widget.activity.lieu,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isSmallScreen ? 2 : 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on,
+                                      color: Colors.grey[600],
+                                      size: isSmallScreen ? 12 : 14,
                                     ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        widget.activity.lieu,
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: isSmallScreen ? 11 : 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isSmallScreen ? 2 : 4),
+                                Text(
+                                  'Completed on ${widget.activity.dateFin != null ? _formatDate(widget.activity.dateFin!) : 'N/A'}',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: isSmallScreen ? 10 : 11,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Completed on ${_formatDate(widget.activity.dateFin)}',
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 11,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Benefits
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF4B63FF).withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.lightbulb,
-                              color: Color(0xFF4B63FF),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Why your review matters',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF4B63FF),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ...[
-                          'Help others make informed decisions',
-                          'Recognize great organizers',
-                          'Improve future experiences',
-                        ].map((benefit) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
+                    
+                    SizedBox(height: isSmallScreen ? 16 : 24),
+                    
+                    // Benefits
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF4B63FF).withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF4B63FF),
-                                  shape: BoxShape.circle,
-                                ),
+                              Icon(
+                                Icons.lightbulb,
+                                color: const Color(0xFF4B63FF),
+                                size: isSmallScreen ? 16 : 20,
                               ),
                               const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  benefit,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[700],
-                                  ),
+                              Text(
+                                'Why your review matters',
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 12 : 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF4B63FF),
                                 ),
                               ),
                             ],
                           ),
-                        )).toList(),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Action Buttons
-                  Row(
-                    children: [
-                      // Maybe Later Button
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : _dismissForLater,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF4B63FF),
-                            side: const BorderSide(color: Color(0xFF4B63FF)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
-                                  ),
-                                )
-                              : const Text(
-                                  'Maybe Later',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                          SizedBox(height: isSmallScreen ? 8 : 12),
+                          ...[
+                            'Help others make informed decisions',
+                            'Recognize great organizers',
+                            'Improve future experiences',
+                          ].map((benefit) => Padding(
+                            padding: EdgeInsets.only(bottom: isSmallScreen ? 6 : 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF4B63FF),
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      
-                      // Leave Review Button
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _leaveReview,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4B63FF),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    benefit,
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 12 : 13,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          )).toList(),
+                        ],
+                      ),
+                    ),
+                    
+                    SizedBox(height: isSmallScreen ? 20 : 32),
+                    
+                    // Action Buttons
+                    Row(
+                      children: [
+                        // Maybe Later Button
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isLoading ? null : _dismissForLater,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF4B63FF),
+                              side: const BorderSide(color: Color(0xFF4B63FF)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
+                            ),
+                            child: _isLoading
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
+                                    ),
+                                  )
+                                : Text(
+                                    'Maybe Later',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
-                          child: const Text(
-                            'Leave Review',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        ),
+                        SizedBox(width: isSmallScreen ? 8 : 12),
+                        
+                        // Leave Review Button
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _leaveReview,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4B63FF),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 16),
+                            ),
+                            child: Text(
+                              'Leave Review',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 12 : 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                    SizedBox(height: isSmallScreen ? 8 : 16),
+                  ],
+                ),
               ),
             ),
           ],
@@ -404,7 +418,7 @@ class ReviewReminderService {
     try {
       // Condition 1: Activité terminée
       final now = DateTime.now();
-      if (now.isBefore(activity.dateFin)) {
+      if (activity.dateFin == null || now.isBefore(activity.dateFin!)) {
         return false;
       }
 
@@ -427,7 +441,10 @@ class ReviewReminderService {
       // (Assume que le booking est déjà filtré pour l'utilisateur actuel)
 
       // Condition 6: Délai valide (7 jours après la fin)
-      final deadline = activity.dateFin.add(const Duration(days: 7));
+      if (activity.dateFin == null) {
+        return false;
+      }
+      final deadline = activity.dateFin!.add(const Duration(days: 7));
       if (now.isAfter(deadline)) {
         return false;
       }
@@ -437,16 +454,40 @@ class ReviewReminderService {
       if (reminderData != null) {
         final remindAt = DateTime.parse(reminderData['remindAt']);
         final reminderCount = reminderData['reminderCount'] ?? 0;
-        
+
         // Ne pas afficher si le temps de rappel n'est pas atteint
         if (now.isBefore(remindAt)) {
           return false;
         }
-        
+
         // Limiter le nombre de rappels (max 3)
         if (reminderCount >= 3) {
           return false;
         }
+      }
+
+      // Condition 8: Vérifier si l'organisateur est actif
+      final organizerId = booking.organisateurId;
+      if (organizerId.isEmpty) {
+        print('Organizer ID is empty for booking ${booking.id}');
+        return false;
+      }
+
+      try {
+        final organizer = await UserService.getUserById(organizerId);
+        if (organizer == null) {
+          print('Organizer not found for booking ${booking.id}');
+          return false;
+        }
+        final accountStatus = organizer['accountStatus'] as String?;
+        if (accountStatus != 'active') {
+          print('Organizer is not active (status: $accountStatus) for booking ${booking.id}');
+          return false;
+        }
+      } catch (e) {
+        print('Error checking organizer status: $e');
+        // If we can't check organizer status, don't show the modal to be safe
+        return false;
       }
 
       return true;

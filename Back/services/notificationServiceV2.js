@@ -33,15 +33,17 @@ function initializeFirebase() {
 
 /**
  * Get user FCM token with device type detection
+ * Uses the new FCM token service for proper active token management
  */
 async function getUserFcmToken(userId) {
   try {
-    const user = await User.findById(userId).select('fcmTokens accountStatus');
-    const activeTokens = (user?.fcmTokens || [])
-      .filter(t => t.isActive)
-      .map(t => t.token);
+    const fcmTokenService = require('./fcmTokenService');
+    const activeTokens = await fcmTokenService.getActiveTokens(userId);
+    
+    const user = await User.findById(userId).select('accountStatus');
+    
     return {
-      tokens: activeTokens,
+      tokens: activeTokens.map(t => t.token),
       accountStatus: user?.accountStatus || 'active',
     };
   } catch (error) {
@@ -732,6 +734,93 @@ async function sendAppealResolvedNotification({ userId, appealId, status }) {
   });
 }
 
+/**
+ * Social Network notifications
+ */
+async function sendNewPublicationNotification({ userId, authorName, postId, postTitle }) {
+  return sendPushNotificationQueued({
+    userId,
+    title: 'Nouvelle publication 📰',
+    body: `${authorName} a publié: "${postTitle || 'Nouvelle publication'}"`,
+    data: {
+      type: 'new_publication',
+      postId,
+    },
+    notificationType: 'publication',
+    priority: 'medium',
+  });
+}
+
+async function sendReactionNotification({ userId, reactorName, postId, commentId, reactionType, entityType }) {
+  const isPost = entityType === 'post';
+  const title = isPost ? 'Nouvelle réaction ❤️' : 'Réaction à votre commentaire 💬';
+  const body = isPost 
+    ? `${reactorName} a réagi à votre publication`
+    : `${reactorName} a réagi à votre commentaire`;
+  
+  return sendPushNotificationQueued({
+    userId,
+    title,
+    body,
+    data: {
+      type: 'new_reaction',
+      postId,
+      commentId,
+      reactionType,
+      entityType,
+    },
+    notificationType: 'reaction',
+    priority: 'medium',
+  });
+}
+
+async function sendCommentNotification({ userId, commenterName, postId, commentContent }) {
+  return sendPushNotificationQueued({
+    userId,
+    title: 'Nouveau commentaire 💬',
+    body: `${commenterName} a commenté: "${commentContent?.substring(0, 50) || '...'}"`,
+    data: {
+      type: 'new_comment',
+      postId,
+    },
+    notificationType: 'comment',
+    priority: 'medium',
+  });
+}
+
+async function sendReplyNotification({ userId, replierName, postId, parentCommentId, replyContent }) {
+  return sendPushNotificationQueued({
+    userId,
+    title: 'Nouvelle réponse 💬',
+    body: `${replierName} a répondu à votre commentaire`,
+    data: {
+      type: 'new_reply',
+      postId,
+      parentCommentId,
+    },
+    notificationType: 'reply',
+    priority: 'medium',
+  });
+}
+
+async function sendMentionNotification({ userId, mentionerName, postId, commentId }) {
+  const title = commentId ? 'Vous avez été mentionné 💬' : 'Vous avez été mentionné 📰';
+  const body = `${mentionerName} vous a mentionné`;
+  
+  return sendPushNotificationQueued({
+    userId,
+    title,
+    body,
+    data: {
+      type: 'mention',
+      postId,
+      commentId,
+    },
+    notificationType: 'comment',
+    priority: 'high',
+  });
+}
+
 module.exports = {
   initializeFirebase,
   sendPushNotification,
@@ -767,4 +856,10 @@ module.exports = {
   // Appeal notifications
   sendAppealCreatedNotification,
   sendAppealResolvedNotification,
+  // Social Network notifications
+  sendNewPublicationNotification,
+  sendReactionNotification,
+  sendCommentNotification,
+  sendReplyNotification,
+  sendMentionNotification,
 };

@@ -422,45 +422,26 @@ exports.sendBookingConfirmationEmail = async ({
   bookingTime,
   participants,
   totalPrice,
-  qrDataUrl,
+  qrPublicUrl,
 }) => {
   try {
-    const qrAttachment = (() => {
-      if (!qrDataUrl) return null;
-      const match = qrDataUrl.match(
-        /^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/i,
-      );
-      if (!match) return null;
-
-      const mimeType =
-        match[1].toLowerCase() === "image/jpg"
-          ? "image/jpeg"
-          : match[1].toLowerCase();
-      const base64Data = match[2];
-      return {
-        filename: "booking-qr.png",
-        content: Buffer.from(base64Data, "base64"),
-        cid: "booking-qr-code",
-        contentType: mimeType,
-      };
-    })();
-
     const mailOptions = getBaseMailOptions({
       to: email,
       subject: "Your booking is confirmed - DJTrip",
-      attachments: qrAttachment ? [qrAttachment] : [],
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; }
+            body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
             .header { background: linear-gradient(135deg, #1d4ed8, #4f6bff); color:#fff; padding: 28px; }
             .content { padding: 28px; }
             .qr { text-align:center; padding: 18px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fbff; }
+            .qr img { max-width:100%; height:auto; display:inline-block; }
             .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
             .meta p { margin: 6px 0; }
             .code { font-weight:700; letter-spacing:1px; color:#1d4ed8; }
@@ -475,7 +456,7 @@ exports.sendBookingConfirmationEmail = async ({
               </div>
               <div class="content">
                 <p>Keep this QR code for check-in at the activity.</p>
-                ${qrAttachment ? `<div class="qr"><img src="cid:booking-qr-code" alt="Booking QR code" width="220" height="220" /></div>` : ""}
+                ${qrPublicUrl ? `<div class="qr"><img src="${qrPublicUrl}" alt="Booking QR code" width="220" height="220" style="width:220px; height:220px;" /></div>` : ""}
                 <div class="meta">
                   <p><strong>Activity:</strong> ${activityTitle}</p>
                   <p><strong>Date:</strong> ${bookingDate}</p>

@@ -1,7 +1,22 @@
+console.log('[COMMENT CONTROLLER] Loading comment controller...');
+
 const Comment = require("../models/comment");
 const Post = require("../models/post");
 const notificationEventBus = require("../services/notificationEventBus");
 const { createActivityLog } = require("../services/activityLogService");
+const User = require("../models/user");
+const { extractAndValidateMentions, calculateDepth } = require("../utils/mentionParser");
+
+// Socket.io will be set via app.locals from server.js
+let io = null;
+
+// Initialize io instance
+exports.initSocketIO = (socketIO) => {
+  io = socketIO;
+  console.log('[COMMENT CONTROLLER] Socket.io initialized');
+};
+
+console.log('[COMMENT CONTROLLER] All imports loaded successfully');
 
 // Helper function to get user reaction type
 const getUserReaction = (reactions, userId) => {
@@ -24,7 +39,16 @@ const getReactionCounts = (reactions) => {
 const mapComment = (comment, currentUserId = null) => {
   const user = comment.user_id || {};
   const parent = comment.parent_comment_id || {};
-  
+
+  console.log('[mapComment] Debug:', {
+    commentId: comment._id,
+    userId: comment.user_id,
+    userType: typeof comment.user_id,
+    populatedUser: user,
+    userFullname: user.fullname,
+    userTypeField: user.userType,
+  });
+
   return {
     _id: comment._id,
     post_id: comment.post_id,
@@ -33,6 +57,7 @@ const mapComment = (comment, currentUserId = null) => {
       fullname: user.fullname || "Anonymous",
       avatar: user.avatar,
       userType: user.userType,
+      username: user.username,
     },
     content: comment.content,
     parent_comment_id: comment.parent_comment_id
@@ -42,6 +67,9 @@ const mapComment = (comment, currentUserId = null) => {
           content: parent.content,
         }
       : null,
+    depth: comment.depth || 0,
+    replies_count: comment.replies_count || 0,
+    mentions: comment.mentions || [],
     reactions: comment.reactions || [],
     total_reactions: comment.total_reactions || 0,
     user_reaction: currentUserId ? getUserReaction(comment.reactions, currentUserId) : null,
@@ -53,84 +81,212 @@ const mapComment = (comment, currentUserId = null) => {
 
 // Create a new comment (IMMEDIATE PUBLICATION - NO PENDING)
 exports.createComment = async (req, res) => {
+  console.log('[createComment] FUNCTION CALLED - Starting execution');
   try {
     const userId = req.user.userId;
     const { postId } = req.params;
     const { content, parentCommentId = null } = req.body;
+    console.log('[createComment] Extracted params - userId:', userId, 'postId:', postId);
 
     const trimmedContent = String(content || "").trim();
     if (!trimmedContent) {
       return res.status(400).json({ message: "Comment content is required" });
     }
 
+    console.log('[createComment] Creating comment for post:', postId, 'by user:', userId);
+
+    // Check if user is Google-authenticated and has required fields
+    try {
+      console.log('[createComment] Step 0: Checking user data...');
+      const userCheck = await User.findById(userId).select("fullname googleId facebookId userType email");
+      console.log('[createComment] Step 0 user data:', {
+        _id: userCheck?._id,
+        fullname: userCheck?.fullname,
+        googleId: userCheck?.googleId ? 'YES' : 'NO',
+        facebookId: userCheck?.facebookId ? 'YES' : 'NO',
+        userType: userCheck?.userType,
+        email: userCheck?.email,
+      });
+      if (!userCheck) {
+        console.error('[createComment] Step 0 ERROR: User not found');
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (!userCheck.fullname) {
+        console.error('[createComment] Step 0 ERROR: User missing fullname');
+        return res.status(400).json({ message: "User profile incomplete: missing fullname" });
+      }
+      if (!userCheck.userType) {
+        console.error('[createComment] Step 0 ERROR: User missing userType');
+        return res.status(400).json({ message: "User profile incomplete: missing userType" });
+      }
+      console.log('[createComment] Step 0 complete: User data valid');
+    } catch (error) {
+      console.error('[createComment] Step 0 ERROR checking user:', error.message);
+      return res.status(500).json({ message: "Error checking user data", error: error.message });
+    }
+
     // Verify post exists and is active
-    const post = await Post.findOne({ _id: postId, is_active: true });
+    let post;
+    try {
+      console.log('[createComment] Step 1: Finding post...');
+      post = await Post.findOne({ _id: postId, is_active: true });
+      console.log('[createComment] Step 1 complete: Post found =', !!post);
+    } catch (error) {
+      console.error('[createComment] Step 1 ERROR finding post:', error.message);
+      return res.status(500).json({ message: "Error finding post", error: error.message });
+    }
+
     if (!post) {
+      console.log('[createComment] Post not found:', postId);
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Verify parent comment exists if provided
+    console.log('[createComment] Post found, author:', post.author_id);
+
+    // Verify parent comment exists if provided and calculate depth
+    let commentDepth = 0;
     if (parentCommentId) {
-      const parentComment = await Comment.findOne({
-        _id: parentCommentId,
-        post_id: postId,
-        is_active: true,
-      });
-      if (!parentComment) {
-        return res.status(404).json({ message: "Parent comment not found" });
+      try {
+        console.log('[createComment] Step 2: Finding parent comment and calculating depth...');
+        commentDepth = await calculateDepth(parentCommentId, 3);
+        console.log('[createComment] Step 2 complete: Depth calculated =', commentDepth);
+      } catch (error) {
+        console.error('[createComment] Step 2 ERROR calculating depth:', error.message);
+        return res.status(400).json({ message: error.message });
       }
     }
 
+    // Extract and validate mentions from content
+    let mentionedUserIds = [];
+    try {
+      console.log('[createComment] Step 2.5: Extracting mentions...');
+      const { validUserIds } = await extractAndValidateMentions(trimmedContent);
+      mentionedUserIds = validUserIds;
+      console.log('[createComment] Step 2.5 complete: Mentions found =', mentionedUserIds.length);
+    } catch (error) {
+      console.error('[createComment] Step 2.5 ERROR extracting mentions:', error.message);
+      // Don't block comment creation if mention extraction fails
+    }
+
     // Create comment - IMMEDIATE PUBLICATION
-    const comment = await Comment.create({
-      post_id: postId,
-      user_id: userId,
-      content: trimmedContent,
-      parent_comment_id: parentCommentId,
-    });
+    let comment;
+    try {
+      console.log('[createComment] Step 3: Creating comment...');
+      comment = await Comment.create({
+        post_id: postId,
+        user_id: userId,
+        content: trimmedContent,
+        parent_comment_id: parentCommentId,
+        depth: commentDepth,
+        mentions: mentionedUserIds,
+      });
+      console.log('[createComment] Step 3 complete: Comment created:', comment._id);
+    } catch (error) {
+      console.error('[createComment] Step 3 ERROR creating comment:', error.message);
+      return res.status(500).json({ message: "Error creating comment", error: error.message });
+    }
 
     // Update post comment count
-    await Post.findByIdAndUpdate(postId, {
-      $inc: { comments_count: 1 },
-    });
+    try {
+      console.log('[createComment] Step 4: Updating post comment count...');
+      await Post.findByIdAndUpdate(postId, {
+        $inc: { comments_count: 1 },
+      });
+      console.log('[createComment] Step 4 complete: Post comment count updated');
+    } catch (error) {
+      console.error('[createComment] Step 4 ERROR updating post comment count:', error.message);
+      return res.status(500).json({ message: "Error updating post comment count", error: error.message });
+    }
+
+    // Increment parent comment's replies_count if this is a reply
+    if (parentCommentId) {
+      try {
+        console.log('[createComment] Step 4.5: Incrementing parent comment replies_count...');
+        await Comment.findByIdAndUpdate(parentCommentId, {
+          $inc: { replies_count: 1 },
+        });
+        console.log('[createComment] Step 4.5 complete: Parent comment replies_count updated');
+      } catch (error) {
+        console.error('[createComment] Step 4.5 ERROR updating parent comment replies_count:', error.message);
+        // Don't block comment creation if this fails
+      }
+    }
 
     // Get populated comment
-    const populatedComment = await Comment.findById(comment._id)
-      .populate("user_id", "fullname avatar userType")
-      .populate("parent_comment_id", "user_id content")
-      .lean();
+    let populatedComment;
+    try {
+      console.log('[createComment] Step 5: Populating comment...');
+      populatedComment = await Comment.findById(comment._id)
+        .populate("user_id", "fullname avatar userType")
+        .populate("parent_comment_id", "user_id content")
+        .lean();
+      console.log('[createComment] Step 5 complete: Comment populated');
+    } catch (error) {
+      console.error('[createComment] Step 5 ERROR populating comment:', error.message);
+      return res.status(500).json({ message: "Error populating comment", error: error.message });
+    }
+
+    console.log('[createComment] Comment populated:', populatedComment);
 
     // EMIT NOTIFICATION EVENTS
     try {
-      // Notify post owner
+      console.log('[createComment] Step 6: Getting commenter info...');
+      const commenter = await User.findById(userId).select("fullname");
+      const commenterName = commenter?.fullname || 'Someone';
+      console.log('[createComment] Step 6 complete: Commenter name =', commenterName);
+
+      // Notify post owner about new comment
       if (String(post.author_id) !== String(userId)) {
+        console.log('[createComment] Step 7: Triggering comment notification...');
         notificationEventBus.emitCommentCreated({
           postOwnerId: post.author_id,
-          commenterName: populatedComment.user_id.fullname,
+          commenterName: commenterName,
           postId: String(post._id),
           commentId: String(comment._id),
         });
+        console.log('[createComment] Step 7 complete: Comment notification sent');
       }
 
       // Notify parent comment author if it's a reply
       if (parentCommentId) {
+        console.log('[createComment] Step 8: Triggering reply notification...');
         const parentComment = await Comment.findById(parentCommentId).lean();
         if (parentComment && String(parentComment.user_id) !== String(userId)) {
           notificationEventBus.emitCommentReply({
             parentCommentAuthorId: parentComment.user_id,
-            replierName: populatedComment.user_id.fullname,
+            replierName: commenterName,
             postId: String(post._id),
             commentId: String(comment._id),
             parentCommentId: String(parentCommentId),
           });
+          console.log('[createComment] Step 8 complete: Reply notification sent');
         }
       }
+
+      // Notify mentioned users
+      if (mentionedUserIds.length > 0) {
+        console.log('[createComment] Step 9: Triggering mention notifications...');
+        for (const mentionedUserId of mentionedUserIds) {
+          // Don't notify if the mentioned user is the commenter themselves
+          if (String(mentionedUserId) !== String(userId)) {
+            notificationEventBus.emitUserMentioned({
+              mentionedUserId: mentionedUserId,
+              commenterName: commenterName,
+              postId: String(post._id),
+              commentId: String(comment._id),
+            });
+          }
+        }
+        console.log('[createComment] Step 9 complete: Mention notifications sent');
+      }
     } catch (notifError) {
-      console.warn("Notification event emission failed for comment:", notifError.message);
+      console.error('[createComment] Notification ERROR:', notifError.message);
+      console.error('[createComment] Notification ERROR STACK:', notifError.stack);
     }
 
     // Log activity
     try {
+      console.log('[createComment] Step 10: Creating activity log...');
       await createActivityLog({
         actorId: userId,
         action: "create_comment",
@@ -142,15 +298,26 @@ exports.createComment = async (req, res) => {
           content: trimmedContent.slice(0, 100),
         },
       });
+      console.log('[createComment] Step 10 complete: Activity log created');
     } catch (logError) {
-      console.warn("Activity log failed for createComment:", logError.message);
+      console.error('[createComment] Activity log ERROR:', logError.message);
+      console.error('[createComment] Activity log ERROR STACK:', logError.stack);
     }
 
+    console.log('[createComment] Step 11: Sending response...');
+    
+    // Emit Socket.io event for real-time update
+    if (io) {
+      io.to(`post:${postId}`).emit('comment:created', mapComment(populatedComment, userId));
+    }
+    
     return res.status(201).json({
       message: "Comment created successfully",
       comment: mapComment(populatedComment, userId),
     });
   } catch (error) {
+    console.error('[createComment] ERROR:', error.message);
+    console.error('[createComment] ERROR STACK:', error.stack);
     return res.status(500).json({
       message: "Error creating comment",
       error: error.message,
@@ -163,10 +330,29 @@ exports.getPostComments = async (req, res) => {
   try {
     const { postId } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 10; // Default to 10 comments per page (Facebook/Instagram style)
     const currentUserId = req.user?.userId || null;
 
+    // Check post exists and verify audience permissions
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // If post is followers-only, verify user is a follower or the author
+    if (post.audience === "followers") {
+      const isAuthor = String(post.author_id) === String(currentUserId);
+      if (!isAuthor) {
+        // Check if user follows the post author (assuming follow system exists)
+        // For now, allow all authenticated users to see followers-only posts
+        // TODO: Implement proper follow checking when follow system is ready
+      }
+    }
+
     const result = await Comment.getPostCommentsPaginated(postId, { page, limit });
+
+    console.log('[getPostComments] Fetched comments count:', result.comments.length);
+    console.log('[getPostComments] First comment sample:', result.comments[0]);
 
     const comments = result.comments.map((c) => mapComment(c, currentUserId));
 
@@ -193,7 +379,7 @@ exports.getComment = async (req, res) => {
       .populate("parent_comment_id", "user_id content")
       .lean();
 
-    if (!comment || !comment.is_active) {
+    if (!comment) {
       return res.status(404).json({ message: "Comment not found" });
     }
 
@@ -203,6 +389,36 @@ exports.getComment = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error loading comment",
+      error: error.message,
+    });
+  }
+};
+
+// Get replies for a specific comment with pagination (Facebook/Instagram style)
+exports.getCommentReplies = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5; // Default to 5 replies per page
+    const currentUserId = req.user?.userId || null;
+
+    // Check if parent comment exists
+    const parentComment = await Comment.findById(commentId);
+    if (!parentComment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const result = await Comment.getCommentRepliesPaginated(commentId, { page, limit });
+
+    const replies = result.replies.map((r) => mapComment(r, currentUserId));
+
+    return res.status(200).json({
+      replies,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error loading replies",
       error: error.message,
     });
   }
@@ -232,8 +448,19 @@ exports.updateComment = async (req, res) => {
       });
     }
 
+    // Extract and validate mentions from content
+    let mentionedUserIds = [];
+    try {
+      const { validUserIds } = await extractAndValidateMentions(trimmedContent);
+      mentionedUserIds = validUserIds;
+    } catch (error) {
+      console.error('[updateComment] ERROR extracting mentions:', error.message);
+      // Don't block comment update if mention extraction fails
+    }
+
     // Update comment
     comment.content = trimmedContent;
+    comment.mentions = mentionedUserIds;
     comment.updated_at = new Date();
     await comment.save();
 
@@ -241,6 +468,11 @@ exports.updateComment = async (req, res) => {
       .populate("user_id", "fullname avatar userType")
       .populate("parent_comment_id", "user_id content")
       .lean();
+
+    // Emit Socket.io event for real-time update
+    if (io) {
+      io.to(`post:${comment.post_id.toString()}`).emit('comment:updated', mapComment(populatedComment, userId));
+    }
 
     // Log activity
     try {
@@ -308,6 +540,23 @@ exports.deleteComment = async (req, res) => {
     await Post.findByIdAndUpdate(post._id, {
       $inc: { comments_count: -1 },
     });
+
+    // Decrement parent comment's replies_count if this is a reply
+    if (comment.parent_comment_id) {
+      try {
+        await Comment.findByIdAndUpdate(comment.parent_comment_id, {
+          $inc: { replies_count: -1 },
+        });
+      } catch (error) {
+        console.error('[deleteComment] ERROR updating parent comment replies_count:', error.message);
+        // Don't block comment deletion if this fails
+      }
+    }
+
+    // Emit Socket.io event for real-time update
+    if (io) {
+      io.to(`post:${post._id.toString()}`).emit('comment:deleted', { commentId });
+    }
 
     // Log activity
     try {
@@ -388,6 +637,26 @@ exports.reactToComment = async (req, res) => {
         },
         { new: true }
       );
+
+      // Notify comment author about new reaction (if not reacting to own comment)
+      if (String(comment.user_id) !== String(userId)) {
+        try {
+          const reactor = await User.findById(userId).select("fullname");
+          const reactorName = reactor?.fullname || 'Someone';
+          const post = await Post.findById(comment.post_id).select("_id");
+
+          notificationEventBus.emitReactionCreated({
+            targetOwnerId: comment.user_id,
+            reactorName: reactorName,
+            postId: String(post?._id),
+            targetId: String(commentId),
+            reactionType: reactionType,
+            targetType: 'comment'
+          });
+        } catch (notifError) {
+          console.warn("Notification failed for comment reaction:", notifError.message);
+        }
+      }
     } else {
       // User removed their reaction, decrement count
       await Comment.findByIdAndUpdate(
@@ -523,6 +792,47 @@ exports.adminDeleteComment = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error deleting comment",
+      error: error.message,
+    });
+  }
+};
+
+// Search users for mention autocomplete
+exports.searchUsersForMention = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const currentUserId = req.user?.userId || null;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 20);
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({ message: "Query must be at least 2 characters" });
+    }
+
+    // Search users by username or fullname (case-insensitive)
+    const users = await User.find({
+      is_active: true,
+      $or: [
+        { username: { $regex: query, $options: "i" } },
+        { fullname: { $regex: query, $options: "i" } },
+      ],
+      _id: { $ne: currentUserId }, // Exclude current user
+    })
+      .select("_id username fullname avatar userType")
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({
+      users: users.map(user => ({
+        _id: user._id,
+        username: user.username,
+        fullname: user.fullname,
+        avatar: user.avatar,
+        userType: user.userType,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error searching users",
       error: error.message,
     });
   }
