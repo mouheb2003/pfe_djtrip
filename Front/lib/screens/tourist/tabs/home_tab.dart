@@ -43,10 +43,8 @@ class _HomeTabState extends State<HomeTab> {
   List<ActivityModel> _topActivities = [];
   bool _isLoading = true;
   bool _isFetching = false;
-    String _searchQuery = '';
+  String _searchQuery = '';
   final _searchController = TextEditingController();
-
- 
 
   static const String _heroImage =
       'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
@@ -71,13 +69,15 @@ class _HomeTabState extends State<HomeTab> {
       final lieux = await LieuService.getLieux();
       print('[DEBUG] Fetched ${lieux.length} lieux');
       for (var lieu in lieux.take(3)) {
-        print('[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+        print(
+          '[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
+        );
       }
 
       // Fetch top activities from best organizers
       final activities = await ActivityService.getActivities();
       print('[DEBUG] Fetched ${activities.length} activities');
-      
+
       // Filter upcoming activities and sort by organizer rating
       final now = DateTime.now();
       final upcomingActivities = activities.where((activity) {
@@ -123,7 +123,7 @@ class _HomeTabState extends State<HomeTab> {
 
   List<LieuModel> get _filteredVisibleLieux {
     List<LieuModel> items = _lieux;
-    
+
     // Apply search filter if search query is not empty
     if (_searchQuery.isNotEmpty) {
       items = items.where((lieu) {
@@ -132,18 +132,20 @@ class _HomeTabState extends State<HomeTab> {
         final description = lieu.description.toLowerCase();
         final category = lieu.categorie.toLowerCase();
         return title.contains(_searchQuery) ||
-               subtitle.contains(_searchQuery) ||
-               description.contains(_searchQuery) ||
-               category.contains(_searchQuery);
+            subtitle.contains(_searchQuery) ||
+            description.contains(_searchQuery) ||
+            category.contains(_searchQuery);
       }).toList();
     }
-    
+
     return items;
   }
 
   List<LieuModel> get _topDestinationsList {
     final items = List<LieuModel>.from(_filteredVisibleLieux);
-    print('[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}');
+    print(
+      '[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}',
+    );
     // D'abord prioriser les top destinations, puis trier par rating
     items.sort((a, b) {
       if (a.topDestination && !b.topDestination) return -1;
@@ -154,7 +156,9 @@ class _HomeTabState extends State<HomeTab> {
     final result = items.take(6).toList();
     print('[DEBUG] _topDestinations count: ${result.length}');
     for (var lieu in result.take(3)) {
-      print('[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+      print(
+        '[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
+      );
     }
     return result;
   }
@@ -183,7 +187,6 @@ class _HomeTabState extends State<HomeTab> {
     };
   }
 
-  
   Widget _buildFilterButton(String text, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -304,7 +307,8 @@ class _HomeTabState extends State<HomeTab> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const ViewAllPlacesScreen(),
+                                builder: (context) =>
+                                    const ViewAllPlacesScreen(),
                               ),
                             );
                           },
@@ -395,7 +399,9 @@ class _HomeTabState extends State<HomeTab> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
                             ),
                             child: const Center(
                               child: Column(
@@ -423,8 +429,11 @@ class _HomeTabState extends State<HomeTab> {
                             height: 180,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _topActivities.length > 5 ? 5 : _topActivities.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemCount: _topActivities.length > 5
+                                  ? 5
+                                  : _topActivities.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
                               itemBuilder: (context, index) {
                                 final activity = _topActivities[index];
                                 return Container(
@@ -441,45 +450,74 @@ class _HomeTabState extends State<HomeTab> {
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         flex: 3,
                                         child: ClipRRect(
-                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(16),
+                                              ),
                                           child: Stack(
                                             children: [
                                               Container(
                                                 width: double.infinity,
                                                 height: double.infinity,
                                                 color: const Color(0xFFF3F4F6),
-                                                child: activity.imageUrl.isNotEmpty
+                                                child:
+                                                    activity.imageUrl.isNotEmpty
                                                     ? Image.network(
                                                         activity.imageUrl,
                                                         fit: BoxFit.cover,
-                                                        errorBuilder: (_, __, ___) => const Center(
-                                                          child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
-                                                        ),
+                                                        errorBuilder:
+                                                            (
+                                                              _,
+                                                              __,
+                                                              ___,
+                                                            ) => const Center(
+                                                              child: Icon(
+                                                                Icons.event,
+                                                                color: Color(
+                                                                  0xFF9CA3AF,
+                                                                ),
+                                                              ),
+                                                            ),
                                                       )
                                                     : const Center(
-                                                        child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
+                                                        child: Icon(
+                                                          Icons.event,
+                                                          color: Color(
+                                                            0xFF9CA3AF,
+                                                          ),
+                                                        ),
                                                       ),
                                               ),
                                               Positioned(
                                                 top: 8,
                                                 right: 8,
                                                 child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.black.withOpacity(0.7),
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    color: Colors.black
+                                                        .withOpacity(0.7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     '${activity.noteMoyenne.toStringAsFixed(1)}',
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
                                                 ),
@@ -493,7 +531,8 @@ class _HomeTabState extends State<HomeTab> {
                                         child: Padding(
                                           padding: const EdgeInsets.all(10),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 activity.title,
@@ -507,7 +546,8 @@ class _HomeTabState extends State<HomeTab> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                activity.organisateur?['name'] ?? 'Unknown',
+                                                activity.organisateur?['name'] ??
+                                                    'Unknown',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
@@ -841,7 +881,9 @@ class _TopDestinationCard extends StatelessWidget {
             Expanded(
               flex: 3,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
                 child: Stack(
                   children: [
                     Image.network(
@@ -860,7 +902,10 @@ class _TopDestinationCard extends StatelessWidget {
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(12),
@@ -868,7 +913,11 @@ class _TopDestinationCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star, color: Color(0xFFFFC529), size: 12),
+                            const Icon(
+                              Icons.star,
+                              color: Color(0xFFFFC529),
+                              size: 12,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${lieu.noteMoyenne.toStringAsFixed(1)}',

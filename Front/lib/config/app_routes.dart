@@ -74,8 +74,7 @@ class AppRoutes {
           if (id.isNotEmpty) {
             if (type == 'organizer') {
               return MaterialPageRoute(
-                builder: (_) =>
-                    PublicOrganizerProfileScreen(organizerId: id),
+                builder: (_) => PublicOrganizerProfileScreen(organizerId: id),
                 settings: settings,
               );
             }

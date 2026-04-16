@@ -12,6 +12,7 @@ const requestLogger = require("./middleware/requestLogger");
 const requestTimeout = require("./middleware/requestTimeout");
 const sanitizeInput = require("./middleware/sanitizeInput");
 const responseNormalizer = require("./middleware/responseNormalizer");
+const requestActivityLogger = require("./middleware/requestActivityLogger");
 const systemLogStore = require("./services/systemLogStore");
 const {
   notFoundHandler,
@@ -152,6 +153,10 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// ─── User Activity Request Logging ───────────────────────────────────────────
+// Tracks successful authenticated API movements across the app.
+app.use(requestActivityLogger);
 
 // ─── Health Check Endpoint ─────────────────────────────────────────────────────
 app.get("/api/health", async (req, res) => {

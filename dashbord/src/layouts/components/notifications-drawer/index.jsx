@@ -1,5 +1,6 @@
 import { m } from 'framer-motion';
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Tab from '@mui/material/Tab';
@@ -11,6 +12,7 @@ import SvgIcon from '@mui/material/SvgIcon';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -18,34 +20,79 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
 import { varTap, varHover, transitionTap } from 'src/components/animate';
 
+import {
+  getNotifications,
+  getUnreadCount,
+  markAllNotificationsAsRead,
+} from 'src/Controller/actions';
 import { NotificationItem } from './notification-item';
 
 // ----------------------------------------------------------------------
 
-const TABS = [
-  { value: 'all', label: 'All', count: 22 },
-  { value: 'unread', label: 'Unread', count: 12 },
-  { value: 'archived', label: 'Archived', count: 10 },
-];
-
-// ----------------------------------------------------------------------
-
-export function NotificationsDrawer({ data = [], sx, ...other }) {
+export function NotificationsDrawer({ sx, ...other }) {
+  const navigate = useNavigate();
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
   const [currentTab, setCurrentTab] = useState('all');
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  // Load notifications when drawer opens
+  useEffect(() => {
+    if (open) {
+      loadNotifications();
+    }
+  }, [open]);
+
+  const loadNotifications = async () => {
+    setLoading(true);
+    try {
+      const data = await getNotifications({ limit: 50, skip: 0 });
+      setNotifications(Array.isArray(data) ? data : []);
+
+      const count = await getUnreadCount();
+      setUnreadCount(count || 0);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChangeTab = useCallback((event, newValue) => {
     setCurrentTab(newValue);
   }, []);
 
-  const [notifications, setNotifications] = useState(data);
-
-  const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
-
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((notification) => ({ ...notification, isUnRead: false })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   };
+
+  // Calculate counts for tabs
+  const allCount = notifications.length;
+  const unreadCountValue = notifications.filter((n) => !n.is_read).length;
+  const archivedCount = 0; // Adjust based on your notification schema
+
+  const TABS = [
+    { value: 'all', label: 'All', count: allCount },
+    { value: 'unread', label: 'Unread', count: unreadCountValue },
+    { value: 'archived', label: 'Archived', count: archivedCount },
+  ];
+
+  // Filter notifications based on current tab
+  const filteredNotifications = notifications.filter((notification) => {
+    if (currentTab === 'all') return true;
+    if (currentTab === 'unread') return !notification.is_read;
+    if (currentTab === 'archived') return notification.is_archived;
+    return true;
+  });
 
   const renderHead = () => (
     <Box
@@ -62,7 +109,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         Notifications
       </Typography>
 
-      {!!totalUnRead && (
+      {!!unreadCountValue && (
         <Tooltip title="Mark all as read">
           <IconButton color="primary" onClick={handleMarkAllAsRead}>
             <Iconify icon="eva:done-all-fill" />
@@ -108,11 +155,21 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
   const renderList = () => (
     <Scrollbar>
       <Box component="ul">
-        {notifications?.map((notification) => (
-          <Box component="li" key={notification.id} sx={{ display: 'flex' }}>
-            <NotificationItem notification={notification} />
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress size={40} />
           </Box>
-        ))}
+        ) : filteredNotifications.length > 0 ? (
+          filteredNotifications.map((notification) => (
+            <Box component="li" key={notification._id} sx={{ display: 'flex' }}>
+              <NotificationItem notification={notification} onUpdate={loadNotifications} />
+            </Box>
+          ))
+        ) : (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="textSecondary">No notifications</Typography>
+          </Box>
+        )}
       </Box>
     </Scrollbar>
   );
@@ -129,7 +186,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         sx={sx}
         {...other}
       >
-        <Badge badgeContent={totalUnRead} color="error">
+        <Badge badgeContent={unreadCountValue} color="error">
           <SvgIcon>
             {/* https://icon-sets.iconify.design/solar/bell-bing-bold-duotone/ */}
             <path
@@ -157,7 +214,14 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         {renderList()}
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth size="large">
+          <Button
+            fullWidth
+            size="large"
+            onClick={() => {
+              navigate('/dashboard/notifications');
+              onClose();
+            }}
+          >
             View all
           </Button>
         </Box>

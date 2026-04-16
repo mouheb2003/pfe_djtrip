@@ -106,6 +106,18 @@ exports.signUp = async (req, res) => {
     delete userResponse.verificationCode;
     delete userResponse.verificationCodeExpiry;
 
+    try {
+      await createActivityLog({
+        actorId: user._id,
+        action: "user_signup",
+        targetType: "auth",
+        targetId: user._id,
+        templateKey: "user_signup",
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for signUp:", logError.message);
+    }
+
     res.status(201).json({
       message: "User registered successfully. Please verify your email.",
       accessToken,
@@ -359,6 +371,18 @@ exports.signIn = async (req, res) => {
     delete userResponse.verificationCode;
     delete userResponse.verificationCodeExpiry;
 
+    try {
+      await createActivityLog({
+        actorId: user._id,
+        action: "user_login",
+        targetType: "auth",
+        targetId: user._id,
+        templateKey: "user_login",
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for signIn:", logError.message);
+    }
+
     res.status(200).json({
       message: "Login successful",
       accessToken,
@@ -452,6 +476,18 @@ exports.googleAuth = async (req, res) => {
     delete userResponse.googleId;
     delete userResponse.facebookId;
 
+    try {
+      await createActivityLog({
+        actorId: user._id,
+        action: "user_login",
+        targetType: "auth",
+        targetId: user._id,
+        templateKey: "user_login",
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for googleAuth:", logError.message);
+    }
+
     return res.status(200).json({
       message: isExistingUser
         ? "Google sign-in successful"
@@ -543,6 +579,18 @@ exports.facebookAuth = async (req, res) => {
     delete userResponse.mot_de_passe;
     delete userResponse.googleId;
     delete userResponse.facebookId;
+
+    try {
+      await createActivityLog({
+        actorId: user._id,
+        action: "user_login",
+        targetType: "auth",
+        targetId: user._id,
+        templateKey: "user_login",
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for facebookAuth:", logError.message);
+    }
 
     return res.status(200).json({
       message: isExistingUser
@@ -1382,6 +1430,18 @@ exports.logout = async (req, res) => {
     await require("../models/user").findByIdAndUpdate(userId, {
       $inc: { tokenVersion: 1 },
     });
+
+    try {
+      await createActivityLog({
+        actorId: userId,
+        action: "user_logout",
+        targetType: "auth",
+        targetId: userId,
+        templateKey: "user_logout",
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for logout:", logError.message);
+    }
 
     console.log(`🎯 [LOGOUT] User ${userId} logout completed successfully`);
     res.status(200).json({ message: "Logout successful" });

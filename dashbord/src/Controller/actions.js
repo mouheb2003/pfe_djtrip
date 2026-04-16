@@ -79,6 +79,95 @@ export async function getUserById(id) {
   return data?.user ?? data;
 }
 
+export async function updateMyProfile(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const data = await Put(END_POINT.me, payload);
+  return data?.user ?? data;
+}
+
+export async function changeMyPassword(currentPassword, newPassword) {
+  if (!currentPassword || !newPassword) return null;
+
+  return Put(END_POINT.mePassword, {
+    currentPassword,
+    newPassword,
+  });
+}
+
+export async function logoutCurrentUser() {
+  return Post(END_POINT.logout);
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+export async function getNotifications(queryParams = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (queryParams.limit) params.append('limit', queryParams.limit);
+    if (queryParams.skip) params.append('skip', queryParams.skip);
+    if (queryParams.type) params.append('type', queryParams.type);
+    if (queryParams.unread_only) params.append('unread_only', queryParams.unread_only);
+
+    const url = `${END_POINT.notifications}${params.toString() ? `?${params.toString()}` : ''}`;
+    const data = await Get(url);
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.notifications)) return data.notifications;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+export async function getUnreadCount() {
+  try {
+    const data = await Get(END_POINT.notificationUnreadCount);
+    return data?.unread_count ?? 0;
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    return 0;
+  }
+}
+
+export async function markNotificationAsRead(notificationId) {
+  if (!notificationId) return null;
+
+  try {
+    const data = await Put(END_POINT.notificationMarkAsRead(notificationId));
+    return data?.success ?? true;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return false;
+  }
+}
+
+export async function markAllNotificationsAsRead() {
+  try {
+    const data = await Put(END_POINT.notificationMarkAllAsRead);
+    return data?.success ?? true;
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return false;
+  }
+}
+
+export async function deleteNotification(notificationId) {
+  if (!notificationId) return null;
+
+  try {
+    const data = await Delete(END_POINT.notificationById(notificationId));
+    return data?.success ?? true;
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return false;
+  }
+}
+
 export async function toggleUserRole(id) {
   if (!id) return null;
 
@@ -143,6 +232,13 @@ export async function deletePublication(id) {
   if (!id) return null;
 
   return Delete(END_POINT.postById(id));
+}
+
+export async function getPublicationById(id) {
+  if (!id) return null;
+
+  const posts = await getPublications();
+  return posts.find((post) => String(post?._id ?? post?.id) === String(id)) ?? null;
 }
 
 export async function getActivitesAdmin() {
@@ -276,7 +372,70 @@ export async function getAdminComments(filters = {}) {
   }
 }
 
+export async function getAdminCommentsPage(filters = {}) {
+  const params = {};
+  if (filters.page) params.page = filters.page;
+  if (filters.limit) params.limit = filters.limit;
+  if (filters.postId) params.postId = filters.postId;
+  if (filters.search) params.search = filters.search;
+
+  const data = await Get(END_POINT.adminComments, { params });
+
+  const comments = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.comments)
+      ? data.comments
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.results)
+          ? data.results
+          : [];
+
+  const pagination = data?.pagination ?? {
+    page: Number(filters.page ?? 1),
+    limit: Number(filters.limit ?? comments.length ?? 0),
+    total: Number(comments.length ?? 0),
+    totalPages: 1,
+  };
+
+  return { comments, pagination };
+}
+
 export async function adminDeleteComment(id) {
   if (!id) return null;
   return Delete(END_POINT.adminCommentById(id));
+}
+
+export async function getPostCommentsByPostId(postId, options = {}) {
+  if (!postId) return [];
+
+  const params = {};
+  if (options.page) params.page = options.page;
+  if (options.limit) params.limit = options.limit;
+
+  const data = await Get(END_POINT.postComments(postId), { params });
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.comments)) return data.comments;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.results)) return data.results;
+
+  return [];
+}
+
+export async function getPostCommentsByPostRoute(postId, options = {}) {
+  if (!postId) return [];
+
+  const params = {};
+  if (options.page) params.page = options.page;
+  if (options.limit) params.limit = options.limit;
+
+  const data = await Get(END_POINT.postCommentsFromPostsModule(postId), { params });
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.comments)) return data.comments;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.results)) return data.results;
+
+  return [];
 }

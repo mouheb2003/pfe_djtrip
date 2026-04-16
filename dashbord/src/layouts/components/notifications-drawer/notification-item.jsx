@@ -6,249 +6,173 @@ import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
+import IconButton from '@mui/material/IconButton';
 
 import { fToNow } from 'src/utils/format-time';
-
-import { CONFIG } from 'src/global-config';
-
-import { Label } from 'src/components/label';
-import { FileThumbnail } from 'src/components/file-thumbnail';
+import { Iconify } from 'src/components/iconify';
+import { markNotificationAsRead, deleteNotification } from 'src/Controller/actions';
 
 // ----------------------------------------------------------------------
 
-export function NotificationItem({ notification }) {
+const notificationTypeIcons = {
+  order: 'solar:cart-check-bold',
+  chat: 'solar:chat-line-bold',
+  mail: 'solar:inbox-in-bold',
+  delivery: 'solar:delivery-bold',
+  comment: 'solar:chat-round-bold',
+  like: 'solar:heart-bold',
+  follow: 'solar:user-plus-bold',
+  activity: 'solar:lightning-bold',
+};
+
+const notificationTypeColors = {
+  order: 'info',
+  chat: 'success',
+  mail: 'warning',
+  delivery: 'primary',
+  comment: 'info',
+  like: 'error',
+  follow: 'success',
+  activity: 'warning',
+};
+
+// Get icon for notification type
+function getNotificationIcon(type) {
+  return notificationTypeIcons[type] || 'solar:bell-bold';
+}
+
+// Get color for notification type
+function getNotificationColor(type) {
+  return notificationTypeColors[type] || 'default';
+}
+
+export function NotificationItem({ notification, onUpdate }) {
+  const isRead = notification?.is_read || false;
+  const createdAt = notification?.created_at || new Date().toISOString();
+  const title = notification?.title || 'Notification';
+  const message = notification?.message || '';
+
+  const handleMarkAsRead = async () => {
+    if (!isRead) {
+      try {
+        await markNotificationAsRead(notification._id);
+        if (onUpdate) onUpdate();
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteNotification(notification._id);
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
   const renderAvatar = () => (
     <ListItemAvatar>
-      {notification.avatarUrl ? (
-        <Avatar src={notification.avatarUrl} sx={{ bgcolor: 'background.neutral' }} />
-      ) : (
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            display: 'flex',
-            borderRadius: '50%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: 'background.neutral',
-          }}
-        >
-          <Box
-            component="img"
-            src={`${CONFIG.assetsDir}/assets/icons/notification/${(notification.type === 'order' && 'ic-order') || (notification.type === 'chat' && 'ic-chat') || (notification.type === 'mail' && 'ic-mail') || (notification.type === 'delivery' && 'ic-delivery')}.svg`}
-            sx={{ width: 24, height: 24 }}
-          />
-        </Box>
-      )}
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          display: 'flex',
+          borderRadius: '50%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: `${getNotificationColor(notification?.type)}.lighter`,
+          color: `${getNotificationColor(notification?.type)}.main`,
+        }}
+      >
+        <Iconify icon={getNotificationIcon(notification?.type)} width={20} />
+      </Box>
     </ListItemAvatar>
   );
 
   const renderText = () => (
     <ListItemText
       disableTypography
-      primary={reader(notification.title)}
+      primary={
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          {title}
+        </Typography>
+      }
       secondary={
-        <Stack
-          divider={
-            <Box
-              sx={{ mx: 0.5, width: 2, height: 2, borderRadius: '50%', bgcolor: 'currentColor' }}
-            />
-          }
-          sx={{
-            alignItems: 'center',
-            flexDirection: 'row',
-            typography: 'caption',
-            color: 'text.disabled',
-          }}
-        >
-          {fToNow(notification.createdAt)}
-          {notification.category}
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {fToNow(createdAt)}
+          </Typography>
+          {message && (
+            <Typography variant="caption" sx={{ color: 'text.disabled', flex: 1 }}>
+              {message.substring(0, 50)}
+              {message.length > 50 ? '...' : ''}
+            </Typography>
+          )}
         </Stack>
       }
     />
   );
 
   const renderUnReadBadge = () =>
-    notification.isUnRead && (
+    !isRead && (
       <Box
         sx={{
-          top: 26,
+          top: 24,
+          right: 16,
           width: 8,
           height: 8,
-          right: 20,
           borderRadius: '50%',
-          bgcolor: 'info.main',
+          bgcolor: 'error.main',
           position: 'absolute',
         }}
       />
     );
 
-  const renderFriendAction = () => (
-    <Box sx={{ gap: 1, mt: 1.5, display: 'flex' }}>
-      <Button size="small" variant="contained">
-        Accept
-      </Button>
-      <Button size="small" variant="outlined">
-        Decline
-      </Button>
-    </Box>
-  );
-
-  const renderProjectAction = () => (
-    <>
-      <Box
-        sx={{
-          p: 1.5,
-          my: 1.5,
-          borderRadius: 1.5,
-          color: 'text.secondary',
-          bgcolor: 'background.neutral',
-        }}
-      >
-        {reader(
-          `<p><strong>@Jaydon Frankie</strong> feedback by asking questions or just leave a note of appreciation.</p>`
-        )}
-      </Box>
-
-      <Button size="small" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-        Reply
-      </Button>
-    </>
-  );
-
-  const renderFileAction = () => (
-    <Box
-      sx={{
-        pl: 1,
-        gap: 1,
-        p: 1.5,
-        mt: 1.5,
-        display: 'flex',
-        borderRadius: 1.5,
-        bgcolor: 'background.neutral',
-      }}
-    >
-      <FileThumbnail file="http://localhost:8080/httpsdesign-suriname-2015.mp3" />
-
-      <Box
-        sx={{
-          gap: 1,
-          flexGrow: 1,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-        }}
-      >
-        <ListItemText
-          disableTypography
-          primary={
-            <Typography variant="subtitle2" component="div" sx={{ color: 'text.secondary' }} noWrap>
-              design-suriname-2015.mp3
-            </Typography>
-          }
-          secondary={
-            <Stack
-              divider={
-                <Box
-                  sx={{
-                    mx: 0.5,
-                    width: 2,
-                    height: 2,
-                    borderRadius: '50%',
-                    bgcolor: 'currentColor',
-                  }}
-                />
-              }
-              sx={{
-                alignItems: 'center',
-                typography: 'caption',
-                color: 'text.disabled',
-                flexDirection: 'row',
-              }}
-            >
-              <span>2.3 GB</span>
-              <span>30 min ago</span>
-            </Stack>
-          }
-        />
-
-        <Button size="small" variant="outlined">
-          Download
+  const renderActions = () => (
+    <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+      {!isRead && (
+        <Button size="small" variant="outlined" onClick={handleMarkAsRead}>
+          Mark as read
         </Button>
-      </Box>
-    </Box>
-  );
-
-  const renderTagsAction = () => (
-    <Box
-      sx={{
-        mt: 1.5,
-        gap: 0.75,
-        display: 'flex',
-        flexWrap: 'wrap',
-      }}
-    >
-      <Label variant="outlined" color="info">
-        Design
-      </Label>
-      <Label variant="outlined" color="warning">
-        Dashboard
-      </Label>
-      <Label variant="outlined">Design system</Label>
-    </Box>
-  );
-
-  const renderPaymentAction = () => (
-    <Box sx={{ gap: 1, mt: 1.5, display: 'flex' }}>
-      <Button size="small" variant="contained">
-        Pay
-      </Button>
-      <Button size="small" variant="outlined">
-        Decline
-      </Button>
-    </Box>
+      )}
+    </Stack>
   );
 
   return (
     <ListItemButton
       disableRipple
-      sx={[
-        (theme) => ({
-          p: 2.5,
-          alignItems: 'flex-start',
-          borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
-        }),
-      ]}
+      onClick={handleMarkAsRead}
+      sx={{
+        p: 2.5,
+        position: 'relative',
+        alignItems: 'flex-start',
+        borderBottom: (theme) => `dashed 1px ${theme.palette.divider}`,
+        opacity: isRead ? 0.6 : 1,
+        '&:hover': {
+          bgcolor: (theme) => theme.palette.action.hover,
+        },
+      }}
     >
       {renderUnReadBadge()}
       {renderAvatar()}
 
       <Box sx={{ flex: '1 1 auto' }}>
         {renderText()}
-        {notification.type === 'friend' && renderFriendAction()}
-        {notification.type === 'project' && renderProjectAction()}
-        {notification.type === 'file' && renderFileAction()}
-        {notification.type === 'tags' && renderTagsAction()}
-        {notification.type === 'payment' && renderPaymentAction()}
+        {renderActions()}
       </Box>
+
+      <IconButton
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDelete();
+        }}
+        sx={{ ml: 1, color: 'text.disabled' }}
+      >
+        <Iconify icon="mingcute:close-line" width={16} />
+      </IconButton>
     </ListItemButton>
-  );
-}
-
-// ----------------------------------------------------------------------
-
-function reader(data) {
-  return (
-    <Box
-      dangerouslySetInnerHTML={{ __html: data }}
-      sx={[
-        () => ({
-          mb: 0.5,
-          '& p': { typography: 'body2', m: 0 },
-          '& a': { color: 'inherit', textDecoration: 'none' },
-          '& strong': { typography: 'subtitle2' },
-        }),
-      ]}
-    />
   );
 }

@@ -64,6 +64,50 @@ function levelFromStatus(statusCode) {
   return "info";
 }
 
+function actorLabel(userType) {
+  const role = String(userType || "").toLowerCase();
+  if (role === "admin") return "L'administrateur";
+  if (role === "organisator") return "L'organisateur";
+  if (role === "touriste") return "Le touriste";
+  if (role === "anonymous") return "Un visiteur";
+  return "L'utilisateur";
+}
+
+function readableTarget(pathname = "") {
+  const clean = String(pathname || "").split("?")[0].toLowerCase();
+
+  if (clean.includes("/messages/conversations")) return "les conversations";
+  if (clean.includes("/messages")) return "les messages";
+  if (clean.includes("/notifications")) return "les notifications";
+  if (clean.includes("/posts")) return "les publications";
+  if (clean.includes("/activites")) return "les activites";
+  if (clean.includes("/lieux")) return "les lieux";
+  if (clean.includes("/users")) return "les utilisateurs";
+
+  const normalized = clean.replace(/^\/api\/v\d+\//, "");
+  const firstSegment = normalized.split("/").filter(Boolean)[0] || "la ressource";
+  return firstSegment;
+}
+
+function readableVerb(action, method) {
+  const actionValue = String(action || "").toLowerCase();
+  if (actionValue.endsWith(".create") || method === "POST") return "a cree";
+  if (actionValue.endsWith(".update") || method === "PUT" || method === "PATCH")
+    return "a modifie";
+  if (actionValue.endsWith(".delete") || method === "DELETE") return "a supprime";
+  if (actionValue === "message.send") return "a envoye";
+  if (actionValue === "auth.login") return "s'est connecte";
+  if (actionValue === "auth.logout") return "s'est deconnecte";
+  return "a consulte";
+}
+
+function formatReadableRequestMessage({ action, userType, method, path, statusCode, durationMs }) {
+  const actor = actorLabel(userType);
+  const verb = readableVerb(action, method);
+  const target = readableTarget(path);
+  return `${actor} ${verb} ${target} (statut ${statusCode}, ${durationMs} ms)`;
+}
+
 module.exports = function requestLogger(req, res, next) {
   const startedAt = Date.now();
   const requestId =
@@ -81,10 +125,14 @@ module.exports = function requestLogger(req, res, next) {
     const action = classifyAction(req.method, req.originalUrl);
     const level = levelFromStatus(res.statusCode);
 
-    const msg =
-      `[${source.toUpperCase()}] action=${action} user=${userId} role=${userType} ` +
-      `method=${req.method} path=${req.originalUrl} status=${res.statusCode} ` +
-      `duration=${durationMs}ms requestId=${requestId}`;
+    const msg = formatReadableRequestMessage({
+      action,
+      userType,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs,
+    });
 
     systemLogStore.addLog({
       level,
@@ -99,8 +147,6 @@ module.exports = function requestLogger(req, res, next) {
       durationMs,
       requestId,
     });
-
-    console.log(msg);
   });
 
   if (process.env.NODE_ENV !== "production") {

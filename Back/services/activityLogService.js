@@ -96,8 +96,26 @@ async function listActivityLogs({
     ActivityLog.countDocuments(filter),
   ]);
 
+  const normalizedData = data.map((row) => {
+    if (row.action !== "api_request") return row;
+
+    const method = row?.metadata?.method;
+    const endpoint = row?.metadata?.endpoint;
+    if (!method || !endpoint) return row;
+
+    return {
+      ...row,
+      description: generateLog("api_request", {
+        actor: row.actorName || "Utilisateur",
+        method,
+        endpoint,
+        date: row.createdAt || new Date(),
+      }),
+    };
+  });
+
   return {
-    data,
+    data: normalizedData,
     pagination: {
       page: safePage,
       limit: safeLimit,

@@ -19,6 +19,7 @@ const CommentsPage = lazy(() => import('src/sections/PageComments'));
 const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
 const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
 const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
+const SettingsPage = lazy(() => import('src/pages/dashboard/Settings'));
 const AppealsPage = lazy(() => import('src/pages/dashboard/Appeals'));
 const ApprovalsPage = lazy(() => import('src/pages/dashboard/Approvals'));
 const NotificationsPage = lazy(() => import('src/pages/dashboard/Notifications'));
@@ -47,14 +48,11 @@ export const dashboardRoutes = [
       { path: 'comments', element: <CommentsPage /> },
       { path: 'messages', element: <MessagesPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       { path: 'three', element: <UsersPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
       { path: 'appeals', element: <AppealsPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
-      {
-        path: 'group',
-        children: [],
-      },
     ],
   },
 ];

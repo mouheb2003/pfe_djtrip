@@ -55,6 +55,64 @@ function formatDateTime(value) {
   return date.toLocaleString('fr-FR');
 }
 
+function actorFromRow(row) {
+  const role = String(row?.userType || '').toLowerCase();
+  if (role === 'admin') return "L'administrateur";
+  if (role === 'organisator') return "L'organisateur";
+  if (role === 'touriste') return 'Le touriste';
+  if (role === 'anonymous') return 'Un visiteur';
+  return "L'utilisateur";
+}
+
+function targetFromRow(row) {
+  const path = String(row?.path || '').split('?')[0].toLowerCase();
+  if (path.includes('/messages/conversations')) return 'les conversations';
+  if (path.includes('/messages')) return 'les messages';
+  if (path.includes('/notifications')) return 'les notifications';
+  if (path.includes('/posts')) return 'les publications';
+  if (path.includes('/activites')) return 'les activites';
+  if (path.includes('/lieux')) return 'les lieux';
+  if (path.includes('/users')) return 'les utilisateurs';
+  return 'la ressource';
+}
+
+function verbFromRow(row) {
+  const action = String(row?.action || '').toLowerCase();
+  const method = String(row?.method || '').toUpperCase();
+  if (action === 'auth.login') return "s'est connecte a";
+  if (action === 'auth.logout') return "s'est deconnecte de";
+  if (action.endsWith('.create') || method === 'POST') return 'a cree';
+  if (action.endsWith('.update') || method === 'PUT' || method === 'PATCH') return 'a modifie';
+  if (action.endsWith('.delete') || method === 'DELETE') return 'a supprime';
+  if (action === 'message.send') return 'a envoye';
+  return 'a consulte';
+}
+
+function fallbackMessage(row) {
+  const actor = actorFromRow(row);
+  const verb = verbFromRow(row);
+  const target = targetFromRow(row);
+  const status = row?.statusCode != null ? ` (statut ${row.statusCode})` : '';
+  return `${actor} ${verb} ${target}${status}`.trim();
+}
+
+function formatMessage(message, row) {
+  const text = String(message || '').trim();
+
+  // If message looks technical, replace by unified readable format.
+  const looksTechnical =
+    !text ||
+    text.startsWith('[') ||
+    /action=|method=|path=|requestId=|status=\d+/i.test(text) ||
+    /\b(GET|POST|PUT|PATCH|DELETE)\b\s+\/api\//i.test(text);
+
+  if (looksTechnical) {
+    return fallbackMessage(row);
+  }
+
+  return text;
+}
+
 export function LogsView({ sx }) {
   const table = useTable({ defaultRowsPerPage: 25 });
 
@@ -275,12 +333,13 @@ export function LogsView({ sx }) {
                           <Typography
                             variant="body2"
                             sx={{
-                              fontFamily: 'monospace',
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
+                              color: 'text.primary',
+                              fontWeight: 500,
                             }}
                           >
-                            {row.message || '-'}
+                            {formatMessage(row.message, row)}
                           </Typography>
                         </TableCell>
                       </TableRow>
