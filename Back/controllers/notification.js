@@ -1,6 +1,7 @@
 const Notification = require("../models/notification");
 const User = require("../models/user");
 const { createActivityLog } = require("../services/activityLogService");
+const notificationService = require("../services/notificationServiceV2");
 
 // ─── POST /notifications ───────────────────────────────────────────────────────
 // Create a new notification (internal use)
@@ -428,9 +429,173 @@ exports.triggerSystemNotification = async (title, message, options = {}) => {
 // Cleanup expired notifications (run daily)
 exports.cleanupExpiredNotifications = async () => {
   try {
-    const result = await Notification.cleanupExpired();
-    console.log(`Cleaned up ${result.deletedCount} expired notifications`);
+    await Notification.cleanupExpired();
+    console.log("Expired notifications cleaned up");
   } catch (error) {
     console.error("Error cleaning up expired notifications:", error);
+  }
+};
+
+// ─── SOCIAL NETWORK NOTIFICATIONS ───────────────────────────────────────────────
+
+// Trigger notification for new publication
+exports.triggerPublicationNotification = async (userId, authorName, postId, postTitle) => {
+  try {
+    await Notification.createNotification({
+      user_id: userId,
+      type: "publication",
+      title: "Nouvelle publication ",
+      message: `${authorName} a publié: "${postTitle || 'Nouvelle publication'}"`,
+      data: {
+        type: "new_publication",
+        postId,
+      },
+      related_entity_type: "post",
+      related_entity_id: postId,
+      priority: "medium",
+    });
+
+    // Send FCM push notification
+    await notificationService.sendNewPublicationNotification({
+      userId,
+      authorName,
+      postId,
+      postTitle,
+    });
+  } catch (error) {
+    console.error("Error triggering publication notification:", error);
+  }
+};
+
+// Trigger notification for reaction
+exports.triggerReactionNotification = async (userId, reactorName, postId, commentId, reactionType, entityType) => {
+  try {
+    const isPost = entityType === 'post';
+    const title = isPost ? 'Nouvelle réaction ' : 'Réaction à votre commentaire ';
+    const message = isPost 
+      ? `${reactorName} a réagi à votre publication`
+      : `${reactorName} a réagi à votre commentaire`;
+
+    await Notification.createNotification({
+      user_id: userId,
+      type: "reaction",
+      title,
+      message,
+      data: {
+        type: "new_reaction",
+        postId,
+        commentId,
+        reactionType,
+        entityType,
+      },
+      related_entity_type: isPost ? "post" : "comment",
+      related_entity_id: isPost ? postId : commentId,
+      priority: "medium",
+    });
+
+    // Send FCM push notification
+    await notificationService.sendReactionNotification({
+      userId,
+      reactorName,
+      postId,
+      commentId,
+      reactionType,
+      entityType,
+    });
+  } catch (error) {
+    console.error("Error triggering reaction notification:", error);
+  }
+};
+
+// Trigger notification for comment
+exports.triggerCommentNotification = async (userId, commenterName, postId, commentContent) => {
+  try {
+    await Notification.createNotification({
+      user_id: userId,
+      type: "comment",
+      title: "Nouveau commentaire ",
+      message: `${commenterName} a commenté: "${commentContent?.substring(0, 50) || '...'}"`,
+      data: {
+        type: "new_comment",
+        postId,
+      },
+      related_entity_type: "post",
+      related_entity_id: postId,
+      priority: "medium",
+    });
+
+    // Send FCM push notification
+    await notificationService.sendCommentNotification({
+      userId,
+      commenterName,
+      postId,
+      commentContent,
+    });
+  } catch (error) {
+    console.error("Error triggering comment notification:", error);
+  }
+};
+
+// Trigger notification for reply
+exports.triggerReplyNotification = async (userId, replierName, postId, parentCommentId, replyContent) => {
+  try {
+    await Notification.createNotification({
+      user_id: userId,
+      type: "reply",
+      title: "Nouvelle réponse ",
+      message: `${replierName} a répondu à votre commentaire`,
+      data: {
+        type: "new_reply",
+        postId,
+        parentCommentId,
+      },
+      related_entity_type: "comment",
+      related_entity_id: parentCommentId,
+      priority: "medium",
+    });
+
+    // Send FCM push notification
+    await notificationService.sendReplyNotification({
+      userId,
+      replierName,
+      postId,
+      parentCommentId,
+      replyContent,
+    });
+  } catch (error) {
+    console.error("Error triggering reply notification:", error);
+  }
+};
+
+// Trigger notification for mention
+exports.triggerMentionNotification = async (userId, mentionerName, postId, commentId) => {
+  try {
+    const title = commentId ? 'Vous avez été mentionné ' : 'Vous avez été mentionné ';
+    const message = `${mentionerName} vous a mentionné`;
+
+    await Notification.createNotification({
+      user_id: userId,
+      type: "comment",
+      title,
+      message,
+      data: {
+        type: "mention",
+        postId,
+        commentId,
+      },
+      related_entity_type: commentId ? "comment" : "post",
+      related_entity_id: commentId || postId,
+      priority: "high",
+    });
+
+    // Send FCM push notification
+    await notificationService.sendMentionNotification({
+      userId,
+      mentionerName,
+      postId,
+      commentId,
+    });
+  } catch (error) {
+    console.error("Error triggering mention notification:", error);
   }
 };

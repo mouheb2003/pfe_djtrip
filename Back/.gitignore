@@ -14,6 +14,7 @@ build/
 # Uploaded files (temporary storage before Cloudinary)
 uploads/
 
+# Firebase service account credentials (use FIREBASE_KEY_BASE64 env var instead)
+config/firebase-service-account.json
 
-#firebase private key 
-Back/config/firebase-service-account.json
+

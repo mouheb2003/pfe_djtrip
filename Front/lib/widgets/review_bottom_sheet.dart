@@ -21,6 +21,8 @@ class _ReviewBottomSheetState extends State<ReviewBottomSheet> {
   int _rating = 0;
   final TextEditingController _commentController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isLoading = true;
+  bool _hasAlreadyReviewed = false;
 
   String get _ratingLabel {
     switch (_rating) {
@@ -39,6 +41,32 @@ class _ReviewBottomSheetState extends State<ReviewBottomSheet> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _checkIfAlreadyReviewed();
+  }
+
+  Future<void> _checkIfAlreadyReviewed() async {
+    final reviewStatus = await ReviewService.getMyActivityReview(widget.activiteId);
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _hasAlreadyReviewed = reviewStatus['hasReviewed'] == true;
+      });
+      
+      if (_hasAlreadyReviewed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have already reviewed this activity'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,14 +76,14 @@ class _ReviewBottomSheetState extends State<ReviewBottomSheet> {
     }
 
     setState(() => _isSubmitting = true);
-    final success = await ReviewService.submitActivityReview(
+    final result = await ReviewService.submitActivityReview(
       activiteId: widget.activiteId,
       note: _rating,
       commentaire: _commentController.text,
     );
     setState(() => _isSubmitting = false);
 
-    if (success) {
+    if (result['success'] == true) {
       if (mounted) {
         Navigator.pop(context); // Close bottom sheet
         Navigator.push(
@@ -65,8 +93,15 @@ class _ReviewBottomSheetState extends State<ReviewBottomSheet> {
       }
     } else {
       if (mounted) {
+        // Show specific error message for duplicate reviews
+        final message = result['isDuplicate'] == true
+            ? 'You have already reviewed this activity'
+            : (result['message'] ?? 'Failed to submit review');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit review. Maybe you already reviewed this?')),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: result['isDuplicate'] == true ? Colors.orange : Colors.red,
+          ),
         );
       }
     }

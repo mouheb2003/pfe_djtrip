@@ -12,7 +12,6 @@ const requestLogger = require("./middleware/requestLogger");
 const requestTimeout = require("./middleware/requestTimeout");
 const sanitizeInput = require("./middleware/sanitizeInput");
 const responseNormalizer = require("./middleware/responseNormalizer");
-const requestActivityLogger = require("./middleware/requestActivityLogger");
 const systemLogStore = require("./services/systemLogStore");
 const {
   notFoundHandler,
@@ -24,6 +23,16 @@ systemLogStore.installConsoleCapture();
 
 const connectDB = require("./config/db");
 connectDB();
+
+const notificationServiceV2 = require("./services/notificationServiceV2");
+const { startWorker: startNotificationWorker } = require("./workers/notificationWorkerV2");
+const { closeQueues } = require("./config/bullmq");
+
+// Initialize Firebase for push notifications (V2)
+notificationServiceV2.initializeFirebase();
+
+// Start notification worker (event-driven)
+startNotificationWorker();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");
@@ -34,11 +43,23 @@ const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
 const postRoutes = require("./routes/post");
-const commentRoutes = require("./routes/comment");
+let commentRoutes;
+try {
+  console.log('[SERVER] Loading comment routes...');
+  commentRoutes = require("./routes/comment");
+  console.log('[SERVER] Comment routes loaded successfully');
+} catch (error) {
+  console.error('[SERVER] ERROR loading comment routes:', error.message);
+  console.error('[SERVER] ERROR stack:', error.stack);
+  commentRoutes = express.Router(); // Fallback to empty router
+}
+
 const systemLogRoutes = require("./routes/systemLog");
 const logRoutes = require("./routes/logRoutes");
 const appealRoutes = require("./routes/appeal");
 const notificationRoutes = require("./routes/notification");
+const notificationPreferencesRoutes = require("./routes/notificationPreferences");
+const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
 const Message = require("./models/message");
@@ -68,6 +89,13 @@ const io = new Server(server, {
 
 // 🚀 NEW: Store io instance globally for logout access
 app.set("io", io);
+
+// Initialize Socket.io in comment controller
+const commentController = require("./controllers/comment");
+if (commentController.initSocketIO) {
+  commentController.initSocketIO(io);
+  console.log('[SERVER] Socket.io initialized in comment controller');
+}
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
@@ -154,10 +182,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── User Activity Request Logging ───────────────────────────────────────────
-// Tracks successful authenticated API movements across the app.
-app.use(requestActivityLogger);
-
 // ─── Health Check Endpoint ─────────────────────────────────────────────────────
 app.get("/api/health", async (req, res) => {
   try {
@@ -236,6 +260,8 @@ app.use("/api/v1/system-logs", systemLogRoutes);
 app.use("/api/v1/logs", logRoutes);
 app.use("/api/v1/appeals", appealRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/notifications", notificationPreferencesRoutes);
+app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
 
@@ -577,6 +603,21 @@ io.on("connection", (socket) => {
       });
   });
 
+  // ─── Comment Events ─────────────────────────────────────────────────────
+  socket.on("comment:subscribe", ({ postId }) => {
+    if (postId) {
+      socket.join(`post:${postId}`);
+      socket.emit("comment:subscribed", { postId });
+    }
+  });
+
+  socket.on("comment:unsubscribe", ({ postId }) => {
+    if (postId) {
+      socket.leave(`post:${postId}`);
+      socket.emit("comment:unsubscribed", { postId });
+    }
+  });
+
   // ─── Audio/Video Calls (WebRTC Signaling) ─────────────────────────────────
   socket.on("call:start", ({ calleeId, type, offer }) => {
     if (!calleeId || !type) return;
@@ -640,6 +681,19 @@ process.on("unhandledRejection", (reason) => {
 
 process.on("uncaughtException", (error) => {
   console.error("❌ Uncaught Exception:", error);
+});
+
+// Graceful shutdown for notification queues
+process.on("SIGTERM", async () => {
+  console.log("🔒 SIGTERM received, closing notification queues...");
+  await closeQueues();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("🔒 SIGINT received, closing notification queues...");
+  await closeQueues();
+  process.exit(0);
 });
 
 const PORT = process.env.PORT || 3000;

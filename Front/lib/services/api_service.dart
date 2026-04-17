@@ -243,9 +243,35 @@ class ApiService {
             final body = jsonDecode(response.body);
             print('[API 403] Full response body: $body');
             print('[API 403] forceLogout: ${body['forceLogout']}');
+            print('[API 403] requires_onboarding: ${body['requires_onboarding']}');
             print('[API 403] type: ${body['type']}');
             print('[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})');
             print('[API 403] remainingSeconds: ${body['remainingSeconds']}');
+            
+            // Handle onboarding requirement
+            if (body is Map && body['requires_onboarding'] == true) {
+              print('[API 403] Checking onboarding status before redirect');
+              try {
+                final user = await AuthService.getUser();
+                final isOnboarded = user?['is_onboarded'] ?? false;
+                final userType = user?['userType'];
+                print('[API 403] is_onboarded: $isOnboarded, userType: $userType');
+                
+                // Only redirect to onboarding if user is not already onboarded
+                if (!isOnboarded) {
+                  print('[API 403] Redirecting to onboarding');
+                  await NavigationService.navigateToOnboarding(userType: userType);
+                } else {
+                  print('[API 403] User already onboarded, skipping redirect');
+                }
+              } catch (e) {
+                print('[API 403] Error checking onboarding status: $e');
+                await NavigationService.navigateToOnboarding();
+              }
+              return response;
+            }
+            
+            // Handle account restrictions (suspended, banned, etc.)
             if (body is Map && body['forceLogout'] == true) {
               final restriction = <String, dynamic>{};
               final type = body['type']?.toString().trim() ?? '';

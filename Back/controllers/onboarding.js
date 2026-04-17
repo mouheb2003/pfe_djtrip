@@ -41,6 +41,34 @@ exports.updateOnboardingStep = async (req, res) => {
   }
 };
 
+// Update user type during onboarding
+exports.updateUserType = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    const { userType } = req.body;
+    
+    if (!userType) {
+      return res.status(400).json({
+        success: false,
+        message: 'User type is required'
+      });
+    }
+    
+    const result = await OnboardingService.updateUserType(userId, userType);
+    
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('Error updating user type:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update user type'
+    });
+  }
+};
+
 // Complete onboarding
 exports.completeOnboarding = async (req, res) => {
   try {

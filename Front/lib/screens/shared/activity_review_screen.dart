@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/review_service.dart';
 import '../../../theme/app_theme.dart';
+import 'organizer_review_screen.dart';
 
 class ActivityReviewScreen extends StatefulWidget {
   final BookingModel booking;
@@ -25,6 +27,9 @@ class _ActivityReviewScreenState extends State<ActivityReviewScreen> {
   final _commentController = TextEditingController();
   final List<String> _selectedTags = [];
   bool _isSubmitting = false;
+  int _currentImageIndex = 0;
+  bool _isLoading = true;
+  bool _hasAlreadyReviewed = false;
 
   static const List<String> _availableTags = [
     'Amazing Experience',
@@ -36,6 +41,32 @@ class _ActivityReviewScreenState extends State<ActivityReviewScreen> {
     'Professional Service',
     'Highly Recommended',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfAlreadyReviewed();
+  }
+
+  Future<void> _checkIfAlreadyReviewed() async {
+    final reviewStatus = await ReviewService.getMyActivityReview(widget.activity.id);
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _hasAlreadyReviewed = reviewStatus['hasReviewed'] == true;
+      });
+      
+      if (_hasAlreadyReviewed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You have already reviewed this activity'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -71,19 +102,24 @@ class _ActivityReviewScreenState extends State<ActivityReviewScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ThankYouScreen(
-                activityTitle: widget.activity.titre,
-                rating: _rating,
+              builder: (_) => OrganizerReviewScreen(
+                booking: widget.booking,
+                activity: widget.activity,
+                activityRating: _rating,
               ),
             ),
           );
         }
       } else {
         if (mounted) {
+          // Show specific error message for duplicate reviews
+          final message = result['isDuplicate'] == true
+              ? 'You have already reviewed this activity'
+              : (result['message'] ?? 'Failed to submit review');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Failed to submit review'),
-              backgroundColor: Colors.red,
+              content: Text(message),
+              backgroundColor: result['isDuplicate'] == true ? Colors.orange : Colors.red,
             ),
           );
         }
@@ -162,6 +198,15 @@ class _ActivityReviewScreenState extends State<ActivityReviewScreen> {
   }
 
   Widget _buildActivityInfo() {
+    final photos = widget.activity.photos;
+    final thumbnailUrl = widget.activity.thumbnailUrl;
+    final hasPhotos = photos.isNotEmpty;
+    final displayImages = hasPhotos ? photos : (thumbnailUrl?.isNotEmpty == true ? [thumbnailUrl!] : []);
+
+    debugPrint('🖼️ Activity Review - Photos: $photos');
+    debugPrint('🖼️ Activity Review - Thumbnail: $thumbnailUrl');
+    debugPrint('🖼️ Activity Review - Display Images: $displayImages');
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -175,78 +220,160 @@ class _ActivityReviewScreenState extends State<ActivityReviewScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Activity Image
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              image: widget.activity.thumbnailUrl?.isNotEmpty == true
-                  ? DecorationImage(
-                      image: NetworkImage(widget.activity.thumbnailUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              color: const Color(0xFFE8E5FF),
-            ),
-            child: widget.activity.thumbnailUrl?.isEmpty != false
-                ? const Icon(
-                    Icons.image,
-                    color: Color(0xFF4B63FF),
-                    size: 32,
-                  )
-                : null,
-          ),
-          const SizedBox(width: 16),
-          
-          // Activity Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Image Carousel
+          if (displayImages.isNotEmpty)
+            Column(
               children: [
-                Text(
-                  widget.activity.titre,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E225E),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on,
-                      color: Colors.grey[600],
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        widget.activity.lieu,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 13,
+                SizedBox(
+                  height: 150,
+                  child: PageView.builder(
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentImageIndex = index;
+                      });
+                    },
+                    itemCount: displayImages.length,
+                    itemBuilder: (context, index) {
+                      debugPrint('🖼️ Loading image: ${displayImages[index]}');
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          displayImages[index],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint('❌ Image load error: $error');
+                            return Container(
+                              color: const Color(0xFFE8E5FF),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.image,
+                                    color: Color(0xFF4B63FF),
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Image failed to load',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              color: const Color(0xFFE8E5FF),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
+                  ),
+                ),
+                if (displayImages.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        displayImages.length,
+                        (index) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: index == _currentImageIndex
+                                ? const Color(0xFF4B63FF)
+                                : Colors.grey[300],
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Booked on ${_formatDate(widget.booking.createdAt)}',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
                   ),
-                ),
               ],
+            )
+          else
+            Container(
+              height: 150,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFE8E5FF),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.image,
+                    color: Color(0xFF4B63FF),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No images available',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          const SizedBox(height: 16),
+          
+          // Activity Details
+          Text(
+            widget.activity.titre,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E225E),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.location_on,
+                color: Colors.grey[600],
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  widget.activity.lieu,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Booked on ${_formatDate(widget.booking.createdAt)}',
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 12,
             ),
           ),
         ],
@@ -515,83 +642,84 @@ class ThankYouScreen extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.check_circle,
-              color: Color(0xFF4B63FF),
-              size: 64,
-            ),
-          ),
-          const SizedBox(height: 32),
-          
-          // Thank You Message
-          const Text(
-            'Thank You!',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Your review has been submitted successfully',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          
-          // Rating Display
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (index) {
-              return Icon(
-                index < rating ? Icons.star : Icons.star_border,
-                color: Colors.amber,
-                size: 24,
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            activityTitle,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1E225E),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 48),
-          
-          // Done Button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4B63FF),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  color: Color(0xFF4B63FF),
+                  size: 64,
                 ),
               ),
-              child: const Text(
-                'Done',
+              const SizedBox(height: 32),
+
+              // Thank You Message
+              const Text(
+                'Thank You!',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E225E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your review has been submitted successfully',
                 style: TextStyle(
                   fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+
+              // Rating Display
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < rating ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 24,
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                activityTitle,
+                style: const TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E225E),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+
+              // Done Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4B63FF),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

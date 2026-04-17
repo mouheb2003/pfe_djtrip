@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
 import '../../services/activity_service.dart';
+import '../../widgets/ai_image_generator_widget.dart';
 import 'activity_preview_screen.dart';
 import 'map_picker_screen.dart';
 
@@ -48,6 +49,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   // Media
   final List<XFile> _photos = [];
+  String? _aiGeneratedImageUrl;
 
   // Preparation
   final List<String> _includedEquipment = [];
@@ -166,6 +168,15 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     if (picked.isNotEmpty) {
       setState(() => _photos.addAll(picked));
     }
+  }
+
+  void _onAIImageGenerated(String imageUrl) {
+    setState(() {
+      _aiGeneratedImageUrl = imageUrl;
+      print('🤖 AI image generated in create screen: $imageUrl');
+      // Add AI image to photos list so it's saved with the activity
+      // Note: Since AI images are URLs, not local files, they'll be handled separately by the backend
+    });
   }
 
   void _recalcEndDate() {
@@ -417,6 +428,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       dateDebut: _startDateTime!,
       dateFin: endDateTime,
       photos: _photos.map((x) => File(x.path)).toList(),
+      aiGeneratedImageUrl: _aiGeneratedImageUrl,
       equipementsInclus: List.from(_includedEquipment),
       aApporter: List.from(_itemsToBring),
       languesDisponibles: List.from(_languages),
@@ -686,7 +698,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           _descCtrl,
           maxLines: 5,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         const Text(
           'ACTIVITY TYPE',
           style: TextStyle(
@@ -774,6 +786,15 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                 ),
               )
               .toList(),
+        ),
+        const SizedBox(height: 20),
+        AIImageGeneratorWidget(
+          titleController: _titleCtrl,
+          descriptionController: _descCtrl,
+          onImageGenerated: _onAIImageGenerated,
+          existingPhotos: _photos,
+          category: _category,
+          showDebugInfo: false, // Set to true for development/debugging
         ),
       ],
     );
@@ -1396,6 +1417,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                           startDateTime: _startDateTime,
                           endDateTime: _endDateTime,
                           photos: List.from(_photos),
+                          existingPhotos: _aiGeneratedImageUrl != null ? [_aiGeneratedImageUrl!] : const [],
                           requirements: List.from(_includedEquipment),
                           optional: List.from(_itemsToBring),
                           pickedLatLng: _pickedLatLng,

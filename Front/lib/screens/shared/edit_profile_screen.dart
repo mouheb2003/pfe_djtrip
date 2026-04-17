@@ -159,12 +159,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final user = await UserService.getProfile();
+    final user = await UserService.getProfile(forceRefresh: true);
 
     if (mounted && user != null) {
       setState(() {
         _userData = user;
         _nameCtrl.text = user['fullname'] ?? '';
+        _userType = user['userType'] ?? '';
 
         // Extract phone number without country code
         String phoneNumber = _storedPhone(user);
@@ -1683,8 +1684,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildTouristScaffold();
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(

@@ -40,6 +40,12 @@ router.get(
   inscriptionController.getMyBookings,
 );
 
+// Get public endpoint to get tourist's participated activities count
+router.get(
+  "/touriste/:touristeId/count",
+  inscriptionController.getTouristeParticipatedCount,
+);
+
 // Cancel a registration (Tourist only)
 router.put(
   "/:inscriptionId/annuler",
@@ -169,6 +175,16 @@ router.get(
   verifyToken,
   verifyTouriste,
   inscriptionController.getPendingReviewReminders,
+);
+
+// PATCH /inscriptions/:id/reviewed
+// Mark booking as reviewed (Tourist only)
+router.patch(
+  "/:id/reviewed",
+  verifyToken,
+  verifyTouriste,
+  invalidateCache(["inscriptions", "activites"]),
+  inscriptionController.markAsReviewed,
 );
 
 module.exports = wrapRouter(router);

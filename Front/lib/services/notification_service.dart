@@ -8,19 +8,20 @@ class NotificationService {
     bool unreadOnly = false,
     int limit = 20,
     int skip = 0,
+    bool cacheFirst = true,
   }) async {
     try {
       List<String> queryParams = [];
-      
+
       if (type != null) queryParams.add('type=$type');
       if (unreadOnly) queryParams.add('unread_only=true');
       if (limit != 20) queryParams.add('limit=$limit');
       if (skip != 0) queryParams.add('skip=$skip');
 
       final queryString = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
-      
-      final response = await ApiClient.get('/notifications$queryString');
-      
+
+      final response = await ApiClient.get('/notifications$queryString', cacheFirst: cacheFirst);
+
       Map<String, dynamic> body = {};
       try {
         body = jsonDecode(response.body);
@@ -42,9 +43,9 @@ class NotificationService {
     }
   }
 
-  static Future<Map<String, dynamic>> getUnreadCount() async {
+  static Future<Map<String, dynamic>> getUnreadCount({bool cacheFirst = true}) async {
     try {
-      final response = await ApiClient.get('/notifications/unread-count');
+      final response = await ApiClient.get('/notifications/unread-count', cacheFirst: cacheFirst);
       
       Map<String, dynamic> body = {};
       try {

@@ -134,6 +134,35 @@ class InscriptionModel {
   bool get canBeApproved => isPending;
   bool get canBeRejected => isPending;
 
+  /// Check if booking can be cancelled based on 24-hour rule
+  /// Cancellation only allowed 24+ hours before activity start
+  bool get canBeCancelledWithTime {
+    if (!canBeCancelled) return false;
+    
+    final activityDate = activite?['date_debut'] ?? activite?['dateDebut'];
+    if (activityDate == null) return false;
+    
+    final startDate = DateTime.tryParse(activityDate.toString());
+    if (startDate == null) return false;
+    
+    final now = DateTime.now();
+    final hoursBeforeStart = startDate.difference(now).inHours;
+    
+    return hoursBeforeStart >= 24;
+  }
+
+  /// Get hours remaining until cancellation deadline
+  int get hoursUntilCancellationDeadline {
+    final activityDate = activite?['date_debut'] ?? activite?['dateDebut'];
+    if (activityDate == null) return 0;
+    
+    final startDate = DateTime.tryParse(activityDate.toString());
+    if (startDate == null) return 0;
+    
+    final now = DateTime.now();
+    return startDate.difference(now).inHours;
+  }
+
   String get qrData => 'DJTRIP_BOOKING:${qrToken ?? id}';
 
   String? get organizerReason {

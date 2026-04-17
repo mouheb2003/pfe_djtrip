@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class NotificationModel {
   final String id;
   final String userId;
@@ -40,15 +42,21 @@ class NotificationModel {
       type: json['type']?.toString() ?? 'system',
       title: json['title']?.toString() ?? '',
       message: json['message']?.toString() ?? '',
-      data: json['data'] is Map<String, dynamic> 
+      data: json['data'] is Map<String, dynamic>
           ? json['data'] as Map<String, dynamic>
           : {},
       isRead: json['is_read'] ?? false,
       priority: json['priority']?.toString() ?? 'medium',
       actionUrl: json['action_url']?.toString(),
       actionText: json['action_text']?.toString(),
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? json['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      expiresAt: json['expires_at'] != null 
+      createdAt:
+          DateTime.tryParse(
+            json['created_at']?.toString() ??
+                json['createdAt']?.toString() ??
+                '',
+          ) ??
+          DateTime.now(),
+      expiresAt: json['expires_at'] != null
           ? DateTime.tryParse(json['expires_at'].toString())
           : null,
       relatedEntityType: json['related_entity_type']?.toString(),
@@ -82,7 +90,7 @@ class NotificationModel {
   bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
   bool get isHighPriority => priority == 'high' || priority == 'urgent';
   bool get isLowPriority => priority == 'low';
-  
+
   String get typeDisplay {
     switch (type) {
       case 'booking':
@@ -197,7 +205,7 @@ class NotificationModel {
   String get timeAgo {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {

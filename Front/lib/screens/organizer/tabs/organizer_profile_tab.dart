@@ -377,11 +377,14 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                      ),
-                      icon: const Icon(Icons.settings),
+                      onPressed: () async {
+                        final user = _user;
+                        if (user == null) return;
+                        final profileUrl = 'https://djtrip.com/profile/${user.id}';
+                        final text = 'Check out ${user.fullname ?? 'this organizer'} on DJTrip!';
+                        await Share.share('$text\n$profileUrl');
+                      },
+                      icon: const Icon(Icons.share),
                       color: AppColors.primary,
                     ),
                   ],
@@ -523,28 +526,64 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
               ),
               const SizedBox(height: 8),
 
-              // ── Identity Cards (Full Width) ───────────────────────
-              Column(
-                children: [
-                  _OrganizerBioCard(bio: _safeBio()),
-                  const SizedBox(height: 4),
-                  _OrganizerLocationCard(
-                    country: _user?.paysOrigine?.trim() ?? 'TUNISIA',
-                    subLocation: 'DJERBA',
+              // ── Location ───────────────────────────────────────────────
+              Text(
+                _displayLocation(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // ── Bio ────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  _safeBio(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: Color(0xFF56608B),
                   ),
-                  const SizedBox(height: 4),
-                  if (_specialties.isNotEmpty)
-                    _OrganizerSpecialtiesCard(specialties: _specialties),
-                  const SizedBox(height: 4),
-                  if (_spokenLanguages.isNotEmpty)
-                    _OrganizerLanguagesCard(languages: _spokenLanguages),
-                  const SizedBox(height: 4),
-                  _OrganizerStatsRow(
-                    activities: _activitiesCount,
-                    rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
-                    reviews: _reviewsCount,
+                ),
+              ),
+              if (_specialties.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _specialties
+                        .map((s) => _SpecialtyChip(label: s))
+                        .toList(),
                   ),
-                ],
+                ),
+              ],
+              if (_spokenLanguages.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _spokenLanguages
+                        .map((l) => _LanguageChip(label: l))
+                        .toList(),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              _OrganizerStatsRow(
+                activities: _activitiesCount,
+                rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
+                reviews: _reviewsCount,
               ),
               const SizedBox(height: 20),
 
@@ -823,22 +862,12 @@ class _OrganizerBioCard extends StatelessWidget {
   const _OrganizerBioCard({required this.bio});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8E8F6), // Matches StatsRow background
-      ),
-      child: Column(
-        children: [
-          const Text('BIO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
-          const SizedBox(height: 10),
-          Text(
-            bio,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF46508A)),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        bio,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF56608B)),
       ),
     );
   }
@@ -849,18 +878,17 @@ class _OrganizerLocationCard extends StatelessWidget {
   const _OrganizerLocationCard({required this.country, required this.subLocation});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8E8F6), // Matches StatsRow background
-      ),
-      child: Column(
-        children: [
-          const Text('COUNTRY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
-          const SizedBox(height: 10),
-          Text(country.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF131A4A))),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        country.toUpperCase(),
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 12,
+          letterSpacing: 1.4,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
       ),
     );
   }
@@ -871,23 +899,13 @@ class _OrganizerSpecialtiesCard extends StatelessWidget {
   const _OrganizerSpecialtiesCard({required this.specialties});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8E8F6), // Matches StatsRow background
-      ),
-      child: Column(
-        children: [
-          const Text('SPECIAL ACTIVITIES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
-          const SizedBox(height: 10),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: specialties.map((s) => _SpecialtyChip(label: s)).toList(),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: specialties.map((s) => _SpecialtyChip(label: s)).toList(),
       ),
     );
   }
@@ -898,23 +916,13 @@ class _OrganizerLanguagesCard extends StatelessWidget {
   const _OrganizerLanguagesCard({required this.languages});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8E8F6), // Matches StatsRow background
-      ),
-      child: Column(
-        children: [
-          const Text('SPOKEN LANGUAGES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4D74F5))),
-          const SizedBox(height: 10),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: languages.map((l) => _LanguageChip(label: l)).toList(),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: languages.map((l) => _LanguageChip(label: l)).toList(),
       ),
     );
   }
@@ -932,16 +940,17 @@ class _OrganizerStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFFE8E8F6),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8E8F6),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
           _StatCardItem(label: 'ACTIVITIES', value: activities.toString()),
-          Container(width: 1, height: 30, color: const Color(0xFFD8D9EC)),
+          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
           _StatCardItem(label: 'RATE', value: rate),
-          Container(width: 1, height: 30, color: const Color(0xFFD8D9EC)),
+          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
           _StatCardItem(label: 'REVIEWS', value: reviews.toString()),
         ],
       ),

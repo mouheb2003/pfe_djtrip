@@ -86,11 +86,6 @@ function formatDate(value) {
   return date.toLocaleString('fr-FR');
 }
 
-function isVideoMedia(url) {
-  const value = String(url ?? '').toLowerCase();
-  return /\.(mp4|webm|ogg|mov|m4v)(\?|$)/.test(value) || value.includes('/video/upload/');
-}
-
 function applyFilter({ inputData, comparator, filters }) {
   const { query, type, status } = filters;
 
@@ -602,101 +597,69 @@ export function ActivitiesView({ sx }) {
         <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="md">
           <DialogTitle>Détails activité</DialogTitle>
           <DialogContent dividers>
-            <Stack spacing={2}>
-              <Typography variant="h6">{detailsRow?.titre ?? '-'}</Typography>
-
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Chip size="small" label={`Type: ${detailsRow?.type_activite ?? '-'}`} />
-                <Chip size="small" label={`Categorie: ${detailsRow?.categorie ?? '-'}`} />
-                <Chip size="small" label={`Difficulte: ${detailsRow?.niveau_difficulte ?? '-'}`} />
-                <Chip size="small" color="info" label={`Prix: ${detailsRow?.prix ?? '-'} DT`} />
-                <Chip size="small" color="warning" label={`Capacite: ${detailsRow?.capacite_max ?? '-'}`} />
-                <Chip size="small" color="success" label={`Statut: ${detailsRow?.statut ?? '-'}`} />
-              </Stack>
-
-              <Card variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Description
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {detailsRow?.description ?? '-'}
-                </Typography>
-              </Card>
-
-              <Stack spacing={0.75}>
-                <Typography variant="subtitle2">Medias</Typography>
+            <Stack spacing={1.25}>
+              <Typography variant="body2">
+                <strong>Titre:</strong> {detailsRow?.titre ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Description:</strong> {detailsRow?.description ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Organisateur:</strong> {detailsRow?.organisateur_name ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>organisateur_id:</strong> {detailsRow?.organisateur_id ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Type:</strong> {detailsRow?.type_activite ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Catégorie:</strong> {detailsRow?.categorie ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Difficulté:</strong> {detailsRow?.niveau_difficulte ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Lieu:</strong> {detailsRow?.lieu ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Durée:</strong> {detailsRow?.duree ?? '-'} h
+              </Typography>
+              <Typography variant="body2">
+                <strong>Prix:</strong> {detailsRow?.prix ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Capacité:</strong> {detailsRow?.capacite_max ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Statut:</strong> {detailsRow?.statut ?? '-'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Date début:</strong> {formatDate(detailsRow?.date_debut)}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Date fin:</strong> {formatDate(detailsRow?.date_fin)}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Créée le:</strong> {formatDate(detailsRow?.createdAt)}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Modifiée le:</strong> {formatDate(detailsRow?.updatedAt)}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Photos:</strong>
+              </Typography>
+              <Stack spacing={0.5}>
                 {(detailsRow?.photos ?? []).length ? (
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                      gap: 1,
-                    }}
-                  >
-                    {detailsRow.photos.map((url, index) => (
-                      <Box
-                        key={`${url}-${index}`}
-                        sx={{
-                          borderRadius: 1.5,
-                          overflow: 'hidden',
-                          bgcolor: 'grey.100',
-                          border: (theme) => `1px solid ${theme.palette.divider}`,
-                          minHeight: 220,
-                        }}
-                      >
-                        {isVideoMedia(url) ? (
-                          <Box
-                            component="video"
-                            src={url}
-                            controls
-                            sx={{ width: '100%', height: '100%', maxHeight: 360, objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <Box
-                            component="img"
-                            src={url}
-                            alt={`activite-media-${index + 1}`}
-                            sx={{ width: '100%', height: '100%', maxHeight: 360, objectFit: 'cover' }}
-                          />
-                        )}
-                      </Box>
-                    ))}
-                  </Box>
+                  detailsRow.photos.map((url) => (
+                    <Typography key={url} variant="body2" noWrap>
+                      {url}
+                    </Typography>
+                  ))
                 ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Aucun media
-                  </Typography>
+                  <Typography variant="body2">-</Typography>
                 )}
               </Stack>
-
-              <Card variant="outlined" sx={{ p: 2 }}>
-                <Stack spacing={0.75}>
-                  <Typography variant="body2">
-                    <strong>Organisateur:</strong> {detailsRow?.organisateur_name ?? '-'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Organisateur ID:</strong> {detailsRow?.organisateur_id ?? '-'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Lieu:</strong> {detailsRow?.lieu ?? '-'}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Duree:</strong> {detailsRow?.duree ?? '-'} h
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Date debut:</strong> {formatDate(detailsRow?.date_debut)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Date fin:</strong> {formatDate(detailsRow?.date_fin)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Creee le:</strong> {formatDate(detailsRow?.createdAt)}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Modifiee le:</strong> {formatDate(detailsRow?.updatedAt)}
-                  </Typography>
-                </Stack>
-              </Card>
             </Stack>
           </DialogContent>
           <DialogActions>

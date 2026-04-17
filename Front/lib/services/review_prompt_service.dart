@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/booking_model.dart';
 import '../models/activity_model.dart';
 import '../services/booking_service.dart';
+import '../services/user_service.dart';
 import '../screens/shared/review_prompt_modal.dart';
 
 class ReviewPromptService {
@@ -115,16 +116,39 @@ class ReviewPromptService {
       if (reminderData != null) {
         final remindAt = DateTime.parse(reminderData['remindAt']);
         final reminderCount = (reminderData['reminderCount'] as num?)?.toInt() ?? 0;
-        
+
         // Ne pas afficher si le temps de rappel n'est pas atteint
         if (now.isBefore(remindAt)) {
           return false;
         }
-        
+
         // Limiter le nombre de rappels (max 3)
         if (reminderCount >= 3) {
           return false;
         }
+      }
+
+      // 8. Vérifier si l'organisateur est actif
+      final organizerId = booking.organisateurId;
+      if (organizerId.isEmpty) {
+        print('Organizer ID is empty for booking ${booking.id}');
+        return false;
+      }
+
+      try {
+        final organizer = await UserService.getUserById(organizerId);
+        if (organizer == null) {
+          print('Organizer not found for booking ${booking.id}');
+          return false;
+        }
+        final accountStatus = organizer['accountStatus'] as String?;
+        if (accountStatus != 'active') {
+          print('Organizer is not active (status: $accountStatus) for booking ${booking.id}');
+          return false;
+        }
+      } catch (e) {
+        print('Error checking organizer status: $e');
+        return false;
       }
 
       return true;

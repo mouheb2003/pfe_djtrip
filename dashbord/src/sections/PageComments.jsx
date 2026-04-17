@@ -23,7 +23,6 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useSearchParams } from 'src/routes/hooks';
 import {
   getAdminComments,
   adminDeleteComment,
@@ -53,7 +52,7 @@ const TABLE_HEAD = [
 function mapComment(comment) {
   const user = comment.user_id || {};
   const post = comment.post_id || {};
-
+  
   return {
     id: comment?._id ?? comment?.id,
     author: user.fullname ?? user.email ?? 'Unknown',
@@ -88,8 +87,8 @@ function applyFilter({ inputData, comparator, filters }) {
   if (query) {
     const q = query.toLowerCase();
     data = data.filter(
-      (row) =>
-        row.content.toLowerCase().includes(q) ||
+      (row) => 
+        row.content.toLowerCase().includes(q) || 
         row.author.toLowerCase().includes(q) ||
         row.authorEmail.toLowerCase().includes(q)
     );
@@ -104,8 +103,6 @@ function applyFilter({ inputData, comparator, filters }) {
 
 export default function CommentsView({ sx }) {
   const table = useTable({ defaultOrderBy: 'createdAt' });
-  const searchParams = useSearchParams();
-  const selectedPostId = searchParams.get('postId') ?? '';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -117,16 +114,9 @@ export default function CommentsView({ sx }) {
 
   const filters = useSetState({
     query: '',
-    postId: selectedPostId,
+    postId: '',
   });
   const { state: currentFilters, setState: updateFilters } = filters;
-
-  useEffect(() => {
-    if (selectedPostId !== currentFilters.postId) {
-      table.onResetPage();
-      updateFilters({ postId: selectedPostId });
-    }
-  }, [currentFilters.postId, selectedPostId, table, updateFilters]);
 
   const loadRows = useCallback(async () => {
     try {
@@ -220,14 +210,6 @@ export default function CommentsView({ sx }) {
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
           <Typography variant="h4">Gestion des Commentaires</Typography>
-          {currentFilters.postId ? (
-            <Chip
-              color="info"
-              variant="soft"
-              label={`Publication: ${currentFilters.postId}`}
-              sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
-            />
-          ) : null}
         </Stack>
 
         <Card sx={{ p: 2 }}>

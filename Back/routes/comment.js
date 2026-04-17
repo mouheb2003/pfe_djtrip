@@ -1,66 +1,59 @@
+console.log('[COMMENT ROUTES] Loading comment routes...');
+
 const express = require("express");
 const router = express.Router();
 const commentController = require("../controllers/comment");
+console.log('[COMMENT ROUTES] Comment controller loaded');
 const validate = require("../middleware/validate");
 const wrapRouter = require("../middleware/wrapRouter");
 const { cacheGet, invalidateCache } = require("../middleware/cache");
-const { verifyToken, verifyTouriste, verifyAdmin } = require("../middleware/auth");
-
-// Validators
-const commentSchema = {
-  content: { type: "string", minLength: 1, maxLength: 1200, required: true },
-  parentCommentId: { type: "string", optional: true },
-};
-
-const updateCommentSchema = {
-  content: { type: "string", minLength: 1, maxLength: 1200, required: true },
-};
-
-const reactionSchema = {
-  reactionType: {
-    type: "string",
-    enum: ["like", "love", "laugh", "wow", "sad", "angry"],
-    required: true,
-  },
-};
+const { verifyToken, verifyTouriste, verifyTouristeOrOrganisator, verifyAdmin } = require("../middleware/auth");
+const { createCommentSchema, updateCommentSchema, reactionSchema } = require("../validators/comment");
 
 // ==================== PUBLIC ENDPOINTS ====================
 
 // Get comments for a post with pagination
 router.get(
-  "/posts/:postId/comments",
-  cacheGet("comments:post", 30),
+  "/:postId/comments",
+  verifyToken,
   commentController.getPostComments
 );
 
 // Get a single comment
 router.get(
-  "/comments/:commentId",
-  cacheGet("comments:single", 30),
+  "/:commentId",
+  verifyToken,
   commentController.getComment
 );
 
 // Get comment reactions
 router.get(
-  "/comments/:commentId/reactions",
-  cacheGet("comments:reactions", 60),
+  "/:commentId/reactions",
+  verifyToken,
   commentController.getCommentReactions
+);
+
+// Get replies for a specific comment with pagination (Facebook/Instagram style)
+router.get(
+  "/:commentId/replies",
+  verifyToken,
+  commentController.getCommentReplies
 );
 
 // ==================== AUTHENTICATED ENDPOINTS ====================
 
 // Create a new comment (IMMEDIATE PUBLICATION)
 router.post(
-  "/posts/:postId/comments",
+  "/:postId/comments",
   verifyToken,
-  validate(commentSchema),
+  validate(createCommentSchema),
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.createComment
 );
 
 // React to a comment
 router.post(
-  "/comments/:commentId/react",
+  "/:commentId/react",
   verifyToken,
   validate(reactionSchema),
   invalidateCache(["comments:reactions", "comments:post"]),
@@ -69,9 +62,9 @@ router.post(
 
 // Update comment (ONLY OWNER)
 router.patch(
-  "/comments/:commentId",
+  "/:commentId",
   verifyToken,
-  verifyTouriste,
+  verifyTouristeOrOrganisator,
   validate(updateCommentSchema),
   invalidateCache(["comments:post", "comments:single"]),
   commentController.updateComment
@@ -79,7 +72,7 @@ router.patch(
 
 // Delete comment (OWNER OR POST OWNER OR ADMIN)
 router.delete(
-  "/comments/:commentId",
+  "/:commentId",
   verifyToken,
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.deleteComment
@@ -89,7 +82,7 @@ router.delete(
 
 // Get all comments with filters (ADMIN)
 router.get(
-  "/admin/comments",
+  "/admin",
   verifyToken,
   verifyAdmin,
   commentController.getAdminComments
@@ -97,13 +90,20 @@ router.get(
 
 // Delete any comment (ADMIN)
 router.delete(
-  "/admin/comments/:commentId",
+  "/admin/:commentId",
   verifyToken,
   verifyAdmin,
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.adminDeleteComment
 );
 
-console.log('[COMMENT ROUTES] Loading comment routes...');
+// Search users for mention autocomplete
+router.get(
+  "/users/search",
+  verifyToken,
+  commentController.searchUsersForMention
+);
+
+console.log('[COMMENT ROUTES] All routes defined, wrapping router...');
 module.exports = wrapRouter(router);
 console.log('[COMMENT ROUTES] Comment routes loaded successfully');

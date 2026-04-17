@@ -18,7 +18,7 @@ const inscriptionSchema = new mongoose.Schema(
     // Reference to the organizer (to facilitate queries)
     organisateur_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organisator",
+      ref: "User",
       required: [true, "Organizer is required"],
     },
     // Registration status
@@ -157,24 +157,38 @@ inscriptionSchema.methods.setReviewReminder = function (remindAt) {
 };
 
 // Method to check if review reminder should be shown
-inscriptionSchema.methods.shouldShowReviewReminder = function () {
+inscriptionSchema.methods.shouldShowReviewReminder = async function () {
   if (this.hasReviewed) return false;
   if (this.statut !== "approuvee") return false;
   if (!this.qr_used_at) return false; // Not checked in
-  
+
   const now = new Date();
   const activityEnd = this.qr_token_expires_at;
   if (!activityEnd) return false;
-  
+
   // Check if within 7 days of activity end
   const deadline = new Date(activityEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
   if (now > deadline) return false;
-  
+
   // Check reminder timing
   if (this.reviewReminder?.remindAt) {
-    return now >= this.reviewReminder.remindAt && this.reviewReminder.reminderCount < 3;
+    if (now < new Date(this.reviewReminder.remindAt)) return false;
   }
-  
+
+  // Limit number of reminders
+  if (this.reviewReminder?.reminderCount >= 3) return false;
+
+  // Check if organizer exists and is active
+  const User = require("./user");
+  try {
+    const organizer = await User.findById(this.organisateur_id);
+    if (!organizer) return false;
+    if (organizer.accountStatus !== "active") return false;
+  } catch (error) {
+    console.error("Error checking organizer status:", error);
+    return false;
+  }
+
   return true;
 };
 

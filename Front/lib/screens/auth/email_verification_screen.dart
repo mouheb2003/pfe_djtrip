@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'onboarding_screen.dart';
+import '../onboarding/user_type_selection_screen.dart';
 import '../../config/app_routes.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -79,12 +80,31 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       final result = await AuthService.verifyEmail(code);
       if (!mounted) return;
       if (result['success'] == true) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => OnboardingScreen(userType: widget.userType),
-          ),
-        );
+        final bool requiresOnboarding = result['requires_onboarding'] ?? false;
+        final bool skipUserTypeSelection = result['skip_user_type_selection'] ?? true;
+
+        if (requiresOnboarding) {
+          if (skipUserTypeSelection) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OnboardingScreen(userType: widget.userType),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserTypeSelectionScreen(),
+              ),
+            );
+          }
+        } else {
+          final route = (widget.userType == 'Organisator' || widget.userType == 'Organizer')
+              ? AppRoutes.organizerMain
+              : AppRoutes.touristMain;
+          Navigator.pushReplacementNamed(context, route);
+        }
       } else {
         setState(
           () => _errorMsg = result['message'] ?? 'Invalid or expired code.',

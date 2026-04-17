@@ -77,6 +77,11 @@ export const navData = [
         path: paths.dashboard.publications,
         icon: ICONS.blog,
       },
+      {
+        title: 'Commentaires',
+        path: paths.dashboard.comments,
+        icon: ICONS.chat,
+      },
     ],
   },
   /**
@@ -91,6 +96,12 @@ export const navData = [
         icon: ICONS.user,
       },
       {
+        title: 'Notifications',
+        path: paths.dashboard.notifications,
+        icon: ICONS.mail,
+        info: <Label color="error">5</Label>,
+      },
+      {
         title: 'Appeals',
         path: paths.dashboard.appeals,
         icon: ICONS.file,
@@ -101,6 +112,12 @@ export const navData = [
         path: paths.dashboard.approvals,
         icon: ICONS.user,
         info: <Label color="orange">5</Label>,
+      },
+      {
+        title: 'Demandes',
+        path: paths.dashboard.group.root,
+        icon: ICONS.mail,
+        info: <Label color="error">3</Label>,
       },
     ],
   },
@@ -118,11 +135,6 @@ export const navData = [
         title: 'Logs',
         path: paths.dashboard.logs,
         icon: ICONS.file,
-      },
-      {
-        title: 'Settings',
-        path: paths.dashboard.settings,
-        icon: ICONS.parameter,
       },
     ],
   },

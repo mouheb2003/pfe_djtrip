@@ -69,6 +69,7 @@ class CancellationPolicy {
   
   /**
    * Check if booking can be cancelled
+   * Policy: Cancellation only allowed 24+ hours before activity start
    */
   static canCancel(booking, activity) {
     const now = new Date();
@@ -80,6 +81,7 @@ class CancellationPolicy {
     // - Activity already started
     // - Booking is already checked-in
     // - Booking is no-show
+    // - Less than 24 hours before activity
     
     if (booking.statut === 'annulee') {
       return { canCancel: false, reason: 'Already cancelled' };
@@ -95,6 +97,11 @@ class CancellationPolicy {
     
     if (hoursBeforeStart <= 0) {
       return { canCancel: false, reason: 'Activity already started' };
+    }
+    
+    // Enforce 24-hour minimum rule
+    if (hoursBeforeStart < 24) {
+      return { canCancel: false, reason: 'Cancellation not allowed within 24 hours of activity start' };
     }
     
     return { canCancel: true, hoursBeforeStart };

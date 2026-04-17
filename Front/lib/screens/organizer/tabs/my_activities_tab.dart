@@ -8,6 +8,7 @@ import '../../shared/activity_detail_screen.dart';
 import '../verify_booking_screen.dart';
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
+import '../../notifications_screen.dart';
 
 class MyActivitiesTab extends StatefulWidget {
   final bool showRequestsDot;
@@ -183,7 +184,6 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
       ),
       child: Row(
         children: [
@@ -205,6 +205,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                   fontSize: 14,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 suffixIcon: _searchQuery.isEmpty
@@ -233,7 +235,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF2F1FA),
       body: SafeArea(
         child: Column(
           children: [
@@ -251,69 +253,121 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                       color: Color(0xFF1E293B),
                     ),
                   ),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        widget.onOpenRequests?.call();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RequestsTab(),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 9,
+                  Row(
+                    children: [
+                      // Notification icon
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => NotificationsScreen(),
                             ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.notifications_none_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Requests',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                Icons.notifications_outlined,
+                                color: AppColors.primary,
+                                size: 24,
+                              ),
+                              if (false) // TODO: Replace with actual unread count check
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '3',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                            ],
                           ),
-                          if (widget.showRequestsDot)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                width: 10,
-                                height: 10,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            widget.onOpenRequests?.call();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const RequestsTab(),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFF3B30),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.notifications_none_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'Requests',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                        ],
+                              if (widget.showRequestsDot)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF3B30),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -669,8 +723,8 @@ class _ActivityCard extends StatelessWidget {
     final durationHours = activity.duree ~/ 60;
     final durationMinutes = activity.duree % 60;
     final durationText = durationHours > 0
-        ? '${durationHours}h ${durationMinutes}m'
-        : '${durationMinutes}m';
+        ? '${durationHours}H ${durationMinutes}H'
+        : '${durationMinutes}H';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -875,7 +929,9 @@ class _ActivityCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '4.5 (12 reviews)',
+                            activity.noteMoyenne > 0
+                                ? '${activity.noteMoyenne.toStringAsFixed(1)} (${activity.nombreAvis} review${activity.nombreAvis == 1 ? '' : 's'})'
+                                : 'No reviews yet',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

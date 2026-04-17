@@ -6,7 +6,7 @@ import '../../../models/inscription_model.dart';
 import '../../../models/conversation_model.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/chat_conversation_screen.dart';
-import '../../shared/public_tourist_profile_screen.dart';
+import '../../shared/public_profile_screen.dart';
 import '../../../services/activity_service.dart';
 import '../../../services/inscription_service.dart';
 import '../../../services/message_service.dart';
@@ -540,9 +540,8 @@ class _ArchiveTabState extends State<ArchiveTab> {
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => PublicUserProfileScreen(
+                                                  builder: (_) => PublicProfileScreen(
                                                     userId: touristId,
-                                                    canContact: true,
                                                   ),
                                                 ),
                                               );
@@ -588,7 +587,7 @@ class _ArchiveTabState extends State<ArchiveTab> {
     final heroImages = _heroImages;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F1FF),
+      backgroundColor: const Color(0xFFF2F1FA),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchArchives,

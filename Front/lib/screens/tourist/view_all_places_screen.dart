@@ -578,7 +578,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
       onTapCancel: _handleTapCancel,
       child: ScaleTransition(
         scale: _scaleAnimation,
-        child: Container(
+          child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -592,6 +592,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Image section
               Flexible(
@@ -646,6 +647,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
               // Content section
               Flexible(
                 flex: 2,
+                fit: FlexFit.tight,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -677,7 +679,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(
+                          Expanded(
                             child: Text(
                               widget.place.prix == 'FREE' ? 'Free' : '${widget.place.prix}',
                               overflow: TextOverflow.ellipsis,
@@ -688,6 +690,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(

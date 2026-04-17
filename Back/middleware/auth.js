@@ -50,18 +50,21 @@ exports.generateTokens = (userId, email, userType, tokenVersion = 0) => {
 // Middleware to verify access token
 exports.verifyToken = async (req, res, next) => {
   try {
+    console.log('[AUTH verifyToken] Starting verification for:', req.method, req.path);
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
+      console.log('[AUTH verifyToken] No token provided');
       return res.status(401).json({
         success: false,
         message: "Authentication token is required",
       });
     }
+    console.log('[AUTH verifyToken] Token provided');
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const user = await User.findById(decoded.userId).select(
-      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion",
+      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion userType",
     );
 
     if (!user) {
@@ -79,6 +82,14 @@ exports.verifyToken = async (req, res, next) => {
         message: "Session expired. Please log in again.",
       });
     }
+
+    // Use userType from database instead of token to handle userType changes
+    req.user = {
+      userId: user._id,
+      email: user.email,
+      userType: user.userType,
+      tokenVersion: user.tokenVersion,
+    };
 
     // Auto-reactivate when suspension is expired
     if (user.accountStatus === "suspended" && user.suspendedUntil) {
@@ -160,7 +171,6 @@ exports.verifyToken = async (req, res, next) => {
       });
     }
 
-    req.user = decoded;
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
@@ -177,36 +187,198 @@ exports.verifyToken = async (req, res, next) => {
 };
 
 // Middleware to verify Organisator userType
-exports.verifyOrganisator = (req, res, next) => {
-  if (req.user.userType !== "Organisator") {
-    return res.status(403).json({
+exports.verifyOrganisator = async (req, res, next) => {
+  try {
+    // Fetch fresh user data from database to ensure we have the latest userType
+    const User = require("../models/user");
+    const user = await User.findById(req.user.userId).select(
+      "userType is_onboarded is_approved signup_method"
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update req.user with fresh data
+    req.user.userType = user.userType;
+    req.user.is_onboarded = user.is_onboarded;
+    req.user.is_approved = user.is_approved;
+
+    // Check if user is an organizer
+    if (user.userType !== "Organisator") {
+      // Only return requires_onboarding if user has no userType at all
+      const needsOnboarding = !user.userType || user.userType === null;
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Organisator access required.",
+        requires_onboarding: needsOnboarding,
+      });
+    }
+
+    // For organizers, check if they are onboarded and approved
+    if (!user.is_onboarded) {
+      return res.status(403).json({
+        success: false,
+        message: "Please complete onboarding to access organizer features",
+        requires_onboarding: true,
+      });
+    }
+
+    if (!user.is_approved) {
+      return res.status(403).json({
+        success: false,
+        message: "Your organizer account is waiting for approval",
+        requires_approval: true,
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in verifyOrganisator middleware:", error);
+    return res.status(500).json({
       success: false,
-      message: "Access denied. Organisator access required.",
+      message: "Error verifying organizer access",
     });
   }
-  next();
 };
 
 // Middleware to verify Touriste userType
-exports.verifyTouriste = (req, res, next) => {
-  if (req.user.userType !== "Touriste") {
-    return res.status(403).json({
+exports.verifyTouriste = async (req, res, next) => {
+  try {
+    // Fetch fresh user data from database to ensure we have the latest userType
+    const User = require("../models/user");
+    const user = await User.findById(req.user.userId).select(
+      "userType is_onboarded"
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update req.user with fresh data
+    req.user.userType = user.userType;
+    req.user.is_onboarded = user.is_onboarded;
+
+    // Check if user is a tourist
+    if (user.userType !== "Touriste") {
+      // Only return requires_onboarding if user has no userType at all
+      const needsOnboarding = !user.userType || user.userType === null;
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Touriste access required.",
+        requires_onboarding: needsOnboarding,
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in verifyTouriste middleware:", error);
+    return res.status(500).json({
       success: false,
-      message: "Access denied. Touriste access required.",
+      message: "Error verifying tourist access",
     });
   }
-  next();
 };
 
 // Middleware to verify Admin userType
-exports.verifyAdmin = (req, res, next) => {
-  if (req.user.userType !== "Admin") {
-    return res.status(403).json({
+exports.verifyAdmin = async (req, res, next) => {
+  try {
+    // Fetch fresh user data from database to ensure we have the latest userType
+    const User = require("../models/user");
+    const user = await User.findById(req.user.userId).select("userType");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update req.user with fresh data
+    req.user.userType = user.userType;
+
+    // Check if user is an admin
+    if (user.userType !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Admin access required.",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in verifyAdmin middleware:", error);
+    return res.status(500).json({
       success: false,
-      message: "Access denied. Admin access required.",
+      message: "Error verifying admin access",
     });
   }
-  next();
+};
+
+// Middleware to verify Tourist or Organizer userType (for routes accessible to both)
+exports.verifyTouristeOrOrganisator = async (req, res, next) => {
+  try {
+    // Fetch fresh user data from database to ensure we have the latest userType
+    const User = require("../models/user");
+    const user = await User.findById(req.user.userId).select(
+      "userType is_onboarded is_approved"
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Update req.user with fresh data
+    req.user.userType = user.userType;
+    req.user.is_onboarded = user.is_onboarded;
+    req.user.is_approved = user.is_approved;
+
+    // Check if user is a tourist or organizer
+    if (user.userType !== "Touriste" && user.userType !== "Organisator") {
+      const needsOnboarding = !user.userType || user.userType === null;
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Tourist or Organizer access required.",
+        requires_onboarding: needsOnboarding,
+      });
+    }
+
+    // For organizers, check if they are onboarded and approved
+    if (user.userType === "Organisator") {
+      if (!user.is_onboarded) {
+        return res.status(403).json({
+          success: false,
+          message: "Please complete onboarding to access this feature",
+          requires_onboarding: true,
+        });
+      }
+
+      if (!user.is_approved) {
+        return res.status(403).json({
+          success: false,
+          message: "Your organizer account is waiting for approval",
+          requires_approval: true,
+        });
+      }
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in verifyTouristeOrOrganisator middleware:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error verifying access",
+    });
+  }
 };
 
 // Refresh Token Handler — verifies tokenVersion to detect revoked tokens

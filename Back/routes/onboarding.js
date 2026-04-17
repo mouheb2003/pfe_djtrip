@@ -6,6 +6,7 @@ const { verifyToken, verifyAdmin } = require('../middleware/auth');
 // User onboarding routes
 router.get('/status', verifyToken, onboardingController.getOnboardingStatus);
 router.post('/step', verifyToken, onboardingController.updateOnboardingStep);
+router.put('/user-type', verifyToken, onboardingController.updateUserType);
 router.post('/complete', verifyToken, onboardingController.completeOnboarding);
 
 // Admin approval routes

@@ -94,6 +94,8 @@ const createActiviteSchema = Joi.object({
   keepExistingPhotos: Joi.alternatives()
     .try(Joi.boolean(), Joi.string())
     .optional(),
+  ai_generated_image_url: Joi.string().optional(),
+  aiGeneratedImageUrl: Joi.string().optional(),
 })
   .or("type_activite", "typeActivite")
   .or("capacite_max", "capaciteMax");
@@ -146,6 +148,14 @@ const updateActiviteSchema = Joi.object({
     .optional(),
   keepExistingPhotos: Joi.alternatives()
     .try(Joi.boolean(), Joi.string())
+    .optional(),
+  ai_generated_image_url: Joi.string().optional(),
+  aiGeneratedImageUrl: Joi.string().optional(),
+  existing_photo_urls: Joi.alternatives()
+    .try(Joi.array().items(Joi.string()), Joi.string())
+    .optional(),
+  existingPhotoUrls: Joi.alternatives()
+    .try(Joi.array().items(Joi.string()), Joi.string())
     .optional(),
 });
 

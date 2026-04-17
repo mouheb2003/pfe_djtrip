@@ -7,6 +7,7 @@ import '../../services/activity_service.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/inscription_service.dart';
+import '../../services/post_service.dart';
 import '../../services/user_service.dart';
 import 'activity_detail_screen.dart';
 import 'chat_conversation_screen.dart';
@@ -31,10 +32,10 @@ class PublicUserProfileScreen extends StatefulWidget {
 class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
   bool _loading = true;
   Map<String, dynamic>? _user;
-  int _favoritesCount = 0;
+  int _postsCount = 0;
   int _reservationsCount = 0;
   int _reviewsCount = 0;
-  List<ActivityModel> _recentActivities = [];
+  List<Map<String, dynamic>> _posts = [];
 
   @override
   void initState() {
@@ -43,61 +44,94 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    final userFuture = UserService.getUserById(widget.userId);
-    final activitiesFuture = ActivityService.getActivities();
+    setState(() => _loading = true);
 
-    final user = await userFuture;
-    final activities = await activitiesFuture;
-    final currentUserId = await AuthService.getUserId();
-
-    int favoritesCount = 0;
     try {
-      final res = await ApiClient.get('/users/${widget.userId}', auth: false);
-      if (res.statusCode == 200) {
-        final raw = jsonDecode(res.body) as Map<String, dynamic>;
-        final u = (raw['user'] ?? raw) as Map<String, dynamic>;
-        final favorites = u['favorites'];
-        if (favorites is List) {
-          favoritesCount = favorites.length;
+      final user = await UserService.getUserById(widget.userId);
+      debugPrint('User loaded: ${user?['_id']}');
+      debugPrint('User type: ${user?['userType']}');
+
+      // Get posts by filtering feed posts
+      List<Map<String, dynamic>> userPosts = [];
+      try {
+        final feedPosts = await PostService.getFeedPosts();
+        debugPrint('Feed posts total: ${feedPosts.length}');
+        
+        // Log first few posts to see structure
+        if (feedPosts.isNotEmpty) {
+          debugPrint('First post structure: ${feedPosts.first.keys}');
+          debugPrint('First post user: ${feedPosts.first['user']}');
         }
+        
+        userPosts = feedPosts.where((post) {
+          final authorId = (post['user']?['_id'] ?? post['userId'] ?? post['author']?['_id'] ?? '').toString();
+          final targetId = (user?['_id'] ?? '').toString();
+          final match = authorId == targetId;
+          if (feedPosts.indexOf(post) < 3) {
+            debugPrint('Post ${feedPosts.indexOf(post)}: authorId=$authorId, targetId=$targetId, match=$match');
+          }
+          return match;
+        }).toList();
+        debugPrint('Filtered feed posts: ${userPosts.length}');
+      } catch (e) {
+        debugPrint('Error loading feed posts: $e');
       }
-    } catch (_) {
-      // Best effort only, endpoint may vary by role/privacy.
-    }
 
-    int reservationsCount = 0;
-    int reviewsCount = 0;
-    List<ActivityModel> recent = [];
+      int reservationsCount = 0;
+      int reviewsCount = 0;
 
-    final mine = activities.where((a) {
-      final orgId = (a.organisateur?['_id'] ?? a.organisateur?['id'] ?? '')
-          .toString();
-      return orgId == (user?['_id'] ?? '').toString();
-    }).toList();
-
-    if (user != null && user['isOrganisator'] == true) {
-      reservationsCount = mine.fold<int>(0, (p, a) => p + a.nombreReservations);
-      reviewsCount = mine.fold<int>(0, (p, a) => p + a.nombreAvis);
-      recent = mine;
-    } else {
-      if (user != null && user['_id'] == currentUserId) {
-        final touristStats = await InscriptionService.getTouristStats();
-        reservationsCount = (touristStats['totalBookings'] as num? ?? 0)
-            .toInt();
+      // For organizers, calculate from activities
+      if (user != null && (user['isOrganisator'] == true || user['userType'] == 'Organisateur')) {
+        final activities = await ActivityService.getActivities();
+        final mine = activities.where((a) {
+          final orgId = (a.organisateur?['_id'] ?? a.organisateur?['id'] ?? '')
+              .toString();
+          return orgId == (user?['_id'] ?? '').toString();
+        }).toList();
+        reservationsCount = mine.fold<int>(0, (p, a) => p + a.nombreReservations);
+        reviewsCount = mine.fold<int>(0, (p, a) => p + a.nombreAvis);
+        debugPrint('Organizer stats - reservations: $reservationsCount, reviews: $reviewsCount');
+      } else {
+        // For tourists, check if viewing own profile
+        try {
+          final currentUserId = await AuthService.getUserId();
+          debugPrint('Current user ID: $currentUserId, Profile user ID: ${user?['_id']}');
+          
+          if (user?['_id'] == currentUserId) {
+            // Viewing own profile - use getMyBookings
+            final bookings = await InscriptionService.getMyBookings();
+            reservationsCount = (bookings['pending']?.length ?? 0) +
+                (bookings['confirmed']?.length ?? 0) +
+                (bookings['cancelled']?.length ?? 0);
+            debugPrint('Own profile bookings: $reservationsCount');
+          } else {
+            // Viewing other tourist's profile - no backend endpoint available
+            debugPrint('Viewing other tourist profile - no booking data available');
+            reservationsCount = 0;
+          }
+        } catch (e) {
+          debugPrint('Error loading tourist bookings: $e');
+          reservationsCount = 0;
+        }
+        reviewsCount = (user?['nombreAvis'] as num? ?? 0).toInt();
+        debugPrint('Tourist stats - reservations: $reservationsCount, reviews: $reviewsCount');
       }
-      reviewsCount = (user?['nombreAvis'] as num? ?? 0).toInt();
-      recent = activities;
-    }
 
-    if (!mounted) return;
-    setState(() {
-      _user = user;
-      _favoritesCount = favoritesCount;
-      _reservationsCount = reservationsCount;
-      _reviewsCount = reviewsCount;
-      _recentActivities = recent;
-      _loading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _user = user;
+        _postsCount = userPosts.length;
+        _reservationsCount = reservationsCount;
+        _reviewsCount = reviewsCount;
+        _posts = userPosts;
+        _loading = false;
+      });
+      debugPrint('Profile loaded - posts: $_postsCount, reservations: $_reservationsCount, reviews: $_reviewsCount');
+    } catch (e) {
+      debugPrint('Error loading profile data: $e');
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   String _resolveUrl(String? raw) {
@@ -119,9 +153,16 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
   String _coverImageUrl() {
     final direct = _resolveUrl(_user?['coverImage']?.toString());
     if (direct.isNotEmpty) return direct;
-    if (_recentActivities.isNotEmpty &&
-        _recentActivities.first.photos.isNotEmpty) {
-      return _resolveUrl(_recentActivities.first.photos.first);
+    if (_posts.isNotEmpty) {
+      final post = _posts.first;
+      final imageUrls = post['imageUrls'] as List?;
+      if (imageUrls != null && imageUrls.isNotEmpty) {
+        return _resolveUrl(imageUrls.first.toString());
+      }
+      final imageUrl = post['imageUrl']?.toString();
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return _resolveUrl(imageUrl);
+      }
     }
     return '';
   }
@@ -132,8 +173,7 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
         .map((e) => e.toString().trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    if (items.isNotEmpty) return items;
-    return const ['Water Sports', 'Culture', 'Gastronomy', 'Photography'];
+    return items;
   }
 
   Future<void> _handleContact() async {
@@ -175,8 +215,8 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
         ? 'Passionate traveler'
         : user!['bio'].toString().trim();
 
-    final postsCount = _recentActivities.length;
-    final gridItems = _recentActivities.take(6).toList();
+    final postsCount = _posts.length;
+    final gridItems = _posts.take(6).toList();
     final extraCount = postsCount > 6 ? postsCount - 6 : 0;
 
     return Scaffold(
@@ -306,8 +346,8 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                                 ),
                                 Expanded(
                                   child: _statItem(
-                                    _favoritesCount.toString(),
-                                    'FAVORITES',
+                                    _postsCount.toString(),
+                                    'POSTS',
                                   ),
                                 ),
                                 Container(
@@ -463,24 +503,17 @@ class _PublicUserProfileScreenState extends State<PublicUserProfileScreen> {
                                   ),
                               itemCount: gridItems.length,
                               itemBuilder: (ctx, i) {
-                                final activity = gridItems[i];
-                                final imageUrl = activity.photos.isNotEmpty
-                                    ? _resolveUrl(activity.photos.first)
-                                    : '';
+                                final post = gridItems[i];
+                                final imageUrls = post['imageUrls'] as List?;
+                                final imageUrl = imageUrls != null && imageUrls.isNotEmpty
+                                    ? _resolveUrl(imageUrls.first.toString())
+                                    : _resolveUrl(post['imageUrl']?.toString());
                                 final isLast = i == gridItems.length - 1;
                                 final showPlus = extraCount > 0 && isLast;
 
                                 return GestureDetector(
                                   onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ActivityDetailScreen(
-                                          activityId: activity.id,
-                                          viewOnly: true,
-                                        ),
-                                      ),
-                                    );
+                                    // Navigate to post detail if needed
                                   },
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),

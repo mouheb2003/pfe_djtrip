@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/onboarding/user_type_selection_screen.dart';
 import '../screens/organizer/waiting_approval_screen.dart';
 import '../screens/organizer/organizer_main_screen.dart';
 import '../screens/shared/not_found_screen.dart';
 import '../screens/shared/public_organizer_profile_screen.dart';
+import '../screens/shared/public_profile_screen.dart';
 import '../screens/shared/public_tourist_profile_screen.dart';
 import '../screens/tourist/tourist_main_screen.dart';
 import '../screens/welcome_screen.dart';
@@ -16,6 +18,7 @@ class AppRoutes {
   static const String welcome = '/welcome';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String userTypeSelection = '/user_type_selection';
   static const String waitingApproval = '/waiting_approval';
   static const String home = '/home';
   static const String touristMain = '/tourist/main';
@@ -50,36 +53,39 @@ class AppRoutes {
           builder: (_) => const SignupScreen(),
           settings: settings,
         );
+      case userTypeSelection:
+        return MaterialPageRoute(
+          builder: (_) => const UserTypeSelectionScreen(),
+          settings: settings,
+        );
       case waitingApproval:
         return MaterialPageRoute(
           builder: (_) => const WaitingApprovalScreen(),
           settings: settings,
         );
       case touristMain:
+        final initialIndex = settings.arguments is Map
+            ? (settings.arguments as Map)['initialIndex'] as int? ?? 0
+            : 0;
         return MaterialPageRoute(
-          builder: (_) => const TouristMainScreen(),
+          builder: (_) => TouristMainScreen(initialIndex: initialIndex),
           settings: settings,
         );
       case organizerMain:
+        final initialIndex = settings.arguments is Map
+            ? (settings.arguments as Map)['initialIndex'] as int? ?? 0
+            : 0;
         return MaterialPageRoute(
-          builder: (_) => const OrganizerMainScreen(),
+          builder: (_) => OrganizerMainScreen(initialIndex: initialIndex),
           settings: settings,
         );
       default:
         final name = settings.name ?? '';
         if (name.startsWith(profilePrefix)) {
-          final uri = Uri.tryParse(name);
           final id = name.substring(profilePrefix.length).split('?').first;
-          final type = uri?.queryParameters['type'] ?? 'tourist';
           if (id.isNotEmpty) {
-            if (type == 'organizer') {
-              return MaterialPageRoute(
-                builder: (_) => PublicOrganizerProfileScreen(organizerId: id),
-                settings: settings,
-              );
-            }
             return MaterialPageRoute(
-              builder: (_) => PublicUserProfileScreen(userId: id),
+              builder: (_) => PublicProfileScreen(userId: id),
               settings: settings,
             );
           }

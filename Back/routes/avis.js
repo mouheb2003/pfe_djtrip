@@ -20,13 +20,18 @@ router.get(
   avisController.getOrganisateurRatings,
 );
 
+// Get all reviews submitted by a tourist (public)
+router.get(
+  "/touriste/:touristeId",
+  avisController.getTouristeReviews,
+);
+
 // ─── Authenticated tourist routes ─────────────────────────────────────────────
 // Check if I already reviewed a specific activity
 router.get(
   "/my-review/activite/:activiteId",
   verifyToken,
   verifyTouriste,
-  cacheGet("avis:my-review", 60),
   avisController.getMyActivityReview,
 );
 
@@ -55,6 +60,15 @@ router.post(
   verifyTouriste,
   invalidateCache(["avis", "activites", "organisators"]),
   avisController.submitOrganisateurRating,
+);
+
+// Update own review/rating (tourist only)
+router.put(
+  "/:avisId",
+  verifyToken,
+  verifyTouriste,
+  invalidateCache(["avis", "activites", "organisators"]),
+  avisController.updateAvis,
 );
 
 // Delete own review/rating (tourist only)

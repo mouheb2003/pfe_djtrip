@@ -104,13 +104,41 @@ class BookingService {
         body = {};
       }
 
+      // Handle duplicate review error
+      if (response.statusCode == 400) {
+        return {
+          'success': false,
+          'message': body['message'] ?? 'You have already reviewed this activity',
+          'isDuplicate': true,
+        };
+      }
+
+      // Mark booking as reviewed after successful submission
+      if (response.statusCode == 201) {
+        await markBookingAsReviewed(bookingId);
+      }
+
       return {
         'success': response.statusCode == 201,
         'message': body['message'] ?? 'Unable to submit review',
         'review': body['review'] ?? body['avis'],
+        'isDuplicate': false,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to submit review right now.'};
+      return {
+        'success': false,
+        'message': 'Unable to submit review right now.',
+        'isDuplicate': false,
+      };
+    }
+  }
+
+  static Future<bool> markBookingAsReviewed(String bookingId) async {
+    try {
+      final response = await ApiClient.patch('/inscriptions/$bookingId/reviewed', {});
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 

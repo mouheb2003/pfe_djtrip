@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "613813916532",
+    "project_id": "djtrip-de515",
+    "storage_bucket": "djtrip-de515.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613813916532:android:7c8067a95a05331a591221",
+        "android_client_info": {
+          "package_name": "com.djtrip.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "613813916532-kk3646477mvadspi6r3mtd4fmfna7m6o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtwd16mlZnZsAqYGfL6ahlrDomqk45suE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "613813916532-kk3646477mvadspi6r3mtd4fmfna7m6o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

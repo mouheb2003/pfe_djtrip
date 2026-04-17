@@ -16,7 +16,6 @@ const {
 router.get(
   "/",
   verifyToken,
-  cacheGet("notifications:user", 30),
   notificationController.getUserNotifications,
 );
 

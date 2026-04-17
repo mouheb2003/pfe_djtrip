@@ -1,55 +1,41 @@
 /// OAuth Configuration for Google and Facebook
 ///
-/// IMPORTANT: The Google Web Client ID (serverClientId) is REQUIRED for mobile OAuth
-/// This is the SAME Client ID used in your backend (.env GOOGLE_CLIENT_ID)
+/// IMPORTANT:
+/// The Google Web Client ID (serverClientId) is REQUIRED for mobile OAuth.
+/// This must match your backend GOOGLE_CLIENT_ID (.env file).
 ///
-/// Get from Google Cloud Console: https://console.cloud.google.com
-/// - Project → Credentials → OAuth 2.0 Client IDs
-/// - Look for "Web application" type (format: xxxxx.apps.googleusercontent.com)
+/// Get it from:
+/// https://console.cloud.google.com
+/// Project → Credentials → OAuth 2.0 Client IDs
+/// Use the "Web application" client ID
 ///
-/// You can pass it via environment variable:
+/// You can also pass it via:
 /// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=your-id.apps.googleusercontent.com
-///
-/// Or replace the default value below.
 
 class OAuthConfig {
-  /// Google OAuth Server Client ID (Web Application from Google Cloud Console)
-  /// This is CRITICAL for getting ID tokens in mobile apps
-  /// Must match the GOOGLE_CLIENT_ID in Backend .env file
-  static const String googleServerClientId = String.fromEnvironment(
-    'GOOGLE_SERVER_CLIENT_ID',
-    // Backend Web Client ID - Get this from Google Cloud Console
-    defaultValue:
-        '510642344687-bbik9oh3gcb74aakqbrnuie8h1hhbhsm.apps.googleusercontent.com',
-  );
+  /// Google Web Client ID (Web Application from Google Cloud Console)
+  /// Must match backend GOOGLE_CLIENT_ID
+  static const String googleServerClientId =
+      '488329502891-h71m67eo5hmk36q81ds4kkkd6kc3c0ot.apps.googleusercontent.com';
 
-  /// Facebook App ID
-  static const String facebookAppId = String.fromEnvironment(
-    'FACEBOOK_APP_ID',
-    defaultValue: '1234567890', // Replace with your Facebook App ID
-  );
-
-  /// Validate configuration
+  /// Google configuration validation
   static bool get isGoogleConfigured => googleServerClientId.isNotEmpty;
-  static bool get isFacebookConfigured => facebookAppId.isNotEmpty;
 
-  /// Debug helper - Call this in main.dart to verify setup
+  /// Debug helper
   static void printConfig() {
     print('\n🔐 ═══════════════════════════════════════════════════════');
     print('   OAuth Configuration Status');
     print('═══════════════════════════════════════════════════════');
+
     print(
-      '   Google Server Client ID: ${isGoogleConfigured ? "✓ Configured" : "✗ MISSING (REQUIRED)"}',
+      '   Google Server Client ID: '
+      '${isGoogleConfigured ? "✓ Configured" : "✗ MISSING"}',
     );
+
     if (!isGoogleConfigured) {
-      print('   ⚠️  Google login will FAIL! Set via:');
-      print(
-        '       flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=your-id.apps.googleusercontent.com',
-      );
+      print('   ⚠️ Google login will FAIL!');
     }
-    print(
-      '   Facebook App ID: ${isFacebookConfigured ? "✓ Configured" : "⚠️  Optional"}',
-    );
+
     print('═══════════════════════════════════════════════════════\n');
   }
 }

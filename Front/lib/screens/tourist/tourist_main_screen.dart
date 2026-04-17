@@ -7,11 +7,17 @@ import 'tabs/explore_tab.dart';
 import 'tabs/screen_network.dart';
 import 'tabs/tourist_profile_tab.dart';
 import '../shared/messages_screen.dart';
+import '../shared/notification_history_screen.dart';
 import '../../services/lieu_service.dart';
 import '../../services/post_service.dart';
 import '../../services/message_service.dart';
 import '../../services/inscription_service.dart';
 import '../../services/novelty_badge_service.dart';
+import '../../services/review_reminder_service.dart' as review_service;
+import '../../models/inscription_model.dart';
+import '../../models/activity_model.dart';
+import '../../models/booking_model.dart';
+import '../shared/review_prompt_modal.dart';
 
 class TouristMainScreen extends StatefulWidget {
   final int initialIndex;
@@ -52,6 +58,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onExploreTap: () => _goToTab(1),
         onMessagesTap: () => _goToTab(5),
         onActivitiesTap: () => _goToTab(2),
+        onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       ),
       const ExploreTab(),
@@ -65,12 +72,64 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     _noveltyTimer = Timer.periodic(_noveltyRefreshInterval, (_) {
       _refreshNoveltyBadges();
     });
+
+    // Check for pending review popups after a short delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        _checkAndShowReviewPopup();
+      });
+    });
   }
 
   @override
   void dispose() {
     _noveltyTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkAndShowReviewPopup() async {
+    if (!mounted) return;
+
+    try {
+      final pendingReview = await review_service.ReviewReminderService.getNextPendingReview();
+      if (pendingReview == null) return;
+
+      final booking = pendingReview['booking'] as InscriptionModel;
+      final activity = pendingReview['activity'] as ActivityModel;
+
+      // Convert InscriptionModel to BookingModel for ReviewPromptModal
+      final bookingModel = BookingModel(
+        id: booking.id,
+        activityId: booking.activite?['_id'] ?? '',
+        touristeId: booking.touriste?['_id'] ?? '',
+        organisateurId: booking.organisateur?['_id'] ?? '',
+        statut: booking.statut,
+        createdAt: booking.dateDemande ?? DateTime.now(),
+        dateReservation: booking.dateDemande ?? DateTime.now(),
+        nombreParticipants: booking.nombreParticipants,
+        prixTotal: booking.prixTotal,
+        checkedIn: booking.qrUsedAt != null,
+        hasReviewed: false,
+        activity: booking.activite,
+        touriste: booking.touriste,
+      );
+
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ReviewPromptModal(
+          booking: bookingModel,
+          activity: activity,
+        ),
+      );
+
+      // Mark as shown after popup is closed
+      await review_service.ReviewReminderService.markAsShown(booking.id);
+    } catch (e) {
+      print('[TouristMainScreen] Error showing review popup: $e');
+    }
   }
 
   Future<String> _buildHomeSignature() async {
@@ -165,6 +224,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
           onExploreTap: () => _goToTab(1),
           onMessagesTap: () => _goToTab(5),
           onActivitiesTap: () => _goToTab(2),
+          onNotificationsTap: () => _openNotifications(),
           showMessagesDot: _showMessagesDot,
         );
       });
@@ -202,9 +262,19 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onExploreTap: () => _goToTab(1),
         onMessagesTap: () => _goToTab(5),
         onActivitiesTap: () => _goToTab(2),
+        onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       );
     });
+  }
+
+  void _openNotifications() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const NotificationHistoryScreen(),
+      ),
+    );
   }
 
   @override

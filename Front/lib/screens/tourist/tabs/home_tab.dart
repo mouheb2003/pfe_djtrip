@@ -8,6 +8,7 @@ import '../../../services/place_service.dart';
 import '../../../services/activity_service.dart';
 import '../place_detail_screen.dart';
 import '../place_detail_new_screen.dart';
+import '../../shared/activity_detail_screen.dart';
 import '../view_all_activities_screen.dart';
 import '../view_all_places_screen.dart';
 import '../../shared/activity_card.dart';
@@ -18,6 +19,7 @@ class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
   final VoidCallback? onActivitiesTap;
+  final VoidCallback? onNotificationsTap;
   final bool showMessagesDot;
 
   const HomeTab({
@@ -25,6 +27,7 @@ class HomeTab extends StatefulWidget {
     required this.onExploreTap,
     required this.onMessagesTap,
     this.onActivitiesTap,
+    this.onNotificationsTap,
     this.showMessagesDot = false,
   });
 
@@ -41,10 +44,16 @@ class _HomeTabState extends State<HomeTab> {
   List<LieuModel> _visibleLieux = [];
   List<LieuModel> _topDestinations = [];
   List<ActivityModel> _topActivities = [];
+  List<ActivityModel> _allActivities = [];
   bool _isLoading = true;
   bool _isFetching = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  bool _showSuggestions = false;
+  List<Map<String, dynamic>> _searchSuggestions = [];
+
+ 
 
   static const String _heroImage =
       'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
@@ -58,6 +67,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -69,22 +79,20 @@ class _HomeTabState extends State<HomeTab> {
       final lieux = await LieuService.getLieux();
       print('[DEBUG] Fetched ${lieux.length} lieux');
       for (var lieu in lieux.take(3)) {
-        print(
-          '[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
-        );
+        print('[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
       }
 
-      // Fetch top activities from best organizers
+      // Fetch all activities
       final activities = await ActivityService.getActivities();
       print('[DEBUG] Fetched ${activities.length} activities');
 
-      // Filter upcoming activities and sort by organizer rating
+      // Filter upcoming activities and sort by organizer rating for display
       final now = DateTime.now();
       final upcomingActivities = activities.where((activity) {
         return activity.isUpcoming;
       }).toList();
 
-      // Sort by rating (highest first) and take top 10
+      // Sort by rating (highest first) and take top 10 for display
       upcomingActivities.sort((a, b) {
         final ratingA = a.noteMoyenne;
         final ratingB = b.noteMoyenne;
@@ -98,6 +106,7 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _lieux = lieux;
           _topActivities = topActivities;
+          _allActivities = activities; // Store all activities for search
           _isLoading = false;
         });
       }
@@ -123,7 +132,7 @@ class _HomeTabState extends State<HomeTab> {
 
   List<LieuModel> get _filteredVisibleLieux {
     List<LieuModel> items = _lieux;
-
+    
     // Apply search filter if search query is not empty
     if (_searchQuery.isNotEmpty) {
       items = items.where((lieu) {
@@ -132,20 +141,18 @@ class _HomeTabState extends State<HomeTab> {
         final description = lieu.description.toLowerCase();
         final category = lieu.categorie.toLowerCase();
         return title.contains(_searchQuery) ||
-            subtitle.contains(_searchQuery) ||
-            description.contains(_searchQuery) ||
-            category.contains(_searchQuery);
+               subtitle.contains(_searchQuery) ||
+               description.contains(_searchQuery) ||
+               category.contains(_searchQuery);
       }).toList();
     }
-
+    
     return items;
   }
 
   List<LieuModel> get _topDestinationsList {
     final items = List<LieuModel>.from(_filteredVisibleLieux);
-    print(
-      '[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}',
-    );
+    print('[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}');
     // D'abord prioriser les top destinations, puis trier par rating
     items.sort((a, b) {
       if (a.topDestination && !b.topDestination) return -1;
@@ -156,9 +163,7 @@ class _HomeTabState extends State<HomeTab> {
     final result = items.take(6).toList();
     print('[DEBUG] _topDestinations count: ${result.length}');
     for (var lieu in result.take(3)) {
-      print(
-        '[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
-      );
+      print('[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
     }
     return result;
   }
@@ -167,6 +172,88 @@ class _HomeTabState extends State<HomeTab> {
     final items = [..._visibleLieux];
     items.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
     return items.take(5).toList();
+  }
+
+  void _updateSearchSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _searchSuggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    final suggestions = <Map<String, dynamic>>[];
+    final lowerQuery = query.toLowerCase();
+
+    // Add lieux suggestions
+    for (var lieu in _lieux) {
+      if (lieu.titre.toLowerCase().contains(lowerQuery)) {
+        suggestions.add({
+          'type': 'lieu',
+          'id': lieu.id,
+          'title': lieu.titre,
+          'subtitle': lieu.sousTitre,
+          'image': lieu.displayImage,
+          'rating': lieu.noteMoyenne,
+        });
+        if (suggestions.length >= 5) break;
+      }
+    }
+
+    // Add activities suggestions if still need more (search through ALL activities)
+    if (suggestions.length < 5) {
+      for (var activity in _allActivities) {
+        if (activity.titre.toLowerCase().contains(lowerQuery)) {
+          suggestions.add({
+            'type': 'activity',
+            'id': activity.id,
+            'title': activity.titre,
+            'subtitle': activity.description,
+            'image': activity.photos.isNotEmpty ? activity.photos.first : '',
+            'rating': activity.noteMoyenne,
+          });
+          if (suggestions.length >= 5) break;
+        }
+      }
+    }
+
+    setState(() {
+      _searchSuggestions = suggestions;
+      _showSuggestions = suggestions.isNotEmpty;
+    });
+  }
+
+  void _selectSuggestion(Map<String, dynamic> suggestion) {
+    _searchController.text = suggestion['title'];
+    _searchFocusNode.unfocus();
+    setState(() {
+      _searchQuery = suggestion['title'].toLowerCase();
+      _showSuggestions = false;
+    });
+
+    // Navigate to the appropriate screen based on type
+    if (suggestion['type'] == 'lieu') {
+      final lieu = _lieux.firstWhere((l) => l.id == suggestion['id']);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PlaceDetailNewScreen(
+            place: lieu,
+          ),
+        ),
+      );
+    } else if (suggestion['type'] == 'activity') {
+      // Navigate to activity detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ActivityDetailScreen(
+            activityId: suggestion['id'],
+          ),
+        ),
+      );
+    }
   }
 
   Map<String, dynamic> _toPlaceMap(LieuModel l) {
@@ -187,6 +274,7 @@ class _HomeTabState extends State<HomeTab> {
     };
   }
 
+  
   Widget _buildFilterButton(String text, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -219,6 +307,7 @@ class _HomeTabState extends State<HomeTab> {
               backgroundImage: _heroImage,
               onExploreTap: widget.onExploreTap,
               onMessagesTap: widget.onMessagesTap,
+              onNotificationsTap: widget.onNotificationsTap,
               showMessagesDot: widget.showMessagesDot,
             ),
             Transform.translate(
@@ -235,58 +324,154 @@ class _HomeTabState extends State<HomeTab> {
                     const SizedBox(height: 18),
                     const SizedBox(height: 20),
                     // Barre de recherche fonctionnelle
-                    Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
+                    SizedBox(
+                      height: _showSuggestions ? 280 : 50,
+                      child: Stack(
+                        children: [
+                          Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              focusNode: _searchFocusNode,
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value.toLowerCase();
+                                });
+                                _updateSearchSuggestions(value);
+                              },
+                              onTap: () {
+                                if (_searchController.text.isNotEmpty) {
+                                  _updateSearchSuggestions(_searchController.text);
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Search destinations, activities...',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 14,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  color: Color(0xFF6B7280),
+                                  size: 20,
+                                ),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(
+                                          Icons.clear,
+                                          color: Color(0xFF6B7280),
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                            _showSuggestions = false;
+                                          });
+                                        },
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 15,
+                                ),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value.toLowerCase();
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Search destinations...',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 14,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            color: Color(0xFF6B7280),
-                            size: 20,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Icons.clear,
-                                    color: Color(0xFF6B7280),
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                    });
+                          if (_showSuggestions)
+                            Positioned(
+                              top: 60,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: _searchSuggestions.length,
+                                  itemBuilder: (context, index) {
+                                    final suggestion = _searchSuggestions[index];
+                                    return ListTile(
+                                      leading: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          suggestion['image'] ?? '',
+                                          width: 48,
+                                          height: 48,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: 48,
+                                              height: 48,
+                                              color: Colors.grey[300],
+                                              child: const Icon(Icons.place),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      title: Text(
+                                        suggestion['title'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        suggestion['subtitle'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.star,
+                                            size: 14,
+                                            color: Colors.amber[600],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            suggestion['rating']?.toStringAsFixed(1) ?? '0.0',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      onTap: () => _selectSuggestion(suggestion),
+                                    );
                                   },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 15,
-                          ),
-                        ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -307,8 +492,7 @@ class _HomeTabState extends State<HomeTab> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    const ViewAllPlacesScreen(),
+                                builder: (context) => const ViewAllPlacesScreen(),
                               ),
                             );
                           },
@@ -399,9 +583,7 @@ class _HomeTabState extends State<HomeTab> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7EB),
-                              ),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
                             ),
                             child: const Center(
                               child: Column(
@@ -429,11 +611,8 @@ class _HomeTabState extends State<HomeTab> {
                             height: 180,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _topActivities.length > 5
-                                  ? 5
-                                  : _topActivities.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
+                              itemCount: _topActivities.length > 5 ? 5 : _topActivities.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 12),
                               itemBuilder: (context, index) {
                                 final activity = _topActivities[index];
                                 return Container(
@@ -450,74 +629,45 @@ class _HomeTabState extends State<HomeTab> {
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         flex: 3,
                                         child: ClipRRect(
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(16),
-                                              ),
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                                           child: Stack(
                                             children: [
                                               Container(
                                                 width: double.infinity,
                                                 height: double.infinity,
                                                 color: const Color(0xFFF3F4F6),
-                                                child:
-                                                    activity.imageUrl.isNotEmpty
+                                                child: activity.imageUrl.isNotEmpty
                                                     ? Image.network(
                                                         activity.imageUrl,
                                                         fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (
-                                                              _,
-                                                              __,
-                                                              ___,
-                                                            ) => const Center(
-                                                              child: Icon(
-                                                                Icons.event,
-                                                                color: Color(
-                                                                  0xFF9CA3AF,
-                                                                ),
-                                                              ),
-                                                            ),
+                                                        errorBuilder: (_, __, ___) => const Center(
+                                                          child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
+                                                        ),
                                                       )
                                                     : const Center(
-                                                        child: Icon(
-                                                          Icons.event,
-                                                          color: Color(
-                                                            0xFF9CA3AF,
-                                                          ),
-                                                        ),
+                                                        child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
                                                       ),
                                               ),
                                               Positioned(
                                                 top: 8,
                                                 right: 8,
                                                 child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withOpacity(0.7),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
+                                                    color: Colors.black.withOpacity(0.7),
+                                                    borderRadius: BorderRadius.circular(8),
                                                   ),
                                                   child: Text(
                                                     '${activity.noteMoyenne.toStringAsFixed(1)}',
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                                      fontWeight: FontWeight.w600,
                                                     ),
                                                   ),
                                                 ),
@@ -531,8 +681,7 @@ class _HomeTabState extends State<HomeTab> {
                                         child: Padding(
                                           padding: const EdgeInsets.all(10),
                                           child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 activity.title,
@@ -546,8 +695,7 @@ class _HomeTabState extends State<HomeTab> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                activity.organisateur?['name'] ??
-                                                    'Unknown',
+                                                activity.organisateur?['name'] ?? 'Unknown',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
@@ -610,12 +758,14 @@ class _HomeHero extends StatelessWidget {
   final String backgroundImage;
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
+  final VoidCallback? onNotificationsTap;
   final bool showMessagesDot;
 
   const _HomeHero({
     required this.backgroundImage,
     required this.onExploreTap,
     required this.onMessagesTap,
+    this.onNotificationsTap,
     required this.showMessagesDot,
   });
 
@@ -661,7 +811,10 @@ class _HomeHero extends StatelessWidget {
                         showDot: showMessagesDot,
                       ),
                       const SizedBox(width: 12),
-                      const _HeroIcon(icon: Icons.notifications_none),
+                      _HeroIcon(
+                        icon: Icons.notifications_none,
+                        onTap: onNotificationsTap ?? () {},
+                      ),
                     ],
                   ),
                   const Spacer(),
@@ -881,9 +1034,7 @@ class _TopDestinationCard extends StatelessWidget {
             Expanded(
               flex: 3,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 child: Stack(
                   children: [
                     Image.network(
@@ -902,10 +1053,7 @@ class _TopDestinationCard extends StatelessWidget {
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(12),
@@ -913,11 +1061,7 @@ class _TopDestinationCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Color(0xFFFFC529),
-                              size: 12,
-                            ),
+                            const Icon(Icons.star, color: Color(0xFFFFC529), size: 12),
                             const SizedBox(width: 4),
                             Text(
                               '${lieu.noteMoyenne.toStringAsFixed(1)}',

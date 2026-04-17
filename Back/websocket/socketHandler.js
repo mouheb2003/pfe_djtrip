@@ -117,6 +117,15 @@ class SocketHandler {
         this.handleActivityUpdated(socket, data);
       });
       
+      // Comment events
+      socket.on('comment:subscribe', (data) => {
+        this.handleCommentSubscribe(socket, data);
+      });
+      
+      socket.on('comment:unsubscribe', (data) => {
+        this.handleCommentUnsubscribe(socket, data);
+      });
+      
       // Dashboard events
       socket.on('dashboard:subscribe', (data) => {
         this.handleDashboardSubscribe(socket, data);
@@ -237,6 +246,72 @@ class SocketHandler {
     });
     
     logger.info('Activity updated event emitted', { activityId: data.activityId });
+  }
+  
+  /**
+   * Handle comment subscription (join post room)
+   */
+  handleCommentSubscribe(socket, data) {
+    const { postId } = data;
+    
+    if (postId) {
+      socket.join(`post:${postId}`);
+      
+      socket.emit('comment:subscribed', {
+        postId,
+        timestamp: new Date()
+      });
+      
+      logger.info('Comment subscription', { 
+        userId: socket.userId, 
+        postId 
+      });
+    }
+  }
+  
+  /**
+   * Handle comment unsubscription (leave post room)
+   */
+  handleCommentUnsubscribe(socket, data) {
+    const { postId } = data;
+    
+    if (postId) {
+      socket.leave(`post:${postId}`);
+      
+      socket.emit('comment:unsubscribed', {
+        postId,
+        timestamp: new Date()
+      });
+      
+      logger.info('Comment unsubscription', { 
+        userId: socket.userId, 
+        postId 
+      });
+    }
+  }
+  
+  /**
+   * Emit comment created event to post room
+   */
+  emitCommentCreated(postId, comment) {
+    this.io.to(`post:${postId}`).emit('comment:created', comment);
+    logger.info('Comment created event emitted', { postId, commentId: comment._id });
+  }
+  
+  /**
+   * Emit comment deleted event to post room
+   */
+  emitCommentDeleted(postId, commentId) {
+    this.io.to(`post:${postId}`).emit('comment:deleted', { commentId });
+    logger.info('Comment deleted event emitted', { postId, commentId });
+  }
+  
+  /**
+   * Emit comment updated event to post room
+   */
+  emitCommentUpdated(postId, comment) {
+    this.io.to(`post:${postId}`).emit('comment:updated', comment);
+    logger.info('Comment updated event emitted', { postId, commentId: comment._id });
   }
   
   /**

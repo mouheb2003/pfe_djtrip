@@ -13,14 +13,31 @@ class InscriptionServiceImproved {
   static Future<Map<String, dynamic>> validateQrBookingWithRetry(String qrData) async {
     int retryCount = 0;
 
+    print('[QR SERVICE] Starting validation for QR: $qrData');
+
     while (retryCount <= _maxRetries) {
       try {
+        print('[QR SERVICE] Attempt ${retryCount + 1} of ${_maxRetries + 1}');
+        
         final res = await ApiClient.post('/inscriptions/qr/validate', {
           'qrData': qrData,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            print('[QR SERVICE] Request timed out after 10 seconds');
+            throw Exception('Request timeout');
+          },
+        );
+
+        print('[QR SERVICE] Status code: ${res.statusCode}');
+        print('[QR SERVICE] Response body: ${res.body}');
 
         if (res.statusCode == 200) {
           final body = _decodeObject(res.body);
+          print('[QR SERVICE] Parsed body: $body');
+          print('[QR SERVICE] Success: ${body['success']}');
+          print('[QR SERVICE] Data: ${body['data']}');
+          
           return {
             'success': true,
             'statusCode': res.statusCode,
@@ -30,6 +47,7 @@ class InscriptionServiceImproved {
           };
         } else if (res.statusCode >= 500) {
           // Server error, retry
+          print('[QR SERVICE] Server error, retrying...');
           retryCount++;
           if (retryCount <= _maxRetries) {
             await Future.delayed(_retryDelay * retryCount);
@@ -39,6 +57,8 @@ class InscriptionServiceImproved {
 
         // Client error or max retries exceeded
         final body = _decodeObject(res.body);
+        print('[QR SERVICE] Error response: $body');
+        
         return {
           'success': false,
           'statusCode': res.statusCode,
@@ -46,15 +66,21 @@ class InscriptionServiceImproved {
           'code': body['code'],
         };
       } catch (e) {
+        print('[QR SERVICE] Exception: $e');
+        print('[QR SERVICE] Exception type: ${e.runtimeType}');
+        
         retryCount++;
         if (retryCount <= _maxRetries) {
+          print('[QR SERVICE] Retrying in ${_retryDelay.inSeconds * retryCount} seconds...');
           await Future.delayed(_retryDelay * retryCount);
           continue;
         }
 
         // Check if offline
         if (e.toString().contains('SocketException') || 
-            e.toString().contains('NetworkException')) {
+            e.toString().contains('NetworkException') ||
+            e.toString().contains('timeout')) {
+          print('[QR SERVICE] Network error detected');
           return {
             'success': false,
             'statusCode': 0,

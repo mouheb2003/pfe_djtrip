@@ -88,7 +88,7 @@ class OnboardingService {
   // Update user type (for Google signup users)
   static Future<Map<String, dynamic>> updateUserType(String userType) async {
     try {
-      final response = await ApiClient.put('/api/v1/users/me', {
+      final response = await ApiClient.put('$_baseUrl/user-type', {
         'userType': userType,
       });
       

@@ -28,12 +28,6 @@ router.post(
 // POST /signin - Login user
 router.post("/signin", validate(signInSchema), userController.signIn);
 
-// POST /auth/google - Authenticate with Google
-router.post("/auth/google", userController.googleAuth);
-
-// POST /auth/facebook - Authenticate with Facebook
-router.post("/auth/facebook", userController.facebookAuth);
-
 // POST /forgot-password - Send password reset code
 router.post(
   "/forgot-password",
@@ -100,6 +94,20 @@ router.put(
   verifyToken,
   invalidateCache(["users", "users:me", "posts"]),
   userController.updateProfile,
+);
+
+// POST /me/fcm-token - Add or update FCM token for push notifications (protected route)
+router.post(
+  "/me/fcm-token",
+  verifyToken,
+  userController.addFcmToken,
+);
+
+// DELETE /me/fcm-token/:deviceId - Remove FCM token for push notifications (protected route)
+router.delete(
+  "/me/fcm-token/:deviceId",
+  verifyToken,
+  userController.removeFcmToken,
 );
 
 // PUT /me/avatar - Update current user avatar (protected route)

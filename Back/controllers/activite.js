@@ -59,6 +59,8 @@ exports.createActivite = async (req, res) => {
       date_fin,
       dateFin,
       statut,
+      ai_generated_image_url,
+      aiGeneratedImageUrl,
     } = req.body;
 
     // Parse JSON fields that may come as strings from multipart/form-data
@@ -95,6 +97,14 @@ exports.createActivite = async (req, res) => {
           error: uploadError.message,
         });
       }
+    }
+
+    // Add AI-generated image URL if provided
+    const aiImageUrl = ai_generated_image_url || aiGeneratedImageUrl;
+    console.log("🤖 AI-generated image URL received:", aiImageUrl);
+    if (aiImageUrl && aiImageUrl.length > 0) {
+      console.log("🤖 Adding AI-generated image URL:", aiImageUrl);
+      photosUrls.push(aiImageUrl);
     }
 
     // Create the new activity
@@ -293,7 +303,10 @@ exports.updateActivite = async (req, res) => {
     }
 
     // Verify the user owns the activity
-    if (activite.organisateur_id.toString() !== userId) {
+    const activityOrganizerId = activite.organisateur_id.toString().trim();
+    const userIdString = String(userId).trim();
+    
+    if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to modify this activity",
       });
@@ -306,6 +319,9 @@ exports.updateActivite = async (req, res) => {
         message: "Cannot modify a completed activity",
       });
     }
+
+    console.log('📦 Full req.body keys:', Object.keys(req.body));
+    console.log('📦 Full req.body:', req.body);
 
     // Support both camelCase (from frontend) and snake_case
     const {
@@ -331,6 +347,10 @@ exports.updateActivite = async (req, res) => {
       dateFin,
       statut,
       keepExistingPhotos, // "true" to keep existing photos and add the new ones
+      ai_generated_image_url,
+      aiGeneratedImageUrl,
+      existing_photo_urls,
+      existingPhotoUrls,
     } = req.body;
 
     // Parse JSON fields that may come as strings from multipart/form-data
@@ -352,6 +372,17 @@ exports.updateActivite = async (req, res) => {
         parsedEquipementsInclus = JSON.parse(equipements_inclus);
       } catch (e) {
         parsedEquipementsInclus = [equipements_inclus];
+      }
+    }
+
+    let parsedExistingPhotoUrls = existing_photo_urls || existingPhotoUrls;
+    const existingPhotoUrlsProvided = (existing_photo_urls !== undefined || existingPhotoUrls !== undefined);
+    if (parsedExistingPhotoUrls !== undefined && typeof parsedExistingPhotoUrls === "string") {
+      try {
+        parsedExistingPhotoUrls = JSON.parse(parsedExistingPhotoUrls);
+      } catch (e) {
+        console.warn("⚠️ Failed to parse existing_photo_urls:", e);
+        parsedExistingPhotoUrls = [];
       }
     }
 
@@ -394,9 +425,14 @@ exports.updateActivite = async (req, res) => {
           await ActiviteService.uploadMultipleImages(fileBuffers);
         console.log("✅ New photos uploaded successfully:", newPhotosUrls);
 
+        // Use parsed existing photo URLs if provided, otherwise use activity's current photos
+        const basePhotos = parsedExistingPhotoUrls && parsedExistingPhotoUrls.length > 0
+          ? parsedExistingPhotoUrls
+          : (activite.photos || []);
+
         // If keepExistingPhotos is true, append new photos to existing ones
         if (keepExistingPhotos === "true" || keepExistingPhotos === true) {
-          updateData.photos = [...(activite.photos || []), ...newPhotosUrls];
+          updateData.photos = [...basePhotos, ...newPhotosUrls];
         } else {
           // Otherwise, replace all photos
           updateData.photos = newPhotosUrls;
@@ -408,6 +444,24 @@ exports.updateActivite = async (req, res) => {
           error: uploadError.message,
         });
       }
+    } else {
+      // If no new photos uploaded, check if existing_photo_urls was provided
+      if (existingPhotoUrlsProvided) {
+        // Field was provided - use it (even if empty to delete all photos)
+        console.log("📸 Using provided existing photo URLs (may be empty):", parsedExistingPhotoUrls || []);
+        updateData.photos = parsedExistingPhotoUrls || [];
+      } else {
+        // Field not provided - keep existing photos
+        console.log("📸 No new photos uploaded, keeping existing photos");
+        updateData.photos = activite.photos || [];
+      }
+    }
+
+    // Add AI-generated image URL if provided (and not already in photos)
+    const aiImageUrl = ai_generated_image_url || aiGeneratedImageUrl;
+    if (aiImageUrl && aiImageUrl.length > 0 && !updateData.photos.includes(aiImageUrl)) {
+      console.log("🤖 Adding AI-generated image URL to update:", aiImageUrl);
+      updateData.photos.push(aiImageUrl);
     }
 
     const activiteUpdated = await Activite.findByIdAndUpdate(
@@ -452,7 +506,10 @@ exports.deleteActivite = async (req, res) => {
     }
 
     // Verify the user owns the activity
-    if (activite.organisateur_id.toString() !== userId) {
+    const activityOrganizerId = activite.organisateur_id.toString().trim();
+    const userIdString = String(userId).trim();
+    
+    if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to delete this activity",
       });

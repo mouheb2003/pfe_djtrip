@@ -1,5 +1,25 @@
 const mongoose = require("mongoose");
 
+const postReactionSchema = new mongoose.Schema(
+  {
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["like", "love", "laugh", "wow", "sad", "angry"],
+      required: true,
+    },
+    created_at: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 const postSchema = new mongoose.Schema(
   {
     author_id: {
@@ -62,6 +82,15 @@ const postSchema = new mongoose.Schema(
         },
       ],
       default: [],
+    },
+    reactions: {
+      type: [postReactionSchema],
+      default: [],
+    },
+    total_reactions: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     comments_count: {
       type: Number,

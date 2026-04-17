@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/fcm_notification_service.dart';
 import '../../services/onboarding_service.dart';
-import 'forgot_password_screen.dart';
+import '../../services/navigation_service.dart';
 import 'email_verification_screen.dart';
+import 'forgot_password_screen.dart';
 import 'onboarding_screen.dart';
+import '../onboarding/user_type_selection_screen.dart';
 import '../organizer/waiting_approval_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,22 +37,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadRememberedEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('remembered_email');
+    final storage = FlutterSecureStorage();
+    final savedEmail = await storage.read(key: 'remembered_email');
     if (savedEmail != null && savedEmail.isNotEmpty) {
+      final savedPassword = await storage.read(key: 'remembered_password');
       setState(() {
         _emailCtrl.text = savedEmail;
+        if (savedPassword != null && savedPassword.isNotEmpty) {
+          _passwordCtrl.text = savedPassword;
+        }
         _rememberMe = true;
+      });
+    } else {
+      setState(() {
+        _rememberMe = false;
       });
     }
   }
 
-  Future<void> _saveRememberedEmail(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _saveRememberedEmail(String email, String password) async {
+    final storage = FlutterSecureStorage();
     if (_rememberMe) {
-      await prefs.setString('remembered_email', email);
+      await storage.write(key: 'remembered_email', value: email);
+      await storage.write(key: 'remembered_password', value: password);
     } else {
-      await prefs.remove('remembered_email');
+      await storage.delete(key: 'remembered_email');
+      await storage.delete(key: 'remembered_password');
     }
   }
 
@@ -99,11 +112,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        await _saveRememberedEmail(email);
+        await _saveRememberedEmail(email, password);
         final user = result['user'] as Map<String, dynamic>?;
         final userType = user?['userType'] as String? ?? 'Touriste';
 
-        // 🚀 NEW: Handle email verification flow
+        // � Send FCM token to backend for push notifications
+        try {
+          await FcmNotificationService().sendTokenToBackend();
+        } catch (e) {
+          debugPrint('Error sending FCM token: $e');
+          // Don't block login if FCM fails
+        }
+
+        // �🚀 NEW: Handle email verification flow
         if (result['emailVerified'] == false) {
           Navigator.pushReplacement(
             context,
@@ -118,14 +139,27 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         // 🚀 NEW: Handle onboarding flow
-        final bool is_onboarded = user?['is_onboarded'] ?? true;
-        if (!is_onboarded) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OnboardingScreen(userType: userType),
-            ),
-          );
+        final bool requiresOnboarding = result['requires_onboarding'] ?? false;
+        final bool skipUserTypeSelection = result['skip_user_type_selection'] ?? true;
+
+        if (requiresOnboarding) {
+          if (skipUserTypeSelection) {
+            // Account exists with a type, go directly to onboarding
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OnboardingScreen(userType: userType),
+              ),
+            );
+          } else {
+            // New account, show user type selection first
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UserTypeSelectionScreen(),
+              ),
+            );
+          }
           return;
         }
 
@@ -180,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
               top: 10,
               left: 10,
               child: IconButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.splash),
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: Color(0xFF1F2937),
@@ -296,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               builder: (_) => const ForgotPasswordScreen(),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Forgot password?',
                             style: TextStyle(
                               color: AppColors.primary,
@@ -383,7 +417,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             context,
                             AppRoutes.signup,
                           ),
-                          child: const Text(
+                          child: Text(
                             "Sign Up",
                             style: TextStyle(
                               color: AppColors.primary,
@@ -428,7 +462,7 @@ class _LoginScreenState extends State<LoginScreen> {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w500,
         ),
@@ -436,13 +470,13 @@ class _LoginScreenState extends State<LoginScreen> {
           hintText: hint,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
           suffixIcon: suffixIcon,
-          hintStyle: const TextStyle(color: AppColors.textLight),
+          hintStyle: TextStyle(color: AppColors.textLight),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+            borderSide: BorderSide(color: AppColors.primary, width: 1.5),
           ),
         ),
       ),

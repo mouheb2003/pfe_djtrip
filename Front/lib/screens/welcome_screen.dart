@@ -226,35 +226,49 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: _isLoading ? null : _handleGoogleLogin,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (_isLoading)
-                                const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.primary,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_isLoading)
+                                  const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                else ...[
+                                  Image.network(
+                                    'https://www.google.com/favicon.ico',
+                                    height: 20,
+                                    width: 20,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.g_mobiledata,
+                                        color: Color(0xFF4285F4),
+                                        size: 20,
+                                      );
+                                    },
                                   ),
-                                )
-                              else ...[
-                                Image.network(
-                                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png',
-                                  height: 20,
-                                  width: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Continue with Google',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1F2937),
+                                  const SizedBox(width: 12),
+                                  const Flexible(
+                                    child: Text(
+                                      'Continue with Google',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),

@@ -106,18 +106,6 @@ exports.signUp = async (req, res) => {
     delete userResponse.verificationCode;
     delete userResponse.verificationCodeExpiry;
 
-    try {
-      await createActivityLog({
-        actorId: user._id,
-        action: "user_signup",
-        targetType: "auth",
-        targetId: user._id,
-        templateKey: "user_signup",
-      });
-    } catch (logError) {
-      console.warn("Activity log failed for signUp:", logError.message);
-    }
-
     res.status(201).json({
       message: "User registered successfully. Please verify your email.",
       accessToken,
@@ -371,23 +359,14 @@ exports.signIn = async (req, res) => {
     delete userResponse.verificationCode;
     delete userResponse.verificationCodeExpiry;
 
-    try {
-      await createActivityLog({
-        actorId: user._id,
-        action: "user_login",
-        targetType: "auth",
-        targetId: user._id,
-        templateKey: "user_login",
-      });
-    } catch (logError) {
-      console.warn("Activity log failed for signIn:", logError.message);
-    }
-
     res.status(200).json({
       message: "Login successful",
       accessToken,
       refreshToken,
       user: userResponse,
+      requires_onboarding: !user.is_onboarded,
+      skip_user_type_selection: true, // Email login skips user type selection (account already has type)
+      is_new_user: false, // Email login is always for existing users
     });
   } catch (err) {
     res.status(500).json({ message: "Error signing in", error: err.message });
@@ -415,8 +394,35 @@ exports.googleAuth = async (req, res) => {
         audience: process.env.GOOGLE_CLIENT_ID,
       });
     } catch (error) {
+      // Provide more specific error messages for common OAuth issues
+      const errorMessage = error.message?.toLowerCase() || '';
+
+      if (errorMessage.includes('wrong audience') || errorMessage.includes('audience')) {
+        return res.status(401).json({
+          message: "Google token audience mismatch. Check GOOGLE_CLIENT_ID configuration.",
+          error: "invalid_client",
+          details: error.message,
+        });
+      }
+
+      if (errorMessage.includes('invalid token') || errorMessage.includes('token')) {
+        return res.status(401).json({
+          message: "Invalid or expired Google token. Please try signing in again.",
+          error: "invalid_token",
+          details: error.message,
+        });
+      }
+
+      if (errorMessage.includes('access') || errorMessage.includes('blocked')) {
+        return res.status(403).json({
+          message: "Google access blocked. Please check your Google account permissions.",
+          error: "access_blocked",
+          details: error.message,
+        });
+      }
+
       return res.status(401).json({
-        message: "Invalid Google token",
+        message: "Google authentication failed",
         error: error.message,
       });
     }
@@ -434,12 +440,81 @@ exports.googleAuth = async (req, res) => {
       });
     }
 
+    // Validate that email is verified by Google
+    if (!isEmailVerified) {
+      return res.status(400).json({
+        message: "Email must be verified by Google to sign in. Please verify your email in your Google account.",
+        error: "email_not_verified",
+      });
+    }
+
     let user = await User.findOne({
       $or: [{ googleId }, { email }],
     });
     const isExistingUser = Boolean(user);
 
+    console.log(`[GOOGLE AUTH] Email: ${email}, Google ID: ${googleId}`);
+    console.log(`[GOOGLE AUTH] Found user: ${isExistingUser}, User ID: ${user?._id}, User Type: ${user?.userType}`);
+
     if (isExistingUser) {
+      // Restore expired suspensions before checking status
+      await restoreExpiredSuspensions({ userId: user._id });
+      user = await User.findById(user._id);
+      if (!user) {
+        return res.status(401).json({ message: "User not found after suspension check" });
+      }
+
+      // Check for lockout
+      if (user.lockUntil && user.lockUntil > Date.now()) {
+        const remainingSeconds = Math.ceil((user.lockUntil - Date.now()) / 1000);
+        return res.status(423).json({
+          message: "Account temporarily locked.",
+          remainingSeconds,
+        });
+      }
+
+      // Check account status
+      if (user.accountStatus === "suspended") {
+        const remainingSeconds = user.suspendedUntil
+          ? Math.max(
+              0,
+              Math.ceil(
+                (new Date(user.suspendedUntil).getTime() - Date.now()) / 1000,
+              ),
+            )
+          : null;
+
+        const suspendedUntilISO = user.suspendedUntil
+          ? new Date(user.suspendedUntil).toISOString()
+          : null;
+
+        return res.status(403).json({
+          type: "suspended",
+          forceLogout: true,
+          message: user.suspendReason
+            ? `Account is suspended: ${user.suspendReason}`
+            : "Account is suspended. Please contact support.",
+          reason: user.suspendReason || null,
+          suspendedUntil: suspendedUntilISO,
+          remainingSeconds,
+        });
+      }
+
+      if (user.accountStatus === "banned") {
+        return res.status(403).json({
+          message: user.banReason
+            ? `Account is banned: ${user.banReason}`
+            : "Account is banned. Please contact support.",
+          reason: user.banReason || null,
+        });
+      }
+
+      if (user.accountStatus === "inactive") {
+        return res
+          .status(403)
+          .json({ message: "Account is inactive. Please contact support." });
+      }
+
       if (!user.googleId) user.googleId = googleId;
       if (isEmailVerified && !user.emailVerified) user.emailVerified = true;
       if (!user.avatar && avatar) user.avatar = avatar;
@@ -453,7 +528,7 @@ exports.googleAuth = async (req, res) => {
         googleId,
         avatar,
         emailVerified: isEmailVerified,
-        userType: "Touriste", // Default for Google signup, will be updated during onboarding
+        userType: null, // No default type for Google signup - user selects via UserTypeSelectionScreen
         signup_method: "google",
         is_onboarded: false, // Google signup requires onboarding
         accountStatus: "active",
@@ -461,6 +536,16 @@ exports.googleAuth = async (req, res) => {
       });
       await user.save();
     }
+
+    // Force cleanup before login - mark all users as offline except this one
+    console.log(
+      `🧹 [GOOGLE AUTH] Forcing cleanup before login for user ${user._id}...`,
+    );
+    await User.updateMany(
+      { _id: { $ne: user._id }, isOnline: true },
+      { isOnline: false },
+    );
+    console.log(`✅ [GOOGLE AUTH] Marked all other users as offline`);
 
     await UserService.updateOnlineStatus(user._id, true);
 
@@ -476,18 +561,6 @@ exports.googleAuth = async (req, res) => {
     delete userResponse.googleId;
     delete userResponse.facebookId;
 
-    try {
-      await createActivityLog({
-        actorId: user._id,
-        action: "user_login",
-        targetType: "auth",
-        targetId: user._id,
-        templateKey: "user_login",
-      });
-    } catch (logError) {
-      console.warn("Activity log failed for googleAuth:", logError.message);
-    }
-
     return res.status(200).json({
       message: isExistingUser
         ? "Google sign-in successful"
@@ -496,7 +569,7 @@ exports.googleAuth = async (req, res) => {
       refreshToken,
       user: userResponse,
       requires_onboarding: !user.is_onboarded,
-      skip_user_type_selection: false, // Google signup shows user type selection
+      skip_user_type_selection: isExistingUser && Boolean(user.userType), // Skip if existing user has userType
       is_new_user: !isExistingUser
     });
   } catch (err) {
@@ -579,18 +652,6 @@ exports.facebookAuth = async (req, res) => {
     delete userResponse.mot_de_passe;
     delete userResponse.googleId;
     delete userResponse.facebookId;
-
-    try {
-      await createActivityLog({
-        actorId: user._id,
-        action: "user_login",
-        targetType: "auth",
-        targetId: user._id,
-        templateKey: "user_login",
-      });
-    } catch (logError) {
-      console.warn("Activity log failed for facebookAuth:", logError.message);
-    }
 
     return res.status(200).json({
       message: isExistingUser
@@ -813,6 +874,30 @@ exports.updateProfile = async (req, res) => {
     }
     res.status(500).json({
       message: "Error updating profile",
+      error: err.message,
+    });
+  }
+};
+
+// Update FCM token (PUT /users/me/fcm-token)
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({ message: "FCM token is required" });
+    }
+
+    const User = require("../models/user");
+    await User.findByIdAndUpdate(userId, { fcmToken });
+
+    res.status(200).json({
+      message: "FCM token updated successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: "Error updating FCM token",
       error: err.message,
     });
   }
@@ -1431,18 +1516,6 @@ exports.logout = async (req, res) => {
       $inc: { tokenVersion: 1 },
     });
 
-    try {
-      await createActivityLog({
-        actorId: userId,
-        action: "user_logout",
-        targetType: "auth",
-        targetId: userId,
-        templateKey: "user_logout",
-      });
-    } catch (logError) {
-      console.warn("Activity log failed for logout:", logError.message);
-    }
-
     console.log(`🎯 [LOGOUT] User ${userId} logout completed successfully`);
     res.status(200).json({ message: "Logout successful" });
   } catch (err) {
@@ -1476,6 +1549,8 @@ exports.verifyEmail = async (req, res) => {
     res.status(200).json({
       message: "Email verified successfully",
       emailVerified: true,
+      requires_onboarding: !verifiedUser.is_onboarded,
+      skip_user_type_selection: true, // Email signup skips user type selection (type already selected in signup form)
     });
   } catch (err) {
     // Handle specific errors
@@ -1585,6 +1660,86 @@ exports.deleteUser = async (req, res) => {
     console.error("❌ Error deleting user:", err);
     res.status(500).json({
       message: "Error deleting user",
+      error: err.message,
+    });
+  }
+};
+
+// Add or update FCM token (POST /users/me/fcm-token)
+exports.addFcmToken = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { token, deviceId } = req.body;
+
+    if (!token || !deviceId) {
+      return res.status(400).json({ message: "Token and deviceId are required" });
+    }
+
+    const fcmTokenService = require('../services/fcmTokenService');
+    const result = await fcmTokenService.addFcmToken(userId, token, deviceId);
+
+    // Check for unread messages after re-login
+    if (result.success) {
+      try {
+        const Message = require("../models/message");
+        const notificationService = require("../services/notificationServiceV2");
+
+        const unreadMessages = await Message.find({
+          receiver_id: userId,
+          is_read: false,
+        }).sort({ createdAt: -1 }).limit(5);
+
+        if (unreadMessages.length > 0) {
+          console.log(`📬 Found ${unreadMessages.length} unread messages for user ${userId} after re-login`);
+
+          const mostRecent = unreadMessages[0];
+          const sender = await User.findById(mostRecent.sender_id).select("fullname");
+
+          await notificationService.sendPushNotification({
+            userId: userId,
+            title: `Nouveau message de ${sender?.fullname || "Quelqu'un"}`,
+            body: mostRecent.content?.substring(0, 100) || "Vous avez un nouveau message",
+            data: {
+              type: "new_message",
+              senderId: mostRecent.sender_id,
+            },
+            notificationType: "message",
+            priority: "medium",
+          });
+        }
+      } catch (notifError) {
+        console.error("❌ Error checking/sending unread message notifications:", notifError);
+      }
+    }
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("❌ Error adding FCM token:", err);
+    res.status(500).json({
+      message: "Error adding FCM token",
+      error: err.message,
+    });
+  }
+};
+
+// Remove FCM token (DELETE /users/me/fcm-token)
+exports.removeFcmToken = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { deviceId } = req.params;
+
+    if (!deviceId) {
+      return res.status(400).json({ message: "DeviceId is required" });
+    }
+
+    const fcmTokenService = require('../services/fcmTokenService');
+    const result = await fcmTokenService.logout(userId, deviceId);
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("❌ Error removing FCM token:", err);
+    res.status(500).json({
+      message: "Error removing FCM token",
       error: err.message,
     });
   }

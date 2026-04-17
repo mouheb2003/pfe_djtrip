@@ -88,12 +88,20 @@ exports.invalidateCache = (patterns = []) => {
   const values = Array.isArray(patterns) ? patterns : [patterns];
 
   return (req, res, next) => {
+    console.log('[CACHE invalidateCache] Starting with patterns:', patterns);
     res.on("finish", async () => {
       if (res.statusCode >= 400) return;
-      await Promise.all(
-        values.map((pattern) => cacheService.delByPattern(pattern)),
-      );
+      try {
+        await Promise.all(
+          values.map((pattern) => cacheService.delByPattern(pattern).catch(err => {
+            console.warn('[CACHE] Failed to invalidate pattern:', pattern, err.message);
+          })),
+        );
+      } catch (error) {
+        console.warn('[CACHE] Cache invalidation error:', error.message);
+      }
     });
+    console.log('[CACHE invalidateCache] Passing to next');
     next();
   };
 };

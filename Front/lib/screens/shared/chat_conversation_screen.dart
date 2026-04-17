@@ -13,7 +13,7 @@ import '../../services/api_client.dart';
 import '../../services/message_service.dart';
 import '../../services/navigation_service.dart';
 import '../../theme/app_theme.dart';
-import 'public_organizer_profile_screen.dart';
+import 'public_profile_screen.dart';
 import 'voice_call_screen.dart';
 import 'video_call_screen.dart';
 import '../organizer/map_picker_screen.dart';
@@ -71,6 +71,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   // 🚀 SIMPLIFIED: Simple online status tracking
   bool _partnerOnline = false;
+  Timer? _statusUpdateDebounce;
 
   // ✅ ADDED
   void _disposeSocket() {
@@ -129,6 +130,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _audioRecorder.dispose();
     _recordTicker?.cancel();
     _stopAutoRefresh();
+    _statusUpdateDebounce?.cancel();
     _msgCtrl.dispose();
     _msgFocus.dispose();
     _scrollCtrl.dispose();
@@ -549,7 +551,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       _pushSocketMessage(data);
     });
 
-    // 🚀 CRITICAL: Proper user status handling
+    // 🚀 CRITICAL: Proper user status handling with debounce
     socket.on('user_status', (data) {
       print('📡 [ChatScreen] Received user_status: $data');
       if (!mounted) return;
@@ -570,12 +572,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         print(
           '✅ [ChatScreen] UPDATING PARTNER STATUS to online=$isOnline at $timestamp',
         );
-        setState(() {
-          _partnerOnline = isOnline;
+        
+        // 🚀 FIX: Debounce status updates to prevent excessive setState calls
+        _statusUpdateDebounce?.cancel();
+        _statusUpdateDebounce = Timer(const Duration(milliseconds: 500), () {
+          if (!mounted) return;
+          setState(() {
+            _partnerOnline = isOnline;
+          });
+          print(
+            '✅ [ChatScreen] State updated. New _partnerOnline=$_partnerOnline',
+          );
         });
-        print(
-          '✅ [ChatScreen] State updated. New _partnerOnline=$_partnerOnline',
-        );
       } else {
         print('❌ [ChatScreen] User ID mismatch, ignoring status update');
       }
@@ -615,6 +623,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   void _pushSocketMessage(dynamic data, {bool forceMine = false}) {
     if (!mounted) return;
     if (data is! Map) return;
+    
+    // 🔧 FIX: Wait for current user ID to be loaded before processing messages
+    if (_currentUserId == null) return;
 
     final sender = (data['sender_id'] ?? '').toString();
     final receiver = (data['receiver_id'] ?? '').toString();
@@ -773,7 +784,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
   }
 
-  String _formatClock(DateTime time) {
+  String _formatClock(DateTime? time) {
+    if (time == null) return '';
     final h = time.hour.toString().padLeft(2, '0');
     final m = time.minute.toString().padLeft(2, '0');
     return '$h:$m';
@@ -1383,23 +1395,35 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             color: cs.onSurface,
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: cs.surfaceVariant,
-            backgroundImage: partnerAvatarProvider,
-            child: partnerAvatarProvider == null
-                ? Icon(Icons.person, color: cs.onSurfaceVariant, size: 18)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          GestureDetector(
+            onTap: () {
+              if (!widget.isSupportChat && !_isDjTripAdminThread) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PublicProfileScreen(userId: widget.partnerId),
+                  ),
+                );
+              }
+            },
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: cs.surfaceVariant,
+                  backgroundImage: partnerAvatarProvider,
+                  child: partnerAvatarProvider == null
+                      ? Icon(Icons.person, color: cs.onSurfaceVariant, size: 18)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 200),
                       child: Text(
                         headerTitle,
                         style: TextStyle(
@@ -1407,18 +1431,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           fontWeight: FontWeight.w700,
                           color: cs.onSurface,
                         ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (showAdminIdentity) ...[
-                      const SizedBox(width: 8),
-                      _adminBadge(),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
+                    const SizedBox(height: 2),
                     Text(
                       _partnerOnline ? 'Online' : 'Offline',
                       style: TextStyle(
@@ -1427,26 +1444,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (showAdminIdentity) ...[
-                      const SizedBox(width: 8),
-                      const Text(
-                        ' \u2022 ',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      const Text(
-                        'No-reply chat',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ],
             ),
           ),
+          const Spacer(),
+          if (!widget.isSupportChat && !_isWarningInboxMode) ...[
+            IconButton(
+              onPressed: () => _onCallTap(isVideo: false),
+              icon: const Icon(Icons.phone_rounded),
+              color: cs.onSurface,
+              tooltip: 'Voice call',
+            ),
+            IconButton(
+              onPressed: () => _onCallTap(isVideo: true),
+              icon: const Icon(Icons.videocam_rounded),
+              color: cs.onSurface,
+              tooltip: 'Video call',
+            ),
+          ],
           if (showAdminIdentity)
             IconButton(
               onPressed: () {},
@@ -1737,11 +1754,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      if (msg.type == 'text' &&
-                          msg.isEdited &&
-                          msg.editedAt != null)
+                      if (msg.type == 'text' && msg.isEdited && msg.editedAt != null)
                         Text(
-                          '  \u2022  Modified ${_formatClock(msg.editedAt!)}',
+                          '  \u2022  Modified ${_formatClock(msg.editedAt)}',
                           style: TextStyle(
                             color: timeColor,
                             fontSize: 11,
@@ -1750,13 +1765,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         )
                       else if (isMine && msg.isRead && msg.readAt != null)
                         Text(
-                          '  \u2022  Read ${_formatClock(msg.readAt!)}',
+                          '  \u2022  Read ${_formatClock(msg.readAt)}',
                           style: TextStyle(
                             color: timeColor,
                             fontSize: 11,
                             fontWeight: FontWeight.w400,
                           ),
-                        ),
+                        )
                     ],
                   ),
                 ],
@@ -2286,8 +2301,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PublicOrganizerProfileScreen(
-                              organizerId: widget.partnerId,
+                            builder: (_) => PublicProfileScreen(
+                              userId: widget.partnerId,
                             ),
                           ),
                         );

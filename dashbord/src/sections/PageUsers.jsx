@@ -25,7 +25,6 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useSearchParams } from 'src/routes/hooks';
 import {
   getUsers,
   deleteUser,
@@ -146,8 +145,6 @@ function applyFilter({ inputData, comparator, filters }) {
 
 export function UsersView({ sx }) {
   const table = useTable({ defaultOrderBy: 'fullname' });
-  const searchParams = useSearchParams();
-  const selectedUserIdFromQuery = searchParams.get('userId') ?? '';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -165,7 +162,6 @@ export function UsersView({ sx }) {
   const [warningDialogOpen, setWarningDialogOpen] = useState(false);
   const [warningTargetUser, setWarningTargetUser] = useState(null);
   const [warningMessage, setWarningMessage] = useState('');
-  const [openedFromQueryUserId, setOpenedFromQueryUserId] = useState('');
 
   const filters = useSetState({
     query: '',
@@ -191,6 +187,34 @@ export function UsersView({ sx }) {
 
   useEffect(() => {
     fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchUsers();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      fetchUsers();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUsers();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchUsers]);
 
   useEffect(() => {
@@ -230,15 +254,6 @@ export function UsersView({ sx }) {
       setBusyUserId('');
     }
   }, []);
-
-  useEffect(() => {
-    if (!selectedUserIdFromQuery) return;
-    if (loading) return;
-    if (openedFromQueryUserId === selectedUserIdFromQuery) return;
-
-    setOpenedFromQueryUserId(selectedUserIdFromQuery);
-    handleViewDetails(selectedUserIdFromQuery);
-  }, [handleViewDetails, loading, openedFromQueryUserId, selectedUserIdFromQuery]);
 
   const handleOpenWarningDialog = useCallback((user) => {
     setWarningTargetUser(user);

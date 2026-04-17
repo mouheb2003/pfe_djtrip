@@ -51,13 +51,18 @@ class NavigationService {
     _isRedirecting = false;
   }
 
-  static void navigateToOnboarding({String userType = 'Touriste'}) {
+  static Future<void> navigateToOnboarding({String? userType}) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
-    navigator.pushReplacement(
-      MaterialPageRoute(builder: (_) => OnboardingScreen(userType: userType)),
-    );
+    // If no userType provided, navigate to user type selection screen first
+    if (userType == null) {
+      navigator.pushReplacementNamed(AppRoutes.userTypeSelection);
+    } else {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => OnboardingScreen(userType: userType)),
+      );
+    }
   }
 
   static void navigateToWaitingApproval() {
