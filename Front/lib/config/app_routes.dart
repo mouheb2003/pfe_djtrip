@@ -7,6 +7,7 @@ import '../screens/organizer/waiting_approval_screen.dart';
 import '../screens/organizer/organizer_main_screen.dart';
 import '../screens/shared/not_found_screen.dart';
 import '../screens/shared/public_organizer_profile_screen.dart';
+import '../screens/shared/public_profile_screen.dart';
 import '../screens/shared/public_tourist_profile_screen.dart';
 import '../screens/tourist/tourist_main_screen.dart';
 import '../screens/welcome_screen.dart';
@@ -81,19 +82,10 @@ class AppRoutes {
       default:
         final name = settings.name ?? '';
         if (name.startsWith(profilePrefix)) {
-          final uri = Uri.tryParse(name);
           final id = name.substring(profilePrefix.length).split('?').first;
-          final type = uri?.queryParameters['type'] ?? 'tourist';
           if (id.isNotEmpty) {
-            if (type == 'organizer') {
-              return MaterialPageRoute(
-                builder: (_) =>
-                    PublicOrganizerProfileScreen(organizerId: id),
-                settings: settings,
-              );
-            }
             return MaterialPageRoute(
-              builder: (_) => PublicUserProfileScreen(userId: id),
+              builder: (_) => PublicProfileScreen(userId: id),
               settings: settings,
             );
           }

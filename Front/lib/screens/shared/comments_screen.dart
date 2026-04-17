@@ -421,11 +421,42 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
   }
 
   Future<void> _reactToComment(String commentId, String reactionType) async {
-    // Optimistic update - update UI immediately
-    final commentIndex = _comments.indexWhere((c) => c.id == commentId);
-    if (commentIndex == -1) return;
+    debugPrint('Reacting to comment: $commentId with type: $reactionType');
     
-    final oldComment = _comments[commentIndex];
+    // Check if it's a reply or root comment
+    final isReply = _comments.any((c) => c.id != commentId) || 
+                   _repliesMap.values.any((replies) => replies.any((r) => r.id == commentId));
+    
+    // Find the comment in root comments
+    final commentIndex = _comments.indexWhere((c) => c.id == commentId);
+    
+    CommentModel? targetComment;
+    int? targetIndex;
+    String? parentCommentId;
+    
+    if (commentIndex != -1) {
+      // It's a root comment
+      targetComment = _comments[commentIndex];
+      targetIndex = commentIndex;
+    } else {
+      // It's a reply - find it in the replies map
+      for (final entry in _repliesMap.entries) {
+        final replyIndex = entry.value.indexWhere((r) => r.id == commentId);
+        if (replyIndex != -1) {
+          targetComment = entry.value[replyIndex];
+          targetIndex = replyIndex;
+          parentCommentId = entry.key;
+          break;
+        }
+      }
+    }
+    
+    if (targetComment == null) {
+      debugPrint('Comment not found: $commentId');
+      return;
+    }
+    
+    final oldComment = targetComment;
     
     // Toggle reaction locally
     final currentReaction = oldComment.userReaction;
@@ -447,22 +478,32 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
       });
     }
     
+    final updatedComment = CommentModel(
+      id: oldComment.id,
+      postId: widget.postId,
+      content: oldComment.content,
+      authorId: oldComment.authorId,
+      authorName: oldComment.authorName,
+      authorAvatar: oldComment.authorAvatar,
+      createdAt: oldComment.createdAt,
+      updatedAt: oldComment.updatedAt,
+      reactions: newReactions,
+      totalReactions: newTotalReactions,
+      userReaction: isRemoving ? null : reactionType,
+      parentCommentId: oldComment.parentCommentId,
+    );
+    
     // Update UI immediately
     setState(() {
-      _comments[commentIndex] = CommentModel(
-        id: oldComment.id,
-        postId: widget.postId,
-        content: oldComment.content,
-        authorId: oldComment.authorId,
-        authorName: oldComment.authorName,
-        authorAvatar: oldComment.authorAvatar,
-        createdAt: oldComment.createdAt,
-        updatedAt: oldComment.updatedAt,
-        reactions: newReactions,
-        totalReactions: newTotalReactions,
-        userReaction: isRemoving ? null : reactionType,
-        parentCommentId: oldComment.parentCommentId,
-      );
+      if (parentCommentId != null) {
+        // It's a reply - update in replies map
+        final replies = List<CommentModel>.from(_repliesMap[parentCommentId] ?? []);
+        replies[targetIndex!] = updatedComment;
+        _repliesMap[parentCommentId] = replies;
+      } else {
+        // It's a root comment
+        _comments[commentIndex] = updatedComment;
+      }
     });
     
     HapticFeedback.lightImpact();
@@ -470,13 +511,21 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     // Send to server in background
     try {
       await PostService.reactToComment(commentId, reactionType);
+      debugPrint('Reaction successful');
       // Reload to sync with server state
       await _loadComments();
     } catch (e) {
+      debugPrint('Error reacting to comment: $e');
       // Revert on error
       if (mounted) {
         setState(() {
-          _comments[commentIndex] = oldComment;
+          if (parentCommentId != null) {
+            final replies = List<CommentModel>.from(_repliesMap[parentCommentId] ?? []);
+            replies[targetIndex!] = oldComment;
+            _repliesMap[parentCommentId] = replies;
+          } else {
+            _comments[commentIndex] = oldComment;
+          }
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

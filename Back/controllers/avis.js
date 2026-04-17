@@ -3,6 +3,31 @@ const Activite = require("../models/activite");
 const Organisator = require("../models/organisator");
 const Inscription = require("../models/inscription");
 
+// ─── GET /avis/touriste/:touristeId ─────────────────────────────────────────
+// Get all reviews submitted by a tourist (public)
+exports.getTouristeReviews = async (req, res) => {
+  try {
+    const { touristeId } = req.params;
+    
+    const reviews = await Avis.find({ touriste_id: touristeId })
+      .populate('activite_id', 'titre')
+      .populate('organisateur_id', 'fullname')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      count: reviews.length,
+      avis: reviews,
+    });
+  } catch (error) {
+    console.error('Error fetching tourist reviews:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching reviews' 
+    });
+  }
+};
+
 // ─── Helper: recalculate and persist activity stats ─────────────────────────
 async function refreshActiviteStats(activiteId) {
   const all = await Avis.find({ activite_id: activiteId, type: "activite" });

@@ -5,7 +5,7 @@ import '../../../services/inscription_service.dart';
 import '../../../services/activity_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../shared/chat_conversation_screen.dart';
-import '../../shared/public_tourist_profile_screen.dart';
+import '../../shared/public_profile_screen.dart';
 import '../verify_booking_screen.dart';
 
 // ── IMAGE UTILITIES ────────────────────────────────────────────────────────
@@ -509,22 +509,8 @@ class _RequestCard extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PublicUserProfileScreen(
+        builder: (_) => PublicProfileScreen(
           userId: participantId,
-          canContact: true,
-          onContact: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatConversationScreen(
-                  partnerId: participantId,
-                  partnerName: _participantName,
-                  partnerAvatar: _participantAvatar,
-                  partnerType: 'Tourist',
-                ),
-              ),
-            );
-          },
         ),
       ),
     );

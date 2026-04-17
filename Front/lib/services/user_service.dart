@@ -234,9 +234,16 @@ class UserService {
   }
 
   /// Get user by ID
-  static Future<Map<String, dynamic>?> getUserById(String userId) async {
+  static Future<Map<String, dynamic>?> getUserById(String userId, {bool forceRefresh = false}) async {
     try {
       _devLog('👤 [GET_USER] Fetching user $userId...');
+
+      if (forceRefresh) {
+        // Invalidate cache for this user before fetching
+        CacheManager.instance.remove('GET:/users/$userId');
+        CacheManager.instance.removeByPattern('GET:/users/$userId*');
+        _devLog('🗑️ [GET_USER] Cache invalidated for user $userId');
+      }
 
       final response = await EnhancedApiService.instance.getCached(
         '$_endpoint/$userId',

@@ -382,6 +382,26 @@ class InscriptionService {
     return {'totalBookings': 0};
   }
 
+  /// Public: get tourist's participated activities count
+  static Future<int> getTouristeParticipatedCount(String touristeId) async {
+    try {
+      final response = await ApiClient.get(
+        '/inscriptions/touriste/$touristeId/count',
+        auth: false,
+        cacheFirst: false,
+      );
+
+      if (response.statusCode == 200) {
+        final data = _decodeObject(response.body);
+        return data['count'] ?? 0;
+      } else {
+        return 0;
+      }
+    } catch (e) {
+      return 0;
+    }
+  }
+
   /// Organizer: get inscription by ID for QR verification
   static Future<InscriptionModel?> getInscriptionById(
     String inscriptionId,

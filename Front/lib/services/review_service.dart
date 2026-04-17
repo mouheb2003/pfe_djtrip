@@ -26,6 +26,31 @@ class ReviewService {
     }
   }
 
+  /// Public: get reviews submitted by a tourist.
+  static Future<Map<String, dynamic>> getTouristeReviews(
+    String touristeId,
+  ) async {
+    try {
+      final res = await ApiClient.get(
+        '/avis/touriste/$touristeId',
+        auth: false,
+        cacheFirst: false,
+      );
+      if (res.statusCode != 200) {
+        return {'success': false, 'count': 0, 'avis': []};
+      }
+
+      final data = jsonDecode(res.body);
+      return {
+        'success': data['success'] ?? false,
+        'count': data['count'] ?? 0,
+        'avis': data['avis'] ?? [],
+      };
+    } catch (_) {
+      return {'success': false, 'count': 0, 'avis': []};
+    }
+  }
+
   /// Public: get activity reviews.
   static Future<List<Map<String, dynamic>>> getActivityReviews(
     String activityId,

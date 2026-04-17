@@ -15,7 +15,7 @@ import '../../theme/app_theme.dart';
 import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
 import 'chat_conversation_screen.dart';
-import 'public_organizer_profile_screen.dart';
+import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
@@ -468,8 +468,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => PublicOrganizerProfileScreen(
-                                  organizerId: orgId,
+                                builder: (_) => PublicProfileScreen(
+                                  userId: orgId,
                                 ),
                               ),
                             );

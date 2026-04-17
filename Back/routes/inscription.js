@@ -40,6 +40,12 @@ router.get(
   inscriptionController.getMyBookings,
 );
 
+// Get public endpoint to get tourist's participated activities count
+router.get(
+  "/touriste/:touristeId/count",
+  inscriptionController.getTouristeParticipatedCount,
+);
+
 // Cancel a registration (Tourist only)
 router.put(
   "/:inscriptionId/annuler",

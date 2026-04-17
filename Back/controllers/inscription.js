@@ -448,6 +448,27 @@ exports.getMyBookings = async (req, res) => {
   }
 };
 
+// Get tourist's participated activities count (public endpoint)
+exports.getTouristeParticipatedCount = async (req, res) => {
+  try {
+    const { touristeId } = req.params;
+    
+    // Count all inscriptions for this tourist (confirmed + cancelled + completed)
+    const count = await Inscription.countDocuments({ touriste_id: touristeId });
+    
+    res.json({
+      success: true,
+      count: count,
+    });
+  } catch (error) {
+    console.error('Error fetching tourist participated count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching participated count',
+    });
+  }
+};
+
 // Get registrations for an organizer (all requests)
 exports.getInscriptionsByOrganisateur = async (req, res) => {
   try {

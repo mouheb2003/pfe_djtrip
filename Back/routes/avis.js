@@ -20,6 +20,12 @@ router.get(
   avisController.getOrganisateurRatings,
 );
 
+// Get all reviews submitted by a tourist (public)
+router.get(
+  "/touriste/:touristeId",
+  avisController.getTouristeReviews,
+);
+
 // ─── Authenticated tourist routes ─────────────────────────────────────────────
 // Check if I already reviewed a specific activity
 router.get(
