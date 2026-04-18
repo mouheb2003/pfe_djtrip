@@ -1,42 +1,53 @@
-import { Outlet } from 'react-router';
-import { lazy, Suspense } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardLayout } from 'src/layouts/dashboard';
-
-import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AuthGuard } from 'src/auth/guard';
 
 // ----------------------------------------------------------------------
 
-const HomePage = lazy(() => import('src/pages/dashboard/Home'));
-const IndexPage = lazy(() => import('src/pages/dashboard/Page1'));
-const LieuxDetailsPage = lazy(() => import('src/pages/dashboard/LieuxDetails'));
-const ActivitiesPage = lazy(() => import('src/pages/dashboard/Activities'));
-const PublicationsPage = lazy(() => import('src/pages/dashboard/Publications'));
-const CommentsPage = lazy(() => import('src/sections/PageComments'));
-const MessagesPage = lazy(() => import('src/pages/dashboard/Messages'));
-const UsersPage = lazy(() => import('src/pages/dashboard/Users'));
-const LogsPage = lazy(() => import('src/pages/dashboard/Logs'));
-const AppealsPage = lazy(() => import('src/pages/dashboard/Appeals'));
-const ApprovalsPage = lazy(() => import('src/pages/dashboard/Approvals'));
-const NotificationsPage = lazy(() => import('src/pages/dashboard/Notifications'));
+import HomePage from 'src/pages/dashboard/Home';
+import IndexPage from 'src/pages/dashboard/Page1';
+import LieuxDetailsPage from 'src/pages/dashboard/LieuxDetails';
+import ActivitiesPage from 'src/pages/dashboard/Activities';
+import PublicationsPage from 'src/pages/dashboard/Publications';
+import MessagesPage from 'src/pages/dashboard/Messages';
+import UsersPage from 'src/pages/dashboard/Users';
+import LogsPage from 'src/pages/dashboard/Logs';
+import AppealsPage from 'src/pages/dashboard/Appeals';
+import ApprovalsPage from 'src/pages/dashboard/Approvals';
 
 // ----------------------------------------------------------------------
 
-const dashboardLayout = () => (
+function DashboardOutlet() {
+  const { pathname } = useLocation();
+
+  return (
   <DashboardLayout>
-    <Suspense fallback={<LoadingScreen />}>
+    <div key={pathname}>
       <Outlet />
-    </Suspense>
+    </div>
   </DashboardLayout>
-);
+  );
+}
+
+function DashboardRouteElement() {
+  if (CONFIG.auth.skip) {
+    return <DashboardOutlet />;
+  }
+
+  return (
+    <AuthGuard>
+      <DashboardOutlet />
+    </AuthGuard>
+  );
+}
 
 export const dashboardRoutes = [
   {
     path: 'dashboard',
-    element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
+    element: <DashboardRouteElement />,
     children: [
       { element: <HomePage />, index: true },
       { path: 'lieux', element: <IndexPage /> },
@@ -44,17 +55,11 @@ export const dashboardRoutes = [
       { path: 'activites', element: <ActivitiesPage /> },
       { path: 'two', element: <ActivitiesPage /> },
       { path: 'publications', element: <PublicationsPage /> },
-      { path: 'comments', element: <CommentsPage /> },
       { path: 'messages', element: <MessagesPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'three', element: <UsersPage /> },
-      { path: 'notifications', element: <NotificationsPage /> },
       { path: 'appeals', element: <AppealsPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
-      {
-        path: 'group',
-        children: [],
-      },
     ],
   },
 ];

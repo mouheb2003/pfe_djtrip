@@ -17,6 +17,13 @@ import { FileThumbnail } from 'src/components/file-thumbnail';
 // ----------------------------------------------------------------------
 
 export function NotificationItem({ notification }) {
+  const iconKey =
+    (notification.type === 'order' && 'ic-order') ||
+    (notification.type === 'chat' && 'ic-chat') ||
+    (notification.type === 'mail' && 'ic-mail') ||
+    (notification.type === 'delivery' && 'ic-delivery') ||
+    'ic-mail';
+
   const renderAvatar = () => (
     <ListItemAvatar>
       {notification.avatarUrl ? (
@@ -35,7 +42,7 @@ export function NotificationItem({ notification }) {
         >
           <Box
             component="img"
-            src={`${CONFIG.assetsDir}/assets/icons/notification/${(notification.type === 'order' && 'ic-order') || (notification.type === 'chat' && 'ic-chat') || (notification.type === 'mail' && 'ic-mail') || (notification.type === 'delivery' && 'ic-delivery')}.svg`}
+            src={`${CONFIG.assetsDir}/assets/icons/notification/${iconKey}.svg`}
             sx={{ width: 24, height: 24 }}
           />
         </Box>

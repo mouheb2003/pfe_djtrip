@@ -49,18 +49,11 @@ export const paths = {
     },
     activites: `${ROOTS.DASHBOARD}/activites`,
     publications: `${ROOTS.DASHBOARD}/publications`,
-    comments: `${ROOTS.DASHBOARD}/comments`,
     messages: `${ROOTS.DASHBOARD}/messages`,
     logs: `${ROOTS.DASHBOARD}/logs`,
-    notifications: `${ROOTS.DASHBOARD}/notifications`,
     appeals: `${ROOTS.DASHBOARD}/appeals`,
     approvals: `${ROOTS.DASHBOARD}/approvals`,
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
-    group: {
-      root: `${ROOTS.DASHBOARD}/group`,
-      five: `${ROOTS.DASHBOARD}/group/five`,
-      six: `${ROOTS.DASHBOARD}/group/six`,
-    },
   },
 };

@@ -6,6 +6,7 @@ import { JWT_STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 10000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -25,6 +26,17 @@ apiClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.code === 'ECONNABORTED') {
+      return Promise.reject(new Error('Request timeout: backend did not respond in time'));
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export async function Get(endpoint, config = {}) {
   const response = await apiClient.get(endpoint, config);

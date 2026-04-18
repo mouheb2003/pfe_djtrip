@@ -653,6 +653,10 @@ exports.getAdminPosts = async (_req, res) => {
       .sort({ createdAt: -1 })
       .limit(200)
       .populate(basePopulate)
+      .populate({
+        path: 'liked_by',
+        select: 'fullname avatar userType',
+      })
       .lean();
 
     return res.status(200).json({ posts });

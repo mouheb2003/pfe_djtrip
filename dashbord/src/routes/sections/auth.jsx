@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router';
+import { Navigate, Outlet } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 
 import { AuthSplitLayout } from 'src/layouts/auth-split';

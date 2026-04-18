@@ -23,6 +23,7 @@ import { useTable, rowInPage, getComparator } from 'src/components/table';
 import { PageHeader } from './Page1/Header';
 import { InvoiceTable } from './Page1/Tableau';
 import { InvoiceFilters } from './Page1/Filter';
+import { LieuDetailsDialog } from './Page1/Components/LieuDetails';
 
 // ----------------------------------------------------------------------
 
@@ -143,6 +144,8 @@ export function BlankView({ title = 'Lieux', sx }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [selectedLieu, setSelectedLieu] = useState(null);
+  const [openLieuDetails, setOpenLieuDetails] = useState(false);
   const [addForm, setAddForm] = useState({
     nom: '',
     type: 'Hebergement',
@@ -185,6 +188,15 @@ export function BlankView({ title = 'Lieux', sx }) {
 
   const handleOpenAddDialog = useCallback(() => {
     setOpenAddDialog(true);
+  }, []);
+
+  const handleOpenLieuDetails = useCallback((lieu) => {
+    setSelectedLieu(lieu);
+    setOpenLieuDetails(true);
+  }, []);
+
+  const handleCloseLieuDetails = useCallback(() => {
+    setOpenLieuDetails(false);
   }, []);
 
   const handleCloseAddDialog = useCallback(() => {
@@ -412,8 +424,11 @@ export function BlankView({ title = 'Lieux', sx }) {
             calculateAverageNote={calculateAverageNote}
             onDeleteRow={handleDeleteRow}
             onDeleteSelected={handleDeleteRows}
+            onViewDetails={handleOpenLieuDetails}
           />
         </Card>
+
+        <LieuDetailsDialog open={openLieuDetails} onClose={handleCloseLieuDetails} lieu={selectedLieu} />
 
         <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
           <DialogTitle>Ajouter un lieu</DialogTitle>

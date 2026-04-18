@@ -325,3 +325,5 @@
 {"timestamp":"2026-04-16 20:51:11","level":"info","message":"Adding FCM token for user 69ab6710f3c2a4172e14a6f0, device android_BE2A.250530.026.D1_1776101136285","service":"djtrip-api","environment":"development"}
 {"timestamp":"2026-04-16 20:51:11","level":"info","message":"Updated existing FCM token for user 69ab6710f3c2a4172e14a6f0, device android_BE2A.250530.026.D1_1776101136285","service":"djtrip-api","environment":"development"}
 {"timestamp":"2026-04-16 20:57:31","level":"info","message":"Adding FCM token for user 69ab6710f3c2a4172e14a6f0, device android_BE2A.250530.026.D1_1776101136285","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-04-18 01:54:42","level":"info","message":"Adding FCM token for user 69ce57b6993712cdcade5d2b, device android_BP41.250822.007_1776472700936","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-04-18 01:54:42","level":"info","message":"Added new FCM token for user 69ce57b6993712cdcade5d2b, device android_BP41.250822.007_1776472700936","service":"djtrip-api","environment":"development"}

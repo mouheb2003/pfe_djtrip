@@ -5,17 +5,20 @@ import { getBackendUrl } from 'src/services/backend';
 
 // ----------------------------------------------------------------------
 
-const axiosInstance = axios.create({ baseURL: CONFIG.serverUrl });
+const axiosInstance = axios.create({
+  baseURL: CONFIG.serverUrl,
+  timeout: 10000,
+});
 
 axiosInstance.interceptors.request.use((config) => {
   config.baseURL = getBackendUrl();
-  
+
   // Add JWT token to headers if available
   const accessToken = sessionStorage.getItem('jwt_access_token');
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
-  
+
   return config;
 });
 

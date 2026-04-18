@@ -16,9 +16,6 @@ import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
-import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
-
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -42,22 +39,15 @@ export function InvoiceTable({
   calculateAverageNote,
   onDeleteRow,
   onDeleteSelected,
+  onViewDetails,
 }) {
   const confirmDialog = useBoolean();
-  const router = useRouter();
 
   const [expandedRows, setExpandedRows] = useState({}); // { [id]: boolean }
 
   const handleToggleExpanded = useCallback((id) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev?.[id] }));
   }, []);
-
-  const handleViewDetails = useCallback(
-    (lieu) => {
-      router.push(paths.dashboard.lieux.details(lieu.id));
-    },
-    [router]
-  );
 
   const renderSecondaryRow = useCallback(
     (row) => {
@@ -223,7 +213,7 @@ export function InvoiceTable({
 
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         <Tooltip title="Voir détails">
-                          <IconButton color="info" onClick={() => handleViewDetails(row)}>
+                          <IconButton color="info" onClick={() => onViewDetails?.(row)}>
                             <Iconify icon="solar:eye-bold" />
                           </IconButton>
                         </Tooltip>

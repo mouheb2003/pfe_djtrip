@@ -22,6 +22,6 @@ export const END_POINT = {
   messageById: (messageId) => buildApiPath(`/messages/${messageId}`),
   systemLogs: buildApiPath('/system-logs'),
   activityLogs: buildApiPath('/logs'),
-  adminComments: buildApiPath('/comments/admin/comments'),
-  adminCommentById: (id) => buildApiPath(`/comments/admin/comments/${id}`),
+  adminComments: buildApiPath('/comments/admin'),
+  adminCommentById: (id) => buildApiPath(`/comments/admin/${id}`),
 };
