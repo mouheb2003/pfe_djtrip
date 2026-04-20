@@ -62,6 +62,7 @@ const notificationPreferencesRoutes = require("./routes/notificationPreferences"
 const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
+const paymentRoutes = require("./routes/payment");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
@@ -98,6 +99,7 @@ if (commentController.initSocketIO) {
 }
 
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
+// Express JSON parser for regular requests
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(responseNormalizer);
@@ -240,6 +242,7 @@ app.get("/", (req, res) => {
       activityLogs: "/api/v1/logs",
       appeals: "/api/v1/appeals",
       notifications: "/api/v1/notifications",
+      payments: "/api/payments",
     },
   });
 });
@@ -264,6 +267,7 @@ app.use("/api/v1/notifications", notificationPreferencesRoutes);
 app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);

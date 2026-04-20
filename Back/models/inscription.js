@@ -24,8 +24,13 @@ const inscriptionSchema = new mongoose.Schema(
     // Registration status
     statut: {
       type: String,
-      enum: ["en_attente", "approuvee", "refusee", "annulee", "verifie"],
+      enum: ["en_attente", "approuvee", "refusee", "annulee", "verifie", "PAID_PENDING_CONFIRMATION"],
       default: "en_attente",
+    },
+    // Reference to payment (for paid bookings)
+    payment_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
     },
     // Number of participants (if the tourist registers multiple people)
     nombre_participants: {

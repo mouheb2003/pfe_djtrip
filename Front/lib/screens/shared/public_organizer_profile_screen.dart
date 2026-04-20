@@ -39,7 +39,7 @@ class _PublicOrganizerProfileScreenState
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     final targetId = widget.organizerId ?? await AuthService.getUserId();
     final currentUserId = await AuthService.getUserId();
     if (targetId == null || targetId.isEmpty) {
@@ -48,7 +48,9 @@ class _PublicOrganizerProfileScreenState
       return;
     }
 
-    final userFuture = UserService.getUserById(targetId);
+    print('[PUBLIC PROFILE] Loading data for targetId: $targetId, forceRefresh: $forceRefresh');
+
+    final userFuture = UserService.getUserById(targetId, forceRefresh: forceRefresh);
     final activitiesFuture = ActivityService.getActivities();
     final reviewsFuture = ReviewService.getOrganizerReviews(targetId);
 
@@ -56,11 +58,16 @@ class _PublicOrganizerProfileScreenState
     final allActivities = await activitiesFuture;
     final reviews = await reviewsFuture;
 
+    print('[PUBLIC PROFILE] User data received: $user');
+    print('[PUBLIC PROFILE] Activities count: ${allActivities.length}, Reviews count: ${reviews.length}');
+
     final mine = allActivities.where((a) {
       final rawId = (a.organisateur?['_id'] ?? a.organisateur?['id'] ?? '')
           .toString();
       return rawId == targetId;
     }).toList();
+
+    print('[PUBLIC PROFILE] Filtered activities count: ${mine.length}');
 
     if (!mounted) return;
     setState(() {
@@ -125,7 +132,17 @@ class _PublicOrganizerProfileScreenState
   }
 
   double _globalRating(Map<String, dynamic> user) {
-    if ((user['noteMoyenne'] ?? 0) > 0) return user['noteMoyenne']!.toDouble();
+    // Try multiple possible field names for rating
+    final rating = user['noteMoyenne'] ?? 
+                   user['note_moyenne'] ?? 
+                   user['rating'] ?? 
+                   user['averageRating'] ??
+                   user['avg_rating'] ??
+                   user['avgRating'] ??
+                   user['moyenne'] ??
+                   user['average'] ?? 0;
+    
+    if (rating > 0) return rating.toDouble();
     if (_activities.isEmpty) return 0;
     final sum = _activities.fold<double>(0, (p, a) => p + a.noteMoyenne);
     return sum / _activities.length;
@@ -192,9 +209,21 @@ class _PublicOrganizerProfileScreenState
     final user = _organizer;
     final avatarUrl = _resolveUrl(user?['avatar']);
     final rating = user == null ? 0.0 : _globalRating(user);
-    final reviewsCount = (user?['nombreAvis'] ?? 0) > 0
-        ? user!['nombreAvis']
+    
+    // Try multiple possible field names for reviews count
+    final userReviewsCount = user?['nombreAvis'] ??
+                             user?['nombre_avis'] ??
+                             user?['reviewsCount'] ??
+                             user?['totalReviews'] ??
+                             user?['review_count'] ??
+                             user?['reviewCount'] ??
+                             user?['avis_count'] ??
+                             user?['avisCount'] ?? 0;
+    
+    final reviewsCount = userReviewsCount > 0
+        ? userReviewsCount
         : (_activities.fold<int>(0, (p, a) => p + a.nombreAvis));
+    
     final headerImageUrl = _headerImageUrl();
     final specialties = _specialties();
 
@@ -233,7 +262,7 @@ class _PublicOrganizerProfileScreenState
           : user == null
           ? const Center(child: Text('Organizer not found.'))
           : RefreshIndicator(
-              onRefresh: _loadData,
+              onRefresh: () => _loadData(forceRefresh: true),
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [

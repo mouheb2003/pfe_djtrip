@@ -30,31 +30,39 @@ exports.getTouristeReviews = async (req, res) => {
 
 // ─── Helper: recalculate and persist activity stats ─────────────────────────
 async function refreshActiviteStats(activiteId) {
-  const all = await Avis.find({ activite_id: activiteId, type: "activite" });
-  const noteMoyenne =
-    all.length > 0
-      ? Math.round((all.reduce((s, a) => s + a.note, 0) / all.length) * 10) / 10
-      : 0;
-  await Activite.findByIdAndUpdate(activiteId, {
-    note_moyenne: noteMoyenne,
-    nombre_avis: all.length,
-  });
+  try {
+    const all = await Avis.find({ activite_id: activiteId, type: "activite" });
+    const noteMoyenne =
+      all.length > 0
+        ? Math.round((all.reduce((s, a) => s + a.note, 0) / all.length) * 10) / 10
+        : 0;
+    await Activite.findByIdAndUpdate(activiteId, {
+      note_moyenne: noteMoyenne,
+      nombre_avis: all.length,
+    });
+  } catch (error) {
+    console.error('[refreshActiviteStats] Error:', error);
+  }
 }
 
 // ─── Helper: recalculate and persist organizer stats ─────────────────────────
 async function refreshOrganisateurStats(organisateurId) {
-  const all = await Avis.find({
-    organisateur_id: organisateurId,
-    type: "organisateur",
-  });
-  const noteMoyenne =
-    all.length > 0
-      ? Math.round((all.reduce((s, a) => s + a.note, 0) / all.length) * 10) / 10
-      : 0;
-  await Organisator.findByIdAndUpdate(organisateurId, {
-    note_moyenne: noteMoyenne,
-    nombre_avis: all.length,
-  });
+  try {
+    const all = await Avis.find({
+      organisateur_id: organisateurId,
+      type: "organisateur",
+    });
+    const noteMoyenne =
+      all.length > 0
+        ? Math.round((all.reduce((s, a) => s + a.note, 0) / all.length) * 10) / 10
+        : 0;
+    await Organisator.findByIdAndUpdate(organisateurId, {
+      note_moyenne: noteMoyenne,
+      nombre_avis: all.length,
+    });
+  } catch (error) {
+    console.error('[refreshOrganisateurStats] Error:', error);
+  }
 }
 
 // ─── POST /avis/activite/:activiteId ─────────────────────────────────────────

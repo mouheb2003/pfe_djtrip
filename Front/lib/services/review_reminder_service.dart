@@ -5,6 +5,7 @@ import '../models/activity_model.dart';
 import 'inscription_service.dart';
 import 'user_service.dart';
 import 'api_client.dart';
+import 'review_service.dart';
 
 /// Simple service to manage review reminders for completed activities
 /// Handles both online (activity ends while app is open) and offline (activity ends while disconnected) scenarios
@@ -127,11 +128,30 @@ class ReviewReminderService {
             print('[ReviewReminderService] Organizer is not active (status: $accountStatus) for booking ${booking.id} - SKIPPING');
             continue;
           }
-          print('[ReviewReminderService] Organizer is active for booking ${booking.id} - ADDING TO PENDING');
+          print('[ReviewReminderService] Organizer is active for booking ${booking.id}');
         } catch (e) {
           print('[ReviewReminderService] Error checking organizer status for booking ${booking.id}: $e');
           continue;
         }
+
+        // Check if activity has already been reviewed by this user
+        try {
+          final activityReview = await ReviewService.getMyActivityReview(activity.id);
+          if (activityReview['hasReviewed'] == true) {
+            print('[ReviewReminderService] Activity ${activity.id} already reviewed by user - SKIPPING');
+            continue;
+          }
+          print('[ReviewReminderService] Activity ${activity.id} not yet reviewed');
+        } catch (e) {
+          print('[ReviewReminderService] Error checking activity review status for booking ${booking.id}: $e');
+          // If we can't check, skip to be safe
+          continue;
+        }
+
+        // Note: Users CAN review the same organizer for different activities
+        // Only activity review is checked once per activity
+
+        print('[ReviewReminderService] Adding booking ${booking.id} to pending reviews');
 
         // Add to pending reviews
         pendingReviews.add({

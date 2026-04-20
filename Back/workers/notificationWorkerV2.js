@@ -63,26 +63,41 @@ async function initializeEventListeners() {
 
   notificationEventBus.on('booking.approved', async (data) => {
     try {
-      console.log('📨 Booking approved event:', data);
-      
-      // Send to tourist
-      await notificationService.sendBookingApprovedNotification({
-        touristId: data.touristId,
-        activityTitle: data.activityTitle,
-        bookingId: data.bookingId,
-      });
+      console.log('📨 Booking approved event received:', data);
+      console.log('📨 Tourist ID type:', typeof data.touristId, 'value:', data.touristId);
+      console.log('📨 Booking ID type:', typeof data.bookingId, 'value:', data.bookingId);
 
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.touristId,
-        type: 'booking',
-        title: 'Réservation approuvée ✅',
-        message: `Votre réservation pour "${data.activityTitle}" a été confirmée`,
-        data: { bookingId: data.bookingId },
-        priority: 'high',
-        related_entity_type: 'booking',
-        related_entity_id: data.bookingId,
-      });
+      // Create DB notification FIRST (ensure it's saved even if account is suspended)
+      try {
+        const notificationData = {
+          user_id: data.touristId,
+          type: 'booking',
+          title: 'Réservation approuvée ✅',
+          message: `Votre réservation pour "${data.activityTitle}" a été confirmée`,
+          data: { bookingId: data.bookingId },
+          priority: 'high',
+          related_entity_type: 'booking',
+          related_entity_id: data.bookingId,
+        };
+        console.log('📨 Creating notification with data:', notificationData);
+
+        await Notification.createNotification(notificationData);
+        console.log('✅ DB notification created for booking approval');
+      } catch (dbError) {
+        console.error('❌ Error creating DB notification:', dbError);
+      }
+
+      // Send to tourist (may skip if account is suspended)
+      try {
+        await notificationService.sendBookingApprovedNotification({
+          touristId: data.touristId,
+          activityTitle: data.activityTitle,
+          bookingId: data.bookingId,
+        });
+      } catch (fcmError) {
+        console.error('❌ Error sending FCM notification:', fcmError);
+        // Don't throw - DB notification is already saved
+      }
     } catch (error) {
       console.error('Error processing booking.approved event:', error);
     }
@@ -91,25 +106,35 @@ async function initializeEventListeners() {
   notificationEventBus.on('booking.rejected', async (data) => {
     try {
       console.log('📨 Booking rejected event:', data);
-      
-      // Send to tourist
-      await notificationService.sendBookingRejectedNotification({
-        touristId: data.touristId,
-        activityTitle: data.activityTitle,
-        bookingId: data.bookingId,
-      });
 
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.touristId,
-        type: 'booking',
-        title: 'Réservation refusée ❌',
-        message: `Votre réservation pour "${data.activityTitle}" a été refusée`,
-        data: { bookingId: data.bookingId },
-        priority: 'high',
-        related_entity_type: 'booking',
-        related_entity_id: data.bookingId,
-      });
+      // Create DB notification FIRST (ensure it's saved even if account is suspended)
+      try {
+        await Notification.createNotification({
+          user_id: data.touristId,
+          type: 'booking',
+          title: 'Réservation refusée ❌',
+          message: `Votre réservation pour "${data.activityTitle}" a été refusée`,
+          data: { bookingId: data.bookingId },
+          priority: 'high',
+          related_entity_type: 'booking',
+          related_entity_id: data.bookingId,
+        });
+        console.log('✅ DB notification created for booking rejection');
+      } catch (dbError) {
+        console.error('❌ Error creating DB notification:', dbError);
+      }
+
+      // Send to tourist (may skip if account is suspended)
+      try {
+        await notificationService.sendBookingRejectedNotification({
+          touristId: data.touristId,
+          activityTitle: data.activityTitle,
+          bookingId: data.bookingId,
+        });
+      } catch (fcmError) {
+        console.error('❌ Error sending FCM notification:', fcmError);
+        // Don't throw - DB notification is already saved
+      }
     } catch (error) {
       console.error('Error processing booking.rejected event:', error);
     }
@@ -118,18 +143,23 @@ async function initializeEventListeners() {
   notificationEventBus.on('booking.cancelled', async (data) => {
     try {
       console.log('📨 Booking cancelled event:', data);
-      
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.touristId,
-        type: 'booking',
-        title: 'Réservation annulée',
-        message: `Votre réservation pour "${data.activityTitle}" a été annulée`,
-        data: { bookingId: data.bookingId },
-        priority: 'medium',
-        related_entity_type: 'booking',
-        related_entity_id: data.bookingId,
-      });
+
+      // Create DB notification FIRST (ensure it's saved even if account is suspended)
+      try {
+        await Notification.createNotification({
+          user_id: data.touristId,
+          type: 'booking',
+          title: 'Réservation annulée',
+          message: `Votre réservation pour "${data.activityTitle}" a été annulée`,
+          data: { bookingId: data.bookingId },
+          priority: 'medium',
+          related_entity_type: 'booking',
+          related_entity_id: data.bookingId,
+        });
+        console.log('✅ DB notification created for booking cancellation');
+      } catch (dbError) {
+        console.error('❌ Error creating DB notification:', dbError);
+      }
     } catch (error) {
       console.error('Error processing booking.cancelled event:', error);
     }
@@ -138,26 +168,36 @@ async function initializeEventListeners() {
   notificationEventBus.on('booking.reminder', async (data) => {
     try {
       console.log('📨 Booking reminder event:', data);
-      
-      // Send to tourist
-      await notificationService.sendBookingReminder({
-        touristId: data.touristId,
-        activityTitle: data.activityTitle,
-        bookingId: data.bookingId,
-        activityId: data.activityId,
-      });
 
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.touristId,
-        type: 'reminder',
-        title: 'Rappel de réservation ⏰',
-        message: `"${data.activityTitle}" commence bientôt`,
-        data: { bookingId: data.bookingId, activityId: data.activityId },
-        priority: 'high',
-        related_entity_type: 'booking',
-        related_entity_id: data.bookingId,
-      });
+      // Create DB notification FIRST (ensure it's saved even if account is suspended)
+      try {
+        await Notification.createNotification({
+          user_id: data.touristId,
+          type: 'reminder',
+          title: 'Rappel de réservation ⏰',
+          message: `"${data.activityTitle}" commence bientôt`,
+          data: { bookingId: data.bookingId, activityId: data.activityId },
+          priority: 'high',
+          related_entity_type: 'booking',
+          related_entity_id: data.bookingId,
+        });
+        console.log('✅ DB notification created for booking reminder');
+      } catch (dbError) {
+        console.error('❌ Error creating DB notification:', dbError);
+      }
+
+      // Send to tourist (may skip if account is suspended)
+      try {
+        await notificationService.sendBookingReminder({
+          touristId: data.touristId,
+          activityTitle: data.activityTitle,
+          bookingId: data.bookingId,
+          activityId: data.activityId,
+        });
+      } catch (fcmError) {
+        console.error('❌ Error sending FCM notification:', fcmError);
+        // Don't throw - DB notification is already saved
+      }
     } catch (error) {
       console.error('Error processing booking.reminder event:', error);
     }

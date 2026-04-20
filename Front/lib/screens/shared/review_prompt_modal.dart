@@ -4,6 +4,7 @@ import '../../../models/booking_model.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/user_service.dart';
+import '../../../services/review_service.dart';
 import '../../../theme/app_theme.dart';
 import 'activity_review_screen.dart';
 
@@ -489,6 +490,22 @@ class ReviewReminderService {
         // If we can't check organizer status, don't show the modal to be safe
         return false;
       }
+
+      // Check if activity has already been reviewed by this user
+      try {
+        final activityReview = await ReviewService.getMyActivityReview(activity.id);
+        if (activityReview['hasReviewed'] == true) {
+          print('Activity ${activity.id} already reviewed by user - not showing modal');
+          return false;
+        }
+      } catch (e) {
+        print('Error checking activity review status: $e');
+        // If we can't check, don't show the modal to be safe
+        return false;
+      }
+
+      // Note: Users CAN review the same organizer for different activities
+      // Only activity review is checked once per activity
 
       return true;
     } catch (e) {

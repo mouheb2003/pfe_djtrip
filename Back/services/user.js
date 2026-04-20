@@ -111,22 +111,53 @@ class UserService {
           "France",
       );
 
-      const phoneValidation = this._validateAndFormatPhone(
-        normalizedData.num_tel,
-        normalizedData.pays_telephone ||
-          normalizedData.pays_origine ||
-          "France",
+      // Skip validation if phone is just a country code or too short
+      const cleanPhone = normalizedData.num_tel.replace(/\D/g, "");
+      const countryCodes = {
+        "+33": "France",
+        "+216": "Tunisie",
+        "+213": "Algérie",
+        "+218": "Libye",
+        "+212": "Maroc",
+        "+39": "Italie",
+        "+49": "Allemagne",
+        "+44": "Royaume-Uni",
+        "+34": "Espagne",
+        "+32": "Belgique",
+        "+41": "Suisse",
+        "+1": "Canada",
+        "+20": "Égypte",
+        "+7": "Russie",
+        "+966": "Arabie Saoudite",
+        "+971": "Émirats Arabes Unis",
+      };
+
+      // Check if phone is just a country code (incomplete)
+      const isJustCountryCode = Object.keys(countryCodes).some(code => 
+        cleanPhone === code.replace('+', '')
       );
 
-      if (!phoneValidation.valid) {
-        throw new Error(phoneValidation.error);
+      if (!isJustCountryCode && cleanPhone.length >= 8) {
+        const phoneValidation = this._validateAndFormatPhone(
+          normalizedData.num_tel,
+          normalizedData.pays_telephone ||
+            normalizedData.pays_origine ||
+            "France",
+        );
+
+        if (!phoneValidation.valid) {
+          throw new Error(phoneValidation.error);
+        }
+
+        normalizedData.num_tel = phoneValidation.phone;
+        normalizedData.pays_telephone = phoneValidation.country;
+        console.log(
+          `📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`,
+        );
+      } else {
+        // Phone is incomplete or just country code - skip validation but keep the value
+        console.log(`📱 Phone is incomplete (${normalizedData.num_tel}), skipping validation`);
       }
-
-      normalizedData.num_tel = phoneValidation.phone;
-      normalizedData.pays_telephone = phoneValidation.country;
-      console.log(
-        `📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`,
-      );
     }
 
     // Auto-validate interests array
@@ -222,6 +253,9 @@ class UserService {
     }
 
     const cleanPhone = phone.replace(/\s+/g, "").replace(/[^\d+]/g, "");
+
+    // Normalize country name to handle both English and French
+    const normalizedCountry = this._normalizeCountryName(country);
 
     const countryPhoneFormats = {
       France: {
@@ -447,7 +481,7 @@ class UserService {
       },
     };
 
-    const format = countryPhoneFormats[country];
+    const format = countryPhoneFormats[normalizedCountry];
     if (!format) {
       return { valid: false, error: "Unsupported country" };
     }
@@ -498,6 +532,105 @@ class UserService {
     }
 
     return cleaned;
+  }
+
+  static _normalizeCountryName(country) {
+    if (!country) return "France"; // Default to France if no country provided
+
+    const countryAliases = {
+      // English -> French mappings
+      "Tunisia": "Tunisie",
+      "tunisia": "Tunisie",
+      "Tunisie": "Tunisie",
+      "tunisie": "Tunisie",
+      
+      "Algeria": "Algérie",
+      "algeria": "Algérie",
+      "Algérie": "Algérie",
+      "algérie": "Algérie",
+      
+      "Libya": "Libye",
+      "libya": "Libye",
+      "Libye": "Libye",
+      "libye": "Libye",
+      
+      "Morocco": "Maroc",
+      "morocco": "Maroc",
+      "Maroc": "Maroc",
+      "maroc": "Maroc",
+      
+      "Italy": "Italie",
+      "italy": "Italie",
+      "Italie": "Italie",
+      "italie": "Italie",
+      
+      "Germany": "Allemagne",
+      "germany": "Allemagne",
+      "Allemagne": "Allemagne",
+      "allemagne": "Allemagne",
+      
+      "United Kingdom": "Royaume-Uni",
+      "united kingdom": "Royaume-Uni",
+      "UK": "Royaume-Uni",
+      "uk": "Royaume-Uni",
+      "Royaume-Uni": "Royaume-Uni",
+      
+      "Spain": "Espagne",
+      "spain": "Espagne",
+      "Espagne": "Espagne",
+      "espagne": "Espagne",
+      
+      "Belgium": "Belgique",
+      "belgium": "Belgique",
+      "Belgique": "Belgique",
+      "belgique": "Belgique",
+      
+      "Switzerland": "Suisse",
+      "switzerland": "Suisse",
+      "Suisse": "Suisse",
+      "suisse": "Suisse",
+      
+      "Canada": "Canada",
+      "canada": "Canada",
+      
+      "Egypt": "Égypte",
+      "egypt": "Égypte",
+      "Égypte": "Égypte",
+      "égypte": "Égypte",
+      
+      "Russia": "Russie",
+      "russia": "Russie",
+      "Russie": "Russie",
+      "russie": "Russie",
+      
+      "Saudi Arabia": "Arabie Saoudite",
+      "saudi arabia": "Arabie Saoudite",
+      "Arabie Saoudite": "Arabie Saoudite",
+      
+      "UAE": "Émirats Arabes Unis",
+      "uae": "Émirats Arabes Unis",
+      "United Arab Emirates": "Émirats Arabes Unis",
+      "Émirats Arabes Unis": "Émirats Arabes Unis",
+      
+      "France": "France",
+      "france": "France",
+    };
+
+    // Try exact match first
+    if (countryAliases[country]) {
+      return countryAliases[country];
+    }
+
+    // Try case-insensitive match
+    const lowerCountry = country.toLowerCase();
+    for (const [key, value] of Object.entries(countryAliases)) {
+      if (key.toLowerCase() === lowerCountry) {
+        return value;
+      }
+    }
+
+    // Return original if no match found
+    return country;
   }
 
   static _coerceStringArray(value) {

@@ -204,7 +204,7 @@ class InscriptionService {
   }
 
   /// Get ALL bookings for the tourist, bucketed by reservation status
-  /// Returns a map with 'pending', 'confirmed', 'cancelled'
+  /// Returns a map with 'pending', 'confirmed', 'cancelled', 'used'
   static Future<Map<String, List<InscriptionModel>>> getMyBookings() async {
     try {
       final body = await _get('/inscriptions/touriste/my-bookings');
@@ -243,12 +243,13 @@ class InscriptionService {
           'pending': parseList(data['pending'], 'pending'),
           'confirmed': parseList(data['confirmed'], 'confirmed'),
           'cancelled': parseList(data['cancelled'], 'cancelled'),
+          'used': parseList(data['used'], 'used'),
         };
 
         return result;
       }
 
-      return {'pending': [], 'confirmed': [], 'cancelled': []};
+      return {'pending': [], 'confirmed': [], 'cancelled': [], 'used': []};
     } catch (e) {
       print('Error in getMyBookings: $e');
       throw Exception(_extractErrorMessage(e.toString()));

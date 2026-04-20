@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
+import '../../services/user_service.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../shared/activity_detail_screen.dart';
 import '../shared/chat_conversation_screen.dart';
+import '../shared/public_organizer_profile_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final InscriptionModel inscription;
@@ -16,8 +19,10 @@ class BookingDetailScreen extends StatefulWidget {
 }
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
-  bool _isCancelling = false;
   late InscriptionModel _inscription;
+  bool _isCancelling = false;
+  Map<String, dynamic>? _fullOrganizerData;
+  bool _isLoadingOrganizer = false;
 
   double _asDouble(dynamic value, {double fallback = 0}) {
     if (value is num) return value.toDouble();
@@ -33,6 +38,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       return int.tryParse(value.trim()) ?? fallback;
     }
     return fallback;
+  }
+
+  List<String> _activityPhotoUrls(Map<String, dynamic>? activity) {
+    final raw = activity?['photos'];
+    if (raw is! List) return const [];
+
+    final urls = <String>[];
+    for (final item in raw) {
+      final value = item?.toString().trim() ?? '';
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        urls.add(value);
+      }
+    }
+    return urls.toSet().toList(growable: false);
   }
 
   Future<void> _openOrganizerChat({
@@ -67,6 +86,52 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   void initState() {
     super.initState();
     _inscription = widget.inscription;
+    _fetchOrganizerDataIfNeeded();
+  }
+
+  Future<void> _fetchOrganizerDataIfNeeded() async {
+    final act = _inscription.activite ?? {};
+    final orgaRaw =
+        _inscription.organisateur ??
+        (act['organisateur'] is Map
+            ? Map<String, dynamic>.from(act['organisateur'] as Map)
+            : null) ??
+        (act['organisateur_id'] is Map
+            ? Map<String, dynamic>.from(act['organisateur_id'] as Map)
+            : null) ??
+        const <String, dynamic>{};
+    
+    final organizerId = (orgaRaw['_id'] ?? orgaRaw['id'] ?? '').toString().trim();
+    
+    print('[BOOKING DETAIL] Organizer ID: $organizerId');
+    print('[BOOKING DETAIL] Initial organizer data: $orgaRaw');
+    
+    // Check if rating or reviews are missing
+    final hasRating = orgaRaw['note_moyenne'] != null || 
+                      orgaRaw['noteMoyenne'] != null || 
+                      orgaRaw['rating'] != null;
+    final hasReviews = orgaRaw['nombre_avis'] != null || 
+                       orgaRaw['nombreAvis'] != null || 
+                       orgaRaw['reviewsCount'] != null;
+    
+    print('[BOOKING DETAIL] Has rating: $hasRating, Has reviews: $hasReviews');
+    
+    if (organizerId.isNotEmpty && (!hasRating || !hasReviews)) {
+      setState(() => _isLoadingOrganizer = true);
+      try {
+        final fullData = await UserService.getUserById(organizerId);
+        print('[BOOKING DETAIL] Fetched full organizer data: $fullData');
+        if (mounted && fullData != null) {
+          setState(() => _fullOrganizerData = fullData);
+        }
+      } catch (e) {
+        print('[BOOKING DETAIL] Error fetching organizer data: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoadingOrganizer = false);
+        }
+      }
+    }
   }
 
   String _formatDate(DateTime? date) {
@@ -179,10 +244,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final act = _inscription.activite ?? {};
-    final photos = act['photos'] as List?;
-    final imageUrl = photos != null && photos.isNotEmpty
-        ? photos[0] as String
-        : '';
+    final photoUrls = _activityPhotoUrls(act);
+    final imageUrl = photoUrls.isNotEmpty ? photoUrls[0] : '';
     final title = act['titre'] as String? ?? 'Activity';
     final lieu = act['lieu'] as String? ?? 'Location';
     final placeCount = _inscription.nombreParticipants;
@@ -193,6 +256,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
     // Organizer profile (real values when available)
     final orgaRaw =
+        _fullOrganizerData ??
         _inscription.organisateur ??
         (act['organisateur'] is Map
             ? Map<String, dynamic>.from(act['organisateur'] as Map)
@@ -209,12 +273,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final orgaPhoto = (orgaRaw['avatar'] ?? orgaRaw['photoProfil'] ?? '')
         .toString();
     final orgaRating = _asDouble(
-      orgaRaw['note_moyenne'] ?? orgaRaw['noteMoyenne'] ?? orgaRaw['rating'],
+      orgaRaw['note_moyenne'] ?? 
+      orgaRaw['noteMoyenne'] ?? 
+      orgaRaw['rating'] ?? 
+      orgaRaw['averageRating'] ??
+      orgaRaw['avg_rating'] ??
+      orgaRaw['avgRating'] ??
+      orgaRaw['moyenne'] ??
+      orgaRaw['average'],
     );
     final orgaReviews = _asInt(
       orgaRaw['nombre_avis'] ??
           orgaRaw['nombreAvis'] ??
-          orgaRaw['reviewsCount'],
+          orgaRaw['reviewsCount'] ??
+          orgaRaw['totalReviews'] ??
+          orgaRaw['review_count'] ??
+          orgaRaw['reviewCount'] ??
+          orgaRaw['avis_count'] ??
+          orgaRaw['avisCount'],
     );
 
     // Get activity dates properly
@@ -227,6 +303,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -252,13 +329,392 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
         ],
       ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              // Status Icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: _inscription.statusColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _inscription.statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _inscription.isApproved
+                          ? Icons.check
+                          : _inscription.isPending
+                          ? Icons.hourglass_top_rounded
+                          : _inscription.isCancelled
+                          ? Icons.info_outline_rounded
+                          : Icons.verified_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                _inscription.isApproved
+                    ? 'Booking Confirmed!'
+                    : _inscription.isPending
+                    ? 'Waiting for approval'
+                    : _inscription.isCancelled
+                    ? 'Booking Cancelled'
+                    : 'Booking Details',
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _inscription.isApproved
+                    ? 'Your booking is approved. Keep your QR code for check-in.'
+                    : _inscription.isPending
+                    ? 'Your request has been sent. The organizer will review it soon.'
+                    : _inscription.isCancelled
+                    ? 'This booking was cancelled.'
+                    : 'View your booking details',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Top media section: show QR for approved bookings, otherwise activity carousel
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: _BookingMediaPanel(
+                    showQr: _inscription.isApproved,
+                    hasQrData: _inscription.qrData.trim().isNotEmpty,
+                    qrData: _inscription.qrData,
+                    photoUrls: photoUrls,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Booking Summary Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Booking Summary',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _inscription.statusColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _inscription.statusLabel.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _SummaryRow(
+                      icon: Icons.surfing,
+                      label: 'ACTIVITY',
+                      value: title,
+                    ),
+                    const SizedBox(height: 16),
+                    _SummaryRow(
+                      icon: Icons.location_on_outlined,
+                      label: 'LOCATION',
+                      value: lieu,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryRow(
+                            icon: Icons.calendar_today,
+                            label: 'DATE',
+                            value: activityDate != null
+                                ? DateFormat('MMM dd, yyyy').format(activityDate!)
+                                : DateFormat('MMM dd, yyyy').format(_inscription.dateDemande ?? DateTime.now()),
+                          ),
+                        ),
+                        Expanded(
+                          child: _SummaryRow(
+                            icon: Icons.access_time,
+                            label: 'TIME',
+                            value: act['heure'] as String? ?? '10:00 AM',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryRow(
+                            icon: Icons.people_outline,
+                            label: 'PEOPLE',
+                            value: '$placeCount Participants',
+                          ),
+                        ),
+                        Expanded(
+                          child: _SummaryRow(
+                            icon: Icons.confirmation_number_outlined,
+                            label: 'ID',
+                            value: '#DJT-${_inscription.id.substring(_inscription.id.length - 5).toUpperCase()}',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Price',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        Text(
+                          '${total.toStringAsFixed(2)} TND',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (_inscription.isApproved) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.email_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'A confirmation email has been sent to your registered address with the QR code ticket and arrival instructions.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              // Organizer section with contact and profile buttons
+              const Text(
+                'Organizer',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundImage: orgaPhoto.isNotEmpty
+                              ? NetworkImage(orgaPhoto)
+                              : null,
+                          child: orgaPhoto.isEmpty
+                              ? Text(
+                                  orgaName.isNotEmpty ? orgaName[0].toUpperCase() : 'O',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                orgaName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    orgaRating > 0 ? orgaRating.toStringAsFixed(1) : 'N/A',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${orgaReviews} reviews)',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: organizerId.isNotEmpty
+                                ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => PublicOrganizerProfileScreen(
+                                          organizerId: organizerId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            icon: const Icon(Icons.person_outline, size: 16),
+                            label: const Text('Profile', style: TextStyle(fontSize: 13)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              minimumSize: Size(0, 40),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openOrganizerChat(
+                              organizerId: organizerId,
+                              organizerName: orgaName,
+                              organizerAvatar: orgaPhoto,
+                            ),
+                            icon: const Icon(Icons.chat_outlined, size: 16),
+                            label: const Text('Contact', style: TextStyle(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.primary),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              minimumSize: Size(0, 40),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 120), // Space for bottom navigation
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -307,524 +763,192 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         ),
                       )
                     : _inscription.canBeCancelledWithTime
-                    ? ElevatedButton.icon(
-                        onPressed: _isCancelling ? null : _cancelBooking,
-                        icon: _isCancelling
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.cancel_outlined, size: 20),
-                        label: Text(
-                          _isCancelling ? 'Cancelling...' : 'Cancel Booking',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                        ? ElevatedButton.icon(
+                            onPressed: _isCancelling ? null : _cancelBooking,
+                            icon: _isCancelling
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.cancel_outlined, size: 20),
+                            label: Text(
+                              _isCancelling ? 'Cancelling...' : 'Cancel Booking',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            label: Text(_inscription.statusLabel),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
                           ),
-                        ),
-                      )
-                    : ElevatedButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.info_outline, size: 20),
-                        label: Text(_inscription.statusLabel),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                      ),
               ),
             ],
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _SummaryRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BookingMediaPanel extends StatefulWidget {
+  final bool showQr;
+  final bool hasQrData;
+  final String qrData;
+  final List<String> photoUrls;
+
+  const _BookingMediaPanel({
+    required this.showQr,
+    required this.hasQrData,
+    required this.qrData,
+    required this.photoUrls,
+  });
+
+  @override
+  State<_BookingMediaPanel> createState() => _BookingMediaPanelState();
+}
+
+class _BookingMediaPanelState extends State<_BookingMediaPanel> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.showQr && widget.hasQrData) {
+      return Container(
+        color: Colors.white,
+        alignment: Alignment.center,
+        child: QrImageView(
+          data: widget.qrData,
+          version: QrVersions.auto,
+          size: 170,
+          backgroundColor: Colors.white,
+          padding: const EdgeInsets.all(10),
+        ),
+      );
+    }
+
+    if (widget.photoUrls.isEmpty) {
+      return Container(
+        color: const Color(0xFFF1F5F9),
+        alignment: Alignment.center,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top Card
-            GestureDetector(
-              onTap: () {
-                final activityId = act['_id'] as String? ?? '';
-                if (activityId.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ActivityDetailScreen(
-                        activityId: activityId,
-                        viewOnly: true,
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: imageUrl.isNotEmpty
-                            ? Image.network(imageUrl, fit: BoxFit.cover)
-                            : Container(color: Colors.grey[300]),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _inscription.statusColor.withOpacity(
-                                    0.15,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  _inscription.statusLabel.toUpperCase(),
-                                  style: TextStyle(
-                                    color: _inscription.statusColor,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '#DJT-${_inscription.id.substring(_inscription.id.length - 5).toUpperCase()}',
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today,
-                                size: 14,
-                                color: Colors.black54,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                activityDate != null
-                                    ? _formatDate(activityDate)
-                                    : _formatDate(_inscription.dateDemande),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Colors.black54,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                lieu,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // QR Code Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'CHECK-IN QR CODE',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: 160,
-                    height: 160,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F3F5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(2, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.qr_code_2,
-                          size: 80,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Present this QR code to the organizer at the meeting point.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Participants
-            const Text(
-              'Participants',
+            Icon(Icons.qr_code_2_outlined, size: 34, color: Color(0xFF94A3B8)),
+            SizedBox(height: 10),
+            Text(
+              'No images found',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: Color(0xFF64748B),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 60,
-                    child: Stack(
-                      children: [
-                        const CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Color(0xFFC3D0A3),
-                        ),
-                        if (placeCount > 1)
-                          Positioned(
-                            left: 20,
-                            child: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: const Color(0xFF2C413D),
-                              child: Text(
-                                '+$placeCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '$placeCount Person${placeCount > 1 ? 's' : ''}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Price Details
-            const Text(
-              'Price Details',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Adult x $placeCount',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        '${subtotal.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Service Fee',
-                        style: TextStyle(color: Colors.black54, fontSize: 14),
-                      ),
-                      Text(
-                        '${serviceFee.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        '${total.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Organizer
-            const Text(
-              'Organizer',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: orgaPhoto.isNotEmpty
-                        ? NetworkImage(orgaPhoto)
-                        : null,
-                    child: orgaPhoto.isEmpty
-                        ? const Icon(Icons.person, color: Colors.grey)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          orgaName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: Color(0xFFF59E0B),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              orgaRating > 0
-                                  ? orgaRating.toStringAsFixed(1)
-                                  : 'No rating',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF334155),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              orgaReviews > 0
-                                  ? '$orgaReviews reviews'
-                                  : '0 reviews',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _openOrganizerChat(
-                      organizerId: organizerId,
-                      organizerName: orgaName,
-                      organizerAvatar: orgaPhoto,
-                    ),
-                    icon: const Icon(Icons.chat_outlined, size: 16),
-                    label: const Text('Contact'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: Color(0xFFBFDBFE)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
           ],
         ),
-      ),
+      );
+    }
+
+    return Stack(
+      children: [
+        PageView.builder(
+          itemCount: widget.photoUrls.length,
+          onPageChanged: (value) => setState(() => _index = value),
+          itemBuilder: (context, index) {
+            return Image.network(
+              widget.photoUrls[index],
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFE2E8F0),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.broken_image_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 36,
+                ),
+              ),
+            );
+          },
+        ),
+        if (widget.photoUrls.length > 1)
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_index + 1}/${widget.photoUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

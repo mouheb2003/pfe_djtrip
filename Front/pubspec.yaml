@@ -54,6 +54,9 @@ dependencies:
   # Image picker for avatar upload
   image_picker: ^1.0.7
 
+  # Cached network image for image loading
+  cached_network_image: ^3.3.1
+
   # HTTP multipart for file upload
   http_parser: ^4.0.2
 
@@ -70,6 +73,9 @@ dependencies:
 
   # Real-time messaging
   socket_io_client: ^2.0.3+1
+
+  # WebView for payment integration
+  webview_flutter: ^4.4.4
 
   # Connectivity and caching
   connectivity_plus: ^6.0.5

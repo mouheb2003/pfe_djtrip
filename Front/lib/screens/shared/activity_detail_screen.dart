@@ -478,11 +478,32 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ),
                       const SizedBox(height: 24),
                       _SectionTitle('Reviews'),
-                      if (_loadingReviews)
-                        const Center(
-                          child: CircularProgressIndicator(),
-                        )
-                      else if (_reviews.isEmpty)
+                      if (_activity?.timelineStatus == 'past')
+                        if (_loadingReviews)
+                          const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        else if (_reviews.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: const Text(
+                              'No reviews yet. Be the first to review!',
+                              style: TextStyle(color: Color(0xFF6B7280)),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        else
+                          ..._reviews.map((review) => _ReviewCard(
+                            review: review,
+                            currentUserId: _currentUserId,
+                            onReviewUpdated: _loadReviews,
+                          )).toList()
+                      else
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -491,17 +512,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                             border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
                           child: const Text(
-                            'No reviews yet. Be the first to review!',
+                            'Reviews will be available after the activity is completed.',
                             style: TextStyle(color: Color(0xFF6B7280)),
                             textAlign: TextAlign.center,
                           ),
-                        )
-                      else
-                        ..._reviews.map((review) => _ReviewCard(
-                          review: review,
-                          currentUserId: _currentUserId,
-                          onReviewUpdated: _loadReviews,
-                        )).toList(),
+                        ),
                     ],
                   ),
                 ),

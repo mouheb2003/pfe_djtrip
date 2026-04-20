@@ -85,6 +85,12 @@ const userSchema = new mongoose.Schema(
     lockUntil: Date,
     // Token versioning (used to invalidate refresh tokens on logout)
     tokenVersion: { type: Number, default: 0 },
+    // Wallet balance for refunds (in TND)
+    wallet_balance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     // Favorites (activities)
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Activite" }],
     // Archived chat partners for the current user

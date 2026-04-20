@@ -3,7 +3,9 @@ import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
+import '../payment/stripe_payment_screen.dart';
 import 'booking_confirmation_screen.dart';
+import 'booking_detail_screen.dart';
 
 class BookingSelectionScreen extends StatefulWidget {
   final ActivityModel activity;
@@ -341,14 +343,14 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     Text(
-                      'Confirm booking',
+                      'Pay & Confirm',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 20),
+                    Icon(Icons.payment, size: 20),
                   ],
                 ),
         ),
@@ -380,26 +382,56 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     }
 
     setState(() => _isLoading = true);
-    final result = await InscriptionService.createInscription(
-      activiteId: widget.activity.id,
-      nombreParticipants: requested,
-      message: 'Adults: $_adults, Children: $_children',
-    );
-    if (!mounted) return;
-    setState(() => _isLoading = false);
 
-    if (result['success'] == true) {
-      final inscription = InscriptionModel.fromJson(result['inscription']);
-      Navigator.push(
+    // Step 1: Navigate to Stripe payment screen directly
+    // Inscription will be created after successful payment
+    try {
+      final paymentCompleted = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => BookingConfirmationScreen(inscription: inscription),
+          builder: (_) => StripePaymentScreen(
+            activityId: widget.activity.id,
+            activityTitle: widget.activity.titre,
+            nombreParticipants: requested,
+            adults: _adults,
+            children: _children,
+            amount: _total,
+            currency: 'USD',
+            description: 'Booking for ${widget.activity.titre}',
+          ),
         ),
       );
-    } else {
+
+      if (!mounted) return;
+
+      if (paymentCompleted == true) {
+        // Payment successful, navigate to booking details
+        // The inscription ID will be returned from the payment screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking confirmed!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (paymentCompleted != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment cancelled or failed'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] as String? ?? 'Booking error'),
+          content: Text('Error: $e'),
           backgroundColor: Colors.red,
         ),
       );

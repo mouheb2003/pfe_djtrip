@@ -22,12 +22,13 @@ class _BookingsTabState extends State<BookingsTab> {
     'pending': [],
     'confirmed': [],
     'cancelled': [],
+    'used': [],
   };
 
   @override
   void initState() {
     super.initState();
-    _tabIndex = widget.initialTabIndex.clamp(0, 2);
+    _tabIndex = widget.initialTabIndex.clamp(0, 3);
     _loadInscriptions();
   }
 
@@ -59,13 +60,15 @@ class _BookingsTabState extends State<BookingsTab> {
   List<InscriptionModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
-        return _buckets['pending']!;
+        return _buckets['pending'] ?? [];
       case 1:
-        return _buckets['confirmed']!;
+        return _buckets['confirmed'] ?? [];
       case 2:
-        return _buckets['cancelled']!;
+        return _buckets['cancelled'] ?? [];
+      case 3:
+        return _buckets['used'] ?? [];
       default:
-        return _buckets['pending']!;
+        return _buckets['pending'] ?? [];
     }
   }
 
@@ -347,8 +350,8 @@ class _BookingsSegmentedControl extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2DDFF)),
       ),
       child: Row(
-        children: List.generate(3, (index) {
-          final label = ['Pending', 'Approved', 'Cancelled'][index];
+        children: List.generate(4, (index) {
+          final label = ['Pending', 'Approved', 'Cancelled', 'Used'][index];
           final active = currentIndex == index;
           return Expanded(
             child: InkWell(

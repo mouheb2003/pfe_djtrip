@@ -13,64 +13,74 @@ const { createActivityLog } = require("../services/activityLogService");
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 async function restoreExpiredSuspensions({ userId } = {}) {
-  const now = new Date();
-  const query = {
-    accountStatus: "suspended",
-    suspendedUntil: { $ne: null, $lte: now },
-  };
+  try {
+    const now = new Date();
+    const query = {
+      accountStatus: "suspended",
+      suspendedUntil: { $ne: null, $lte: now },
+    };
 
-  if (userId) {
-    query._id = userId;
-  }
+    if (userId) {
+      query._id = userId;
+    }
 
-  const users = await User.find(query).select(
-    "email fullname accountStatus suspendedUntil suspendReason suspendedAt",
-  );
+    const users = await User.find(query).select(
+      "email fullname accountStatus suspendedUntil suspendReason suspendedAt",
+    );
 
-  if (!users.length) {
+    if (!users.length) {
+      return 0;
+    }
+
+    for (const user of users) {
+      const previousReason = user.suspendReason;
+      user.accountStatus = "active";
+      user.suspendedUntil = null;
+      user.suspendReason = null;
+      user.suspendedAt = null;
+      await user.save();
+
+      try {
+        await emailService.sendAccountRestoredEmail(
+          user.email,
+          user.fullname || "DJTrip User",
+          "suspended",
+          previousReason,
+        );
+      } catch (emailErr) {
+        console.error("Error sending auto-restored account email:", emailErr);
+      }
+    }
+
+    return users.length;
+  } catch (error) {
+    console.error("Error in restoreExpiredSuspensions:", error);
     return 0;
   }
-
-  for (const user of users) {
-    const previousReason = user.suspendReason;
-    user.accountStatus = "active";
-    user.suspendedUntil = null;
-    user.suspendReason = null;
-    user.suspendedAt = null;
-    await user.save();
-
-    try {
-      await emailService.sendAccountRestoredEmail(
-        user.email,
-        user.fullname || "DJTrip User",
-        "suspended",
-        previousReason,
-      );
-    } catch (emailErr) {
-      console.error("Error sending auto-restored account email:", emailErr);
-    }
-  }
-
-  return users.length;
 }
 
 async function fetchFacebookProfile(accessToken) {
-  if (typeof fetch !== "function") {
-    throw new Error("Global fetch is not available on this Node.js runtime");
+  try {
+    if (typeof fetch !== "function") {
+      throw new Error("Global fetch is not available on this Node.js runtime");
+    }
+
+    const fields = "id,name,email,picture.type(large)";
+    const response = await fetch(
+      `https://graph.facebook.com/me?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`,
+    );
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      const message = data?.error?.message || "Invalid Facebook token";
+      throw new Error(message);
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching Facebook profile:", error);
+    throw error;
   }
-
-  const fields = "id,name,email,picture.type(large)";
-  const response = await fetch(
-    `https://graph.facebook.com/me?fields=${fields}&access_token=${encodeURIComponent(accessToken)}`,
-  );
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    const message = data?.error?.message || "Invalid Facebook token";
-    throw new Error(message);
-  }
-
-  return data;
 }
 
 // Sign Up - Register a new user (Phase 1: Basic info only)
@@ -849,6 +859,9 @@ exports.updateProfile = async (req, res) => {
     const userId = req.user.userId;
     const updateData = req.body;
 
+    console.log('[PROFILE UPDATE] User ID:', userId);
+    console.log('[PROFILE UPDATE] Update data:', JSON.stringify(updateData, null, 2));
+
     // Use UserService to update profile
     const user = await UserService.updateProfile(userId, updateData);
 
@@ -857,6 +870,11 @@ exports.updateProfile = async (req, res) => {
       user: user,
     });
   } catch (err) {
+    console.error('[PROFILE UPDATE ERROR]', err);
+    console.error('[PROFILE UPDATE ERROR] Name:', err.name);
+    console.error('[PROFILE UPDATE ERROR] Message:', err.message);
+    console.error('[PROFILE UPDATE ERROR] Code:', err.code);
+    
     if (err.message === "User not found") {
       return res.status(404).json({ message: "User not found" });
     }

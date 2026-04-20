@@ -609,14 +609,13 @@ async function sendPaymentCompletedNotification({ userId, amount, activityTitle,
   return sendPushNotificationQueued({
     userId,
     title: 'Paiement réussi 💳',
-    body: `Votre paiement de ${amount}€ pour "${activityTitle}" est confirmé`,
+    body: `Votre paiement de ${amount} pour ${activityTitle} a été effectué avec succès`,
     data: {
-      type: 'payment_completed',
+      type: 'payment',
       paymentId,
-      amount,
     },
     notificationType: 'payment',
-    priority: 'urgent',
+    priority: 'high',
   });
 }
 

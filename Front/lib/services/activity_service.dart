@@ -365,6 +365,10 @@ class ActivityService {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
       }
 
+      if (aiGeneratedImageUrl != null && aiGeneratedImageUrl.isNotEmpty) {
+        request.fields['aiGeneratedImageUrl'] = aiGeneratedImageUrl;
+      }
+
       for (final file in photos) {
         request.files.add(
           await http.MultipartFile.fromPath('photos', file.path),
@@ -464,6 +468,14 @@ class ActivityService {
 
       if (coordonnees != null) {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
+      }
+
+      if (aiGeneratedImageUrl != null && aiGeneratedImageUrl.isNotEmpty) {
+        request.fields['aiGeneratedImageUrl'] = aiGeneratedImageUrl;
+      }
+
+      if (existingPhotoUrls.isNotEmpty) {
+        request.fields['existingPhotoUrls'] = jsonEncode(existingPhotoUrls);
       }
 
       for (final file in newPhotos) {
