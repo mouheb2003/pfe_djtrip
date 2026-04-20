@@ -7,9 +7,11 @@ import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
@@ -28,6 +30,8 @@ import {
   getPublications,
   createPublication,
   deletePublication,
+  getAdminComments,
+  adminDeleteComment,
 } from 'src/Controller/actions';
 
 import { toast } from 'src/components/snackbar';
@@ -68,10 +72,51 @@ function mapPost(post) {
         : [],
     tripLink: post?.trip_link ?? '',
     likesCount: post?.likes_count ?? 0,
+    likedByUsers: Array.isArray(post?.liked_by)
+      ? post.liked_by.map((user) => ({
+          id: user?._id ?? user?.id,
+          fullname: user?.fullname ?? 'Unknown',
+          avatar: user?.avatar ?? '',
+          userType: user?.userType ?? '',
+        }))
+      : [],
     commentsCount: post?.comments_count ?? 0,
     createdAt: post?.createdAt ?? null,
     updatedAt: post?.updatedAt ?? null,
   };
+}
+
+function mapPublicationComment(comment) {
+  const author = comment?.user_id ?? {};
+
+  return {
+    id: comment?._id ?? comment?.id,
+    content: String(comment?.content ?? ''),
+    authorName: author?.fullname ?? author?.email ?? 'Unknown',
+    createdAt: comment?.created_at ?? comment?.createdAt ?? null,
+  };
+}
+
+function getInitial(name) {
+  return String(name || '?').trim().charAt(0).toUpperCase();
+}
+
+function getUserSubtitle(userType) {
+  const normalized = String(userType || '').toLowerCase();
+  if (normalized === 'admin') return 'Admin';
+  if (normalized === 'organisator' || normalized === 'organisateur') return 'Organisateur';
+  if (normalized === 'touriste') return 'Touriste';
+  return 'Utilisateur';
+}
+
+function typeChipColor(type) {
+  if (type === 'activity') return 'warning';
+  return 'primary';
+}
+
+function audienceChipColor(audience) {
+  if (audience === 'followers') return 'secondary';
+  return 'default';
 }
 
 function formatDate(value) {
@@ -121,6 +166,9 @@ export function PublicationsView({ sx }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
+  const [detailsComments, setDetailsComments] = useState([]);
+  const [detailsCommentsLoading, setDetailsCommentsLoading] = useState(false);
+  const [detailsCommentsError, setDetailsCommentsError] = useState('');
   const [form, setForm] = useState({
     content: '',
     postType: 'post',
@@ -154,6 +202,25 @@ export function PublicationsView({ sx }) {
   useEffect(() => {
     loadRows();
   }, [loadRows]);
+
+  const loadPostComments = useCallback(async (postId) => {
+    if (!postId) {
+      setDetailsComments([]);
+      return;
+    }
+
+    try {
+      setDetailsCommentsLoading(true);
+      setDetailsCommentsError('');
+      const comments = await getAdminComments({ postId });
+      setDetailsComments(comments.map(mapPublicationComment));
+    } catch {
+      setDetailsCommentsError('Impossible de charger les commentaires');
+      setDetailsComments([]);
+    } finally {
+      setDetailsCommentsLoading(false);
+    }
+  }, []);
 
   const filteredRows = useMemo(
     () =>
@@ -272,27 +339,88 @@ export function PublicationsView({ sx }) {
     [loadRows]
   );
 
-  const openDetails = useCallback((row) => {
+  const openDetails = useCallback(async (row) => {
     setDetailsRow(row);
     setOpenDetailsDialog(true);
-  }, []);
+    await loadPostComments(row?.id);
+  }, [loadPostComments]);
 
   const closeDetails = useCallback(() => {
     setOpenDetailsDialog(false);
     setDetailsRow(null);
+    setDetailsComments([]);
+    setDetailsCommentsError('');
+    setDetailsCommentsLoading(false);
   }, []);
+
+  const handleDeleteCommentFromDetails = useCallback(async (commentId) => {
+    if (!commentId || !detailsRow?.id) return;
+
+    const confirmed = window.confirm('Supprimer ce commentaire ?');
+    if (!confirmed) return;
+
+    try {
+      await adminDeleteComment(commentId);
+      setDetailsComments((prev) => prev.filter((comment) => comment.id !== commentId));
+      setRows((prev) =>
+        prev.map((post) =>
+          post.id === detailsRow.id
+            ? { ...post, commentsCount: Math.max(0, Number(post.commentsCount || 0) - 1) }
+            : post
+        )
+      );
+      setDetailsRow((prev) =>
+        prev
+          ? { ...prev, commentsCount: Math.max(0, Number(prev.commentsCount || 0) - 1) }
+          : prev
+      );
+      toast.success('Commentaire supprimé');
+    } catch {
+      toast.error('Échec de suppression du commentaire');
+    }
+  }, [detailsRow?.id]);
 
   return (
     <DashboardContent maxWidth="xl" sx={sx}>
       <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
-          <Typography variant="h4">Publications</Typography>
-          <Button variant="contained" onClick={openCreateDialog}>
-            Nouvelle publication
-          </Button>
-        </Stack>
+        <Card
+          sx={{
+            p: { xs: 2, md: 2.5 },
+            borderRadius: 2,
+            background: (theme) =>
+              `linear-gradient(135deg, ${theme.palette.primary.main}14 0%, ${theme.palette.info.main}1F 100%)`,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            justifyContent="space-between"
+            alignItems={{ md: 'center' }}
+          >
+            <Box>
+              <Typography variant="h4">Publications</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                Gérez vos contenus, médias et commentaires depuis une vue unifiée.
+              </Typography>
+            </Box>
 
-        <Card sx={{ p: 2 }}>
+            <Stack direction="row" spacing={1.25} alignItems="center">
+              <Chip
+                size="small"
+                color="info"
+                variant="soft"
+                label={`${filteredRows.length} publication(s)`}
+              />
+              <Button variant="contained" onClick={openCreateDialog} startIcon={<Iconify icon="solar:add-circle-bold" />}>
+                Nouvelle publication
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
+
+        <Card sx={{ p: 2, borderRadius: 2 }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
             <TextField
               fullWidth
@@ -332,7 +460,7 @@ export function PublicationsView({ sx }) {
           </Stack>
         </Card>
 
-        <Card>
+        <Card sx={{ borderRadius: 2, overflow: 'hidden' }}>
           {loading ? (
             <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
               <CircularProgress />
@@ -357,17 +485,53 @@ export function PublicationsView({ sx }) {
                     <TableBody>
                       {dataInPage.map((row) => (
                         <TableRow key={row.id} hover>
-                          <TableCell>{row.author}</TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1.25} alignItems="center">
+                              <Avatar sx={{ width: 34, height: 34, fontSize: 14 }}>
+                                {getInitial(row.author)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {row.author}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  {row.commentsCount ?? 0} com. • {row.likesCount ?? 0} likes
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </TableCell>
                           <TableCell sx={{ maxWidth: 420 }}>
-                            <Typography variant="body2" noWrap>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
                               {row.content || '-'}
                             </Typography>
+                            {(row.imageUrls ?? []).length > 0 ? (
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {(row.imageUrls ?? []).length} image(s)
+                              </Typography>
+                            ) : null}
                           </TableCell>
                           <TableCell>
-                            <Chip size="small" label={row.postType} />
+                            <Chip size="small" color={typeChipColor(row.postType)} variant="soft" label={row.postType} />
                           </TableCell>
-                          <TableCell>{row.audience}</TableCell>
-                          <TableCell>{formatDate(row.createdAt)}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              color={audienceChipColor(row.audience)}
+                              variant="soft"
+                              label={row.audience}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{formatDate(row.createdAt)}</Typography>
+                          </TableCell>
                           <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                             <Tooltip title="Voir détails">
                               <IconButton color="info" onClick={() => openDetails(row)}>
@@ -480,67 +644,307 @@ export function PublicationsView({ sx }) {
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="md">
-          <DialogTitle>Détails publication</DialogTitle>
-          <DialogContent dividers>
-            <Stack spacing={1.25}>
-              <Typography variant="body2">
-                <strong>Auteur:</strong> {detailsRow?.author ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Type:</strong> {detailsRow?.postType ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Audience:</strong> {detailsRow?.audience ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Lieu:</strong> {detailsRow?.locationLabel || '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Hashtags:</strong> {detailsRow?.hashtags || '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Likes:</strong> {detailsRow?.likesCount ?? 0}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Commentaires:</strong> {detailsRow?.commentsCount ?? 0}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date création:</strong> {formatDate(detailsRow?.createdAt)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date modification:</strong> {formatDate(detailsRow?.updatedAt)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Trip link:</strong>{' '}
-                {detailsRow?.tripLink ? (
-                  <Link href={detailsRow.tripLink} target="_blank" rel="noopener noreferrer">
-                    {detailsRow.tripLink}
-                  </Link>
-                ) : (
-                  '-'
-                )}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Contenu:</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {detailsRow?.content || '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Images:</strong>
-              </Typography>
-              <Stack spacing={0.5}>
-                {(detailsRow?.imageUrls ?? []).length ? (
-                  detailsRow.imageUrls.map((url) => (
-                    <Link key={url} href={url} target="_blank" rel="noopener noreferrer" noWrap>
-                      {url}
-                    </Link>
-                  ))
-                ) : (
-                  <Typography variant="body2">-</Typography>
-                )}
+        <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="lg">
+          <DialogTitle sx={{ pb: 1.5 }}>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1.25}
+              justifyContent="space-between"
+              alignItems={{ md: 'center' }}
+            >
+              <Stack direction="row" spacing={1.25} alignItems="center">
+                <Avatar
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: 'primary.main',
+                  }}
+                >
+                  <Iconify icon="solar:document-text-bold" width={18} />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">Détails publication</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Vue complète du post et de ses commentaires
+                  </Typography>
+                </Box>
               </Stack>
+
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip size="small" color="primary" variant="soft" label={detailsRow?.postType ?? '-'} />
+                <Chip size="small" color="default" variant="soft" label={detailsRow?.audience ?? '-'} />
+                <Chip size="small" color="success" variant="soft" label={`${detailsRow?.likesCount ?? 0} likes`} />
+                <Chip size="small" color="info" variant="soft" label={`${detailsRow?.commentsCount ?? 0} com.`} />
+              </Stack>
+            </Stack>
+          </DialogTitle>
+
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Stack spacing={2.5}>
+              {(detailsRow?.imageUrls ?? []).length > 0 ? (
+                <Box
+                  sx={{
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.neutral',
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={detailsRow?.imageUrls?.[0]}
+                    alt="Cover publication"
+                    sx={{ width: '100%', height: { xs: 180, md: 240 }, objectFit: 'cover' }}
+                  />
+                </Box>
+              ) : null}
+
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    `linear-gradient(135deg, ${theme.palette.info.main}12 0%, ${theme.palette.primary.main}10 100%)`,
+                }}
+              >
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                    Auteur
+                  </Typography>
+                  <Typography variant="h6">{detailsRow?.author ?? '-'}</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Publiée le {formatDate(detailsRow?.createdAt)} • modifiée le {formatDate(detailsRow?.updatedAt)}
+                  </Typography>
+                </Stack>
+              </Card>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+                }}
+              >
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Lieu
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.locationLabel || '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Hashtags
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.hashtags || '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Lien du trip
+                  </Typography>
+                  {detailsRow?.tripLink ? (
+                    <Link href={detailsRow.tripLink} target="_blank" rel="noopener noreferrer" noWrap>
+                      {detailsRow.tripLink}
+                    </Link>
+                  ) : (
+                    <Typography variant="body2">-</Typography>
+                  )}
+                </Card>
+              </Box>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Contenu du post
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                  {detailsRow?.content || '-'}
+                </Typography>
+              </Card>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Galerie média
+                </Typography>
+                {(detailsRow?.imageUrls ?? []).length ? (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 1,
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                    }}
+                  >
+                    {detailsRow.imageUrls.map((url) => (
+                      <Box
+                        key={url}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1 }}
+                      >
+                        <Box
+                          component="img"
+                          src={url}
+                          alt="Publication"
+                          sx={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 1 }}
+                        />
+                        <Link
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          noWrap
+                          sx={{ display: 'block', mt: 1, fontSize: 12 }}
+                        >
+                          {url}
+                        </Link>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Aucune image
+                  </Typography>
+                )}
+              </Card>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  justifyContent="space-between"
+                  spacing={1}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Typography variant="subtitle2">Utilisateurs qui ont liké</Typography>
+                  <Chip
+                    size="small"
+                    color="success"
+                    variant="soft"
+                    label={`${detailsRow?.likedByUsers?.length ?? 0} utilisateur(s)`}
+                  />
+                </Stack>
+
+                {(detailsRow?.likedByUsers ?? []).length ? (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 1,
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                    }}
+                  >
+                    {detailsRow.likedByUsers.map((user) => (
+                      <Stack
+                        key={user.id}
+                        direction="row"
+                        spacing={1.25}
+                        alignItems="center"
+                        sx={{
+                          p: 1.25,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'background.neutral',
+                        }}
+                      >
+                        <Avatar sx={{ width: 34, height: 34, fontSize: 14 }}>
+                          {getInitial(user.fullname)}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                            {user.fullname}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {getUserSubtitle(user.userType)}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Aucun like pour cette publication.
+                  </Typography>
+                )}
+              </Card>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  justifyContent="space-between"
+                  spacing={1}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Typography variant="subtitle2">Commentaires du post</Typography>
+                  <Button
+                    size="small"
+                    startIcon={<Iconify icon="solar:refresh-bold" />}
+                    onClick={() => loadPostComments(detailsRow?.id)}
+                    disabled={detailsCommentsLoading || !detailsRow?.id}
+                  >
+                    Actualiser
+                  </Button>
+                </Stack>
+
+                {detailsCommentsLoading ? (
+                  <Stack alignItems="center" justifyContent="center" sx={{ py: 4 }}>
+                    <CircularProgress size={24} />
+                  </Stack>
+                ) : detailsCommentsError ? (
+                  <Typography variant="body2" color="error.main">
+                    {detailsCommentsError}
+                  </Typography>
+                ) : detailsComments.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Aucun commentaire pour cette publication.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.5}>
+                    {detailsComments.map((comment) => (
+                      <Card
+                        key={comment.id}
+                        variant="outlined"
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 1.5,
+                          bgcolor: 'background.neutral',
+                        }}
+                      >
+                        <Stack direction="row" justifyContent="space-between" spacing={1}>
+                          <Stack direction="row" spacing={1.25} alignItems="center">
+                            <Avatar sx={{ width: 30, height: 30, fontSize: 13 }}>
+                              {getInitial(comment.authorName)}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="subtitle2">{comment.authorName}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {formatDate(comment.createdAt)}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Tooltip title="Supprimer commentaire">
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => handleDeleteCommentFromDetails(comment.id)}
+                            >
+                              <Iconify icon="solar:trash-bin-trash-bold" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+
+                        <Divider sx={{ my: 1 }} />
+
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                          {comment.content || '-'}
+                        </Typography>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </Card>
             </Stack>
           </DialogContent>
           <DialogActions>

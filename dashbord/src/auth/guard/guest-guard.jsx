@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 
-import { useRouter, useSearchParams } from 'src/routes/hooks';
+import { useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 
@@ -11,35 +11,17 @@ import { useAuthContext } from '../hooks';
 // ----------------------------------------------------------------------
 
 export function GuestGuard({ children }) {
-  const router = useRouter();
-
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo') || CONFIG.auth.redirectPath;
 
   const { loading, authenticated } = useAuthContext();
 
-  const [isChecking, setIsChecking] = useState(true);
-
-  const checkPermissions = async () => {
-    if (loading) {
-      return;
-    }
-
-    if (authenticated) {
-      router.replace(returnTo);
-      return;
-    }
-
-    setIsChecking(false);
-  };
-
-  useEffect(() => {
-    checkPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, loading]);
-
-  if (isChecking) {
+  if (loading) {
     return <SplashScreen />;
+  }
+
+  if (authenticated) {
+    return <Navigate to={returnTo} replace />;
   }
 
   return <>{children}</>;

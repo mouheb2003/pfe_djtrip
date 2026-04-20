@@ -190,14 +190,6 @@ export function UsersView({ sx }) {
   }, [fetchUsers]);
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchUsers();
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [fetchUsers]);
-
-  useEffect(() => {
     const onFocus = () => {
       fetchUsers();
     };
@@ -828,40 +820,112 @@ export function UsersView({ sx }) {
           )}
         </Card>
 
-        <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle>Détails utilisateur</DialogTitle>
+        <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="md">
+          <DialogTitle>
+            <Stack spacing={0.5}>
+              <Typography variant="h6">Détails utilisateur</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Vue détaillée du profil et de l'état du compte
+              </Typography>
+            </Stack>
+          </DialogTitle>
           <DialogContent dividers>
-            <Stack spacing={1.25}>
-              <Typography variant="body2">
-                <strong>Nom:</strong> {selectedUser?.fullname ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Email:</strong> {selectedUser?.email ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Rôle:</strong> {selectedUser?.role ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Statut compte:</strong> {selectedUser?.status ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Suspendu jusqu au:</strong>{' '}
-                {selectedUser?.suspendedUntil
-                  ? new Date(selectedUser.suspendedUntil).toLocaleString('fr-FR')
-                  : '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Statut organisateur:</strong> {selectedUser?.statutOrganisateur ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Téléphone:</strong> {selectedUser?.numTel ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Age:</strong> {selectedUser?.age ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Bio:</strong> {selectedUser?.bio ?? '-'}
-              </Typography>
+            <Stack spacing={2}>
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: 'background.neutral',
+                }}
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Box>
+                    <Typography variant="h6">{selectedUser?.fullname ?? '-'}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {selectedUser?.email ?? '-'}
+                    </Typography>
+                  </Box>
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Label variant="soft" color={roleColor(selectedUser?.role)}>
+                      Role: {selectedUser?.role ?? '-'}
+                    </Label>
+                    <Label variant="soft" color={statusColor(selectedUser?.status)}>
+                      Statut: {selectedUser?.status ?? '-'}
+                    </Label>
+                  </Stack>
+                </Stack>
+              </Card>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                }}
+              >
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Date inscription
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedUser?.dateInscription
+                      ? new Date(selectedUser.dateInscription).toLocaleString('fr-FR')
+                      : '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Suspendu jusqu au
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedUser?.suspendedUntil
+                      ? new Date(selectedUser.suspendedUntil).toLocaleString('fr-FR')
+                      : '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Statut organisateur
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedUser?.statutOrganisateur ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Téléphone
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedUser?.numTel ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Age
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {selectedUser?.age ?? '-'}
+                  </Typography>
+                </Card>
+              </Box>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                  Bio
+                </Typography>
+                <Typography variant="body2">{selectedUser?.bio ?? '-'}</Typography>
+              </Card>
             </Stack>
           </DialogContent>
           <DialogActions>

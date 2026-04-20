@@ -1,45 +1,21 @@
-import axios from 'axios';
+import axios from 'src/lib/axios';
+import { buildApiPath } from 'src/services/backend';
 
-const API_BASE_URL = 'http://localhost:3000/api/v1';
-
-// Create axios instance with auth
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-});
-
-// Add auth token to requests
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Handle response errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired, redirect to login
-      localStorage.removeItem('adminToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+const API = {
+  userNotifications: buildApiPath('/notifications'),
+  adminNotifications: buildApiPath('/notifications/admin'),
+  unreadCount: buildApiPath('/notifications/unread-count'),
+  markAllRead: buildApiPath('/notifications/read-all'),
+  one: (id) => buildApiPath(`/notifications/${id}`),
+  markRead: (id) => buildApiPath(`/notifications/${id}/read`),
+  bulk: buildApiPath('/notifications/bulk'),
+};
 
 export const notificationService = {
   // Get all notifications (admin)
   getAllNotifications: async (params = {}) => {
     try {
-      const response = await apiClient.get('/admin/notifications', { params });
+      const response = await axios.get(API.adminNotifications, { params });
       return response.data;
     } catch (error) {
       console.error('Error getting notifications:', error);
@@ -50,7 +26,7 @@ export const notificationService = {
   // Create notification
   createNotification: async (notificationData) => {
     try {
-      const response = await apiClient.post('/notifications', notificationData);
+      const response = await axios.post(API.userNotifications, notificationData);
       return response.data;
     } catch (error) {
       console.error('Error creating notification:', error);
@@ -61,7 +37,7 @@ export const notificationService = {
   // Create bulk notifications
   createBulkNotifications: async (notifications) => {
     try {
-      const response = await apiClient.post('/notifications/bulk', { notifications });
+      const response = await axios.post(API.bulk, { notifications });
       return response.data;
     } catch (error) {
       console.error('Error creating bulk notifications:', error);
@@ -72,7 +48,7 @@ export const notificationService = {
   // Delete notification
   deleteNotification: async (id) => {
     try {
-      const response = await apiClient.delete(`/notifications/${id}`);
+      const response = await axios.delete(API.one(id));
       return response.data;
     } catch (error) {
       console.error('Error deleting notification:', error);
@@ -83,7 +59,7 @@ export const notificationService = {
   // Mark notification as read
   markAsRead: async (id) => {
     try {
-      const response = await apiClient.patch(`/notifications/${id}/read`);
+      const response = await axios.patch(API.markRead(id));
       return response.data;
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -94,10 +70,21 @@ export const notificationService = {
   // Mark all notifications as read
   markAllAsRead: async () => {
     try {
-      const response = await apiClient.patch('/notifications/read-all');
+      const response = await axios.patch(API.markAllRead);
       return response.data;
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      throw error;
+    }
+  },
+
+  // Get unread count for current user
+  getUnreadCount: async () => {
+    try {
+      const response = await axios.get(API.unreadCount);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting unread count:', error);
       throw error;
     }
   },

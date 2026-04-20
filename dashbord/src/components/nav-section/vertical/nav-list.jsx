@@ -2,7 +2,7 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { useRef, useEffect, useCallback } from 'react';
 import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 
-import { usePathname } from 'src/routes/hooks';
+import { usePathname, useRouter } from 'src/routes/hooks';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
@@ -12,6 +12,7 @@ import { NavUl, NavLi, NavCollapse } from '../components';
 
 export function NavList({ data, depth, render, slotProps, currentRole, enabledRootRedirect }) {
   const pathname = usePathname();
+  const router = useRouter();
   const navItemRef = useRef(null);
 
   const isActive = isActiveLink(pathname, data.path, !!data.children);
@@ -25,11 +26,17 @@ export function NavList({ data, depth, render, slotProps, currentRole, enabledRo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const handleToggleMenu = useCallback(() => {
+  const handleToggleMenu = useCallback((event) => {
     if (data.children) {
       onToggle();
+      return;
     }
-  }, [data.children, onToggle]);
+
+    if (!isExternalLink(data.path)) {
+      event.preventDefault();
+      router.push(data.path);
+    }
+  }, [data.children, data.path, onToggle, router]);
 
   const renderNavItem = () => (
     <NavItem

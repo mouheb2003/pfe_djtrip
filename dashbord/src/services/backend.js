@@ -41,6 +41,11 @@ export const BACKEND_MODES = [
 ];
 
 export function getBackendMode() {
+  // In local development, always prefer local backend to avoid stale persisted mode.
+  if (import.meta.env.DEV) {
+    return 'dev';
+  }
+
   if (typeof window === 'undefined') {
     return normalizeMode(import.meta.env.VITE_BACKEND_MODE ?? 'dev');
   }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSearchParams as _useSearchParams } from 'react-router';
+import { useSearchParams as _useSearchParams } from 'react-router-dom';
 
 // ----------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 import { useTheme } from '@mui/material/styles';
 import { popoverClasses } from '@mui/material/Popover';
 
-import { usePathname } from 'src/routes/hooks';
+import { usePathname, useRouter } from 'src/routes/hooks';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
@@ -25,6 +25,7 @@ export function NavList({
   const theme = useTheme();
 
   const pathname = usePathname();
+  const router = useRouter();
 
   const isActive = isActiveLink(pathname, data.path, !!data.children);
 
@@ -41,11 +42,17 @@ export function NavList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const handleOpenMenu = useCallback(() => {
+  const handleOpenMenu = useCallback((event) => {
     if (data.children) {
       onOpen();
+      return;
     }
-  }, [data.children, onOpen]);
+
+    if (!isExternalLink(data.path)) {
+      event.preventDefault();
+      router.push(data.path);
+    }
+  }, [data.children, data.path, onOpen, router]);
 
   const renderNavItem = () => (
     <NavItem

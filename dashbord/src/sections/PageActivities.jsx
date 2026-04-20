@@ -4,11 +4,13 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
@@ -84,6 +86,28 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('fr-FR');
+}
+
+function getInitial(value) {
+  return String(value || '?').trim().charAt(0).toUpperCase();
+}
+
+function statusColor(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'active') return 'success';
+  if (normalized === 'inactive') return 'warning';
+  if (normalized === 'archived') return 'default';
+  if (normalized === 'completed') return 'info';
+  return 'default';
+}
+
+function difficultyColor(value) {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'easy') return 'success';
+  if (normalized === 'moderate') return 'info';
+  if (normalized === 'difficult') return 'warning';
+  if (normalized === 'expert') return 'error';
+  return 'default';
 }
 
 function applyFilter({ inputData, comparator, filters }) {
@@ -594,72 +618,248 @@ export function ActivitiesView({ sx }) {
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="md">
-          <DialogTitle>Détails activité</DialogTitle>
-          <DialogContent dividers>
-            <Stack spacing={1.25}>
-              <Typography variant="body2">
-                <strong>Titre:</strong> {detailsRow?.titre ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Description:</strong> {detailsRow?.description ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Organisateur:</strong> {detailsRow?.organisateur_name ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>organisateur_id:</strong> {detailsRow?.organisateur_id ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Type:</strong> {detailsRow?.type_activite ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Catégorie:</strong> {detailsRow?.categorie ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Difficulté:</strong> {detailsRow?.niveau_difficulte ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Lieu:</strong> {detailsRow?.lieu ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Durée:</strong> {detailsRow?.duree ?? '-'} h
-              </Typography>
-              <Typography variant="body2">
-                <strong>Prix:</strong> {detailsRow?.prix ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Capacité:</strong> {detailsRow?.capacite_max ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Statut:</strong> {detailsRow?.statut ?? '-'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date début:</strong> {formatDate(detailsRow?.date_debut)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Date fin:</strong> {formatDate(detailsRow?.date_fin)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Créée le:</strong> {formatDate(detailsRow?.createdAt)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Modifiée le:</strong> {formatDate(detailsRow?.updatedAt)}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Photos:</strong>
-              </Typography>
-              <Stack spacing={0.5}>
-                {(detailsRow?.photos ?? []).length ? (
-                  detailsRow.photos.map((url) => (
-                    <Typography key={url} variant="body2" noWrap>
-                      {url}
-                    </Typography>
-                  ))
-                ) : (
-                  <Typography variant="body2">-</Typography>
-                )}
+        <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="lg">
+          <DialogTitle sx={{ pb: 1.5 }}>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1.5}
+              justifyContent="space-between"
+              alignItems={{ md: 'center' }}
+            >
+              <Stack direction="row" spacing={1.25} alignItems="center">
+                <Avatar
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    bgcolor: 'primary.main',
+                  }}
+                >
+                  <Iconify icon="solar:map-point-bold" width={20} />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">Détails activité</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Vue complète de l’activité et de ses informations clés
+                  </Typography>
+                </Box>
               </Stack>
+
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip size="small" color="primary" variant="soft" label={detailsRow?.type_activite ?? '-'} />
+                <Chip size="small" color={statusColor(detailsRow?.statut)} variant="soft" label={detailsRow?.statut ?? '-'} />
+                <Chip size="small" color={difficultyColor(detailsRow?.niveau_difficulte)} variant="soft" label={detailsRow?.niveau_difficulte ?? '-'} />
+                <Chip size="small" color="info" variant="soft" label={`${detailsRow?.prix ?? 0} DT`} />
+              </Stack>
+            </Stack>
+          </DialogTitle>
+
+          <DialogContent dividers sx={{ pt: 2 }}>
+            <Stack spacing={2.5}>
+              {(detailsRow?.photos ?? []).length > 0 ? (
+                <Box
+                  sx={{
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.neutral',
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={detailsRow?.photos?.[0]}
+                    alt="Activity cover"
+                    sx={{ width: '100%', height: { xs: 180, md: 240 }, objectFit: 'cover' }}
+                  />
+                </Box>
+              ) : null}
+
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  background: (theme) =>
+                    `linear-gradient(135deg, ${theme.palette.primary.main}12 0%, ${theme.palette.info.main}10 100%)`,
+                }}
+              >
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1.5}
+                  justifyContent="space-between"
+                  alignItems={{ md: 'center' }}
+                >
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+                      Titre
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {detailsRow?.titre ?? '-'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Créée le {formatDate(detailsRow?.createdAt)} • modifiée le {formatDate(detailsRow?.updatedAt)}
+                    </Typography>
+                  </Box>
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Chip size="small" color="success" variant="soft" label={`Durée: ${detailsRow?.duree ?? '-'} h`} />
+                    <Chip size="small" color="warning" variant="soft" label={`Capacité: ${detailsRow?.capacite_max ?? '-'}`} />
+                  </Stack>
+                </Stack>
+              </Card>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+                }}
+              >
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Organisateur
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.organisateur_name ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Lieu
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.lieu ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Prix
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.prix ?? '-'} DT
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Type
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.type_activite ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Catégorie
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.categorie ?? '-'}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Difficulte
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {detailsRow?.niveau_difficulte ?? '-'}
+                  </Typography>
+                </Card>
+              </Box>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Description
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                  {detailsRow?.description ?? '-'}
+                </Typography>
+              </Card>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                }}
+              >
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Date début
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {formatDate(detailsRow?.date_debut)}
+                  </Typography>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    Date fin
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {formatDate(detailsRow?.date_fin)}
+                  </Typography>
+                </Card>
+              </Box>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Photos
+                </Typography>
+                {(detailsRow?.photos ?? []).length ? (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 1,
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                    }}
+                  >
+                    {detailsRow.photos.map((url, index) => (
+                      <Box
+                        key={url}
+                        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1 }}
+                      >
+                        <Box
+                          component="img"
+                          src={url}
+                          alt={`Activity ${index + 1}`}
+                          sx={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 1 }}
+                        />
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }} noWrap>
+                          {url}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Aucune photo
+                  </Typography>
+                )}
+              </Card>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Informations techniques
+                </Typography>
+                <Stack spacing={0.75} divider={<Divider flexItem />}>
+                  <Stack direction="row" justifyContent="space-between" spacing={2}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>organisateur_id</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                      {detailsRow?.organisateur_id ?? '-'}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between" spacing={2}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>Capacité max</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {detailsRow?.capacite_max ?? '-'}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Card>
             </Stack>
           </DialogContent>
           <DialogActions>
