@@ -3,7 +3,7 @@ import 'dart:async';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
 import 'tabs/home_tab.dart';
-import 'tabs/explore_tab.dart';
+import '../../features/maps/presentation/map_explorer_screen.dart';
 import 'tabs/screen_network.dart';
 import 'tabs/tourist_profile_tab.dart';
 import '../shared/messages_screen.dart';
@@ -61,7 +61,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       ),
-      const ExploreTab(),
+      const MapExplorerScreen(),
       const MyActivitiesScreen(),
       const ScreenNetwork(),
       TouristProfileTab(onNavigateToTab: _goToTab),
@@ -91,7 +91,8 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     if (!mounted) return;
 
     try {
-      final pendingReview = await review_service.ReviewReminderService.getNextPendingReview();
+      final pendingReview =
+          await review_service.ReviewReminderService.getNextPendingReview();
       if (pendingReview == null) return;
 
       final booking = pendingReview['booking'] as InscriptionModel;
@@ -119,16 +120,14 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => ReviewPromptModal(
-          booking: bookingModel,
-          activity: activity,
-        ),
+        builder: (context) =>
+            ReviewPromptModal(booking: bookingModel, activity: activity),
       );
 
       // Mark as shown after popup is closed
       await review_service.ReviewReminderService.markAsShown(booking.id);
     } catch (e) {
-      print('[TouristMainScreen] Error showing review popup: $e');
+      debugPrint('[TouristMainScreen] Error showing review popup: $e');
     }
   }
 
@@ -271,9 +270,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
   void _openNotifications() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const NotificationHistoryScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
     );
   }
 
@@ -305,7 +302,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.14),
+                        color: AppColors.primary.withValues(alpha: 0.14),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),
@@ -383,7 +380,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.2),
+                              color: AppColors.primary.withValues(alpha: 0.2),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),

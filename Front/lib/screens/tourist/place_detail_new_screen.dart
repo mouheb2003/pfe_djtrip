@@ -61,7 +61,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
   Widget _buildMediaSection() {
     return Stack(
       children: [
-        Container(
+        SizedBox(
           height: 250,
           width: double.infinity,
           child: widget.place.video != null && widget.place.video!.isNotEmpty
@@ -104,7 +104,10 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.favorite_border, color: Colors.white),
+                      icon: const Icon(
+                        Icons.favorite_border,
+                        color: Colors.white,
+                      ),
                       onPressed: () {},
                     ),
                   ),
@@ -114,6 +117,198 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTitleSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1D4ED8), Color(0xFF167BFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF167BFF).withOpacity(0.22),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                        child: const Text(
+                          'TICKET PLACE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.place.titre,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.05,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.place.sousTitre.isNotEmpty
+                            ? widget.place.sousTitre
+                            : 'Djerba, Tunisia',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.88),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.22)),
+                  ),
+                  child: Text(
+                    widget.place.categorie,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _buildTicketDivider(),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTicketMetric(
+                    Icons.attach_money,
+                    'Price',
+                    widget.place.prix != 'FREE' ? widget.place.prix : 'Free',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTicketMetric(
+                    Icons.star,
+                    'Rating',
+                    widget.place.noteMoyenne.toStringAsFixed(1),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTicketMetric(
+                    Icons.place,
+                    'Avis',
+                    '${widget.place.nombreAvis}',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketDivider() {
+    return Row(
+      children: List.generate(
+        18,
+        (index) => Expanded(
+          child: Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.24),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketMetric(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(height: 8),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.76),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.7,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -130,9 +325,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
             height: double.infinity,
           ),
           Container(
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-            ),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(0.3)),
           ),
           Container(
             width: 60,
@@ -141,11 +334,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
               color: Colors.white.withOpacity(0.9),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.play_arrow,
-              color: Colors.black,
-              size: 30,
-            ),
+            child: const Icon(Icons.play_arrow, color: Colors.black, size: 30),
           ),
         ],
       ),
@@ -154,12 +343,14 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
 
   Widget _buildImageSlider() {
     return PageView.builder(
-      itemCount: widget.place.images.length > 0 ? widget.place.images.length : 1,
+      itemCount: widget.place.images.length > 0
+          ? widget.place.images.length
+          : 1,
       itemBuilder: (context, index) {
-        final imageUrl = widget.place.images.isNotEmpty 
-            ? widget.place.images[index] 
+        final imageUrl = widget.place.images.isNotEmpty
+            ? widget.place.images[index]
             : widget.place.displayImage;
-        
+
         return Image.network(
           imageUrl,
           fit: BoxFit.cover,
@@ -171,81 +362,6 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildTitleSection() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.place.titre,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.place.sousTitre.isNotEmpty 
-                          ? widget.place.sousTitre 
-                          : 'Djerba, Tunisia',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _getCategoryColor(widget.place.categorie),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  widget.place.categorie,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Row(
-                children: List.generate(5, (index) => Icon(
-                  index < widget.place.noteMoyenne.floor() ? Icons.star : Icons.star_border,
-                  color: Colors.orange,
-                  size: 16,
-                )),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${widget.place.noteMoyenne.toStringAsFixed(1)} (${widget.place.nombreAvis} reviews)',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -324,8 +440,8 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            widget.place.description.isNotEmpty 
-                ? widget.place.description 
+            widget.place.description.isNotEmpty
+                ? widget.place.description
                 : 'No description available for this place.',
             style: const TextStyle(
               fontSize: 14,
@@ -364,7 +480,11 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
               _buildInfoCard(Icons.attach_money, 'Price', widget.place.prix),
               _buildInfoCard(Icons.access_time, 'Hours', '9 AM - 6 PM'),
               _buildInfoCard(Icons.location_on, 'Location', 'Djerba'),
-              _buildInfoCard(Icons.star, 'Rating', '${widget.place.noteMoyenne.toStringAsFixed(1)}'),
+              _buildInfoCard(
+                Icons.star,
+                'Rating',
+                '${widget.place.noteMoyenne.toStringAsFixed(1)}',
+              ),
             ],
           ),
         ],
@@ -387,10 +507,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           const SizedBox(height: 8),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF64748B),
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 4),
           Text(
@@ -425,28 +542,32 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: widget.place.amenities.map((amenity) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  amenity,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              )).toList(),
+              children: widget.place.amenities
+                  .map(
+                    (amenity) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        amenity,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             )
           else
             Text(
               'No amenities listed',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF64748B),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
             ),
         ],
       ),
@@ -468,11 +589,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           ),
         ],
       ),
-      child: const Icon(
-        Icons.navigation,
-        color: Colors.white,
-        size: 24,
-      ),
+      child: const Icon(Icons.navigation, color: Colors.white, size: 24),
     );
   }
 
@@ -508,10 +625,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
                   ),
                   const Text(
                     'Per person',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
               ),
@@ -558,8 +672,8 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            widget.place.description.isNotEmpty 
-                ? widget.place.description 
+            widget.place.description.isNotEmpty
+                ? widget.place.description
                 : 'No description available for this place.',
             style: const TextStyle(
               fontSize: 16,
@@ -740,7 +854,12 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
     );
   }
 
-  Widget _buildReviewItem(String name, String comment, double rating, String date) {
+  Widget _buildReviewItem(
+    String name,
+    String comment,
+    double rating,
+    String date,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -761,11 +880,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
                   color: AppColors.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
+                child: Icon(Icons.person, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -792,11 +907,14 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
               ),
               Row(
                 children: [
-                  ...List.generate(5, (index) => Icon(
-                    index < rating ? Icons.star : Icons.star_border,
-                    color: Colors.orange,
-                    size: 16,
-                  )),
+                  ...List.generate(
+                    5,
+                    (index) => Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     rating.toStringAsFixed(1),
@@ -850,10 +968,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
             child: const Center(
               child: Text(
                 'Similar places coming soon...',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 16),
               ),
             ),
           ),
@@ -923,7 +1038,11 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.white, size: 20),
+                  const Icon(
+                    Icons.calendar_today,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Book Now',
@@ -967,14 +1086,12 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
       ),
       child: Column(
         children: [
-          _buildInfoRow(
-            Icons.category,
-            'Category',
-            widget.place.categorie,
-          ),
+          _buildInfoRow(Icons.category, 'Category', widget.place.categorie),
           const Divider(height: 20),
           _buildInfoRow(
-            widget.place.prix == 'FREE' ? Icons.card_giftcard : Icons.attach_money,
+            widget.place.prix == 'FREE'
+                ? Icons.card_giftcard
+                : Icons.attach_money,
             'Price',
             widget.place.prix,
           ),
@@ -984,7 +1101,8 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
             'Rating',
             '${widget.place.noteMoyenne.toStringAsFixed(1)} (${widget.place.nombreAvis} reviews)',
           ),
-          if (widget.place.latitude != null && widget.place.longitude != null) ...[
+          if (widget.place.latitude != null &&
+              widget.place.longitude != null) ...[
             const Divider(height: 20),
             _buildInfoRow(
               Icons.location_on,
@@ -1006,11 +1124,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: const Color(0xFF64748B),
-          ),
+          child: Icon(icon, size: 20, color: const Color(0xFF64748B)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1058,10 +1172,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                   color: const Color(0xFFF1F5F9),
-                  child: const Icon(
-                    Icons.image,
-                    color: Color(0xFF64748B),
-                  ),
+                  child: const Icon(Icons.image, color: Color(0xFF64748B)),
                 ),
               ),
             ),
@@ -1073,36 +1184,40 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
 
   Widget _buildFeaturesSection() {
     final features = _getCategoryFeatures(widget.place.categorie);
-    
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: features.map((feature) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              feature['icon'],
-              size: 16,
-              color: const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              feature['label'],
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w500,
+      children: features
+          .map(
+            (feature) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    feature['icon'],
+                    size: 16,
+                    color: const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    feature['label'],
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      )).toList(),
+          )
+          .toList(),
     );
   }
 

@@ -57,8 +57,8 @@ dependencies:
   # HTTP multipart for file upload
   http_parser: ^4.0.2
 
-  # Google Maps for location selection
-  google_maps_flutter: ^2.5.3
+  # Google Maps for location selection (with POI click support)
+  google_maps_flutter: ^2.13.1
   geocoding: ^3.0.0
   geolocator: ^12.0.0
 
@@ -100,6 +100,7 @@ dependencies:
   # Device Info for unique deviceId generation
   device_info_plus: ^10.1.0
   cached_network_image: ^3.4.1
+  webview_flutter: ^4.8.0
 
 dev_dependencies:
   flutter_test:
