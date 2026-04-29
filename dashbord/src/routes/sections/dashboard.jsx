@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardLayout } from 'src/layouts/dashboard';
@@ -17,17 +17,15 @@ import UsersPage from 'src/pages/dashboard/Users';
 import LogsPage from 'src/pages/dashboard/Logs';
 import AppealsPage from 'src/pages/dashboard/Appeals';
 import ApprovalsPage from 'src/pages/dashboard/Approvals';
+import PaymentsPage from 'src/pages/dashboard/Payments';
+import ChangePasswordPage from 'src/pages/dashboard/ChangePassword';
 
 // ----------------------------------------------------------------------
 
 function DashboardOutlet() {
-  const { pathname } = useLocation();
-
   return (
   <DashboardLayout>
-    <div key={pathname}>
-      <Outlet />
-    </div>
+    <Outlet />
   </DashboardLayout>
   );
 }
@@ -60,6 +58,8 @@ export const dashboardRoutes = [
       { path: 'three', element: <UsersPage /> },
       { path: 'appeals', element: <AppealsPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
+      { path: 'payments', element: <PaymentsPage /> },
+      { path: 'change-password', element: <ChangePasswordPage /> },
     ],
   },
 ];

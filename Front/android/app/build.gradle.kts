@@ -17,6 +17,8 @@ android {
     targetCompatibility = JavaVersion.VERSION_17
     }
 
+    useLibrary("org.apache.http.legacy")
+
 
     kotlin {
     compilerOptions {

@@ -33,6 +33,16 @@ export function AuthProvider({ children }) {
     }
   }, [setState]);
 
+  const logout = useCallback(async () => {
+    try {
+      await setSession(null);
+      setState({ user: null, loading: false });
+    } catch (error) {
+      console.error('Logout error:', error);
+      setState({ user: null, loading: false });
+    }
+  }, [setState]);
+
   useEffect(() => {
     checkUserSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,11 +58,12 @@ export function AuthProvider({ children }) {
     () => ({
       user: state.user ? { ...state.user, role: state.user?.role ?? 'admin' } : null,
       checkUserSession,
+      logout,
       loading: status === 'loading',
       authenticated: status === 'authenticated',
       unauthenticated: status === 'unauthenticated',
     }),
-    [checkUserSession, state.user, status]
+    [checkUserSession, logout, state.user, status]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

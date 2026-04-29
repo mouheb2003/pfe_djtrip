@@ -155,16 +155,38 @@ class ActivityService {
   /// Fetch a single activity by id.
   static Future<ActivityModel?> getActivityById(String id) async {
     try {
-      final res = await ApiClient.get('/activites/$id', auth: false);
+      print('🔍 [ACTIVITY SERVICE] Fetching activity with ID: $id');
+      final res = await ApiClient.get('/activites/$id', auth: false, cacheFirst: false);
+      print('🔍 [ACTIVITY SERVICE] Response status: ${res.statusCode}');
+      print('🔍 [ACTIVITY SERVICE] Response body: ${res.body}');
+      
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
+        print('🔍 [ACTIVITY SERVICE] Parsed body keys: ${body.keys}');
+        print('🔍 [ACTIVITY SERVICE] Has activite key: ${body.containsKey('activite')}');
+        print('🔍 [ACTIVITY SERVICE] activite value: ${body['activite']}');
+        
         final data = (body['activite'] is Map<String, dynamic>)
             ? body['activite'] as Map<String, dynamic>
             : body;
-        return ActivityModel.fromJson(data);
+        print('🔍 [ACTIVITY SERVICE] Data keys: ${data.keys}');
+        print('🔍 [ACTIVITY SERVICE] Data _id: ${data['_id']}');
+        
+        try {
+          final activity = ActivityModel.fromJson(data);
+          print('✅ [ACTIVITY SERVICE] Successfully parsed activity: ${activity.titre}');
+          return activity;
+        } catch (parseError) {
+          print('❌ [ACTIVITY SERVICE] Parse error: $parseError');
+          print('❌ [ACTIVITY SERVICE] Parse error stack: ${StackTrace.current}');
+          return null;
+        }
       }
+      print('❌ [ACTIVITY SERVICE] Status code not 200: ${res.statusCode}');
       return null;
-    } catch (_) {
+    } catch (e) {
+      print('❌ [ACTIVITY SERVICE] Error: $e');
+      print('❌ [ACTIVITY SERVICE] Error stack: ${StackTrace.current}');
       return null;
     }
   }
@@ -231,6 +253,44 @@ class ActivityService {
       return [];
     } catch (e) {
       print('❌ getAllMyActivities failed: $e');
+      return [];
+    }
+  }
+
+  /// Fetch activities for a specific organizer by ID
+  static Future<List<ActivityModel>> getActivitiesByOrganisateur(
+    String organisateurId, {
+    bool refresh = false,
+  }) async {
+    try {
+      print('🔍 [ACTIVITY SERVICE] Fetching activities for organizer: $organisateurId');
+      final res = await ApiClient.get(
+        '/activites/organisateur/$organisateurId',
+        cacheFirst: !refresh,
+      );
+      print('🔍 [ACTIVITY SERVICE] Response status: ${res.statusCode}');
+      
+      if (res.statusCode == 200) {
+        final body = _safeObject(res.body);
+        final list = _safeMapList(body['activites'] ?? body['activities']);
+        print('🔍 [ACTIVITY SERVICE] Activities count: ${list.length}');
+
+        // Map safely to avoid one bad activity crashing the whole list
+        return list
+            .map((item) {
+              try {
+                return ActivityModel.fromJson(item);
+              } catch (e) {
+                print('❌ Skipping corrupted activity in list: $e');
+                return null;
+              }
+            })
+            .whereType<ActivityModel>()
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ getActivitiesByOrganisateur failed: $e');
       return [];
     }
   }
@@ -314,6 +374,7 @@ class ActivityService {
     String? niveauDifficulte,
     String? statut,
     Map<String, dynamic>? coordonnees,
+    bool notifyFollowers = true,
   }) async {
     try {
       final token = await AuthService.getAccessToken();
@@ -369,6 +430,8 @@ class ActivityService {
         request.fields['aiGeneratedImageUrl'] = aiGeneratedImageUrl;
       }
 
+      request.fields['notifyFollowers'] = notifyFollowers.toString();
+
       for (final file in photos) {
         request.files.add(
           await http.MultipartFile.fromPath('photos', file.path),
@@ -419,6 +482,7 @@ class ActivityService {
     String? niveauDifficulte,
     String? statut,
     Map<String, dynamic>? coordonnees,
+    bool notifyBookedUsers = true,
   }) async {
     try {
       final token = await AuthService.getAccessToken();
@@ -477,6 +541,8 @@ class ActivityService {
       if (existingPhotoUrls.isNotEmpty) {
         request.fields['existingPhotoUrls'] = jsonEncode(existingPhotoUrls);
       }
+
+      request.fields['notifyBookedUsers'] = notifyBookedUsers.toString();
 
       for (final file in newPhotos) {
         request.files.add(

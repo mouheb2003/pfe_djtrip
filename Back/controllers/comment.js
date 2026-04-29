@@ -710,11 +710,13 @@ exports.getCommentReactions = async (req, res) => {
   }
 };
 
-// ADMIN: Get all comments with filters
+// ADMIN: Get all comments with filters (including replies)
 exports.getAdminComments = async (req, res) => {
   try {
     const { page = 1, limit = 50, postId, search } = req.query;
     const skip = (page - 1) * limit;
+
+    console.log('[getAdminComments] Query params:', { page, limit, postId, search });
 
     const filter = { is_active: true };
     if (postId) filter.post_id = postId;
@@ -722,18 +724,33 @@ exports.getAdminComments = async (req, res) => {
       filter.content = { $regex: search, $options: "i" };
     }
 
+    console.log('[getAdminComments] Filter:', filter);
+
+    // Fetch ALL comments (both root and replies) for this post
     const comments = await Comment.find(filter)
-      .populate("user_id", "fullname email userType")
-      .populate("post_id", "content author_id")
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
+    console.log('[getAdminComments] Fetched comments count:', comments.length);
+
+    // Manually populate user_id to avoid potential issues
+    const userIds = comments.map(c => c.user_id).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } }).select("fullname email userType avatar").lean();
+    const userMap = {};
+    users.forEach(u => { userMap[u._id.toString()] = u; });
+
+    const commentsWithUsers = comments.map(c => ({
+      ...c,
+      user_id: userMap[c.user_id?.toString()] || c.user_id,
+    }));
+
     const total = await Comment.countDocuments(filter);
+    console.log('[getAdminComments] Total comments:', total);
 
     return res.status(200).json({
-      comments,
+      comments: commentsWithUsers,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -742,6 +759,8 @@ exports.getAdminComments = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('[getAdminComments] ERROR:', error.message);
+    console.error('[getAdminComments] ERROR STACK:', error.stack);
     return res.status(500).json({
       message: "Error loading admin comments",
       error: error.message,
@@ -760,13 +779,25 @@ exports.adminDeleteComment = async (req, res) => {
       return res.status(404).json({ message: "Comment not found" });
     }
 
-    // Soft delete
+    // Find all replies to this comment
+    const replies = await Comment.find({ parent_comment_id: commentId, is_active: true });
+    const replyCount = replies.length;
+
+    // Soft delete the comment
     comment.is_active = false;
     await comment.save();
 
-    // Update post comment count
+    // Soft delete all replies
+    if (replyCount > 0) {
+      await Comment.updateMany(
+        { parent_comment_id: commentId, is_active: true },
+        { is_active: false }
+      );
+    }
+
+    // Update post comment count (comment + all replies)
     await Post.findByIdAndUpdate(comment.post_id, {
-      $inc: { comments_count: -1 },
+      $inc: { comments_count: -(1 + replyCount) },
     });
 
     // Log activity
@@ -780,6 +811,7 @@ exports.adminDeleteComment = async (req, res) => {
         metadata: {
           postId: comment.post_id,
           content: comment.content.slice(0, 100),
+          repliesDeleted: replyCount,
         },
       });
     } catch (logError) {
@@ -787,7 +819,7 @@ exports.adminDeleteComment = async (req, res) => {
     }
 
     return res.status(200).json({
-      message: "Comment deleted by admin",
+      message: `Comment deleted by admin${replyCount > 0 ? ` along with ${replyCount} reply/replies` : ''}`,
     });
   } catch (error) {
     return res.status(500).json({

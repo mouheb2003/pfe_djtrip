@@ -31,6 +31,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
   double get _subtotal => (_adults + _children) * widget.activity.prix;
   double get _total => _subtotal + _serviceFee;
+  String get _currency => 'TND';
 
   List<String> get _activityImages {
     final images = <String>[];
@@ -278,12 +279,12 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
           _PriceRow(
             label:
                 'Subtotal (${participants}x ${participants > 1 ? 'Adults' : 'Adult'})',
-            value: '${_subtotal.toStringAsFixed(0)} TND',
+            value: '${_subtotal.toStringAsFixed(0)} $_currency',
           ),
           const SizedBox(height: 8),
           _PriceRow(
             label: 'Service fee',
-            value: '${_serviceFee.toStringAsFixed(0)} TND',
+            value: '${_serviceFee.toStringAsFixed(0)} $_currency',
           ),
           const SizedBox(height: 12),
           Divider(color: const Color(0xFFD8DEE8), endIndent: 0),
@@ -300,7 +301,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                 ),
               ),
               Text(
-                '${_total.toStringAsFixed(0)} TND',
+                '${_total.toStringAsFixed(0)} $_currency',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -363,12 +364,13 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     if (_maxParticipants <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No seats available for this activity.'),
+          content: Text('This activity is no longer available'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
+
     if (requested > _maxParticipants) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -383,20 +385,42 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
     setState(() => _isLoading = true);
 
-    // Step 1: Navigate to Stripe payment screen directly
-    // Inscription will be created after successful payment
+    // Step 1: Create inscription with PAID_PENDING_CONFIRMATION status
     try {
+      final inscriptionResult = await InscriptionService.createInscription(
+        activiteId: widget.activity.id,
+        nombreParticipants: requested,
+      );
+
+      if (!mounted) return;
+
+      final inscriptionId = inscriptionResult['inscription']?['_id']?.toString() ?? inscriptionResult['inscription']?['id']?.toString();
+
+      if (inscriptionId == null || inscriptionId.isEmpty) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to create booking'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Step 2: Navigate to Stripe payment screen with inscriptionId
       final paymentCompleted = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (_) => StripePaymentScreen(
+            inscriptionId: inscriptionId,
             activityId: widget.activity.id,
             activityTitle: widget.activity.titre,
             nombreParticipants: requested,
             adults: _adults,
             children: _children,
             amount: _total,
-            currency: 'USD',
+            currency: _currency,
             description: 'Booking for ${widget.activity.titre}',
           ),
         ),
@@ -406,11 +430,19 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
       if (paymentCompleted == true) {
         // Payment successful, navigate to booking details
-        // The inscription ID will be returned from the payment screen
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Booking confirmed!'),
             backgroundColor: Colors.green,
+          ),
+        );
+        // Navigate to booking detail screen
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(
+              inscription: InscriptionModel.fromJson(inscriptionResult['inscription']),
+            ),
           ),
         );
       }
@@ -421,7 +453,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
       if (paymentCompleted != true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Payment cancelled or failed'),
+            content: Text('Payment cancelled or failed. You can retry payment from the activity details.'),
             backgroundColor: Colors.orange,
           ),
         );

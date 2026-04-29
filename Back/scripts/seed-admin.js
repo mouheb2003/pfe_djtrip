@@ -24,6 +24,7 @@ async function seedAdmin() {
     existing.accountStatus = 'active';
     existing.emailVerified = true;
     existing.fullname = existing.fullname || 'Administrator';
+    existing.userType = 'Admin';
     await existing.save();
     console.log('Admin account updated: admin/admin');
   } else {

@@ -27,12 +27,20 @@ connectDB();
 const notificationServiceV2 = require("./services/notificationServiceV2");
 const { startWorker: startNotificationWorker } = require("./workers/notificationWorkerV2");
 const { closeQueues } = require("./config/bullmq");
+const paymentExpirationCronJob = require("./jobs/paymentExpirationCronJob");
+const bookingReminderCronJob = require("./jobs/bookingReminderCronJob");
 
 // Initialize Firebase for push notifications (V2)
 notificationServiceV2.initializeFirebase();
 
 // Start notification worker (event-driven)
 startNotificationWorker();
+
+// Start payment expiration cron job
+
+// Start booking reminder cron job
+bookingReminderCronJob.start();
+paymentExpirationCronJob.start();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");
@@ -63,6 +71,8 @@ const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
 const paymentRoutes = require("./routes/payment");
+const invoiceRoutes = require("./routes/invoice");
+const followRoutes = require("./routes/follow");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
@@ -98,10 +108,17 @@ if (commentController.initSocketIO) {
   console.log('[SERVER] Socket.io initialized in comment controller');
 }
 
+// Initialize Socket.io in message controller
+const messageController = require("./controllers/message");
+if (messageController.initSocketIO) {
+  messageController.initSocketIO(io);
+  console.log('[SERVER] Socket.io initialized in message controller');
+}
+
 // ─── Body Parsing ─────────────────────────────────────────────────────────────
 // Express JSON parser for regular requests
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(responseNormalizer);
 app.use(requestLogger);
 app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS || 15000)));
@@ -243,6 +260,7 @@ app.get("/", (req, res) => {
       appeals: "/api/v1/appeals",
       notifications: "/api/v1/notifications",
       payments: "/api/payments",
+      invoices: "/api/v1/invoices",
     },
   });
 });
@@ -268,6 +286,8 @@ app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
 app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
+app.use("/api/v1/follow", followRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);
@@ -351,6 +371,7 @@ app.use("/api/lieux", lieuRoutes);
 app.use("/api/appeals", appealRoutes);
 app.use("/api/system-logs", systemLogRoutes);
 app.use("/api/logs", logRoutes);
+app.use("/api/invoices", invoiceRoutes);
 app.post("/api/auth/refresh", authMiddleware.refreshToken);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────

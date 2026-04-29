@@ -10,10 +10,9 @@ class CancellationPolicy {
   /**
    * Calculate refund based on time before activity
    * Policy:
-   * - 48+ hours before: 100% refund
-   * - 24-48 hours: 50% refund
-   * - 12-24 hours: 25% refund
-   * - <12 hours: 0% refund
+   * - 48+ hours before: 100% refund (0% platform fee)
+   * - 24-48 hours: 85% refund (15% platform fee)
+   * - <24 hours: 70% refund (30% platform fee)
    */
   static calculateRefund(booking, activity) {
     const now = new Date();
@@ -28,14 +27,12 @@ class CancellationPolicy {
       refundPercent = 100;
       feePercent = 0;
     } else if (hoursBeforeStart >= 24) {
-      refundPercent = 50;
-      feePercent = 50;
-    } else if (hoursBeforeStart >= 12) {
-      refundPercent = 25;
-      feePercent = 75;
+      refundPercent = 85;
+      feePercent = 15;
     } else {
-      refundPercent = 0;
-      feePercent = 100;
+      // Less than 24 hours: 70% refund (30% platform fee)
+      refundPercent = 70;
+      feePercent = 30;
     }
     
     const refundAmount = (booking.prix_total * refundPercent) / 100;
@@ -59,17 +56,15 @@ class CancellationPolicy {
     if (hoursBeforeStart >= 48) {
       return 'Full refund (48+ hours before activity)';
     } else if (hoursBeforeStart >= 24) {
-      return '50% refund (24-48 hours before activity)';
-    } else if (hoursBeforeStart >= 12) {
-      return '25% refund (12-24 hours before activity)';
+      return '85% refund (24-48 hours before activity - 15% platform fee)';
     } else {
-      return 'No refund (<12 hours before activity)';
+      return '70% refund (<24 hours before activity - 30% platform fee)';
     }
   }
   
   /**
    * Check if booking can be cancelled
-   * Policy: Cancellation only allowed 24+ hours before activity start
+   * Policy: Cancellation allowed any time before activity starts
    */
   static canCancel(booking, activity) {
     const now = new Date();
@@ -81,7 +76,6 @@ class CancellationPolicy {
     // - Activity already started
     // - Booking is already checked-in
     // - Booking is no-show
-    // - Less than 24 hours before activity
     
     if (booking.statut === 'annulee') {
       return { canCancel: false, reason: 'Already cancelled' };
@@ -99,11 +93,7 @@ class CancellationPolicy {
       return { canCancel: false, reason: 'Activity already started' };
     }
     
-    // Enforce 24-hour minimum rule
-    if (hoursBeforeStart < 24) {
-      return { canCancel: false, reason: 'Cancellation not allowed within 24 hours of activity start' };
-    }
-    
+    // Cancellation allowed any time before activity starts
     return { canCancel: true, hoursBeforeStart };
   }
   
@@ -119,32 +109,39 @@ class CancellationPolicy {
       // Fetch booking
       const booking = await Inscription.findById(bookingId).session(session);
       if (!booking) {
-        await session.abortTransaction();
         throw new Error('Booking not found');
       }
       
       // Verify ownership
-      if (booking.touriste_id.toString() !== touristId) {
-        await session.abortTransaction();
+      const bookingTouristId = booking.touriste_id.toString();
+      const requestTouristId = touristId.toString();
+      console.log('[CANCELLATION] Ownership check:', {
+        bookingTouristId,
+        requestTouristId,
+        match: bookingTouristId === requestTouristId
+      });
+      
+      if (bookingTouristId !== requestTouristId) {
         throw new Error('Unauthorized to cancel this booking');
       }
       
       // Fetch activity
       const activity = await Activite.findById(booking.activite_id).session(session);
       if (!activity) {
-        await session.abortTransaction();
         throw new Error('Activity not found');
       }
       
       // Check if can cancel
       const canCancelCheck = this.canCancel(booking, activity);
       if (!canCancelCheck.canCancel) {
-        await session.abortTransaction();
         throw new Error(canCancelCheck.reason);
       }
       
       // Calculate refund
       const refund = this.calculateRefund(booking, activity);
+      
+      // Check if was approved before changing status (for capacity decrement)
+      const wasApproved = booking.statut === 'approuvee';
       
       // Update booking
       booking.statut = 'annulee';
@@ -161,7 +158,7 @@ class CancellationPolicy {
       await booking.save({ session });
       
       // Decrement capacity if was approved
-      if (booking.statut === 'approuvee') {
+      if (wasApproved) {
         await Activite.findByIdAndUpdate(
           booking.activite_id,
           { $inc: { nombre_reservations: -booking.nombre_participants } },
@@ -178,6 +175,80 @@ class CancellationPolicy {
         refundPercent: refund.refundPercent
       });
       
+      // Process refund via Stripe if applicable (after transaction commit)
+      // Process refund if there's a payment, regardless of approval status
+      if (refund.refundAmount > 0) {
+        try {
+          const Payment = require('../models/payment');
+          const stripeService = require('../services/stripeService');
+          
+          const payment = await Payment.findOne({ inscription_id: bookingId });
+          console.log('[CANCELLATION] Looking for payment for booking:', bookingId);
+          
+          if (payment && payment.stripe_payment_intent_id) {
+            const amountInCents = Math.round(refund.refundAmount * 100);
+            console.log('[CANCELLATION] Processing Stripe refund:', {
+              paymentIntentId: payment.stripe_payment_intent_id,
+              amountInCents,
+              refundAmount: refund.refundAmount,
+              paymentStatus: payment.status
+            });
+            
+            const refundResult = await stripeService.refundPayment(
+              payment.stripe_payment_intent_id, 
+              amountInCents
+            );
+            
+            console.log('[CANCELLATION] Stripe refund successful:', refundResult);
+            
+            // Update payment status
+            payment.status = "refunded";
+            payment.refunded_at = new Date();
+            await payment.save();
+            
+            // Update booking refund processed flag
+            booking.cancellationPolicy.refundProcessed = true;
+            await booking.save();
+            
+            logger.info('Refund processed via Stripe', { 
+              bookingId, 
+              refundAmount: refund.refundAmount,
+              refundId: refundResult.id
+            });
+          } else {
+            console.log('[CANCELLATION] No payment found or no payment_intent_id for booking, skipping Stripe refund');
+            console.log('[CANCELLATION] Payment:', payment ? { id: payment._id, status: payment.status, hasPaymentIntent: !!payment.stripe_payment_intent_id } : 'null');
+            // Queue for retry via event bus if there's a refund amount
+            if (refund.refundAmount > 0) {
+              const notificationEventBus = require('../services/notificationEventBus');
+              await notificationEventBus.emitBookingCancelled(
+                bookingId, 
+                activity.organisateur_id, 
+                touristId, 
+                activity.titre, 
+                reason, 
+                refund.refundAmount
+              );
+            }
+          }
+        } catch (refundError) {
+          logger.error('Stripe refund failed, queueing for retry', { 
+            bookingId, 
+            error: refundError.message 
+          });
+          // Queue for retry via event bus
+          const notificationEventBus = require('../services/notificationEventBus');
+          await notificationEventBus.emitBookingCancelled(
+            bookingId, 
+            activity.organisateur_id, 
+            touristId, 
+            activity.titre, 
+            reason, 
+            refund.refundAmount
+          );
+        }
+      }
+      
       return {
         success: true,
         booking,
@@ -190,15 +261,26 @@ class CancellationPolicy {
         }
       };
     } catch (error) {
-      await session.abortTransaction();
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        // Transaction might already be aborted by MongoDB
+        console.log('[CANCELLATION] Transaction already aborted or ended:', abortError.message);
+      }
       logger.error('Booking cancellation failed', {
         bookingId,
         touristId,
-        error: error.message
+        error: error.message,
+        stack: error.stack
       });
       throw error;
     } finally {
-      session.endSession();
+      try {
+        session.endSession();
+      } catch (endError) {
+        // Session might already be ended
+        console.log('[CANCELLATION] Session already ended:', endError.message);
+      }
     }
   }
   

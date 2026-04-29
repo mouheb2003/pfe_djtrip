@@ -62,6 +62,18 @@ const userSchema = new mongoose.Schema(
     notifications_email: { type: Boolean, default: true },
     notifications_sms: { type: Boolean, default: false },
     consentement_donnees: { type: Boolean, default: false },
+    // Booking reminder preferences
+    reminderPreferences: {
+      bookingReminder: {
+        type: Boolean,
+        default: true,
+      },
+      reminderTiming: {
+        type: String,
+        enum: ['1h', '24h', 'both'],
+        default: '1h',
+      },
+    },
     // Email verification fields
     emailVerified: { type: Boolean, default: false },
     verificationCode: String,
@@ -99,6 +111,10 @@ const userSchema = new mongoose.Schema(
     ],
     // Deleted chat partners hidden only for the current user
     deletedConversationPartners: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    ],
+    // Muted conversation partners for the current user
+    mutedConversationPartners: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ],
     // FCM tokens for push notifications (multi-device support)

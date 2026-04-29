@@ -467,8 +467,8 @@ async function sendBatchNotification({ userIds, title, body, data = {}, notifica
 async function sendCheckInConfirmation({ touristId, activityTitle, bookingId, activityId }) {
   return sendPushNotificationQueued({
     userId: touristId,
-    title: 'Check-in confirmé ✅',
-    body: `Votre réservation pour "${activityTitle}" est validée. Bonne activité !`,
+    title: 'Check-in Confirmed ✅',
+    body: `Your booking for "${activityTitle}" is validated. Enjoy your activity!`,
     data: {
       type: 'checkin_confirmed',
       bookingId,
@@ -482,8 +482,8 @@ async function sendCheckInConfirmation({ touristId, activityTitle, bookingId, ac
 async function sendNewBookingNotification({ organizerId, touristName, activityTitle, bookingId }) {
   return sendPushNotificationQueued({
     userId: organizerId,
-    title: 'Nouvelle réservation 🎫',
-    body: `${touristName} a réservé "${activityTitle}"`,
+    title: 'New Booking 🎫',
+    body: `${touristName} booked "${activityTitle}" - Waiting for payment`,
     data: {
       type: 'new_booking',
       bookingId,
@@ -498,8 +498,8 @@ async function sendNewBookingNotification({ organizerId, touristName, activityTi
 async function sendBookingApprovedNotification({ touristId, activityTitle, bookingId }) {
   return sendPushNotificationQueued({
     userId: touristId,
-    title: 'Réservation approuvée ✅',
-    body: `Votre réservation pour "${activityTitle}" a été confirmée`,
+    title: 'Booking Approved ✅',
+    body: `Your booking for "${activityTitle}" has been confirmed`,
     data: {
       type: 'booking_approved',
       bookingId,
@@ -512,8 +512,8 @@ async function sendBookingApprovedNotification({ touristId, activityTitle, booki
 async function sendBookingRejectedNotification({ touristId, activityTitle, bookingId }) {
   return sendPushNotificationQueued({
     userId: touristId,
-    title: 'Réservation refusée ❌',
-    body: `Votre réservation pour "${activityTitle}" a été refusée`,
+    title: 'Booking Rejected ❌',
+    body: `Your booking for "${activityTitle}" has been rejected`,
     data: {
       type: 'booking_rejected',
       bookingId,
@@ -526,8 +526,8 @@ async function sendBookingRejectedNotification({ touristId, activityTitle, booki
 async function sendBookingReminder({ touristId, activityTitle, bookingId, activityId }) {
   return sendPushNotificationQueued({
     userId: touristId,
-    title: 'Rappel de réservation ⏰',
-    body: `"${activityTitle}" commence bientôt. Préparez-vous !`,
+    title: 'Booking Reminder ⏰',
+    body: `"${activityTitle}" is starting soon. Get ready!`,
     data: {
       type: 'booking_reminder',
       bookingId,
@@ -544,8 +544,8 @@ async function sendBookingReminder({ touristId, activityTitle, bookingId, activi
 async function sendReviewReminder({ touristId, activityTitle, bookingId, activityId }) {
   return sendPushNotificationQueued({
     userId: touristId,
-    title: 'Donnez votre avis ⭐',
-    body: `Comment s'est passée "${activityTitle}" ? Laissez un review !`,
+    title: 'Leave a Review ⭐',
+    body: `How was "${activityTitle}"? Share your experience!`,
     data: {
       type: 'review_reminder',
       bookingId,
@@ -559,8 +559,8 @@ async function sendReviewReminder({ touristId, activityTitle, bookingId, activit
 async function sendNewReviewNotification({ organizerId, touristName, activityTitle, rating, reviewId }) {
   return sendPushNotificationQueued({
     userId: organizerId,
-    title: 'Nouvel avis reçu ⭐',
-    body: `${touristName} a noté "${activityTitle}" ${rating}/5`,
+    title: 'New Review Received ⭐',
+    body: `${touristName} rated "${activityTitle}" ${rating}/5`,
     data: {
       type: 'new_review',
       reviewId,
@@ -577,8 +577,8 @@ async function sendNewReviewNotification({ organizerId, touristName, activityTit
 async function sendNewFollowerNotification({ userId, followerName, followerId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Nouveau follower 👋',
-    body: `${followerName} a commencé à vous suivre`,
+    title: 'New Follower 👋',
+    body: `${followerName} started following you`,
     data: {
       type: 'new_follower',
       followerId,
@@ -591,8 +591,8 @@ async function sendNewFollowerNotification({ userId, followerName, followerId })
 async function sendFollowAcceptedNotification({ followerId, userName, userId }) {
   return sendPushNotificationQueued({
     userId: followerId,
-    title: 'Follow accepté 🎉',
-    body: `${userName} a accepté votre follow`,
+    title: 'Follow Accepted 🎉',
+    body: `${userName} accepted your follow`,
     data: {
       type: 'follow_accepted',
       userId,
@@ -608,8 +608,8 @@ async function sendFollowAcceptedNotification({ followerId, userName, userId }) 
 async function sendPaymentCompletedNotification({ userId, amount, activityTitle, paymentId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Paiement réussi 💳',
-    body: `Votre paiement de ${amount} pour ${activityTitle} a été effectué avec succès`,
+    title: 'Payment Successful 💳',
+    body: `Your payment of ${amount} for ${activityTitle} was successful`,
     data: {
       type: 'payment',
       paymentId,
@@ -622,8 +622,8 @@ async function sendPaymentCompletedNotification({ userId, amount, activityTitle,
 async function sendPaymentFailedNotification({ userId, amount, activityTitle, paymentId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Paiement échoué ❌',
-    body: `Le paiement de ${amount}€ pour "${activityTitle}" a échoué. Réessayez.`,
+    title: 'Payment Failed ❌',
+    body: `Payment of ${amount}€ for "${activityTitle}" failed. Please try again.`,
     data: {
       type: 'payment_failed',
       paymentId,
@@ -637,8 +637,8 @@ async function sendPaymentFailedNotification({ userId, amount, activityTitle, pa
 async function sendPaymentRefundedNotification({ userId, amount, paymentId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Remboursement effectué 💰',
-    body: `Un remboursement de ${amount}€ a été effectué sur votre compte`,
+    title: 'Refund Processed 💰',
+    body: `A refund of ${amount}€ has been processed to your account`,
     data: {
       type: 'payment_refunded',
       paymentId,
@@ -655,8 +655,8 @@ async function sendPaymentRefundedNotification({ userId, amount, paymentId }) {
 async function sendNewActivityNotification({ followerId, organizerName, activityTitle, activityId }) {
   return sendPushNotificationQueued({
     userId: followerId,
-    title: 'Nouvelle activité 🎯',
-    body: `${organizerName} a publié "${activityTitle}"`,
+    title: 'New Activity 🎯',
+    body: `${organizerName} published "${activityTitle}"`,
     data: {
       type: 'new_activity',
       activityId,
@@ -677,8 +677,8 @@ async function sendActivityCreatedNotification({ organizerName, activityTitle, a
 async function sendProfileUpdatedNotification({ userId, userName }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Profil mis à jour ✏️',
-    body: 'Votre profil a été mis à jour avec succès',
+    title: 'Profile Updated ✏️',
+    body: 'Your profile has been updated successfully',
     data: {
       type: 'profile_updated',
     },
@@ -690,8 +690,8 @@ async function sendProfileUpdatedNotification({ userId, userName }) {
 async function sendProfileVerifiedNotification({ userId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Profil vérifié ✓',
-    body: 'Félicitations ! Votre profil est maintenant vérifié',
+    title: 'Profile Verified ✓',
+    body: 'Congratulations! Your profile is now verified',
     data: {
       type: 'profile_verified',
     },
@@ -706,8 +706,8 @@ async function sendProfileVerifiedNotification({ userId }) {
 async function sendAppealCreatedNotification({ userId, appealId }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Appel soumis 📋',
-    body: 'Votre appel a été soumis et sera traité sous peu',
+    title: 'Appeal Submitted 📋',
+    body: 'Your appeal has been submitted and will be processed soon',
     data: {
       type: 'appeal_created',
       appealId,
@@ -718,11 +718,11 @@ async function sendAppealCreatedNotification({ userId, appealId }) {
 }
 
 async function sendAppealResolvedNotification({ userId, appealId, status }) {
-  const title = status === 'approved' ? 'Appel accepté ✅' : 'Appel rejeté ❌';
+  const title = status === 'approved' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌';
   return sendPushNotificationQueued({
     userId,
     title,
-    body: `Votre appel a été ${status === 'approved' ? 'accepté' : 'rejeté'}`,
+    body: `Your appeal has been ${status === 'approved' ? 'accepted' : 'rejected'}`,
     data: {
       type: 'appeal_resolved',
       appealId,
@@ -739,8 +739,8 @@ async function sendAppealResolvedNotification({ userId, appealId, status }) {
 async function sendNewPublicationNotification({ userId, authorName, postId, postTitle }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Nouvelle publication 📰',
-    body: `${authorName} a publié: "${postTitle || 'Nouvelle publication'}"`,
+    title: 'New Post 📰',
+    body: `${authorName} posted: "${postTitle || 'New post'}"`,
     data: {
       type: 'new_publication',
       postId,
@@ -752,10 +752,10 @@ async function sendNewPublicationNotification({ userId, authorName, postId, post
 
 async function sendReactionNotification({ userId, reactorName, postId, commentId, reactionType, entityType }) {
   const isPost = entityType === 'post';
-  const title = isPost ? 'Nouvelle réaction ❤️' : 'Réaction à votre commentaire 💬';
+  const title = isPost ? 'New Reaction ❤️' : 'Reaction to your comment 💬';
   const body = isPost 
-    ? `${reactorName} a réagi à votre publication`
-    : `${reactorName} a réagi à votre commentaire`;
+    ? `${reactorName} reacted to your post`
+    : `${reactorName} reacted to your comment`;
   
   return sendPushNotificationQueued({
     userId,
@@ -776,8 +776,8 @@ async function sendReactionNotification({ userId, reactorName, postId, commentId
 async function sendCommentNotification({ userId, commenterName, postId, commentContent }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Nouveau commentaire 💬',
-    body: `${commenterName} a commenté: "${commentContent?.substring(0, 50) || '...'}"`,
+    title: 'New Comment 💬',
+    body: `${commenterName} commented: "${commentContent?.substring(0, 50) || '...'}"`,
     data: {
       type: 'new_comment',
       postId,
@@ -790,8 +790,8 @@ async function sendCommentNotification({ userId, commenterName, postId, commentC
 async function sendReplyNotification({ userId, replierName, postId, parentCommentId, replyContent }) {
   return sendPushNotificationQueued({
     userId,
-    title: 'Nouvelle réponse 💬',
-    body: `${replierName} a répondu à votre commentaire`,
+    title: 'New Reply 💬',
+    body: `${replierName} replied to your comment`,
     data: {
       type: 'new_reply',
       postId,
@@ -803,8 +803,8 @@ async function sendReplyNotification({ userId, replierName, postId, parentCommen
 }
 
 async function sendMentionNotification({ userId, mentionerName, postId, commentId }) {
-  const title = commentId ? 'Vous avez été mentionné 💬' : 'Vous avez été mentionné 📰';
-  const body = `${mentionerName} vous a mentionné`;
+  const title = commentId ? 'You were mentioned 💬' : 'You were mentioned 📰';
+  const body = `${mentionerName} mentioned you`;
   
   return sendPushNotificationQueued({
     userId,

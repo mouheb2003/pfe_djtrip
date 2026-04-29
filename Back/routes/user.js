@@ -110,6 +110,14 @@ router.delete(
   userController.removeFcmToken,
 );
 
+// PUT /me/reminder-preferences - Update reminder preferences (protected route)
+router.put(
+  "/me/reminder-preferences",
+  verifyToken,
+  invalidateCache(["users", "users:me"]),
+  userController.updateReminderPreferences,
+);
+
 // PUT /me/avatar - Update current user avatar (protected route)
 router.put(
   "/me/avatar",
@@ -182,6 +190,9 @@ router.get(
 
 // GET /all - Get all users (PUBLIC for testing)
 router.get("/all", cacheGet("users:all", 60), userController.getAllUsersPublic);
+
+// GET /admin - Get admin user (optimized for chat support)
+router.get("/admin", cacheGet("users:admin:single", 30), userController.getAdminUser);
 router.put("/privacy", verifyToken, userController.updatePrivacySettings);
 router.put(
   "/advanced-privacy",
@@ -191,5 +202,8 @@ router.put(
 
 // GET /:id - Get user by ID
 router.get("/:id", cacheGet("users:by-id", 60), userController.getUserById);
+
+// GET /:id/overview - Get comprehensive user overview with all related data
+router.get("/:id/overview", verifyToken, verifyAdmin, userController.getUserOverview);
 
 module.exports = wrapRouter(router);

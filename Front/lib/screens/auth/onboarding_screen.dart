@@ -123,13 +123,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose photo source'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromSource(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromSource(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImageFromSource(ImageSource source) async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: 800,
       imageQuality: 85,
     );
-    if (image != null) setState(() => _profilePhoto = File(image.path));
+    if (image != null && mounted) setState(() => _profilePhoto = File(image.path));
   }
 
   Future<void> _finish({bool skip = false}) async {
@@ -1020,30 +1054,32 @@ class _StepBio extends StatelessWidget {
             onBack: onBack,
           ),
           const SizedBox(height: 30),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: controller,
+                maxLines: null,
+                maxLength: 200,
+                expands: true,
+                decoration: const InputDecoration(
+                  hintText: 'I love traveling and discovering new cultures...',
+                  border: InputBorder.none,
                 ),
-              ],
-            ),
-            child: TextField(
-              controller: controller,
-              maxLines: 5,
-              maxLength: 200,
-              decoration: const InputDecoration(
-                hintText: 'I love traveling and discovering new cultures...',
-                border: InputBorder.none,
               ),
             ),
           ),
-          const Spacer(),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: _NextButton(onPressed: onNext),
@@ -1355,13 +1391,6 @@ class _StepSpecialtiesState extends State<_StepSpecialties> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  ...widget.selectedSpecialties
-                      .where((s) => !_baseSpecialties.contains(s))
-                      .map((spec) => _ChoiceChip(
-                            label: spec,
-                            isSelected: true,
-                            onTap: () => widget.onToggleSpecialty(spec),
-                          )),
                   ..._baseSpecialties.map((spec) {
                     final isSelected = widget.selectedSpecialties.contains(spec);
                     return _ChoiceChip(
@@ -1370,6 +1399,13 @@ class _StepSpecialtiesState extends State<_StepSpecialties> {
                       onTap: () => widget.onToggleSpecialty(spec),
                     );
                   }),
+                  ...widget.selectedSpecialties
+                      .where((s) => !_baseSpecialties.contains(s))
+                      .map((spec) => _ChoiceChip(
+                            label: spec,
+                            isSelected: true,
+                            onTap: () => widget.onToggleSpecialty(spec),
+                          )),
                   _ChoiceChip(
                     label: '+ Other',
                     isSelected: false,

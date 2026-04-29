@@ -1,53 +1,69 @@
+console.log('[LIEU ROUTES] Loading lieu routes...');
+
 const express = require("express");
 const router = express.Router();
 const lieuController = require("../controllers/lieu");
+console.log('[LIEU ROUTES] Lieu controller loaded');
 const wrapRouter = require("../middleware/wrapRouter");
-const { cacheGet, invalidateCache } = require("../middleware/cache");
-const { verifyToken, verifyOrganisator } = require("../middleware/auth");
-const validate = require("../middleware/validate");
-const { createLieuSchema, updateLieuSchema, reviewSchema } = require("../validators/lieu");
+const { verifyToken, verifyAdmin } = require("../middleware/auth");
+const Config = require("../models/lieu").Config;
 
-// ─── Public routes ────────────────────────────────────────────────────────────
-router.get("/", cacheGet("lieux:all", 60), lieuController.getAllLieux);
-router.get("/featured", cacheGet("lieux:featured", 60), lieuController.getFeaturedLieux);
-router.get("/type/:type", cacheGet("lieux:by-type", 60), lieuController.getLieuxByType);
-router.get("/:id", cacheGet("lieux:by-id", 60), lieuController.getLieuById);
+// ==================== PUBLIC ENDPOINTS ====================
 
-// ─── Protected Organizer routes (Lieux management) ──────────────────────────
-// Note: Management typically done by admin/organizer in this app model
-router.post(
-  "/",
-  verifyToken,
-  // verifyOrganisator, // Enable if only organizers can add places
-  validate(createLieuSchema),
-  invalidateCache(["lieux"]),
-  lieuController.createLieu,
-);
+// Get Google Maps API key (must be before /:id to avoid conflicts)
+router.get("/config/google-maps-key", async (req, res) => {
+  try {
+    const config = await Config.findOne({ key: "google_maps_api_key" });
+    if (config) {
+      return res.json({ apiKey: config.value });
+    }
+    // Fallback to environment variable
+    return res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching Google Maps API key" });
+  }
+});
 
-router.put(
-  "/:id",
-  verifyToken,
-  // verifyOrganisator,
-  validate(updateLieuSchema),
-  invalidateCache(["lieux"]),
-  lieuController.updateLieu,
-);
+// Get all lieux
+router.get("/", lieuController.getAllLieux);
 
-router.delete(
-  "/:id",
-  verifyToken,
-  // verifyOrganisator,
-  invalidateCache(["lieux"]),
-  lieuController.deleteLieu,
-);
+// Get a single lieu by ID or slug
+router.get("/:id", lieuController.getLieuById);
 
-// Review routes
-router.post(
-  "/:id/reviews",
-  verifyToken,
-  validate(reviewSchema),
-  invalidateCache(["lieux"]),
-  lieuController.addReview,
-);
+// ==================== AUTHENTICATED ENDPOINTS ====================
 
+// Create a new lieu (ADMIN only)
+router.post("/", verifyToken, verifyAdmin, lieuController.createLieu);
+
+// Update a lieu (ADMIN only)
+router.put("/:id", verifyToken, verifyAdmin, lieuController.updateLieu);
+
+// Delete a lieu (ADMIN only)
+router.delete("/:id", verifyToken, verifyAdmin, lieuController.deleteLieu);
+
+// Upload images for a lieu (ADMIN only)
+router.post("/:id/upload-images", verifyToken, verifyAdmin, lieuController.uploadImages);
+
+// Update Google Maps API key (ADMIN only)
+router.put("/config/google-maps-key", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ message: "API key is required" });
+    }
+
+    await Config.findOneAndUpdate(
+      { key: "google_maps_api_key" },
+      { value: apiKey, description: "Google Maps JavaScript API Key" },
+      { upsert: true, new: true }
+    );
+
+    return res.json({ message: "Google Maps API key updated successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error updating Google Maps API key" });
+  }
+});
+
+console.log('[LIEU ROUTES] All routes defined, wrapping router...');
 module.exports = wrapRouter(router);
+console.log('[LIEU ROUTES] Lieu routes loaded successfully');

@@ -69,10 +69,17 @@ class SocketHandler {
    */
   setupEvents() {
     this.io.on('connection', (socket) => {
-      logger.info('User connected', { 
+      const timestamp = new Date().toISOString();
+      const connectionSentence = `L'utilisateur ${socket.user?.fullname || socket.userId} (${socket.userType}) s'est connecté à la plateforme à ${timestamp}`;
+      
+      logger.info(connectionSentence, { 
         userId: socket.userId, 
         userType: socket.userType,
-        socketId: socket.id 
+        userFullname: socket.user?.fullname,
+        socketId: socket.id,
+        timestamp,
+        source: 'websocket',
+        action: 'connection'
       });
       
       // Join user-specific room
@@ -132,10 +139,18 @@ class SocketHandler {
       });
       
       socket.on('disconnect', (reason) => {
-        logger.info('User disconnected', { 
+        const timestamp = new Date().toISOString();
+        const disconnectionSentence = `L'utilisateur ${socket.user?.fullname || socket.userId} (${socket.userType}) s'est déconnecté de la plateforme à ${timestamp}. Raison: ${reason}`;
+        
+        logger.info(disconnectionSentence, { 
           userId: socket.userId, 
+          userType: socket.userType,
+          userFullname: socket.user?.fullname,
           socketId: socket.id,
-          reason 
+          reason,
+          timestamp,
+          source: 'websocket',
+          action: 'disconnection'
         });
       });
     });
@@ -374,6 +389,13 @@ class SocketHandler {
    */
   getConnectedCount() {
     return this.io.sockets.sockets.size;
+  }
+
+  /**
+   * Get IO instance
+   */
+  getIO() {
+    return this.io;
   }
   
   /**

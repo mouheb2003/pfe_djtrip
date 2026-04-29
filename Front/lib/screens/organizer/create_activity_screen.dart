@@ -1,12 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_theme.dart';
+import 'package:provider/provider.dart';
+import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/ai_image_generator_widget.dart';
+import '../../widgets/place_search_widget.dart';
 import 'activity_preview_screen.dart';
 import 'map_picker_screen.dart';
 
@@ -42,7 +46,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   // Logistics
   final _priceCtrl = TextEditingController(text: '0.00');
   late final FocusNode _priceFocus = FocusNode();
-  final _capacityCtrl = TextEditingController();
+  final _capacityCtrl = TextEditingController(text: '1');
 
   final List<String> _languages = ['English'];
   final _langCtrl = TextEditingController();
@@ -72,6 +76,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   bool _isLoading = false;
   final bool _isPublish = true;
+  bool _notifyFollowers = true;
 
   static const _categories = [
     'Guided Tour',
@@ -204,14 +209,32 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             : TimeOfDay.now(),
       );
       if (time != null) {
+        final selectedDateTime = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
+
+        // Validate: activity must start at least 24 hours from now
+        final now = DateTime.now();
+        final twentyFourHoursLater = now.add(const Duration(hours: 24));
+
+        if (selectedDateTime.isBefore(twentyFourHoursLater)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Activity start date must be at least 24 hours from now'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() {
-          _startDateTime = DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time.hour,
-            time.minute,
-          );
+          _startDateTime = selectedDateTime;
           _recalcEndDate();
         });
       }
@@ -440,6 +463,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               'longitude': _pickedLatLng!.longitude,
             }
           : null,
+      notifyFollowers: _notifyFollowers,
     );
 
     if (!mounted) return;
@@ -908,17 +932,33 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               ),
             ),
             focus: _priceFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 16),
-          _buildTextField(
-            'MAX CAPACITY',
-            'e.g. 12',
-            _capacityCtrl,
-            suffixIcon: const Icon(
-              Icons.people_outline,
-              color: Color(0xFF5E6582),
-              size: 18,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTextField(
+                'MAX CAPACITY',
+                'e.g. 12',
+                _capacityCtrl,
+                suffixIcon: const Icon(
+                  Icons.people_outline,
+                  color: Color(0xFF5E6582),
+                  size: 18,
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Recommended: 1-50 people for optimal experience',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           const Text(
@@ -977,9 +1017,22 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       children: [
         _buildSectionTitle(
           'Location',
-          'Where the magic happens. Use the map to pin exact coordinates.',
+          'Where the magic happens. Search for a place or use the map to pin exact coordinates.',
         ),
-        _buildTextField('', 'Search address/lieu...', _locationCtrl),
+        PlaceSearchWidget(
+          controller: _locationCtrl,
+          hintText: 'Search for a place...',
+          onPlaceSelected: (place) {
+            setState(() {
+              if (place.latitude != null && place.longitude != null) {
+                _pickedLatLng = LatLng(
+                  place.latitude!,
+                  place.longitude!,
+                );
+              }
+            });
+          },
+        ),
         const SizedBox(height: 16),
         GestureDetector(
           onTap: () async {
@@ -1324,6 +1377,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     FocusNode? focus,
     bool readOnly = false,
     VoidCallback? onTap,
+    TextInputType? keyboardType,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1346,6 +1400,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           focusNode: focus,
           readOnly: readOnly,
           onTap: onTap,
+          keyboardType: keyboardType,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -1383,106 +1438,137 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(color: Color(0xFFF8F9FE)),
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(40),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: TextButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ActivityPreviewScreen(
-                          title: _titleCtrl.text.trim(),
-                          category: _category ?? 'Other',
-                          description: _descCtrl.text.trim(),
-                          price: double.tryParse(_priceCtrl.text) ?? 0,
-                          capacity: int.tryParse(_capacityCtrl.text) ?? 0,
-                          location: _locationCtrl.text.trim(),
-                          duration: _isCustomDuration
-                              ? (_customHours + _customMinutes / 60.0)
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Notify followers toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SwitchListTile(
+              title: const Text(
+                'Notify Followers',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1B2352),
+                ),
+              ),
+              subtitle: const Text(
+                'Send notification to your followers about this new activity',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              value: _notifyFollowers,
+              onChanged: (value) {
+                setState(() {
+                  _notifyFollowers = value;
+                });
+              },
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ActivityPreviewScreen(
+                              title: _titleCtrl.text.trim(),
+                              category: _category ?? 'Other',
+                              description: _descCtrl.text.trim(),
+                              price: double.tryParse(_priceCtrl.text) ?? 0,
+                              capacity: int.tryParse(_capacityCtrl.text) ?? 0,
+                              location: _locationCtrl.text.trim(),
+                              duration: _isCustomDuration
+                                  ? (_customHours + _customMinutes / 60.0)
                               : (_selectedDuration?.hours ?? 3.0),
-                          durationLabel: _selectedDuration?.label ?? 'Custom',
-                          startDateTime: _startDateTime,
-                          endDateTime: _endDateTime,
-                          photos: List.from(_photos),
-                          existingPhotos: _aiGeneratedImageUrl != null ? [_aiGeneratedImageUrl!] : const [],
-                          requirements: List.from(_includedEquipment),
-                          optional: List.from(_itemsToBring),
-                          pickedLatLng: _pickedLatLng,
-                          difficulty: _difficultyLevel,
-                          languages: List.from(_languages),
+                              durationLabel: _selectedDuration?.label ?? 'Custom',
+                              startDateTime: _startDateTime,
+                              endDateTime: _endDateTime,
+                              photos: List.from(_photos),
+                              existingPhotos: _aiGeneratedImageUrl != null ? [_aiGeneratedImageUrl!] : const [],
+                              requirements: List.from(_includedEquipment),
+                              optional: List.from(_itemsToBring),
+                              pickedLatLng: _pickedLatLng,
+                              difficulty: _difficultyLevel,
+                              languages: List.from(_languages),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.remove_red_eye_rounded,
+                        color: Color(0xFF4A65E6),
+                        size: 18,
+                      ),
+                      label: const Text(
+                        'Preview',
+                        style: TextStyle(
+                          color: Color(0xFF4A65E6),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.remove_red_eye_rounded,
-                    color: Color(0xFF4A65E6),
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'Preview',
-                    style: TextStyle(
-                      color: Color(0xFF4A65E6),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFF3F4FE),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF3F4FE),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _submit,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Icons.check, color: Colors.white, size: 18),
-                  label: const Text(
-                    'Publish',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F1535),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _submit,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.check, color: Colors.white, size: 18),
+                      label: const Text(
+                        'Publish',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F1535),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

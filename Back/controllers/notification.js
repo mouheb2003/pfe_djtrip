@@ -471,10 +471,10 @@ exports.triggerPublicationNotification = async (userId, authorName, postId, post
 exports.triggerReactionNotification = async (userId, reactorName, postId, commentId, reactionType, entityType) => {
   try {
     const isPost = entityType === 'post';
-    const title = isPost ? 'Nouvelle réaction ' : 'Réaction à votre commentaire ';
+    const title = isPost ? 'New Reaction ' : 'Reaction to your comment ';
     const message = isPost 
-      ? `${reactorName} a réagi à votre publication`
-      : `${reactorName} a réagi à votre commentaire`;
+      ? `${reactorName} reacted to your post`
+      : `${reactorName} reacted to your comment`;
 
     await Notification.createNotification({
       user_id: userId,
@@ -513,8 +513,8 @@ exports.triggerCommentNotification = async (userId, commenterName, postId, comme
     await Notification.createNotification({
       user_id: userId,
       type: "comment",
-      title: "Nouveau commentaire ",
-      message: `${commenterName} a commenté: "${commentContent?.substring(0, 50) || '...'}"`,
+      title: "New Comment ",
+      message: `${commenterName} commented: "${commentContent?.substring(0, 50) || '...'}"`,
       data: {
         type: "new_comment",
         postId,
@@ -542,8 +542,8 @@ exports.triggerReplyNotification = async (userId, replierName, postId, parentCom
     await Notification.createNotification({
       user_id: userId,
       type: "reply",
-      title: "Nouvelle réponse ",
-      message: `${replierName} a répondu à votre commentaire`,
+      title: "New Reply ",
+      message: `${replierName} replied to your comment`,
       data: {
         type: "new_reply",
         postId,
@@ -570,8 +570,8 @@ exports.triggerReplyNotification = async (userId, replierName, postId, parentCom
 // Trigger notification for mention
 exports.triggerMentionNotification = async (userId, mentionerName, postId, commentId) => {
   try {
-    const title = commentId ? 'Vous avez été mentionné ' : 'Vous avez été mentionné ';
-    const message = `${mentionerName} vous a mentionné`;
+    const title = commentId ? 'You were mentioned ' : 'You were mentioned ';
+    const message = `${mentionerName} mentioned you`;
 
     await Notification.createNotification({
       user_id: userId,

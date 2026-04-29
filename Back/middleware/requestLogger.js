@@ -1,5 +1,6 @@
 // ✅ ADDED
 const systemLogStore = require("../services/systemLogStore");
+const { formatReadableDate } = require("../utils/logTemplates");
 
 function maskAuthHeader(headers) {
   if (!headers || !headers.authorization) return headers;
@@ -17,6 +18,72 @@ function classifySource(pathname = "") {
   if (path.includes("/messages")) return "message";
   if (path.includes("/lieux")) return "place";
   return "request";
+}
+
+function generateDescriptiveMessage(method, path, statusCode, userId, userType, durationMs) {
+  const m = String(method || "GET").toUpperCase();
+  const p = String(path).toLowerCase();
+  const statusText = statusCode >= 200 && statusCode < 300 ? "succès" : "échec";
+  const timestamp = formatReadableDate();
+
+  // Authentication actions
+  if (p.includes("/users/signin") || p.includes("/auth/login")) {
+    const userDesc = userId !== "guest" ? `utilisateur ${userId}` : "utilisateur anonyme";
+    return `${timestamp} - Connexion de ${userDesc} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+  if (p.includes("/users/signup") || p.includes("/auth/signup")) {
+    return `${timestamp} - Inscription d'un nouvel utilisateur : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+  if (p.includes("/users/logout") || p.includes("/auth/logout")) {
+    return `${timestamp} - Déconnexion de l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+  if (p.includes("/users/forgot-password")) {
+    return `${timestamp} - Demande de réinitialisation de mot de passe par l'utilisateur ${userId} : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+  if (p.includes("/users/reset-password")) {
+    return `${timestamp} - Réinitialisation du mot de passe par l'utilisateur ${userId} : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // Publication actions
+  if (p.includes("/posts")) {
+    if (m === "POST") return `${timestamp} - Création d'une publication par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "PUT" || m === "PATCH") return `${timestamp} - Modification d'une publication par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "DELETE") return `${timestamp} - Suppression d'une publication par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    return `${timestamp} - Consultation des publications par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // Activity actions
+  if (p.includes("/activites")) {
+    if (m === "POST") return `${timestamp} - Création d'une activité par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "PUT" || m === "PATCH") return `${timestamp} - Modification d'une activité par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "DELETE") return `${timestamp} - Suppression d'une activité par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    return `${timestamp} - Consultation des activités par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // Message actions
+  if (p.includes("/messages")) {
+    if (m === "POST") return `${timestamp} - Envoi d'un message par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "DELETE") return `${timestamp} - Suppression d'un message par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    return `${timestamp} - Consultation des messages par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // User actions
+  if (p.includes("/users")) {
+    if (m === "PUT" || m === "PATCH") return `${timestamp} - Mise à jour du profil par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "DELETE") return `${timestamp} - Suppression du compte par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    return `${timestamp} - Consultation des utilisateurs par ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // Place actions
+  if (p.includes("/lieux")) {
+    if (m === "POST") return `${timestamp} - Ajout d'un lieu par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "PUT" || m === "PATCH") return `${timestamp} - Modification d'un lieu par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    if (m === "DELETE") return `${timestamp} - Suppression d'un lieu par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+    return `${timestamp} - Consultation des lieux par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
+  }
+
+  // Generic request
+  return `${timestamp} - Requête ${m} sur ${path} par l'utilisateur ${userId} (${userType}) : ${statusText} (${statusCode}) - Durée: ${durationMs}ms`;
 }
 
 function classifyAction(method = "GET", pathname = "") {
@@ -81,10 +148,14 @@ module.exports = function requestLogger(req, res, next) {
     const action = classifyAction(req.method, req.originalUrl);
     const level = levelFromStatus(res.statusCode);
 
-    const msg =
-      `[${source.toUpperCase()}] action=${action} user=${userId} role=${userType} ` +
-      `method=${req.method} path=${req.originalUrl} status=${res.statusCode} ` +
-      `duration=${durationMs}ms requestId=${requestId}`;
+    const msg = generateDescriptiveMessage(
+      req.method,
+      req.originalUrl,
+      res.statusCode,
+      userId,
+      userType,
+      durationMs
+    );
 
     systemLogStore.addLog({
       level,

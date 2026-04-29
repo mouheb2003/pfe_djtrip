@@ -19,7 +19,7 @@ class _BookingsTabState extends State<BookingsTab> {
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, List<InscriptionModel>> _buckets = {
-    'pending': [],
+    'pending_for_payment': [],
     'confirmed': [],
     'cancelled': [],
     'used': [],
@@ -60,7 +60,7 @@ class _BookingsTabState extends State<BookingsTab> {
   List<InscriptionModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
-        return _buckets['pending'] ?? [];
+        return _buckets['pending_for_payment'] ?? [];
       case 1:
         return _buckets['confirmed'] ?? [];
       case 2:
@@ -68,7 +68,7 @@ class _BookingsTabState extends State<BookingsTab> {
       case 3:
         return _buckets['used'] ?? [];
       default:
-        return _buckets['pending'] ?? [];
+        return _buckets['pending_for_payment'] ?? [];
     }
   }
 
@@ -351,7 +351,7 @@ class _BookingsSegmentedControl extends StatelessWidget {
       ),
       child: Row(
         children: List.generate(4, (index) {
-          final label = ['Pending', 'Approved', 'Cancelled', 'Used'][index];
+          final label = ['Pending for payment', 'Approved', 'Cancelled', 'Used'][index];
           final active = currentIndex == index;
           return Expanded(
             child: InkWell(

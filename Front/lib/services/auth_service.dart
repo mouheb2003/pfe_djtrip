@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'api_client.dart';
 import 'api_service.dart';
 import 'navigation_service.dart';
@@ -57,11 +58,54 @@ class AuthService {
   static void _stopAccountGuardSocket() {
     _guardSocket?.off('connect');
     _guardSocket?.off('disconnect');
+    _guardSocket?.off('new_notification');
     _guardSocket?.off('connect_error');
     _guardSocket?.off('account_restricted');
     _guardSocket?.disconnect();
     _guardSocket?.dispose();
     _guardSocket = null;
+  }
+
+  static Future<void> _showLocalNotification(Map<String, dynamic> data) async {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
+        FlutterLocalNotificationsPlugin();
+    
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings();
+    
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+    );
+    
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'djtrip_notifications',
+      'DJTrip Notifications',
+      channelDescription: 'Notifications for DJTrip',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails();
+    
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+    
+    await flutterLocalNotificationsPlugin.show(
+      int.tryParse(data['notificationId']?.toString() ?? '') ?? DateTime.now().millisecondsSinceEpoch,
+      data['title']?.toString() ?? 'Notification',
+      data['message']?.toString() ?? '',
+      platformChannelSpecifics,
+    );
   }
 
   static Future<void> _handleAccountRestriction(dynamic data) async {
@@ -168,6 +212,13 @@ class AuthService {
     // Handle disconnection
     socket.on('disconnect', (_) {
       print('[AuthService] Account guard socket disconnected');
+    });
+
+    // Handle new notifications
+    socket.on('new_notification', (data) {
+      print('[AuthService] Received new_notification event: $data');
+      // Show local notification
+      _showLocalNotification(data);
     });
 
     // ONLY handle explicit account restrictions from backend
@@ -487,6 +538,8 @@ class AuthService {
       return {
         'success': res.statusCode == 200,
         'message': body['message'] ?? 'Unable to verify email',
+        'requires_onboarding': body['requires_onboarding'] ?? false,
+        'skip_user_type_selection': body['skip_user_type_selection'] ?? true,
       };
     } catch (_) {
       return {'success': false, 'message': 'Unable to verify email right now.'};

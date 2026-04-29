@@ -2,6 +2,7 @@ const Avis = require("../models/avis");
 const Activite = require("../models/activite");
 const Organisator = require("../models/organisator");
 const Inscription = require("../models/inscription");
+const notificationEventBus = require("../services/notificationEventBus");
 
 // ─── GET /avis/touriste/:touristeId ─────────────────────────────────────────
 // Get all reviews submitted by a tourist (public)
@@ -118,6 +119,20 @@ exports.submitActivityReview = async (req, res) => {
 
     await refreshActiviteStats(activiteId);
 
+    // Emit review created event for notification
+    try {
+      const tourist = await require("../models/touriste").findById(touristeId);
+      notificationEventBus.emitReviewCreated({
+        organizerId: inscription.organisateur_id,
+        touristName: tourist?.fullname || 'A tourist',
+        activityTitle: activity.titre,
+        rating: note,
+        reviewId: avis._id,
+      });
+    } catch (notifError) {
+      console.warn("Failed to send review notification:", notifError.message);
+    }
+
     res.status(201).json({
       message: "Review submitted successfully",
       avis,
@@ -224,18 +239,41 @@ exports.getActivityReviews = async (req, res) => {
 };
 
 // ─── GET /avis/organisateur/:organisateurId ───────────────────────────────────
-// Get all ratings for an organizer (public)
+// Get all ratings for an organizer (public) - includes both direct organizer reviews and activity reviews
 exports.getOrganisateurRatings = async (req, res) => {
   try {
     const { organisateurId } = req.params;
-    const avis = await Avis.find({
+    console.log('🔍 getOrganisateurRatings called with ID:', organisateurId);
+    
+    // Get all activities for this organizer
+    const Activite = require("../models/activite");
+    const activities = await Activite.find({ organisateur_id: organisateurId }).select('_id');
+    const activityIds = activities.map(a => a._id);
+    
+    console.log('🔍 Found activities for organizer:', activityIds.length);
+    
+    // Get direct organizer reviews
+    const organizerReviews = await Avis.find({
       organisateur_id: organisateurId,
       type: "organisateur",
     })
       .populate("touriste_id", "fullname avatar")
       .sort({ createdAt: -1 });
-    res.json(avis);
+    
+    // Get activity reviews for this organizer's activities
+    const activityReviews = await Avis.find({
+      activite_id: { $in: activityIds },
+      type: "activite",
+    })
+      .populate("touriste_id", "fullname avatar")
+      .sort({ createdAt: -1 });
+    
+    const allReviews = [...organizerReviews, ...activityReviews];
+    console.log('🔍 Found reviews - Direct:', organizerReviews.length, 'Activity:', activityReviews.length, 'Total:', allReviews.length);
+    
+    res.json(allReviews);
   } catch (e) {
+    console.error('❌ Error in getOrganisateurRatings:', e);
     res.status(500).json({ message: e.message });
   }
 };
@@ -372,7 +410,37 @@ exports.deleteAvis = async (req, res) => {
     }
 
     res.json({ message: "Review deleted successfully" });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ message: "Error deleting review" });
+  }
+};
+
+// ─── DELETE /avis/admin/:avisId ────────────────────────────────────────────────
+// Admin deletes any review
+exports.deleteAvisAdmin = async (req, res) => {
+  try {
+    const { avisId } = req.params;
+
+    const avis = await Avis.findById(avisId);
+    if (!avis) {
+      return res
+        .status(404)
+        .json({ message: "Review not found" });
+    }
+
+    const { type, activite_id, organisateur_id } = avis;
+    await avis.deleteOne();
+
+    if (type === "activite" && activite_id) {
+      await refreshActiviteStats(activite_id);
+    } else if (type === "organisateur" && organisateur_id) {
+      await refreshOrganisateurStats(organisateur_id);
+    }
+
+    res.json({ message: "Review deleted successfully by admin" });
+  } catch (error) {
+    console.error("Error deleting review by admin:", error);
+    res.status(500).json({ message: "Error deleting review" });
   }
 };

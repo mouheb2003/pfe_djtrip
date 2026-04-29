@@ -7,6 +7,7 @@ const {
   verifyToken,
   verifyTouriste,
   verifyOrganisator,
+  verifyAdmin,
 } = require("../middleware/auth");
 
 // ========================================
@@ -123,6 +124,19 @@ router.get(
   verifyTouriste,
   cacheGet("inscriptions:stats:tourist", 60),
   inscriptionController.getTouristStats,
+);
+
+// ========================================
+// ADMIN ROUTES
+// ========================================
+
+// Get participants for an activity (Admin only)
+router.get(
+  "/admin/activity-participants",
+  verifyToken,
+  verifyAdmin,
+  cacheGet("inscriptions:admin:activity", 60),
+  inscriptionController.getInscriptionsByActivityAdmin,
 );
 
 // ========================================

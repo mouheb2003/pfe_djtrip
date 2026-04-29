@@ -104,6 +104,35 @@ router.delete(
   invalidateCache(["messages"]),
   messageController.deleteMessage,
 );
+router.delete(
+  "/conversations/:partnerId/clear",
+  invalidateCache(["messages", "messages:with"]),
+  messageController.clearChat,
+);
+router.post(
+  "/conversations/:partnerId/block",
+  invalidateCache(["messages"]),
+  messageController.blockUser,
+);
+router.delete(
+  "/conversations/:partnerId/block",
+  invalidateCache(["messages"]),
+  messageController.unblockUser,
+);
+router.post(
+  "/conversations/:partnerId/mute",
+  invalidateCache(["messages"]),
+  messageController.muteConversation,
+);
+router.delete(
+  "/conversations/:partnerId/mute",
+  invalidateCache(["messages"]),
+  messageController.unmuteConversation,
+);
+router.get(
+  "/blocked-users",
+  messageController.getBlockedUsers,
+);
 router.get(
   "/unread-count",
   cacheGet("messages:unread-count", 15),

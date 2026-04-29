@@ -66,6 +66,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         type: _selectedType == 'All' ? null : _selectedType.toLowerCase(),
         limit: 20,
         skip: refresh ? 0 : _notifications.length,
+        cacheFirst: false,
       );
 
       if (mounted) {
@@ -108,6 +109,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         type: _selectedType == 'All' ? null : _selectedType.toLowerCase(),
         limit: 20,
         skip: _notifications.length,
+        cacheFirst: false,
       );
 
       if (mounted) {
@@ -129,7 +131,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _loadUnreadCount() async {
     try {
-      final result = await NotificationService.getUnreadCount();
+      final result = await NotificationService.getUnreadCount(cacheFirst: false);
       if (mounted) {
         setState(() {
           _unreadCount = result['unread_count'] ?? 0;

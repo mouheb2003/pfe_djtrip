@@ -29,6 +29,13 @@ import {
   getActivitesAdmin,
   createActiviteAdmin,
   deleteActiviteAdmin,
+  getActivityParticipants,
+  getUserById,
+  getUserReviews,
+  getUserPosts,
+  deleteReview,
+  getPostComments,
+  deleteComment,
 } from 'src/Controller/actions';
 
 import { toast } from 'src/components/snackbar';
@@ -153,6 +160,18 @@ export function ActivitiesView({ sx }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [userProfileOpen, setUserProfileOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(false);
+  const [userActivities, setUserActivities] = useState([]);
+  const [userReviews, setUserReviews] = useState([]);
+  const [userPosts, setUserPosts] = useState([]);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const [expandedPosts, setExpandedPosts] = useState(new Set());
+  const [postComments, setPostComments] = useState({});
+  const [loadingPostComments, setLoadingPostComments] = useState(new Set());
   const [form, setForm] = useState({
     titre: '',
     description: '',
@@ -264,14 +283,113 @@ export function ActivitiesView({ sx }) {
     setOpenDialog(false);
   }, [submitting]);
 
-  const openDetails = useCallback((row) => {
+  const openDetails = useCallback(async (row) => {
     setDetailsRow(row);
     setOpenDetailsDialog(true);
+    setLoadingParticipants(true);
+    try {
+      const participantsData = await getActivityParticipants(row.id);
+      setParticipants(participantsData);
+    } catch {
+      toast.error('Erreur lors du chargement des participants');
+      setParticipants([]);
+    } finally {
+      setLoadingParticipants(false);
+    }
   }, []);
 
   const closeDetails = useCallback(() => {
     setOpenDetailsDialog(false);
     setDetailsRow(null);
+  }, []);
+
+  const handleOpenUserProfile = useCallback(async (userId) => {
+    if (!userId) return;
+    setLoadingUser(true);
+    setLoadingUserDetails(true);
+    try {
+      const user = await getUserById(userId);
+      setSelectedUser(user);
+      setUserProfileOpen(true);
+
+      // Fetch user reviews and posts in parallel
+      const [reviews, posts] = await Promise.all([
+        getUserReviews(userId),
+        getUserPosts(userId),
+      ]);
+
+      setUserReviews(reviews);
+      setUserPosts(posts);
+
+      // For activities, we'll use the inscriptions data from the participants
+      // Filter participants to get activities for this specific user
+      const userInscriptions = participants.filter(
+        (p) => p.touriste_id?._id === userId || p.touriste_id === userId
+      );
+      setUserActivities(userInscriptions.map((insc) => insc.activite_id).filter(Boolean));
+    } catch {
+      toast.error('Erreur lors du chargement du profil utilisateur');
+    } finally {
+      setLoadingUser(false);
+      setLoadingUserDetails(false);
+    }
+  }, [participants]);
+
+  const closeUserProfile = useCallback(() => {
+    setUserProfileOpen(false);
+    setSelectedUser(null);
+  }, []);
+
+  const handleDeleteReview = useCallback(async (reviewId) => {
+    if (!reviewId || !selectedUser) return;
+
+    try {
+      await deleteReview(reviewId);
+      toast.success('Avis supprimé avec succès');
+      // Refresh reviews
+      const reviews = await getUserReviews(selectedUser._id);
+      setUserReviews(reviews);
+    } catch {
+      toast.error('Erreur lors de la suppression de l\'avis');
+    }
+  }, [selectedUser, getUserReviews]);
+
+  const handleTogglePostExpansion = useCallback(async (postId) => {
+    const newExpanded = new Set(expandedPosts);
+    if (newExpanded.has(postId)) {
+      newExpanded.delete(postId);
+    } else {
+      newExpanded.add(postId);
+      // Fetch comments if not already loaded
+      if (!postComments[postId]) {
+        setLoadingPostComments(prev => new Set([...prev, postId]));
+        try {
+          const comments = await getPostComments(postId);
+          setPostComments(prev => ({ ...prev, [postId]: comments }));
+        } catch {
+          toast.error('Erreur lors du chargement des commentaires');
+        } finally {
+          setLoadingPostComments(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(postId);
+            return newSet;
+          });
+        }
+      }
+    }
+    setExpandedPosts(newExpanded);
+  }, [expandedPosts, postComments]);
+
+  const handleDeleteComment = useCallback(async (commentId, postId) => {
+    try {
+      await deleteComment(commentId);
+      toast.success('Commentaire supprimé avec succès');
+      // Refresh comments for this post
+      const comments = await getPostComments(postId);
+      setPostComments(prev => ({ ...prev, [postId]: comments }));
+    } catch {
+      toast.error('Erreur lors de la suppression du commentaire');
+    }
   }, []);
 
   const handleChangeForm = useCallback((field, value) => {
@@ -842,6 +960,101 @@ export function ActivitiesView({ sx }) {
               </Card>
 
               <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Participants ({participants.length})
+                </Typography>
+                {loadingParticipants ? (
+                  <Stack alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+                    <CircularProgress size={24} />
+                  </Stack>
+                ) : participants.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Aucun participant
+                  </Typography>
+                ) : (
+                  <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    <Table size="small">
+                      <TableBody>
+                        {participants.map((participant) => {
+                          const isPaid = participant.payment_id || participant.statut === 'approuvee' || participant.statut === 'verifie';
+                          const isCheckedIn = !!participant.qr_used_at;
+                          
+                          return (
+                            <TableRow key={participant._id}>
+                              <TableCell>
+                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                  <Avatar
+                                    src={participant.touriste_id?.avatar}
+                                    sx={{ width: 32, height: 32 }}
+                                  >
+                                    {getInitial(participant.touriste_id?.fullname)}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {participant.touriste_id?.fullname || '-'}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      {participant.touriste_id?.email || '-'}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Tooltip title="Voir le profil">
+                                  <IconButton
+                                    size="small"
+                                    color="info"
+                                    onClick={() => handleOpenUserProfile(participant.touriste_id?._id)}
+                                    disabled={loadingUser}
+                                  >
+                                    <Iconify icon="solar:user-circle-bold" width={18} />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Typography variant="body2">
+                                  {participant.nombre_participants || 1}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Stack direction="row" spacing={0.5} justifyContent="center">
+                                  <Chip
+                                    size="small"
+                                    label={isPaid ? 'Payé' : 'Non payé'}
+                                    color={isPaid ? 'success' : 'warning'}
+                                    variant="outlined"
+                                  />
+                                  <Chip
+                                    size="small"
+                                    label={isCheckedIn ? 'Check-in' : 'Non check-in'}
+                                    color={isCheckedIn ? 'info' : 'default'}
+                                    variant="outlined"
+                                  />
+                                </Stack>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Chip
+                                  size="small"
+                                  label={participant.statut}
+                                  color={
+                                    participant.statut === 'approuvee' ? 'success' :
+                                    participant.statut === 'verifie' ? 'info' :
+                                    participant.statut === 'annulee' ? 'error' :
+                                    participant.statut === 'PAID_PENDING_CONFIRMATION' ? 'warning' :
+                                    'default'
+                                  }
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                )}
+              </Card>
+
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
                   Informations techniques
                 </Typography>
@@ -864,6 +1077,403 @@ export function ActivitiesView({ sx }) {
           </DialogContent>
           <DialogActions>
             <Button onClick={closeDetails} color="inherit">
+              Fermer
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={userProfileOpen} onClose={closeUserProfile} fullWidth maxWidth="md">
+          <DialogTitle>
+            <Stack spacing={0.5}>
+              <Typography variant="h6">Profil utilisateur</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Vue complète du profil et de l'état du compte
+              </Typography>
+            </Stack>
+          </DialogTitle>
+          <DialogContent dividers>
+            {loadingUser ? (
+              <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
+                <CircularProgress />
+              </Stack>
+            ) : (
+              <Stack spacing={2}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    background: (theme) =>
+                      `linear-gradient(135deg, ${theme.palette.primary.main}12 0%, ${theme.palette.info.main}10 100%)`,
+                  }}
+                >
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Avatar
+                      src={selectedUser?.avatar}
+                      sx={{ width: 64, height: 64 }}
+                    >
+                      {getInitial(selectedUser?.fullname)}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        {selectedUser?.fullname || '-'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {selectedUser?.email || '-'}
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Chip size="small" label={selectedUser?.userType || '-'} color="primary" variant="soft" />
+                        <Chip
+                          size="small"
+                          label={selectedUser?.accountStatus || '-'}
+                          color={
+                            selectedUser?.accountStatus === 'active' ? 'success' :
+                            selectedUser?.accountStatus === 'suspended' ? 'warning' :
+                            selectedUser?.accountStatus === 'banned' ? 'error' :
+                            'default'
+                          }
+                          variant="soft"
+                        />
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </Card>
+
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 1.5,
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  }}
+                >
+                  <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      Téléphone
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {selectedUser?.num_tel || '-'}
+                    </Typography>
+                  </Card>
+
+                  <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      Date d'inscription
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {selectedUser?.date_inscription ? formatDate(selectedUser.date_inscription) : selectedUser?.createdAt ? formatDate(selectedUser.createdAt) : '-'}
+                    </Typography>
+                  </Card>
+
+                  <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      Dernière connexion
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {selectedUser?.derniere_connexion ? formatDate(selectedUser.derniere_connexion) : selectedUser?.lastActive ? formatDate(selectedUser.lastActive) : '-'}
+                    </Typography>
+                  </Card>
+                </Box>
+
+                <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Informations de compte
+                  </Typography>
+                  <Stack spacing={0.75} divider={<Divider flexItem />}>
+                    <Stack direction="row" justifyContent="space-between" spacing={2}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>ID utilisateur</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                        {selectedUser?._id || '-'}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between" spacing={2}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Type d'utilisateur</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {selectedUser?.userType || '-'}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between" spacing={2}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Statut du compte</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {selectedUser?.accountStatus || '-'}
+                      </Typography>
+                    </Stack>
+                    {selectedUser?.accountStatus === 'suspended' && (
+                      <>
+                        <Stack direction="row" justifyContent="space-between" spacing={2}>
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Suspendu jusqu'au</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {selectedUser?.suspendedUntil ? formatDate(selectedUser.suspendedUntil) : '-'}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" spacing={2}>
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Raison de suspension</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {selectedUser?.suspendReason || '-'}
+                          </Typography>
+                        </Stack>
+                      </>
+                    )}
+                    {selectedUser?.accountStatus === 'banned' && (
+                      <Stack direction="row" justifyContent="space-between" spacing={2}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>Raison de bannissement</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {selectedUser?.banReason || '-'}
+                        </Typography>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Activités participées ({userActivities.length})
+                  </Typography>
+                  {loadingUserDetails ? (
+                    <Stack alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+                      <CircularProgress size={24} />
+                    </Stack>
+                  ) : userActivities.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Aucune activité participée
+                    </Typography>
+                  ) : (
+                    <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                      <Stack spacing={1}>
+                        {userActivities.map((activity) => (
+                          <Card key={activity._id} variant="outlined" sx={{ p: 1.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {activity.titre}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {formatDate(activity.date_debut)}
+                            </Typography>
+                          </Card>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Avis soumis ({userReviews.length})
+                  </Typography>
+                  {loadingUserDetails ? (
+                    <Stack alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+                      <CircularProgress size={24} />
+                    </Stack>
+                  ) : userReviews.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Aucun avis soumis
+                    </Typography>
+                  ) : (
+                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                      <Stack spacing={1}>
+                        {userReviews.map((review) => (
+                          <Card key={review._id} variant="outlined" sx={{ p: 1.5 }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                              <Box sx={{ flex: 1 }}>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    Note: {review.note}/5
+                                  </Typography>
+                                  <Chip size="small" label={review.type || 'activite'} color="default" variant="outlined" />
+                                </Stack>
+                                {review.activite_id && (
+                                  <Typography variant="caption" sx={{ color: 'primary.main', display: 'block' }}>
+                                    Activité: {review.activite_id.titre || '-'}
+                                  </Typography>
+                                )}
+                                {review.organisateur_id && (
+                                  <Typography variant="caption" sx={{ color: 'primary.main', display: 'block' }}>
+                                    Organisateur: {review.organisateur_id.fullname || '-'}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
+                                  {formatDate(review.createdAt)}
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                  {review.commentaire || '-'}
+                                </Typography>
+                              </Box>
+                              <Tooltip title="Supprimer l'avis">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteReview(review._id)}
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </Card>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Card>
+
+                <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Posts ({userPosts.length})
+                  </Typography>
+                  {loadingUserDetails ? (
+                    <Stack alignItems="center" justifyContent="center" sx={{ py: 3 }}>
+                      <CircularProgress size={24} />
+                    </Stack>
+                  ) : userPosts.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Aucun post
+                    </Typography>
+                  ) : (
+                    <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
+                      <Stack spacing={1.5}>
+                        {userPosts.map((post) => (
+                          <Card key={post._id} variant="outlined" sx={{ p: 1.5 }}>
+                            <Stack spacing={1}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    {post.content || post.contenu || '-'}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    {formatDate(post.createdAt)}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              
+                              {/* Images */}
+                              {(post.imageUrl || (post.imageUrls && post.imageUrls.length > 0)) && (
+                                <Box
+                                  sx={{
+                                    display: 'grid',
+                                    gap: 0.5,
+                                    gridTemplateColumns: post.imageUrls?.length > 1 ? 'repeat(2, 1fr)' : '1fr',
+                                    maxWidth: 300,
+                                  }}
+                                >
+                                  {post.imageUrl && (
+                                    <Box
+                                      component="img"
+                                      src={post.imageUrl}
+                                      alt="Post image"
+                                      sx={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 1 }}
+                                    />
+                                  )}
+                                  {post.imageUrls && post.imageUrls.map((url, idx) => (
+                                    <Box
+                                      key={idx}
+                                      component="img"
+                                      src={url}
+                                      alt={`Post image ${idx + 1}`}
+                                      sx={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 1 }}
+                                    />
+                                  ))}
+                                </Box>
+                              )}
+
+                              {/* Reactions - Clickable to expand */}
+                              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                <Chip 
+                                  size="small" 
+                                  label={`❤️ ${post.likes_count || 0}`} 
+                                  variant="outlined"
+                                  onClick={() => handleTogglePostExpansion(post._id)}
+                                  sx={{ cursor: 'pointer' }}
+                                />
+                                <Chip 
+                                  size="small" 
+                                  label={`💬 ${post.comments_count || 0}`} 
+                                  variant="outlined"
+                                  onClick={() => handleTogglePostExpansion(post._id)}
+                                  sx={{ cursor: 'pointer' }}
+                                />
+                                {post.total_reactions && (
+                                  <Chip 
+                                    size="small" 
+                                    label={`👍 ${post.total_reactions}`} 
+                                    variant="outlined"
+                                    onClick={() => handleTogglePostExpansion(post._id)}
+                                    sx={{ cursor: 'pointer' }}
+                                  />
+                                )}
+                              </Stack>
+
+                              {/* Expanded Comments Section */}
+                              {expandedPosts.has(post._id) && (
+                                <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                                  {loadingPostComments.has(post._id) ? (
+                                    <Stack alignItems="center" justifyContent="center" sx={{ py: 2 }}>
+                                      <CircularProgress size={20} />
+                                    </Stack>
+                                  ) : postComments[post._id] && postComments[post._id].length > 0 ? (
+                                    <Stack spacing={1}>
+                                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                                        Commentaires ({postComments[post._id].length}):
+                                      </Typography>
+                                      {postComments[post._id].map((comment) => (
+                                        <Box key={comment._id || comment.id} sx={{ p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                                            <Box sx={{ flex: 1 }}>
+                                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                                <Avatar
+                                                  src={comment.author_id?.avatar}
+                                                  sx={{ width: 24, height: 24 }}
+                                                >
+                                                  {getInitial(comment.author_id?.fullname || 'A')}
+                                                </Avatar>
+                                                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                                  {comment.author_id?.fullname || 'Anonyme'}
+                                                </Typography>
+                                              </Stack>
+                                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', ml: 3.5 }}>
+                                                {comment.content || comment.commentaire || '-'}
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', ml: 3.5 }}>
+                                                {formatDate(comment.createdAt)}
+                                              </Typography>
+                                            </Box>
+                                            <Tooltip title="Supprimer le commentaire">
+                                              <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => handleDeleteComment(comment._id || comment.id, post._id)}
+                                              >
+                                                <Iconify icon="solar:trash-bin-trash-bold" width={16} />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </Stack>
+                                        </Box>
+                                      ))}
+                                    </Stack>
+                                  ) : (
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      Aucun commentaire
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
+                            </Stack>
+                          </Card>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Card>
+
+                {selectedUser?.bio && (
+                  <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                      Bio
+                    </Typography>
+                    <Typography variant="body2">{selectedUser.bio}</Typography>
+                  </Card>
+                )}
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeUserProfile} color="inherit">
               Fermer
             </Button>
           </DialogActions>

@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../services/payment_service.dart';
 import '../../services/inscription_service.dart';
+import '../../services/invoice_service.dart';
 import '../../config/api_config.dart';
 import '../tourist/booking_detail_screen.dart';
+import '../tourist/booking_confirmation_screen.dart';
+import '../tourist/tourist_main_screen.dart';
+import 'invoice_screen.dart';
 import '../../models/inscription_model.dart';
 
 /// Stripe Payment Screen
@@ -31,7 +35,7 @@ class StripePaymentScreen extends StatefulWidget {
     this.adults,
     this.children,
     required this.amount,
-    this.currency = 'USD',
+    this.currency = 'TND',
     required this.description,
   });
 
@@ -63,20 +67,19 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
             print('[STRIPE PAYMENT] Navigation request: ${request.url}');
-            // Prevent loading cancel/success URLs (they don't exist on backend)
-            if (request.url.contains('/payment/cancel') || request.url.contains('/payment/success')) {
-              print('[STRIPE PAYMENT] Payment redirect detected, closing webview');
-              // Trigger status check immediately when redirect is detected
-              setState(() {
-                _showWebView = false;
-              });
-              _checkPaymentStatus();
-              return NavigationDecision.prevent;
-            }
+            // Allow navigation to Stripe checkout pages
             return NavigationDecision.navigate;
           },
           onPageFinished: (String url) {
             print('[STRIPE PAYMENT] Page finished: $url');
+            // Check if user has been redirected to success/cancel page
+            if (url.contains('/payment/cancel') || url.contains('/payment/success')) {
+              print('[STRIPE PAYMENT] Payment redirect detected, closing webview');
+              setState(() {
+                _showWebView = false;
+              });
+              _checkPaymentStatus();
+            }
           },
         ),
       );
@@ -204,16 +207,12 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
   }
 
   void _navigateToResult({required bool success, bool pending = false}) {
-    if (success && _inscriptionId != null) {
-      // Navigate directly to booking detail screen on successful payment
-      _navigateToBookingDetail();
-    } else {
-      setState(() {
-        _paymentStatus = success ? 'paid' : (pending ? 'pending' : 'failed');
-        _showWebView = false;
-        _isCheckingStatus = false;
-      });
-    }
+    // Always show success/failure screen instead of navigating directly
+    setState(() {
+      _paymentStatus = success ? 'paid' : (pending ? 'pending' : 'failed');
+      _showWebView = false;
+      _isCheckingStatus = false;
+    });
   }
 
   void _retryPayment() {
@@ -312,11 +311,11 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
         return;
       }
 
-      // Navigate to booking detail screen
+      // Navigate to booking confirmation screen
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => BookingDetailScreen(inscription: inscription),
+          builder: (_) => BookingConfirmationScreen(inscription: inscription),
         ),
       );
     } catch (e) {
@@ -330,6 +329,72 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _viewInvoice() async {
+    try {
+      // Get payment ID from session
+      if (_sessionId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment session not found')),
+        );
+        return;
+      }
+
+      final invoiceService = InvoiceService();
+      
+      // Check if invoice already exists
+      Map<String, dynamic>? invoice;
+      try {
+        invoice = await invoiceService.getInvoiceByPaymentId(_sessionId!);
+      } catch (e) {
+        // Invoice doesn't exist, generate a new one
+        print('[STRIPE PAYMENT] Invoice not found, generating new one: $e');
+      }
+      
+      // Generate invoice if not exists
+      if (invoice == null) {
+        try {
+          invoice = await invoiceService.generateInvoice(_sessionId!);
+        } catch (e) {
+          // If invoice already exists error, try to get it again
+          if (e.toString().contains('Invoice already exists')) {
+            print('[STRIPE PAYMENT] Invoice already exists, retrieving it');
+            invoice = await invoiceService.getInvoiceByPaymentId(_sessionId!);
+          } else {
+            rethrow;
+          }
+        }
+      }
+      
+      if (!mounted) return;
+      
+      // Auto-send invoice by email
+      try {
+        await invoiceService.sendInvoiceByEmail(invoice!['_id']);
+        print('[STRIPE PAYMENT] Invoice email sent successfully');
+      } catch (e) {
+        print('[STRIPE PAYMENT] Failed to send invoice email: $e');
+        // Don't block navigation if email fails
+      }
+      
+      if (!mounted) return;
+      
+      // Navigate to invoice screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InvoiceScreen(invoice: invoice!),
+        ),
+      );
+    } catch (e) {
+      print('[STRIPE PAYMENT] Error viewing invoice: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading invoice: $e')),
+        );
       }
     }
   }
@@ -401,16 +466,28 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                      // Navigate to Tourist Main Screen with My Activities tab (index 2)
-                      Navigator.pushReplacementNamed(context, '/tourist-main', arguments: 2);
-                    },
-                    icon: const Icon(Icons.close),
-                    iconSize: 32,
-                    style: IconButton.styleFrom(
-                      foregroundColor: Colors.red,
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const TouristMainScreen(initialIndex: 2),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                      icon: const Icon(Icons.close),
+                      label: const Text('Go to My Activities'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -593,6 +670,23 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _viewInvoice,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('View Invoice'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green,
+                        side: const BorderSide(color: Colors.green),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

@@ -7,6 +7,7 @@ import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/message_service.dart';
 import 'chat_conversation_screen.dart';
+import '../notifications_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -20,19 +21,20 @@ class _MessagesScreenState extends State<MessagesScreen>
   static const Duration _refreshInterval = Duration(seconds: 4);
 
   int _tabIndex = 0;
-  final _tabs = const ['All Chats', 'Unread', 'Groups', 'Archived'];
+  final _tabs = const ['All Chats', 'Unread', 'Archived'];
 
   List<ConversationModel> _conversations = [];
   String _query = '';
 
   bool _isLoading = true;
   String? _errorMessage;
+  int _dismissKeyCounter = 0;
+  String? _currentUserId;
 
   io.Socket? _socket;
   Timer? _presenceReloadTimer;
   Timer? _autoRefreshTimer;
 
-  // ✅ ADDED
   void _disposeSocket() {
     _socket?.off('user_status');
     _socket?.off('new_message');
@@ -60,9 +62,19 @@ class _MessagesScreenState extends State<MessagesScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadCurrentUserId();
     _loadConversations();
     _initSocket();
     _startAutoRefresh();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final currentUser = AuthService.currentUser;
+    if (currentUser != null) {
+      setState(() {
+        _currentUserId = currentUser['_id']?.toString();
+      });
+    }
   }
 
   @override
@@ -148,17 +160,23 @@ class _MessagesScreenState extends State<MessagesScreen>
   Future<void> _loadConversations() async {
     try {
       final result = await MessageService.getConversations();
+
+      print('[MessagesScreen] Loaded ${result.length} conversations');
+
       if (!mounted) return;
 
       setState(() {
         _conversations = result;
         _isLoading = false;
         _errorMessage = null;
+        _dismissKeyCounter++;
       });
     } catch (e) {
+      print('[MessagesScreen] Error loading conversations: $e');
       if (!mounted) return;
 
       setState(() {
+        _conversations = [];
         _isLoading = false;
         _errorMessage = e.toString();
       });
@@ -175,10 +193,6 @@ class _MessagesScreenState extends State<MessagesScreen>
     if (_tabIndex == 1) {
       list = list.where((c) => c.unreadCount > 0 && !c.isArchived).toList();
     } else if (_tabIndex == 2) {
-      list = list
-          .where((c) => c.partnerType.toLowerCase() == 'group' && !c.isArchived)
-          .toList();
-    } else if (_tabIndex == 3) {
       list = list.where((c) => c.isArchived).toList();
     } else {
       list = list.where((c) => !c.isArchived).toList();
@@ -203,19 +217,34 @@ class _MessagesScreenState extends State<MessagesScreen>
         child: Column(
           children: [
             const SizedBox(height: 10),
-            const Text(
-              'Messages',
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4F6BFF),
-              ),
+            Row(
+              children: [
+                const SizedBox(width: 16),
+                const Text(
+                  'Messages',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4F6BFF),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Color(0xFF4F6BFF)),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
 
-            /// SEARCH
             _SearchField(onChanged: (v) => setState(() => _query = v)),
 
-            /// TABS
             _TabsRow(
               labels: _tabs,
               current: _tabIndex,
@@ -224,7 +253,6 @@ class _MessagesScreenState extends State<MessagesScreen>
 
             const SizedBox(height: 10),
 
-            /// LIST
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refreshConversations,
@@ -277,9 +305,8 @@ class _MessagesScreenState extends State<MessagesScreen>
                         itemCount: _filteredConversations.length,
                         itemBuilder: (_, i) {
                           final c = _filteredConversations[i];
-
                           return Dismissible(
-                            key: ValueKey('conversation-${c.partnerId}'),
+                            key: ValueKey('conversation-${c.partnerId}-$_dismissKeyCounter'),
                             direction: DismissDirection.horizontal,
                             background: _SwipeActionBackground(
                               color: c.isArchived
@@ -297,6 +324,32 @@ class _MessagesScreenState extends State<MessagesScreen>
                               label: 'Delete',
                               alignment: Alignment.centerRight,
                             ),
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.endToStart) {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Leave Conversation'),
+                                    content: const Text('Are you sure you want to leave this conversation?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                        ),
+                                        child: const Text('Leave'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return confirmed ?? false;
+                              }
+                              return true;
+                            },
                             onDismissed: (direction) async {
                               if (direction == DismissDirection.startToEnd) {
                                 final result = c.isArchived
@@ -327,7 +380,7 @@ class _MessagesScreenState extends State<MessagesScreen>
                                   SnackBar(
                                     content: Text(
                                       result['message']?.toString() ??
-                                          'Conversation deleted',
+                                          'Conversation left',
                                     ),
                                   ),
                                 );
@@ -360,24 +413,9 @@ class _MessagesScreenState extends State<MessagesScreen>
           ],
         ),
       ),
-
-      /// FAB
-      floatingActionButton: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF4F6BFF), Color(0xFF6E8BFF)],
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Icon(Icons.add, color: Colors.white, size: 30),
-      ),
     );
   }
 }
-
-//// ================= UI COMPONENTS =================
 
 class _SearchField extends StatelessWidget {
   final ValueChanged<String> onChanged;
@@ -398,16 +436,12 @@ class _SearchField extends StatelessWidget {
       child: Row(
         children: [
           const Icon(Icons.search, color: Color(0xFF9CA3AF)),
-
-          // Correction ici : Un simple espacement au lieu d'une décoration Border
           const SizedBox(width: 12),
-
           Expanded(
             child: TextField(
               onChanged: onChanged,
               decoration: const InputDecoration(
                 hintText: 'Search conversations...',
-                // On retire toutes les bordures internes du TextField
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -489,7 +523,6 @@ class _MessageTile extends StatelessWidget {
         ? 'DJTrip Admin'
         : conversation.partnerName;
 
-    // 🔧 REMOVE: Filter out "General" label from display
     final displayName = titleName
         .replaceAll(RegExp(r'\s*General\s*'), '')
         .replaceAll(RegExp(r'\s+'), ' ')

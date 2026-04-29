@@ -1,4 +1,5 @@
 const Lieu = require("../models/lieu");
+const LieuService = require("../services/lieu");
 
 // Create a new place
 exports.createLieu = async (req, res) => {
@@ -208,6 +209,37 @@ exports.getLieuxByType = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error retrieving places by type",
+      error: error.message,
+    });
+  }
+};
+
+// Upload images for a place
+exports.uploadImages = async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded",
+      });
+    }
+
+    // Convert files to buffers
+    const fileBuffers = req.files.map((file) => file.buffer);
+
+    // Upload to Cloudinary
+    const imageUrls = await LieuService.uploadMultipleImages(fileBuffers);
+
+    res.status(200).json({
+      success: true,
+      message: "Images uploaded successfully",
+      images: imageUrls.map((url) => ({ url })),
+    });
+  } catch (error) {
+    console.error("Error uploading images:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error uploading images",
       error: error.message,
     });
   }

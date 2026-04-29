@@ -9,6 +9,8 @@ const emailService = require("../services/email");
 const AvatarService = require("../services/avatar");
 const UserService = require("../services/user");
 const { createActivityLog } = require("../services/activityLogService");
+const logger = require("../utils/logger");
+const systemLogStore = require("../services/systemLogStore");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -355,6 +357,22 @@ exports.signIn = async (req, res) => {
     await UserService.updateOnlineStatus(user._id, true);
     console.log(`✅ [LOGIN] User ${user._id} marked as online`);
 
+    // Log login event in sentence format
+    const loginSentence = `L'utilisateur ${user.fullname || user.email} (${user.userType}) s'est connecté avec succès à la plateforme via email à ${new Date().toISOString()}`;
+    systemLogStore.addLog({
+      level: 'info',
+      source: 'auth',
+      message: loginSentence,
+      action: 'auth.login',
+      userId: user._id.toString(),
+      userType: user.userType,
+      userFullname: user.fullname,
+      userEmail: user.email,
+      method: 'email',
+      timestamp: new Date().toISOString()
+    });
+    logger.info(loginSentence);
+
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(
       user._id,
@@ -559,6 +577,25 @@ exports.googleAuth = async (req, res) => {
 
     await UserService.updateOnlineStatus(user._id, true);
 
+    // Log Google auth login event in sentence format
+    const googleAuthSentence = isExistingUser
+      ? `L'utilisateur ${user.fullname || user.email} (${user.userType || 'en attente'}) s'est connecté avec succès à la plateforme via Google à ${new Date().toISOString()}`
+      : `Nouvel utilisateur ${fullname} (${email}) a créé un compte via Google à ${new Date().toISOString()}`;
+    systemLogStore.addLog({
+      level: 'info',
+      source: 'auth',
+      message: googleAuthSentence,
+      action: isExistingUser ? 'auth.login' : 'auth.signup',
+      userId: user._id.toString(),
+      userType: user.userType,
+      userFullname: user.fullname,
+      userEmail: user.email,
+      method: 'google',
+      isNewUser: !isExistingUser,
+      timestamp: new Date().toISOString()
+    });
+    logger.info(googleAuthSentence);
+
     const { accessToken, refreshToken } = generateTokens(
       user._id,
       user.email,
@@ -650,6 +687,25 @@ exports.facebookAuth = async (req, res) => {
     }
 
     await UserService.updateOnlineStatus(user._id, true);
+
+    // Log Facebook auth login event in sentence format
+    const facebookAuthSentence = isExistingUser
+      ? `L'utilisateur ${user.fullname || user.email} (${user.userType}) s'est connecté avec succès à la plateforme via Facebook à ${new Date().toISOString()}`
+      : `Nouvel utilisateur ${fullname} (${normalizedEmail}) a créé un compte via Facebook à ${new Date().toISOString()}`;
+    systemLogStore.addLog({
+      level: 'info',
+      source: 'auth',
+      message: facebookAuthSentence,
+      action: isExistingUser ? 'auth.login' : 'auth.signup',
+      userId: user._id.toString(),
+      userType: user.userType,
+      userFullname: user.fullname,
+      userEmail: user.email,
+      method: 'facebook',
+      isNewUser: !isExistingUser,
+      timestamp: new Date().toISOString()
+    });
+    logger.info(facebookAuthSentence);
 
     const { accessToken: appAccessToken, refreshToken } = generateTokens(
       user._id,
@@ -797,6 +853,39 @@ exports.getAllUsersPublic = async (req, res) => {
   }
 };
 
+// Get admin user (optimized for chat support)
+exports.getAdminUser = async (req, res) => {
+  try {
+    console.log("🔍 [ADMIN] Fetching admin user for chat support...");
+
+    const admin = await User.findOne({
+      userType: { $in: ['Admin', 'admin', 'ADMIN'] }
+    })
+      .select("_id fullname avatar isOnline")
+      .lean();
+
+    if (!admin) {
+      console.log("❌ [ADMIN] No admin user found");
+      return res.status(404).json({
+        message: "Admin user not found",
+        admin: null
+      });
+    }
+
+    console.log(`✅ [ADMIN] Found admin: ${admin._id}`);
+
+    res.status(200).json({
+      message: "Admin user retrieved successfully",
+      admin: admin
+    });
+  } catch (err) {
+    console.error("❌ [ADMIN] Error retrieving admin user:", err);
+    res
+      .status(500)
+      .json({ message: "Error retrieving admin user", error: err.message });
+  }
+};
+
 // Get user by ID
 exports.getUserById = async (req, res) => {
   try {
@@ -820,6 +909,132 @@ exports.getUserById = async (req, res) => {
   }
 };
 
+// Get comprehensive user overview - all related data
+exports.getUserOverview = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Fetch basic user info
+    const user = await UserService.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Fetch related data based on user type
+    const overview = {
+      user: user,
+      inscriptions: [],
+      activities: [],
+      messages: [],
+      reviews: [],
+      publications: [],
+      payments: [],
+      notifications: [],
+    };
+
+    // Fetch inscriptions (bookings)
+    try {
+      const Inscription = require("../models/inscription");
+      overview.inscriptions = await Inscription.find({ user_id: userId })
+        .populate('activity_id', 'titre prix image')
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching inscriptions:', err);
+    }
+
+    // Fetch activities if user is organizer
+    if (user.userType === 'Organisator') {
+      try {
+        const Activite = require("../models/activite");
+        overview.activities = await Activite.find({ organisateur_id: userId })
+          .sort({ createdAt: -1 })
+          .limit(20);
+      } catch (err) {
+        console.error('Error fetching activities:', err);
+      }
+    }
+
+    // Fetch messages
+    try {
+      const Message = require("../models/message");
+      overview.messages = await Message.find({
+        $or: [{ sender_id: userId }, { receiver_id: userId }]
+      })
+        .populate('sender_id', 'fullname email avatar')
+        .populate('receiver_id', 'fullname email avatar')
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching messages:', err);
+    }
+
+    // Fetch reviews (avis)
+    try {
+      const Avis = require("../models/avis");
+      overview.reviews = await Avis.find({ user_id: userId })
+        .populate('activity_id', 'titre')
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching reviews:', err);
+    }
+
+    // Fetch publications (posts)
+    try {
+      const Post = require("../models/post");
+      overview.publications = await Post.find({ user_id: userId })
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching publications:', err);
+    }
+
+    // Fetch payments
+    try {
+      const Payment = require("../models/payment");
+      overview.payments = await Payment.find({ user_id: userId })
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+    }
+
+    // Fetch notifications
+    try {
+      const Notification = require("../models/notification");
+      overview.notifications = await Notification.find({ user_id: userId })
+        .sort({ createdAt: -1 })
+        .limit(20);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+
+    // Add statistics
+    overview.stats = {
+      totalInscriptions: overview.inscriptions.length,
+      totalActivities: overview.activities.length,
+      totalMessages: overview.messages.length,
+      totalReviews: overview.reviews.length,
+      totalPublications: overview.publications.length,
+      totalPayments: overview.payments.length,
+      totalNotifications: overview.notifications.length,
+    };
+
+    res.status(200).json({
+      message: "User overview retrieved successfully",
+      overview: overview,
+    });
+  } catch (err) {
+    console.error('Error in getUserOverview:', err);
+    res.status(500).json({
+      message: "Error retrieving user overview",
+      error: err.message,
+      stack: err.stack,
+    });
+  }
+};
+
 // Change password (PUT /users/me/password)
 exports.changePassword = async (req, res) => {
   try {
@@ -831,10 +1046,10 @@ exports.changePassword = async (req, res) => {
         .status(400)
         .json({ message: "Current password and new password are required" });
     }
-    if (newPassword.length < 8) {
+    if (newPassword.length > 8) {
       return res
         .status(400)
-        .json({ message: "New password must be at least 8 characters" });
+        .json({ message: "New password must be at most 8 characters" });
     }
 
     await UserService.updatePassword(userId, currentPassword, newPassword);
@@ -1493,6 +1708,7 @@ exports.updateAdvancedSettings = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const user = await User.findById(userId).select('fullname email userType');
     console.log(`🔴 [LOGOUT] User ${userId} is logging out...`);
 
     // 🚀 UPDATE: Set user offline in database
@@ -1535,6 +1751,22 @@ exports.logout = async (req, res) => {
     });
 
     console.log(`🎯 [LOGOUT] User ${userId} logout completed successfully`);
+
+    // Log logout event in sentence format
+    const logoutSentence = `L'utilisateur ${user?.fullname || user?.email || userId} (${user?.userType || 'unknown'}) s'est déconnecté de la plateforme à ${new Date().toISOString()}`;
+    systemLogStore.addLog({
+      level: 'info',
+      source: 'auth',
+      message: logoutSentence,
+      action: 'auth.logout',
+      userId: userId,
+      userType: user?.userType,
+      userFullname: user?.fullname,
+      userEmail: user?.email,
+      timestamp: new Date().toISOString()
+    });
+    logger.info(logoutSentence);
+
     res.status(200).json({ message: "Logout successful" });
   } catch (err) {
     console.error(`❌ [LOGOUT] Error during logout:`, err);
@@ -1679,6 +1911,47 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({
       message: "Error deleting user",
       error: err.message,
+    });
+  }
+};
+
+// Update reminder preferences (PUT /users/me/reminder-preferences)
+exports.updateReminderPreferences = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bookingReminder, reminderTiming } = req.body;
+
+    // Validate input
+    if (typeof bookingReminder !== 'boolean') {
+      return res.status(400).json({ message: "bookingReminder must be a boolean" });
+    }
+
+    if (!['1h', '24h', 'both'].includes(reminderTiming)) {
+      return res.status(400).json({ message: "reminderTiming must be '1h', '24h', or 'both'" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update reminder preferences
+    user.reminderPreferences = {
+      bookingReminder,
+      reminderTiming,
+    };
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Reminder preferences updated successfully",
+      reminderPreferences: user.reminderPreferences,
+    });
+  } catch (error) {
+    console.error("Error updating reminder preferences:", error);
+    res.status(500).json({
+      message: "Error updating reminder preferences",
+      error: error.message,
     });
   }
 };

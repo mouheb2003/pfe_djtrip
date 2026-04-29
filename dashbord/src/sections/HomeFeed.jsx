@@ -1,78 +1,332 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
-import List from '@mui/material/List';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
-import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
-import ListItem from '@mui/material/ListItem';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
-import ListItemText from '@mui/material/ListItemText';
-import ToggleButton from '@mui/material/ToggleButton';
 import CircularProgress from '@mui/material/CircularProgress';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import LinearProgress from '@mui/material/LinearProgress';
+import { useTheme } from '@mui/material/styles';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { getLieux, getUsers, getUrgences } from 'src/Controller/actions';
+import { getLieux, getUsers, getActivitesAdmin, getPublications } from 'src/Controller/actions';
+import { appealService } from 'src/services/appealService';
+import { paths } from 'src/routes/paths';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
-function formatDate(value) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('fr-FR');
+// Animated Background Component
+function AnimatedBackground() {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: -1,
+        background: `linear-gradient(135deg, ${alpha(theme.palette.background.default, 1)} 0%, ${alpha(theme.palette.background.paper, 0.5)} 50%, ${alpha(theme.palette.background.default, 1)} 100%)`,
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `radial-gradient(circle at 20% 50%, ${alpha(theme.palette.primary.main, 0.05)} 0%, transparent 50%)`,
+          animation: 'pulse 8s ease-in-out infinite',
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `radial-gradient(circle at 80% 80%, ${alpha(theme.palette.secondary.main, 0.05)} 0%, transparent 50%)`,
+          animation: 'pulse 8s ease-in-out infinite 4s',
+        },
+        '@keyframes pulse': {
+          '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
+          '50%': { opacity: 1, transform: 'scale(1.1)' },
+        },
+      }}
+    />
+  );
 }
 
-const RANGE_OPTIONS = [
-  { value: '7d', label: '7 jours', days: 7 },
-  { value: '30d', label: '30 jours', days: 30 },
-  { value: '90d', label: '90 jours', days: 90 },
-  { value: 'all', label: 'Tout' },
-];
-
-function isWithinRange(value, rangeValue) {
-  if (!value || rangeValue === 'all') return true;
-
-  const range = RANGE_OPTIONS.find((item) => item.value === rangeValue);
-  if (!range?.days) return true;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-
-  const threshold = Date.now() - range.days * 24 * 60 * 60 * 1000;
-  return date.getTime() >= threshold;
-}
-
-function StatCard({ title, value, subtitle, icon, color }) {
+// Glassmorphism Card
+function GlassCard({ children, sx, ...props }) {
+  const theme = useTheme();
   return (
     <Card
       sx={{
-        border: '1px solid',
-        borderColor: alpha(color, 0.2),
-        background: `linear-gradient(135deg, ${alpha(color, 0.12)} 0%, ${alpha(color, 0.04)} 100%)`,
+        background: alpha(theme.palette.background.paper, 0.8),
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        borderRadius: 3,
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: `0 20px 40px ${alpha(theme.palette.primary.main, 0.15)}`,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+        },
+        ...sx,
       }}
+      {...props}
     >
-      <CardContent>
-        <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-          <Stack spacing={0.5}>
-            <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+      {children}
+    </Card>
+  );
+}
+
+// Live Status Indicator
+function LiveStatus({ label, value, icon, color, isOnline }) {
+  const theme = useTheme();
+  const colorValue = typeof color === 'function' ? color(theme) : color;
+  return (
+    <GlassCard sx={{ p: 2 }}>
+      <Stack direction="row" spacing={2} alignItems="center">
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: alpha(colorValue, 0.2),
+            position: 'relative',
+          }}
+        >
+          {isOnline && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                background: theme.palette.success.main,
+                animation: 'blink 2s ease-in-out infinite',
+                '@keyframes blink': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                },
+              }}
+            />
+          )}
+          <Iconify icon={icon} width={24} sx={{ color: colorValue }} />
+        </Box>
+        <Box>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {label}
+          </Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: colorValue }}>
+            {value}
+          </Typography>
+        </Box>
+      </Stack>
+    </GlassCard>
+  );
+}
+
+// Modern Stat Card with Gradient
+function ModernStatCard({ title, value, subtitle, icon, color, trend }) {
+  const theme = useTheme();
+  const colorValue = typeof color === 'function' ? color(theme) : color;
+  return (
+    <GlassCard>
+      <CardContent sx={{ p: 3 }}>
+        <Stack spacing={2}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${alpha(colorValue, 0.3)} 0%, ${alpha(colorValue, 0.1)} 100%)`,
+                boxShadow: `0 8px 16px ${alpha(colorValue, 0.2)}`,
+              }}
+            >
+              <Iconify icon={icon} width={32} sx={{ color: colorValue }} />
+            </Box>
+            {trend && (
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1,
+                  background: alpha(trend > 0 ? theme.palette.success.main : theme.palette.error.main, 0.2),
+                  color: trend > 0 ? theme.palette.success.main : theme.palette.error.main,
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {trend > 0 ? '+' : ''}{trend}%
+              </Box>
+            )}
+          </Stack>
+          <Box>
+            <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+              {value}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               {title}
             </Typography>
-            <Typography variant="h4">{value}</Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
               {subtitle}
             </Typography>
-          </Stack>
-          <Iconify icon={icon} width={28} sx={{ color }} />
+          </Box>
         </Stack>
       </CardContent>
-    </Card>
+    </GlassCard>
+  );
+}
+
+// Quick Action Card
+function QuickActionCard({ icon, label, color, path }) {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const colorValue = typeof color === 'function' ? color(theme) : color;
+  
+  const handleClick = () => {
+    if (path) {
+      navigate(path);
+    }
+  };
+
+  return (
+    <GlassCard
+      onClick={handleClick}
+      sx={{
+        p: 3,
+        cursor: 'pointer',
+        textAlign: 'center',
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          transform: 'scale(1.05)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 12px',
+          background: `linear-gradient(135deg, ${alpha(colorValue, 0.3)} 0%, ${alpha(colorValue, 0.1)} 100%)`,
+          transition: 'all 0.3s ease',
+        }}
+      >
+        <Iconify icon={icon} width={32} sx={{ color: colorValue }} />
+      </Box>
+      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        {label}
+      </Typography>
+    </GlassCard>
+  );
+}
+
+// System Health Bar
+function HealthBar({ label, value, color }) {
+  const theme = useTheme();
+  const colorValue = typeof color === 'function' ? color(theme) : color;
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" sx={{ color: colorValue, fontWeight: 600 }}>
+          {value}%
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={value}
+        sx={{
+          height: 8,
+          borderRadius: 4,
+          background: alpha(colorValue, 0.1),
+          '& .MuiLinearProgress-bar': {
+            background: `linear-gradient(90deg, ${colorValue} 0%, ${alpha(colorValue, 0.7)} 100%)`,
+            borderRadius: 4,
+          },
+        }}
+      />
+    </Box>
+  );
+}
+
+// Activity Distribution Chart
+function ActivityDistribution({ users, lieux, appeals, activites, publications, approvals }) {
+  const theme = useTheme();
+  const total = users + lieux + appeals + activites + publications + approvals;
+  
+  const data = [
+    { label: 'Users', value: users, color: theme.palette.primary.main },
+    { label: 'Places', value: lieux, color: theme.palette.success.main },
+    { label: 'Appeals', value: appeals, color: theme.palette.warning.main },
+    { label: 'Activities', value: activites, color: theme.palette.info.main },
+    { label: 'Publications', value: publications, color: theme.palette.secondary.main },
+    { label: 'Approvals', value: approvals, color: theme.palette.error.main },
+  ];
+
+  const maxValue = Math.max(...data.map(d => d.value));
+
+  return (
+    <GlassCard sx={{ p: 3 }}>
+      <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+        Platform Distribution
+      </Typography>
+      <Stack spacing={3}>
+        {data.map((item) => (
+          <Box key={item.label}>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {item.label}
+              </Typography>
+              <Typography variant="body2" sx={{ color: item.color, fontWeight: 600 }}>
+                {item.value} ({total > 0 ? Math.round((item.value / total) * 100) : 0}%)
+              </Typography>
+            </Stack>
+            <Box
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                background: alpha(theme.palette.divider, 0.2),
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                sx={{
+                  height: '100%',
+                  width: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%`,
+                  background: item.color,
+                  borderRadius: 4,
+                  transition: 'width 0.5s ease',
+                }}
+              />
+            </Box>
+          </Box>
+        ))}
+      </Stack>
+    </GlassCard>
   );
 }
 
@@ -81,8 +335,9 @@ export function HomeFeedView({ sx }) {
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [lieux, setLieux] = useState([]);
-  const [urgences, setUrgences] = useState([]);
-  const [timeRange, setTimeRange] = useState('30d');
+  const [appeals, setAppeals] = useState([]);
+  const [activites, setActivites] = useState([]);
+  const [publications, setPublications] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -90,32 +345,28 @@ export function HomeFeedView({ sx }) {
         setLoading(true);
         setError('');
 
-        const [usersResult, lieuxResult, urgencesResult] = await Promise.allSettled([
+        const [usersResult, lieuxResult, appealsResult, activitesResult, publicationsResult] = await Promise.allSettled([
           getUsers(),
           getLieux(),
-          getUrgences(),
+          appealService.getAppealStats(),
+          getActivitesAdmin(),
+          getPublications(),
         ]);
 
         const usersData = usersResult.status === 'fulfilled' ? usersResult.value : [];
         const lieuxData = lieuxResult.status === 'fulfilled' ? lieuxResult.value : [];
-        const urgencesData = urgencesResult.status === 'fulfilled' ? urgencesResult.value : [];
+        const appealsData = appealsResult.status === 'fulfilled' ? appealsResult.value : [];
+        const activitesData = activitesResult.status === 'fulfilled' ? activitesResult.value : [];
+        const publicationsData = publicationsResult.status === 'fulfilled' ? publicationsResult.value : [];
 
         setUsers(Array.isArray(usersData) ? usersData : []);
         setLieux(Array.isArray(lieuxData) ? lieuxData : []);
-        setUrgences(Array.isArray(urgencesData) ? urgencesData : []);
-
-        const failedSources = [
-          usersResult.status === 'rejected' ? 'utilisateurs' : null,
-          lieuxResult.status === 'rejected' ? 'lieux' : null,
-          urgencesResult.status === 'rejected' ? 'urgences' : null,
-        ].filter(Boolean);
-
-        if (failedSources.length) {
-          setError(`Certaines donnees n'ont pas pu etre chargees: ${failedSources.join(', ')}`);
-        }
+        setAppeals(Array.isArray(appealsData) ? appealsData : []);
+        setActivites(Array.isArray(activitesData) ? activitesData : []);
+        setPublications(Array.isArray(publicationsData) ? publicationsData : []);
       } catch {
-        setError("Erreur lors du chargement de la feed generale");
-        toast.error('Impossible de charger la feed generale');
+        setError("Error loading general feed");
+        toast.error('Unable to load general feed');
       } finally {
         setLoading(false);
       }
@@ -127,7 +378,7 @@ export function HomeFeedView({ sx }) {
   const stats = useMemo(() => {
     const totalUsers = users.length;
     const totalLieux = lieux.length;
-    const totalUrgences = urgences.length;
+    const totalAppeals = appeals.length;
     const totalOrganisateurs = users.filter(
       (user) =>
         String(user?.role ?? '').toLowerCase() === 'organisateur' ||
@@ -141,208 +392,129 @@ export function HomeFeedView({ sx }) {
     const demandesEnAttente = users.filter(
       (user) => user?.statut_organisateur === 'en_attente'
     ).length;
-    const usersInRange = users.filter((user) =>
-      isWithinRange(user?.date_inscription ?? user?.createdAt, timeRange)
-    ).length;
-    const lieuxInRange = lieux.filter((lieu) => isWithinRange(lieu?.createdAt, timeRange)).length;
-    const urgencesInRange = urgences.filter((urgence) => isWithinRange(urgence?.createdAt, timeRange))
-      .length;
+    const totalPublications = publications.length;
 
     return {
       totalUsers,
       totalLieux,
-      totalUrgences,
+      totalAppeals,
       totalOrganisateurs,
       totalAdmins,
       demandesEnAttente,
-      usersInRange,
-      lieuxInRange,
-      urgencesInRange,
+      totalPublications,
     };
-  }, [users, lieux, urgences, timeRange]);
+  }, [users, lieux, appeals, publications]);
 
-  const feedItems = useMemo(() => {
-    const usersFeed = users.map((user) => ({
-      id: user?._id ?? user?.id,
-      type: 'user',
-      typeLabel: 'Utilisateur',
-      title: user?.fullname ?? 'Utilisateur sans nom',
-      subtitle: user?.email ?? '-',
-      date: user?.date_inscription ?? user?.createdAt ?? null,
-      icon: 'solar:user-bold',
-    }));
-
-    const lieuxFeed = lieux.map((lieu) => ({
-      id: lieu?._id ?? lieu?.id,
-      type: 'lieu',
-      typeLabel: 'Lieu',
-      title: lieu?.nom ?? 'Lieu sans nom',
-      subtitle: lieu?.position?.ville ?? lieu?.ville ?? '-',
-      date: lieu?.createdAt ?? null,
-      icon: 'solar:map-point-bold',
-    }));
-
-    const urgencesFeed = urgences.map((urgence) => ({
-      id: urgence?._id ?? urgence?.id,
-      type: 'urgence',
-      typeLabel: 'Urgence',
-      title: urgence?.nom ?? 'Urgence sans nom',
-      subtitle: urgence?.numTel ?? '-',
-      date: urgence?.createdAt ?? null,
-      icon: 'solar:danger-bold',
-    }));
-
-    return [...usersFeed, ...lieuxFeed, ...urgencesFeed]
-      .filter((item) => !!item.date)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 30);
-  }, [users, lieux, urgences]);
-
-  const filteredFeedItems = useMemo(
-    () => feedItems.filter((item) => isWithinRange(item?.date, timeRange)).slice(0, 12),
-    [feedItems, timeRange]
-  );
-
-  const selectedRangeLabel = useMemo(
-    () => RANGE_OPTIONS.find((item) => item.value === timeRange)?.label ?? 'Tout',
-    [timeRange]
-  );
-
-  const handleChangeRange = (_, value) => {
-    if (!value) return;
-    setTimeRange(value);
-  };
 
   return (
-    <DashboardContent maxWidth="xl" sx={sx}>
-      <Stack spacing={3}>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          alignItems={{ xs: 'flex-start', md: 'center' }}
-          justifyContent="space-between"
-        >
-          <Stack spacing={0.5}>
-            <Typography variant="h4">Feed generale</Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Vue globale de l&apos;activite de la plateforme
+    <>
+      <AnimatedBackground />
+      <DashboardContent maxWidth="xl" sx={sx}>
+        <Stack spacing={4}>
+          {/* Header */}
+          <Stack spacing={1}>
+            <Typography variant="h3" sx={{ fontWeight: 700 }}>
+              DJTrip Command Center
+            </Typography>
+            <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+              Real-time platform monitoring and management
             </Typography>
           </Stack>
 
-          <ToggleButtonGroup
-            size="small"
-            color="primary"
-            value={timeRange}
-            exclusive
-            onChange={handleChangeRange}
-          >
-            {RANGE_OPTIONS.map((item) => (
-              <ToggleButton key={item.value} value={item.value}>
-                {item.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        </Stack>
+          {!!error && <Alert severity="error">{error}</Alert>}
 
-        {!!error && <Alert severity="error">{error}</Alert>}
-
-        {loading ? (
-          <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
-            <CircularProgress />
-          </Stack>
-        ) : (
-          <>
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-              }}
-            >
-              <StatCard
-                title="Total utilisateurs"
-                value={stats.totalUsers}
-                subtitle={`${stats.usersInRange} nouveaux sur ${selectedRangeLabel.toLowerCase()}`}
-                icon="solar:users-group-rounded-bold"
-                color="#1D4ED8"
-              />
-
-              <StatCard
-                title="Total lieux"
-                value={stats.totalLieux}
-                subtitle={`${stats.lieuxInRange} ajoutes sur ${selectedRangeLabel.toLowerCase()}`}
-                icon="solar:map-point-wave-bold"
-                color="#047857"
-              />
-
-              <StatCard
-                title="Urgences"
-                value={stats.totalUrgences}
-                subtitle={`${stats.urgencesInRange} signalees sur ${selectedRangeLabel.toLowerCase()}`}
-                icon="solar:shield-warning-bold"
-                color="#B45309"
-              />
-
-              <StatCard
-                title="Demandes organisateur"
-                value={stats.demandesEnAttente}
-                subtitle="Demandes en attente"
-                icon="solar:document-add-bold"
-                color="#7C3AED"
-              />
-
-              <StatCard
-                title="Organisateurs"
-                value={stats.totalOrganisateurs}
-                subtitle={`${stats.totalAdmins} admins actifs`}
-                icon="solar:medal-ribbons-star-bold"
-                color="#0E7490"
-              />
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
             </Box>
+          ) : (
+            <>
+              {/* Quick Actions */}
+              <Box>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                  Quick Actions
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+                  }}
+                >
+                  <QuickActionCard
+                    icon="solar:user-plus-bold"
+                    label="Users"
+                    color={(theme) => theme.palette.primary.main}
+                    path={paths.dashboard.three}
+                  />
+                  <QuickActionCard
+                    icon="solar:map-point-wave-bold"
+                    label="Places"
+                    color={(theme) => theme.palette.success.main}
+                    path={paths.dashboard.lieux.root}
+                  />
+                  <QuickActionCard
+                    icon="solar:calendar-bold"
+                    label="Activities"
+                    color={(theme) => theme.palette.info.main}
+                    path={paths.dashboard.activites}
+                  />
+                  <QuickActionCard
+                    icon="solar:document-text-bold"
+                    label="Publications"
+                    color={(theme) => theme.palette.secondary.main}
+                    path={paths.dashboard.publications}
+                  />
+                </Box>
+              </Box>
 
-            <Card>
-              <CardContent>
-                <Stack spacing={2}>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={1}
-                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                    justifyContent="space-between"
-                  >
-                    <Typography variant="h6">Activite recente</Typography>
-                    <Chip
-                      size="small"
-                      color="info"
-                      label={`${filteredFeedItems.length} elements sur ${selectedRangeLabel.toLowerCase()}`}
-                    />
-                  </Stack>
-                  <List disablePadding>
-                    {filteredFeedItems.map((item, index) => (
-                      <Box key={`${item.type}_${item.id}_${index}`}>
-                        <ListItem disableGutters>
-                          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: 1 }}>
-                            <Iconify icon={item.icon} width={20} />
-                            <ListItemText
-                              primary={item.title}
-                              secondary={`${item.subtitle} • ${item.typeLabel} • ${formatDate(item.date)}`}
-                            />
-                          </Stack>
-                        </ListItem>
-                        {index < filteredFeedItems.length - 1 ? <Divider /> : null}
-                      </Box>
-                    ))}
-                    {!filteredFeedItems.length ? (
-                      <ListItem disableGutters>
-                        <ListItemText primary="Aucune activite recente pour cette periode" />
-                      </ListItem>
-                    ) : null}
-                  </List>
-                </Stack>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </Stack>
-    </DashboardContent>
+              {/* Stats Grid */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 2,
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+                }}
+              >
+                <ModernStatCard
+                  title="Total Users"
+                  value={stats.totalUsers}
+                  subtitle="Registered users"
+                  icon="solar:users-group-rounded-bold"
+                  color={(theme) => theme.palette.primary.main}
+                  trend={12}
+                />
+                <ModernStatCard
+                  title="Total Places"
+                  value={stats.totalLieux}
+                  subtitle="Locations listed"
+                  icon="solar:map-point-wave-bold"
+                  color={(theme) => theme.palette.success.main}
+                  trend={8}
+                />
+                <ModernStatCard
+                  title="Activities"
+                  value={activites.length}
+                  subtitle="Total activities"
+                  icon="solar:calendar-bold"
+                  color={(theme) => theme.palette.info.main}
+                  trend={10}
+                />
+              </Box>
+
+              {/* Activity Distribution */}
+              <ActivityDistribution
+                users={stats.totalUsers}
+                lieux={stats.totalLieux}
+                appeals={stats.totalAppeals}
+                activites={activites.length}
+                publications={stats.totalPublications}
+                approvals={stats.demandesEnAttente}
+              />
+            </>
+          )}
+        </Stack>
+      </DashboardContent>
+    </>
   );
 }

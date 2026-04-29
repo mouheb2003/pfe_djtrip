@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class InscriptionModel {
   final String id;
-  final String statut; // en_attente | approuvee | refusee | annulee | verifie
+  final String statut; // approuvee | annulee | verifie | PAID_PENDING_CONFIRMATION
   final int nombreParticipants;
   final double prixTotal;
   final DateTime? dateDemande;
@@ -65,7 +65,7 @@ class InscriptionModel {
   factory InscriptionModel.fromJson(Map<String, dynamic> json) {
     return InscriptionModel(
       id: json['_id'] as String? ?? '',
-      statut: json['statut'] as String? ?? 'en_attente',
+      statut: json['statut'] as String? ?? 'PAID_PENDING_CONFIRMATION',
       nombreParticipants: (json['nombre_participants'] as num? ?? 1).toInt(),
       prixTotal: (json['prix_total'] as num? ?? 0).toDouble(),
       dateDemande: json['date_demande'] != null
@@ -92,13 +92,13 @@ class InscriptionModel {
   String get statusLabel {
     switch (statut) {
       case 'approuvee':
-        return 'Approved';
+        return 'Confirmed';
       case 'verifie':
         return 'Used';
-      case 'en_attente':
-        return 'Pending';
-      case 'refusee':
-        return 'Rejected';
+      case 'PAID_PENDING_CONFIRMATION':
+        return 'Payment Pending';
+      case 'PAYMENT_FAILED':
+        return 'Payment Failed';
       case 'annulee':
         return 'Cancelled';
       default:
@@ -112,10 +112,10 @@ class InscriptionModel {
         return const Color(0xFF22C55E);
       case 'verifie':
         return const Color(0xFF14B8A6);
-      case 'en_attente':
+      case 'PAID_PENDING_CONFIRMATION':
         return const Color(0xFFF59E0B);
-      case 'refusee':
-        return const Color(0xFFEF4444);
+      case 'PAYMENT_FAILED':
+        return const Color(0xFFDC2626);
       case 'annulee':
         return const Color(0xFF94A3B8);
       default:
@@ -123,19 +123,20 @@ class InscriptionModel {
     }
   }
 
-  bool get isUpcoming => statut == 'approuvee' || statut == 'en_attente';
-  bool get isPending => statut == 'en_attente';
+  bool get isUpcoming => statut == 'approuvee' || statut == 'PAID_PENDING_CONFIRMATION';
+  bool get isPending => statut == 'PAID_PENDING_CONFIRMATION';
   bool get isApproved => statut == 'approuvee';
   bool get isUsed => statut == 'verifie';
-  bool get isRejected => statut == 'refusee';
+  bool get isRejected => false; // No longer used with auto-approval
   bool get isCancelled => statut == 'annulee';
+  bool get isPaymentFailed => statut == 'PAYMENT_FAILED';
 
-  bool get canBeCancelled => isPending || isApproved;
-  bool get canBeApproved => isPending;
-  bool get canBeRejected => isPending;
+  bool get canBeCancelled => isApproved || isPending;
+  bool get canBeApproved => false; // No longer used with auto-approval
+  bool get canBeRejected => false; // No longer used with auto-approval
 
-  /// Check if booking can be cancelled based on 24-hour rule
-  /// Cancellation only allowed 24+ hours before activity start
+  /// Check if booking can be cancelled
+  /// Cancellation allowed any time before activity starts
   bool get canBeCancelledWithTime {
     if (!canBeCancelled) return false;
     
@@ -148,7 +149,8 @@ class InscriptionModel {
     final now = DateTime.now();
     final hoursBeforeStart = startDate.difference(now).inHours;
     
-    return hoursBeforeStart >= 24;
+    // Cancellation allowed any time before activity starts
+    return hoursBeforeStart > 0;
   }
 
   /// Get hours remaining until cancellation deadline

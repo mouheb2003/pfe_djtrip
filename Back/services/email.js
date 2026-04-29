@@ -834,3 +834,34 @@ exports.sendSuspensionNotification = async (
     return { success: false, error: error.message };
   }
 };
+
+// Generic email with attachment (for invoices, etc.)
+exports.sendEmailWithAttachment = async ({
+  to,
+  subject,
+  html,
+  text,
+  attachments = [],
+}) => {
+  try {
+    const mailOptions = getBaseMailOptions({
+      to,
+      subject,
+      html,
+      text,
+      attachments,
+    });
+
+    const info = await sendMailWithLogging(
+      "email with attachment",
+      mailOptions,
+    );
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    emailLog("error", "Error sending email with attachment", {
+      message: error.message,
+      code: error.code,
+    });
+    return { success: false, error: error.message };
+  }
+};

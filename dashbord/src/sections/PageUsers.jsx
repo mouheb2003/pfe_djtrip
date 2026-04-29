@@ -23,12 +23,16 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
+import Avatar from '@mui/material/Avatar';
+import Grid from '@mui/material/Grid';
+import Rating from '@mui/material/Rating';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import {
   getUsers,
   deleteUser,
   getUserById,
+  getUserOverview,
   toggleUserRole,
   updateUserStatus,
   banUser,
@@ -151,6 +155,9 @@ export function UsersView({ sx }) {
   const [users, setUsers] = useState([]);
   const [busyUserId, setBusyUserId] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [userOverview, setUserOverview] = useState(null);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [banDialogOpen, setBanDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -244,6 +251,19 @@ export function UsersView({ sx }) {
       toast.error('Impossible de récupérer les détails utilisateur');
     } finally {
       setBusyUserId('');
+    }
+  }, []);
+
+  const handleViewOverview = useCallback(async (id) => {
+    try {
+      setOverviewLoading(true);
+      setOverviewOpen(true);
+      const overview = await getUserOverview(id);
+      setUserOverview(overview);
+    } catch {
+      toast.error('Impossible de récupérer l\'aperçu utilisateur');
+    } finally {
+      setOverviewLoading(false);
     }
   }, []);
 
@@ -715,11 +735,11 @@ export function UsersView({ sx }) {
                               : '-'}
                           </TableCell>
                           <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                            <Tooltip title="Voir détails">
+                            <Tooltip title="Vue d'ensemble complète">
                               <span>
                                 <IconButton
-                                  color="info"
-                                  onClick={() => handleViewDetails(user.id)}
+                                  color="primary"
+                                  onClick={() => handleViewOverview(user.id)}
                                   disabled={busyUserId === user.id}
                                 >
                                   <Iconify icon="solar:eye-bold" />
@@ -958,6 +978,524 @@ export function UsersView({ sx }) {
               }
             >
               Supprimer
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={overviewOpen} onClose={() => setOverviewOpen(false)} fullWidth maxWidth="xl" scroll="paper">
+          <DialogTitle>
+            <Stack spacing={0.5}>
+              <Typography variant="h6">Vue d'ensemble complète de l'utilisateur</Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Toutes les informations liées à cet utilisateur
+              </Typography>
+            </Stack>
+          </DialogTitle>
+          <DialogContent dividers>
+            {overviewLoading ? (
+              <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
+                <CircularProgress />
+              </Stack>
+            ) : userOverview ? (
+              <Stack spacing={2}>
+                {/* User Info Card */}
+                <Card variant="outlined" sx={{ p: 3, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2.5}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  >
+                    <Avatar
+                      src={userOverview.user?.avatar}
+                      alt={userOverview.user?.fullname}
+                      sx={{ width: 80, height: 80, bgcolor: 'primary.lighter', color: 'primary.main', fontSize: 32 }}
+                    >
+                      {userOverview.user?.fullname?.charAt(0)?.toUpperCase() ?? '?'}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        {userOverview.user?.fullname ?? '-'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
+                        {userOverview.user?.email ?? '-'}
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Label variant="soft" color={roleColor(userOverview.user?.userType)}>
+                          {userOverview.user?.userType ?? '-'}
+                        </Label>
+                        <Label variant="soft" color={statusColor(normalizeAccountStatus(userOverview.user?.accountStatus))}>
+                          {normalizeAccountStatus(userOverview.user?.accountStatus)}
+                        </Label>
+                      </Stack>
+                    </Box>
+                  </Stack>
+                </Card>
+
+                {/* Profile Details Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.lighter', color: 'primary.main' }}>
+                        <Iconify icon="mdi:account" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Profile Information</Typography>
+                    </Stack>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>ID</Typography>
+                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{userOverview.user?._id ?? userOverview.user?.id ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Full Name</Typography>
+                          <Typography variant="body2">{userOverview.user?.fullname ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Email</Typography>
+                          <Typography variant="body2">{userOverview.user?.email ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Phone</Typography>
+                          <Typography variant="body2">{userOverview.user?.num_tel ?? userOverview.user?.numTel ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Age</Typography>
+                          <Typography variant="body2">{userOverview.user?.age ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date of Birth</Typography>
+                          <Typography variant="body2">{userOverview.user?.date_naissance ? new Date(userOverview.user.date_naissance).toLocaleDateString('fr-FR') : '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Bio</Typography>
+                          <Typography variant="body2">{userOverview.user?.bio ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Address</Typography>
+                          <Typography variant="body2">{userOverview.user?.address ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </Stack>
+                </Card>
+
+                {/* Tourist-specific sections */}
+                {userOverview.user?.userType === 'Touriste' && (
+                  <>
+                    {/* Interests Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.lighter', color: 'warning.main' }}>
+                            <Iconify icon="mdi:heart" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Centres d'intérêt</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.interests && Array.isArray(userOverview.user.interests) && userOverview.user.interests.length > 0 ? (
+                            userOverview.user.interests.map((interest, index) => (
+                              <Label key={index} variant="soft" color="info">{interest}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucun centre d'intérêt spécifié</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+
+                    {/* Languages Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'success.lighter', color: 'success.main' }}>
+                            <Iconify icon="mdi:translate" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Langues parlées</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.languages_spoken && Array.isArray(userOverview.user.languages_spoken) && userOverview.user.languages_spoken.length > 0 ? (
+                            userOverview.user.languages_spoken.map((lang, index) => (
+                              <Label key={index} variant="soft" color="success">{lang}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune langue spécifiée</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+
+                    {/* Specialized Activities Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'info.lighter', color: 'info.main' }}>
+                            <Iconify icon="mdi:hiking" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Activités spécialisées</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.specialized_activities && Array.isArray(userOverview.user.specialized_activities) && userOverview.user.specialized_activities.length > 0 ? (
+                            userOverview.user.specialized_activities.map((activity, index) => (
+                              <Label key={index} variant="soft" color="info">{activity}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune activité spécialisée spécifiée</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+                  </>
+                )}
+
+                {/* Organizer-specific sections */}
+                {userOverview.user?.userType === 'Organisator' && (
+                  <>
+                    {/* Business Interests Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.lighter', color: 'warning.main' }}>
+                            <Iconify icon="mdi:business" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Centres d'intérêt business</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.business_interests && Array.isArray(userOverview.user.business_interests) && userOverview.user.business_interests.length > 0 ? (
+                            userOverview.user.business_interests.map((interest, index) => (
+                              <Label key={index} variant="soft" color="info">{interest}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucun centre d'intérêt business spécifié</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+
+                    {/* Specialties Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'info.lighter', color: 'info.main' }}>
+                            <Iconify icon="mdi:star-circle" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Spécialités</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.specialties && Array.isArray(userOverview.user.specialties) && userOverview.user.specialties.length > 0 ? (
+                            userOverview.user.specialties.map((specialty, index) => (
+                              <Label key={index} variant="soft" color="info">{specialty}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune spécialité spécifiée</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+
+                    {/* Languages Section */}
+                    <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                      <Stack spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: 'success.lighter', color: 'success.main' }}>
+                            <Iconify icon="mdi:translate" width={16} />
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Langues parlées</Typography>
+                        </Stack>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {userOverview.user?.languages_spoken && Array.isArray(userOverview.user.languages_spoken) && userOverview.user.languages_spoken.length > 0 ? (
+                            userOverview.user.languages_spoken.map((lang, index) => (
+                              <Label key={index} variant="soft" color="success">{lang}</Label>
+                            ))
+                          ) : (
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune langue spécifiée</Typography>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Card>
+                  </>
+                )}
+
+                {/* Account Status Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'success.lighter', color: 'success.main' }}>
+                        <Iconify icon="mdi:shield-account" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Account Status</Typography>
+                    </Stack>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>User Type</Typography>
+                          <Typography variant="body2">{userOverview.user?.userType ?? userOverview.user?.role ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Account Status</Typography>
+                          <Typography variant="body2">{normalizeAccountStatus(userOverview.user?.accountStatus)}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Organizer Status</Typography>
+                          <Typography variant="body2">{userOverview.user?.statut_organisateur ?? '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Registration Date</Typography>
+                          <Typography variant="body2">{userOverview.user?.date_inscription || userOverview.user?.createdAt ? new Date(userOverview.user.date_inscription || userOverview.user.createdAt).toLocaleDateString('fr-FR') : '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Suspended Until</Typography>
+                          <Typography variant="body2">{userOverview.user?.suspendedUntil ? new Date(userOverview.user.suspendedUntil).toLocaleDateString('fr-FR') : '-'}</Typography>
+                        </Stack>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Email Verified</Typography>
+                          <Typography variant="body2">{userOverview.user?.isVerified ? 'Yes' : 'No'}</Typography>
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </Stack>
+                </Card>
+
+                {/* Organizer Specific Section */}
+                {userOverview.user?.userType === 'Organisator' && (
+                  <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.lighter', color: 'warning.main' }}>
+                          <Iconify icon="mdi:account-star" width={16} />
+                        </Avatar>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Organizer Details</Typography>
+                      </Stack>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 12 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Company Name</Typography>
+                            <Typography variant="body2">{userOverview.user?.company_name ?? '-'}</Typography>
+                          </Stack>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Business License</Typography>
+                            <Typography variant="body2">{userOverview.user?.business_license ?? '-'}</Typography>
+                          </Stack>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Business Description</Typography>
+                            <Typography variant="body2">{userOverview.user?.business_description ?? '-'}</Typography>
+                          </Stack>
+                        </Grid>
+                      </Grid>
+                    </Stack>
+                  </Card>
+                )}
+
+                {/* Statistics Cards */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'info.lighter', color: 'info.main' }}>
+                        <Iconify icon="mdi:chart-line" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Statistics</Typography>
+                    </Stack>
+                    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' } }}>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Réservations</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalInscriptions ?? 0}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Activités</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalActivities ?? 0}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Messages</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalMessages ?? 0}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Avis</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalReviews ?? 0}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Publications</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalPublications ?? 0}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Paiements</Typography><Typography variant="h4" sx={{ fontWeight: 700 }}>{userOverview.stats?.totalPayments ?? 0}</Typography></Card>
+                    </Box>
+                  </Stack>
+                </Card>
+
+                {/* Inscriptions Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.lighter', color: 'primary.main' }}>
+                        <Iconify icon="mdi:calendar-check" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Réservations ({userOverview.stats?.totalInscriptions ?? 0})</Typography>
+                    </Stack>
+                    {userOverview.inscriptions?.length > 0 ? (
+                      userOverview.inscriptions.map((inscription) => (
+                        <Card key={inscription._id} variant="outlined" sx={{ p: 1.5, mb: 1, borderRadius: 1.5 }}>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{inscription.activity_id?.titre ?? 'Activité inconnue'}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Statut: {inscription.statut ?? '-'} | Participants: {inscription.nb_participants ?? '-'}</Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{inscription.activity_id?.prix ?? '-'} TND</Typography>
+                          </Stack>
+                        </Card>
+                      ))
+                    ) : (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune réservation</Typography>
+                    )}
+                  </Stack>
+                </Card>
+
+                {/* Activities Section (if organizer) */}
+                {userOverview.user?.userType === 'Organisator' && (
+                  <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.lighter', color: 'warning.main' }}>
+                          <Iconify icon="mdi:calendar" width={16} />
+                        </Avatar>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Activités créées ({userOverview.stats?.totalActivities ?? 0})</Typography>
+                      </Stack>
+                      {userOverview.activities?.length > 0 ? (
+                        userOverview.activities.map((activity) => (
+                          <Card key={activity._id} variant="outlined" sx={{ p: 1.5, mb: 1, borderRadius: 1.5 }}>
+                            <Stack direction="row" spacing={2} alignItems="center">
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{activity.titre ?? '-'}</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{activity.lieu ?? '-'} | {activity.prix ?? '-'} TND</Typography>
+                              </Box>
+                              <Label variant="soft" color={activity.statut === 'active' ? 'success' : 'default'}>{activity.statut ?? '-'}</Label>
+                            </Stack>
+                          </Card>
+                        ))
+                      ) : (
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune activité créée</Typography>
+                      )}
+                    </Stack>
+                  </Card>
+                )}
+
+                {/* Reviews Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'success.lighter', color: 'success.main' }}>
+                        <Iconify icon="mdi:star" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        {userOverview.user?.userType === 'Touriste' ? 'Avis envoyés' : 'Avis reçus'} ({userOverview.stats?.totalReviews ?? 0})
+                      </Typography>
+                    </Stack>
+                    {userOverview.reviews?.length > 0 ? (
+                      userOverview.reviews.map((review) => (
+                        <Card key={review._id} variant="outlined" sx={{ p: 1.5, mb: 1, borderRadius: 1.5 }}>
+                          <Stack spacing={1}>
+                            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{review.activity_id?.titre ?? 'Activité inconnue'}</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  {userOverview.user?.userType === 'Touriste' 
+                                    ? `Organisateur: ${review.organisateur_id?.fullname ?? review.organisateur_id?.email ?? '-'}`
+                                    : `Touriste: ${review.user_id?.fullname ?? review.user_id?.email ?? '-'}`
+                                  }
+                                </Typography>
+                              </Box>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main' }}>{review.note ?? '-'}/5</Typography>
+                                <Rating value={review.note ?? 0} readOnly size="small" precision={0.5} />
+                              </Stack>
+                            </Stack>
+                            {review.comment && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                                "{review.comment}"
+                              </Typography>
+                            )}
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {new Date(review.createdAt).toLocaleDateString('fr-FR')} à {new Date(review.createdAt).toLocaleTimeString('fr-FR')}
+                            </Typography>
+                          </Stack>
+                        </Card>
+                      ))
+                    ) : (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {userOverview.user?.userType === 'Touriste' ? 'Aucun avis envoyé' : 'Aucun avis reçu'}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Card>
+
+                {/* Publications Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'info.lighter', color: 'info.main' }}>
+                        <Iconify icon="mdi:newspaper" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Publications ({userOverview.stats?.totalPublications ?? 0})</Typography>
+                    </Stack>
+                    {userOverview.publications?.length > 0 ? (
+                      userOverview.publications.map((publication) => (
+                        <Card key={publication._id} variant="outlined" sx={{ p: 1.5, mb: 1, borderRadius: 1.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{publication.contenu?.substring(0, 100) ?? '-'}...</Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>{new Date(publication.createdAt).toLocaleDateString('fr-FR')}</Typography>
+                        </Card>
+                      ))
+                    ) : (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucune publication</Typography>
+                    )}
+                  </Stack>
+                </Card>
+
+                {/* Payments Section */}
+                <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.lighter', color: 'warning.main' }}>
+                        <Iconify icon="mdi:cash" width={16} />
+                      </Avatar>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Paiements ({userOverview.stats?.totalPayments ?? 0})</Typography>
+                    </Stack>
+                    {userOverview.payments?.length > 0 ? (
+                      userOverview.payments.map((payment) => (
+                        <Card key={payment._id} variant="outlined" sx={{ p: 1.5, mb: 1, borderRadius: 1.5 }}>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{payment.montant ?? '-'} TND</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Méthode: {payment.methode_paiement ?? '-'}</Typography>
+                            </Box>
+                            <Label variant="soft" color={payment.statut === 'completed' ? 'success' : 'default'}>{payment.statut ?? '-'}</Label>
+                          </Stack>
+                        </Card>
+                      ))
+                    ) : (
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>Aucun paiement</Typography>
+                    )}
+                  </Stack>
+                </Card>
+              </Stack>
+            ) : (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Aucune donnée disponible
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOverviewOpen(false)} color="inherit">
+              Fermer
             </Button>
           </DialogActions>
         </Dialog>

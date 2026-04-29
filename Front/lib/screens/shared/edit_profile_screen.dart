@@ -7,6 +7,7 @@ import '../../api/api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/cache_manager.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -22,10 +23,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _customInterestCtrl = TextEditingController();
   final _customSpecialtyCtrl = TextEditingController();
   final _customLanguageCtrl = TextEditingController();
-  String _country = 'FR'; // 🚀 Country code for phone number
-  String _originCountry =
-      'FR'; // 🚀 FIX: Separate country of origin (completely independent)
-  String _language = 'English'; // 🚀 FIX: Default language (not French)
+  String _country = ''; // 🚀 Country code for phone number (no default)
+  String _originCountry = ''; // 🚀 Separate country of origin (no default)
+  String _language = ''; // 🚀 No default language
   String? _avatarUrl;
   bool _isSaving = false;
   bool _isAvatarUploading = false;
@@ -312,6 +312,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // 🚀 NEW: Normalize country name to country key
   String _normalizeCountryKey(String raw) {
+    if (raw.trim().isEmpty) return '';
     final v = raw.trim().toLowerCase();
     if (v == 'france' || v == 'fr') return 'FR';
     if (v == 'tunisie' || v == 'tn') return 'TN';
@@ -344,7 +345,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (v == 'australie' || v == 'australia' || v == 'au') return 'AU';
     if (v == 'mexique' || v == 'mexico' || v == 'mx') return 'MX';
     if (v == 'chine' || v == 'china' || v == 'cn') return 'CN';
-    return 'FR'; // Default to France
+    return ''; // No default
   }
 
   String _normalizeLanguage(String raw) {
@@ -442,6 +443,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
     setState(() => _isSaving = false);
     if (result['success'] == true) {
+      // Invalidate cache to ensure fresh data on next load
+      CacheManager.instance.remove('GET:/users/me');
+      CacheManager.instance.removeByPattern('GET:/users/me*');
       Navigator.pop(context);
     } else {
       // 🚀 FIX: Use post-frame callback to avoid build phase error
@@ -462,6 +466,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // 🚀 Phone validation methods
   String _getCountryCode(String countryKey) {
+    if (countryKey.isEmpty) return '';
     const codes = {
       'FR': '+33',
       'TN': '+216',
@@ -491,11 +496,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'MX': '+52',
       'CN': '+86',
     };
-    return codes[countryKey] ?? '+33';
+    return codes[countryKey] ?? '';
   }
 
   // 🚀 NEW: Get country flag emoji
   String _getCountryFlag(String countryKey) {
+    if (countryKey.isEmpty) return '';
     const flags = {
       'FR': '🇫🇷',
       'TN': '🇹🇳',
@@ -520,16 +526,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'SE': '🇸🇪',
       'TR': '🇹🇷',
       'JP': '🇯🇵',
-      'IN': '🇮🇳',
+      'IN': '🇮🳳',
       'AU': '🇦🇺',
       'MX': '🇲🇽',
       'CN': '🇨🇳',
     };
-    return flags[countryKey] ?? '🇫🇷';
+    return flags[countryKey] ?? '';
   }
 
   // 🚀 NEW: Get country name from key
   String _getCountryName(String countryKey) {
+    if (countryKey.isEmpty) return '';
     const names = {
       'FR': 'France',
       'TN': 'Tunisie',
@@ -559,7 +566,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'MX': 'Mexique',
       'CN': 'Chine',
     };
-    return names[countryKey] ?? 'France';
+    return names[countryKey] ?? '';
   }
 
   String _getLanguageFlag(String language) {
@@ -1245,17 +1252,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 SizedBox(
                   width: 71,
                   child: DropdownButtonFormField<String>(
-                    value: _country,
+                    value: _countries.contains(_country) ? _country : null,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
                     decoration: _touristInputDecoration(),
                     items: _countries
                         .map(
                           (c) => DropdownMenuItem(
                             value: c,
-                            child: Text(
-                                _getCountryFlag(c),
-                                style: const TextStyle(fontSize: 10),
-                              ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  _getCountryFlag(c),
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _getCountryName(c),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
                         )
                         .toList(),
@@ -1285,7 +1301,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 14),
             _touristSectionLabel('COUNTRY'),
             DropdownButtonFormField<String>(
-              value: _originCountry,
+              value: _countries.contains(_originCountry) ? _originCountry : null,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               decoration: _touristInputDecoration(),
               items: _countries
@@ -1314,9 +1330,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               },
             ),
             const SizedBox(height: 14),
-            _touristSectionLabel('PREFERRED LANGUAGE'),
+            _touristSectionLabel('NATIVE LANGUAGE'),
             DropdownButtonFormField<String>(
-              value: _language,
+              value: _languages.contains(_language) ? _language : null,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               decoration: _touristInputDecoration(),
               items: _languages
@@ -2025,7 +2041,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: _country,
+                              value: _countries.contains(_country) ? _country : null,
                               isDense: true,
                               isExpanded: true,
                               style: const TextStyle(
@@ -2044,7 +2060,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          _getCountryCode(countryKey),
+                                          _getCountryName(countryKey),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -2215,7 +2231,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _originCountry,
+                  value: _countries.contains(_originCountry) ? _originCountry : null,
                   isExpanded: true,
                   icon: const Padding(
                     padding: EdgeInsets.only(right: 12.0),
@@ -2237,7 +2253,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 size: 20,
                               ),
                               const SizedBox(width: 12),
-                              Text(c, style: const TextStyle(fontSize: 15)),
+                              Text(_getCountryName(c), style: const TextStyle(fontSize: 15)),
                             ],
                           ),
                         ),
@@ -2275,7 +2291,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _language,
+                  value: _languages.contains(_language) ? _language : null,
                   isExpanded: true,
                   icon: const Padding(
                     padding: EdgeInsets.only(right: 12.0),
@@ -2400,7 +2416,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '${_interests.length}/$_maxInterests',
+                            '${_interests.length}',
                             style: const TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -2682,31 +2698,80 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: _availableSpokenLanguages.map((lang) {
-                        final isSelected = _spokenLanguages.contains(lang);
-                        return GestureDetector(
-                          onTap: () => _toggleSpokenLanguage(lang),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF059669)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
+                      children: [
+                        // Predefined languages
+                        ..._availableSpokenLanguages.map((lang) {
+                          final isSelected = _spokenLanguages.contains(lang);
+                          return GestureDetector(
+                            onTap: () => _toggleSpokenLanguage(lang),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
                                 color: isSelected
                                     ? const Color(0xFF059669)
-                                    : const Color(0xFFD1D5DB),
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFFD1D5DB),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSelected)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 4),
+                                      child: Icon(
+                                        Icons.check_circle,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  Flexible(
+                                    child: Text(
+                                      lang,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : const Color(0xFF374151),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isSelected)
+                          );
+                        }).toList(),
+                        // Custom languages (not in predefined list)
+                        ..._spokenLanguages.where((lang) => !_availableSpokenLanguages.contains(lang)).map((lang) {
+                          return GestureDetector(
+                            onTap: () => _toggleSpokenLanguage(lang),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF059669),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
                                   const Padding(
                                     padding: EdgeInsets.only(right: 4),
                                     child: Icon(
@@ -2715,25 +2780,81 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       color: Colors.white,
                                     ),
                                   ),
-                                Flexible(
-                                  child: Text(
-                                    lang,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : const Color(0xFF374151),
+                                  Flexible(
+                                    child: Text(
+                                      lang,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customLanguageCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Add custom language',
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: const Color(0xFFD1D5DB),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: const Color(0xFFD1D5DB),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: const Color(0xFF059669),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onSubmitted: (_) => _addCustomSpokenLanguage(),
                           ),
-                        );
-                      }).toList(),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _addCustomSpokenLanguage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                            ),
+                            child: const Icon(Icons.add, size: 20),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

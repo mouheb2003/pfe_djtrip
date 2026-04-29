@@ -14,6 +14,7 @@ import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
+import '../payment/stripe_payment_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
@@ -32,7 +33,7 @@ class ActivityDetailScreen extends StatefulWidget {
   State<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
 }
 
-class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
+class _ActivityDetailScreenState extends State<ActivityDetailScreen> with WidgetsBindingObserver {
   bool _showFullDesc = false;
   late PageController _pageController;
   Timer? _carouselTimer;
@@ -47,8 +48,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   bool _loadingReviews = false;
 
   final _images = const [
-    'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1516549655169-df83a0774514?q=80&w=1600&auto=format&fit=crop',
+    // Djerba beach images
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1519046904884-53103b34b206?q=80&w=1600&auto=format&fit=crop',
+    // Djerba palm trees and landscape
+    'https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1600&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1473187983305-f6153f717574?q=80&w=1600&auto=format&fit=crop',
+    // Djerba culture and architecture
+    'https://images.unsplash.com/photo-1549140600-78e9c8b3e8c9?q=80&w=1600&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1600&auto=format&fit=crop',
   ];
 
   List<String> get _displayImages {
@@ -68,8 +76,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         }
       }
     }
+    // Only use default images if NO images are provided
     if (extractedUrls.isEmpty) return _images;
-    if (extractedUrls.length == 1) return [extractedUrls.first, _images[1]];
     return extractedUrls;
   }
 
@@ -113,7 +121,36 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     return organizerId == _currentUserId;
   }
 
-  bool get _hasBookingForActivity => _bookingForActivity != null;
+  bool get _hasBookingForActivity {
+    final booking = _bookingForActivity;
+    if (booking == null) return false;
+    // If latest booking is cancelled, treat as no booking (allow rebooking)
+    return !booking.isCancelled;
+  }
+
+  bool get _hasPendingPaymentBooking {
+    final booking = _bookingForActivity;
+    if (booking == null) return false;
+    return booking.statut == 'PAID_PENDING_CONFIRMATION';
+  }
+
+  bool get _isPaymentFailed {
+    final booking = _bookingForActivity;
+    if (booking == null) return false;
+    return booking.isPaymentFailed;
+  }
+
+  bool get _isPaidBooking {
+    final booking = _bookingForActivity;
+    if (booking == null) return false;
+    return booking.isApproved;
+  }
+
+  bool get _isPastActivity {
+    final activity = _activity;
+    if (activity == null) return false;
+    return activity.isPast;
+  }
 
   InscriptionModel? _latestBookingForActivity(
     String activityId,
@@ -203,9 +240,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pageController = PageController();
     _resetCarouselTimer();
     _loadActivity();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Reload activity when app is resumed
+    if (state == AppLifecycleState.resumed) {
+      _loadActivity(isRefresh: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(ActivityDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    print('🔍 [ACTIVITY DETAIL] didUpdateWidget called');
+    print('🔍 [ACTIVITY DETAIL] Old activityId: ${oldWidget.activityId}');
+    print('🔍 [ACTIVITY DETAIL] New activityId: ${widget.activityId}');
+    // Only reload activity when activityId actually changes
+    if (widget.activityId != oldWidget.activityId) {
+      _loadActivity(isRefresh: true);
+    }
   }
 
   void _resetCarouselTimer() {
@@ -228,6 +287,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _carouselTimer?.cancel();
     _pageController.dispose();
     super.dispose();
@@ -300,6 +360,156 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           builder: (_) => BookingSelectionScreen(activity: _activity!),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
+  }
+
+  Future<void> _navigateToPayment() async {
+    final booking = _bookingForActivity;
+    if (booking == null || _activity == null) return;
+
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StripePaymentScreen(
+            inscriptionId: booking.id,
+            activityId: _activity!.id,
+            activityTitle: _activity!.titre,
+            nombreParticipants: booking.nombreParticipants ?? 1,
+            amount: booking.prixTotal,
+            currency: 'TND',
+            description: 'Payment for ${_activity!.titre}',
+          ),
+        ),
+      );
+
+      // Refresh booking status after payment
+      await _loadActivity(isRefresh: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _retryPayment() async {
+    final booking = _bookingForActivity;
+    if (booking == null || _activity == null) return;
+
+    // Delete the failed booking first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Retry Payment'),
+        content: const Text('This will delete the failed booking and create a new payment. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isBooking = true);
+    try {
+      // Delete the failed booking
+      await InscriptionService.deleteInscription(booking.id);
+      
+      // Refresh activity to clear the booking
+      await _loadActivity(isRefresh: true);
+      
+      if (!mounted) return;
+      
+      // Navigate to booking selection to create new booking
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingSelectionScreen(activity: _activity!),
+        ),
+      );
+      
+      // Refresh again after booking
+      await _loadActivity(isRefresh: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
+  }
+
+  Future<void> _deletePendingBooking() async {
+    final booking = _bookingForActivity;
+    if (booking == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Booking'),
+        content: const Text('Are you sure you want to delete this pending booking?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isBooking = true);
+    try {
+      final success = await InscriptionService.cancelInscription(booking.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadActivity(isRefresh: true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete booking'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isBooking = false);
     }
@@ -478,7 +688,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       ),
                       const SizedBox(height: 24),
                       _SectionTitle('Reviews'),
-                      if (_activity?.timelineStatus == 'past')
+                      if (_activity?.isPast == true)
                         if (_loadingReviews)
                           const Center(
                             child: CircularProgressIndicator(),
@@ -524,7 +734,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ],
           ),
           ),
-          if (!widget.viewOnly && !_isActivityOrganizer)
+          if (!widget.viewOnly && !_isActivityOrganizer && !_isPaidBooking)
             Positioned(
               left: 0,
               right: 0,
@@ -532,15 +742,27 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               child: _StickyBottomBar(
                 price: activity.prixFormatted,
                 showPrice: !_hasBookingForActivity,
-                buttonLabel: _hasBookingForActivity
-                    ? 'Check Booking Status'
-                    : 'Book Now',
+                buttonLabel: _isPaymentFailed
+                    ? 'Pay'
+                    : (_hasPendingPaymentBooking
+                        ? 'Pay'
+                        : (_hasBookingForActivity
+                            ? 'Check Booking Status'
+                            : (_isPastActivity && _hasBookingForActivity
+                                ? 'Check Booking Status'
+                                : 'Book Now'))),
                 onBook: _isBooking
                     ? null
-                    : (_hasBookingForActivity
-                          ? _openBookingStatus
-                          : _bookActivity),
+                    : (_isPaymentFailed
+                        ? _retryPayment
+                        : (_hasPendingPaymentBooking
+                            ? _navigateToPayment
+                            : (_hasBookingForActivity
+                                ? _openBookingStatus
+                                : _bookActivity))),
                 isLoading: _isBooking,
+                showDeleteButton: _isPaymentFailed,
+                onDelete: _isPaymentFailed ? _deletePendingBooking : null,
               ),
             ),
         ],
@@ -1092,12 +1314,16 @@ class _StickyBottomBar extends StatelessWidget {
   final String buttonLabel;
   final VoidCallback? onBook;
   final bool isLoading;
+  final bool showDeleteButton;
+  final VoidCallback? onDelete;
   const _StickyBottomBar({
     required this.price,
     required this.showPrice,
     required this.buttonLabel,
     required this.onBook,
     required this.isLoading,
+    this.showDeleteButton = false,
+    this.onDelete,
   });
   @override
   Widget build(BuildContext context) {
@@ -1141,13 +1367,31 @@ class _StickyBottomBar extends StatelessWidget {
             ),
             const SizedBox(width: 20),
           ],
+          if (showDeleteButton) ...[
+            SizedBox(
+              height: 56,
+              width: 56,
+              child: OutlinedButton(
+                onPressed: onDelete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Icon(Icons.delete_outline, size: 20),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: SizedBox(
               height: 56,
               child: ElevatedButton(
                 onPressed: onBook,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
+                  backgroundColor: showDeleteButton ? const Color(0xFFF59E0B) : const Color(0xFF3B82F6),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

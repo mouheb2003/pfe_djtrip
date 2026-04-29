@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/message_service.dart';
+import '../../services/api_client.dart';
 import '../../config/app_routes.dart';
+import '../shared/chat_conversation_screen.dart';
 
 class WaitingApprovalScreen extends StatefulWidget {
   const WaitingApprovalScreen({super.key});
@@ -152,6 +157,104 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
     }
   }
 
+  Future<void> _openContactUsChat() async {
+    Future<bool> openFromConversationsFallback() async {
+      try {
+        final conversations = await MessageService.getConversations();
+        final adminConversation = conversations.firstWhere(
+          (c) =>
+              c.partnerType.trim().toLowerCase() == 'admin' ||
+              c.partnerName.toLowerCase().contains('admin'),
+          orElse: () => throw Exception('No admin conversation found'),
+        );
+
+        if (!mounted) return false;
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatConversationScreen(
+              partnerId: adminConversation.partnerId,
+              partnerName: adminConversation.partnerName,
+              partnerAvatar: adminConversation.partnerAvatar,
+              partnerType: adminConversation.partnerType,
+              partnerOnline: adminConversation.partnerOnline,
+              isSupportChat: true,
+            ),
+          ),
+        );
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    try {
+      // Use optimized endpoint to get only admin user
+      final response = await ApiClient.get('/users/admin', auth: false);
+      if (response.statusCode != 200) {
+        final opened = await openFromConversationsFallback();
+        if (opened || !mounted) return;
+        throw Exception('Unable to load support contact');
+      }
+
+      final decoded = jsonDecode(response.body);
+      final admin = decoded['admin'] as Map<String, dynamic>?;
+
+      if (!mounted) return;
+
+      if (admin == null || admin.isEmpty) {
+        final opened = await openFromConversationsFallback();
+        if (opened || !mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Support chat is not available right now.')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatConversationScreen(
+            partnerId: admin['_id']?.toString() ?? '',
+            partnerName: admin['fullname']?.toString() ?? 'Admin',
+            partnerAvatar: admin['avatar']?.toString(),
+            partnerOnline: admin['isOnline'] == true,
+            isSupportChat: true,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      final opened = await openFromConversationsFallback();
+      if (opened || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open support chat right now.')),
+      );
+    }
+  }
+
+  Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _extractUsers(dynamic decoded) {
+    dynamic users;
+    if (decoded is Map<String, dynamic>) {
+      users = decoded['users'];
+    } else if (decoded is List) {
+      users = decoded;
+    }
+    if (users is List) {
+      return users.map((u) => _asMap(u)).where((u) => u != null).cast<Map<String, dynamic>>().toList();
+    }
+    return [];
+  }
+
   void _contactSupport() {
     HapticFeedback.lightImpact();
     
@@ -196,30 +299,54 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
               _ContactOption(
                 icon: Icons.email,
                 title: 'Email Support',
-                subtitle: 'support@djtrip.com',
-                onTap: () {
+                subtitle: 'djtrip00@gmail.com',
+                onTap: () async {
                   Navigator.pop(context);
-                  // Handle email
+                  final Uri emailUri = Uri(
+                    scheme: 'mailto',
+                    path: 'djtrip00@gmail.com',
+                  );
+                  try {
+                    await launchUrl(emailUri, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not open email app')),
+                      );
+                    }
+                  }
                 },
               ),
               const SizedBox(height: 16),
               _ContactOption(
                 icon: Icons.phone,
                 title: 'Phone Support',
-                subtitle: '+1 234 567 8900',
-                onTap: () {
+                subtitle: '+216 22978485',
+                onTap: () async {
                   Navigator.pop(context);
-                  // Handle phone
+                  final Uri phoneUri = Uri(
+                    scheme: 'tel',
+                    path: '+21622978485',
+                  );
+                  try {
+                    await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not open phone app')),
+                      );
+                    }
+                  }
                 },
               ),
               const SizedBox(height: 16),
               _ContactOption(
                 icon: Icons.chat,
                 title: 'Live Chat',
-                subtitle: 'Available 24/7',
+                subtitle: 'Chat with admin',
                 onTap: () {
                   Navigator.pop(context);
-                  // Handle chat
+                  _openContactUsChat();
                 },
               ),
               const SizedBox(height: 20),

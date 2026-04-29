@@ -150,7 +150,13 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   ) {
     final latestByActivityId = _buildLatestBookingMap(bookings);
 
-    return latestByActivityId.map((key, value) => MapEntry(key, value.statut));
+    return latestByActivityId.map((key, value) {
+      // If latest booking is cancelled, treat as no booking (allow rebooking)
+      if (value.isCancelled) {
+        return MapEntry(key, ''); // Empty string means no active booking
+      }
+      return MapEntry(key, value.statut);
+    });
   }
 
   Map<String, InscriptionModel> _buildLatestBookingMap(
@@ -206,7 +212,10 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   String _buttonLabelFor(ActivityModel activity) {
-    if (_tabIndex == 0 && _bookingStatusByActivityId.containsKey(activity.id)) {
+    final status = _bookingStatusByActivityId[activity.id];
+    // If status is empty (cancelled booking) or null, show Book Now
+    // PAYMENT_FAILED is already handled here as it has a non-empty status
+    if (_tabIndex == 0 && status != null && status.isNotEmpty) {
       return 'Check Booking Status';
     }
     return _tabIndex == 0 ? 'Book Now' : 'View Details';
@@ -214,7 +223,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   void _onPrimaryAction(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
-    if (_tabIndex == 0 && status != null) {
+    // If status is empty (cancelled booking) or null, book the activity
+    if (_tabIndex == 0 && status != null && status.isNotEmpty) {
       final booking = _latestBookingByActivityId[activity.id];
       if (booking == null) return;
       Navigator.push(
@@ -225,7 +235,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       );
       return;
     }
+    // Book the activity
+    _bookActivity(activity);
+  }
 
+  void _bookActivity(ActivityModel activity) {
     if (_tabIndex == 0) {
       Navigator.push(
         context,

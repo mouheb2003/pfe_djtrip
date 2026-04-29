@@ -34,21 +34,6 @@ export async function uploadLieuImages(files) {
   return [];
 }
 
-export async function getUrgences() {
-  try {
-    const data = await Get(END_POINT.urgences);
-
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.urgences)) return data.urgences;
-    if (Array.isArray(data?.data)) return data.data;
-    if (Array.isArray(data?.results)) return data.results;
-
-    return [];
-  } catch {
-    return [];
-  }
-}
-
 export async function getLieuById(id) {
   if (!id) return null;
 
@@ -59,6 +44,13 @@ export async function getLieuById(id) {
     const lieux = await getLieux();
     return lieux.find((lieu) => lieu?._id === id) ?? null;
   }
+}
+
+export async function updateLieu(id, payload) {
+  if (!id) return null;
+
+  const data = await Put(END_POINT.lieuById(id), payload);
+  return data?.lieu ?? data;
 }
 
 export async function getUsers() {
@@ -77,6 +69,13 @@ export async function getUserById(id) {
 
   const data = await Get(END_POINT.userById(id));
   return data?.user ?? data;
+}
+
+export async function getUserOverview(id) {
+  if (!id) return null;
+
+  const data = await Get(`${END_POINT.userById(id)}/overview`);
+  return data?.overview ?? data;
 }
 
 export async function toggleUserRole(id) {
@@ -279,4 +278,98 @@ export async function getAdminComments(filters = {}) {
 export async function adminDeleteComment(id) {
   if (!id) return null;
   return Delete(END_POINT.adminCommentById(id));
+}
+
+export async function getActivityParticipants(activityId) {
+  if (!activityId) return [];
+
+  try {
+    const data = await Get(END_POINT.inscriptionsByActivity(activityId));
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.inscriptions)) return data.inscriptions;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching activity participants:', error);
+    return [];
+  }
+}
+
+export async function getUserReviews(userId) {
+  if (!userId) return [];
+
+  try {
+    const data = await Get(END_POINT.userReviews(userId));
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.avis)) return data.avis;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching user reviews:', error);
+    return [];
+  }
+}
+
+export async function getUserPosts(userId) {
+  if (!userId) return [];
+
+  try {
+    const data = await Get(END_POINT.userPosts(userId));
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.posts)) return data.posts;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching user posts:', error);
+    return [];
+  }
+}
+
+export async function deleteReview(reviewId) {
+  if (!reviewId) return null;
+
+  try {
+    return Delete(END_POINT.deleteReview(reviewId));
+  } catch (error) {
+    console.error('Error deleting review:', error);
+    throw error;
+  }
+}
+
+export async function getPostComments(postId) {
+  if (!postId) return [];
+
+  try {
+    const data = await Get(END_POINT.postComments(postId));
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.comments)) return data.comments;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.results)) return data.results;
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching post comments:', error);
+    return [];
+  }
+}
+
+export async function deleteComment(commentId) {
+  if (!commentId) return null;
+
+  try {
+    return Delete(END_POINT.deleteComment(commentId));
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    throw error;
+  }
 }

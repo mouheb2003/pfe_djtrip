@@ -411,4 +411,110 @@ class MessageService {
       return false;
     }
   }
+
+  /// Clear chat for current user (one-sided deletion)
+  static Future<Map<String, dynamic>> clearChat(String partnerId) async {
+    try {
+      final res = await ApiClient.delete('/messages/conversations/$partnerId/clear');
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Chat cleared successfully',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to clear chat right now.',
+      };
+    }
+  }
+
+  /// Block a user
+  static Future<Map<String, dynamic>> blockUser(String partnerId) async {
+    try {
+      final res = await ApiClient.post('/messages/conversations/$partnerId/block', {});
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'User blocked successfully',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to block user right now.',
+      };
+    }
+  }
+
+  /// Unblock a user
+  static Future<Map<String, dynamic>> unblockUser(String partnerId) async {
+    try {
+      final res = await ApiClient.delete('/messages/conversations/$partnerId/block');
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'User unblocked successfully',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to unblock user right now.',
+      };
+    }
+  }
+
+  /// Mute conversation
+  static Future<Map<String, dynamic>> muteConversation(String partnerId) async {
+    try {
+      final res = await ApiClient.post('/messages/conversations/$partnerId/mute', {});
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Conversation muted successfully',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to mute conversation right now.',
+      };
+    }
+  }
+
+  /// Unmute conversation
+  static Future<Map<String, dynamic>> unmuteConversation(String partnerId) async {
+    try {
+      final res = await ApiClient.delete('/messages/conversations/$partnerId/mute');
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Conversation unmuted successfully',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to unmute conversation right now.',
+      };
+    }
+  }
+
+  /// Get blocked users and muted conversations
+  static Future<Map<String, dynamic>> getBlockedUsers() async {
+    try {
+      final res = await ApiClient.get('/messages/blocked-users');
+      final body = _safeDecodeObject(res.body);
+      return {
+        'success': res.statusCode == 200,
+        'blockedUsers': body['blockedUsers'] ?? [],
+        'mutedConversationPartners': body['mutedConversationPartners'] ?? [],
+        'blockedByUsers': body['blockedByUsers'] ?? [],
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'blockedUsers': <String>[],
+        'mutedConversationPartners': <String>[],
+        'blockedByUsers': <String>[],
+      };
+    }
+  }
 }

@@ -31,12 +31,12 @@ import {
 } from 'src/components/table';
 
 const TABLE_HEAD = [
-  { id: 'timestamp', label: 'Date', width: 220 },
-  { id: 'level', label: 'Niveau', width: 120 },
-  { id: 'source', label: 'Source', width: 140 },
-  { id: 'action', label: 'Action', width: 180 },
-  { id: 'actor', label: 'Utilisateur', width: 190 },
-  { id: 'message', label: 'Message' },
+  { id: 'timestamp', label: 'Date', width: 180 },
+  { id: 'level', label: 'Niveau', width: 100 },
+  { id: 'source', label: 'Source', width: 120 },
+  { id: 'action', label: 'Action', width: 140 },
+  { id: 'actor', label: 'Utilisateur', width: 160 },
+  { id: 'message', label: 'Message détaillé' },
 ];
 
 const AUTO_REFRESH_MS = 10000;
@@ -275,9 +275,11 @@ export function LogsView({ sx }) {
                           <Typography
                             variant="body2"
                             sx={{
-                              fontFamily: 'monospace',
+                              fontFamily: 'inherit',
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
+                              lineHeight: 1.6,
+                              color: 'text.primary',
                             }}
                           >
                             {row.message || '-'}

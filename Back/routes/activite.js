@@ -100,10 +100,9 @@ router.get(
 // ─── Parameterized public routes ──────────────────────────────────────────────
 
 // ⚠️  These MUST come after named routes above to avoid route conflicts
-// Get an activity by ID
+// Get an activity by ID (no cache to ensure fresh data on navigation)
 router.get(
   "/:id",
-  cacheGet("activites:by-id", 60),
   activiteController.getActiviteById,
 );
 

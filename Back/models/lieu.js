@@ -28,6 +28,8 @@ const lieuSchema = new mongoose.Schema(
       longitude: Number,
     },
 
+    telephone: String,
+
     // ================= MEDIA =================
     main_image: String,
     gallery: [String],
@@ -71,6 +73,7 @@ const lieuSchema = new mongoose.Schema(
     },
     discounts: String,
     booking_link: String,
+    website: String,
 
     // ================= AVIS =================
     rating: {
@@ -110,3 +113,24 @@ const lieuSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Lieu", lieuSchema);
+
+// Configuration Schema for storing API keys
+const configSchema = new mongoose.Schema(
+  {
+    key: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    value: {
+      type: String,
+      required: true,
+    },
+    description: String,
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports.Config = mongoose.model("Config", configSchema);

@@ -33,7 +33,7 @@ class ApiConfig {
     }
 
     // Default local API target for development on physical devices.
-    return _ensureScheme('http://192.168.249.99:3000');
+    return _ensureScheme('http://192.168.55.99:3000');
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

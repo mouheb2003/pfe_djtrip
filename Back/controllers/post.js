@@ -2,6 +2,8 @@ const Post = require("../models/post");
 const cloudinary = require("../config/cloudinary");
 const { createActivityLog } = require("../services/activityLogService");
 const { triggerPublicationNotification } = require("../controllers/notification");
+const notificationEventBus = require("../services/notificationEventBus");
+const User = require("../models/user");
 
 const basePopulate = {
   path: "author_id",
@@ -81,6 +83,40 @@ exports.uploadPostImage = async (req, res) => {
     return res.status(500).json({
       message: "Error uploading post image",
       error: error.message,
+    });
+  }
+};
+
+// Get posts by user ID (Admin only)
+exports.getUserPosts = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const posts = await Post.find({ author_id: userId })
+      .populate(basePopulate)
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: posts.length,
+      posts: posts.map((post) => ({
+        _id: post._id,
+        content: post.content,
+        imageUrl: post.image_url,
+        imageUrls: post.image_urls,
+        createdAt: post.createdAt,
+        author_id: post.author_id,
+        likes_count: post.likes_count || 0,
+        comments_count: post.comments_count || 0,
+        total_reactions: post.total_reactions || 0,
+        reactions: post.reactions || [],
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching user posts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user posts",
     });
   }
 };
@@ -582,6 +618,21 @@ exports.togglePostLike = async (req, res) => {
         post.likes_count = post.liked_by.length;
         await post.save();
       }
+
+      // Notify post author about new reaction (if not self-reaction)
+      if (String(post.author_id) !== String(userId)) {
+        try {
+          const reactor = await User.findById(userId).select('fullname');
+          notificationEventBus.emitPostReaction({
+            postOwnerId: post.author_id,
+            reactorName: reactor?.fullname || 'Someone',
+            postId: String(post._id),
+            reactionType: reactionType,
+          });
+        } catch (notifError) {
+          console.error('Error emitting post reaction notification:', notifError);
+        }
+      }
     } else {
       // User removed their reaction, decrement count
       await Post.findByIdAndUpdate(
@@ -653,6 +704,10 @@ exports.getAdminPosts = async (_req, res) => {
       .sort({ createdAt: -1 })
       .limit(200)
       .populate(basePopulate)
+      .populate({
+        path: "liked_by",
+        select: "fullname avatar userType",
+      })
       .lean();
 
     return res.status(200).json({ posts });

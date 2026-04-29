@@ -34,6 +34,20 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _loadRememberedEmail();
+    _emailCtrl.addListener(_updateCredentialsIfRemembered);
+    _passwordCtrl.addListener(_updateCredentialsIfRemembered);
+  }
+
+  void _updateCredentialsIfRemembered() {
+    if (_rememberMe) {
+      final email = _emailCtrl.text.trim();
+      final password = _passwordCtrl.text;
+      if (email.isNotEmpty && password.isNotEmpty) {
+        final storage = FlutterSecureStorage();
+        storage.write(key: 'remembered_email', value: email);
+        storage.write(key: 'remembered_password', value: password);
+      }
+    }
   }
 
   Future<void> _loadRememberedEmail() async {
@@ -61,6 +75,24 @@ class _LoginScreenState extends State<LoginScreen> {
       await storage.write(key: 'remembered_email', value: email);
       await storage.write(key: 'remembered_password', value: password);
     } else {
+      await storage.delete(key: 'remembered_email');
+      await storage.delete(key: 'remembered_password');
+    }
+  }
+
+  Future<void> _toggleRememberMe(bool value) async {
+    setState(() => _rememberMe = value);
+    final storage = FlutterSecureStorage();
+    if (value) {
+      // Save immediately when checked
+      final email = _emailCtrl.text.trim();
+      final password = _passwordCtrl.text;
+      if (email.isNotEmpty && password.isNotEmpty) {
+        await storage.write(key: 'remembered_email', value: email);
+        await storage.write(key: 'remembered_password', value: password);
+      }
+    } else {
+      // Delete immediately when unchecked
       await storage.delete(key: 'remembered_email');
       await storage.delete(key: 'remembered_password');
     }
@@ -112,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        await _saveRememberedEmail(email, password);
+        // Credentials are already saved in real-time via _toggleRememberMe and _updateCredentialsIfRemembered
         final user = result['user'] as Map<String, dynamic>?;
         final userType = user?['userType'] as String? ?? 'Touriste';
 
@@ -304,8 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 24,
                               child: Checkbox(
                                 value: _rememberMe,
-                                onChanged: (v) =>
-                                    setState(() => _rememberMe = v ?? false),
+                                onChanged: (v) => _toggleRememberMe(v ?? false),
                                 activeColor: AppColors.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(4),

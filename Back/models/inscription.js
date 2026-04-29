@@ -24,8 +24,8 @@ const inscriptionSchema = new mongoose.Schema(
     // Registration status
     statut: {
       type: String,
-      enum: ["en_attente", "approuvee", "refusee", "annulee", "verifie", "PAID_PENDING_CONFIRMATION"],
-      default: "en_attente",
+      enum: ["approuvee", "annulee", "verifie", "PAID_PENDING_CONFIRMATION"],
+      default: "PAID_PENDING_CONFIRMATION",
     },
     // Reference to payment (for paid bookings)
     payment_id: {
@@ -96,6 +96,16 @@ const inscriptionSchema = new mongoose.Schema(
         default: 0,
       },
       lastReminder: {
+        type: Date,
+      },
+    },
+    // Booking reminder system
+    bookingReminder: {
+      sent: {
+        type: Boolean,
+        default: false,
+      },
+      sentAt: {
         type: Date,
       },
     },

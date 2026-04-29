@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
 class ReviewService {
@@ -10,18 +11,33 @@ class ReviewService {
       final res = await ApiClient.get(
         '/avis/organisateur/$organizerId',
         auth: false,
+        cacheFirst: false,
       );
+      debugPrint('🔍 getOrganizerReviews status: ${res.statusCode}');
+      
       if (res.statusCode != 200) return [];
 
       final data = jsonDecode(res.body);
+      debugPrint('🔍 getOrganizerReviews decoded type: ${data.runtimeType}');
+      
       if (data is List) {
+        debugPrint('🔍 getOrganizerReviews is List with ${data.length} items');
         return List<Map<String, dynamic>>.from(data);
       }
-      if (data is Map<String, dynamic> && data['avis'] is List) {
-        return List<Map<String, dynamic>>.from(data['avis'] as List);
+      if (data is Map<String, dynamic>) {
+        if (data['data'] is List) {
+          debugPrint('🔍 getOrganizerReviews has data key with ${data['data'].length} items');
+          return List<Map<String, dynamic>>.from(data['data'] as List);
+        }
+        if (data['avis'] is List) {
+          debugPrint('🔍 getOrganizerReviews has avis key with ${data['avis'].length} items');
+          return List<Map<String, dynamic>>.from(data['avis'] as List);
+        }
       }
+      debugPrint('🔍 getOrganizerReviews unexpected structure');
       return [];
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error fetching organizer reviews: $e');
       return [];
     }
   }

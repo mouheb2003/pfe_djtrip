@@ -697,4 +697,13 @@ class ApiService {
       return const <dynamic>[];
     }
   }
+
+  // Update reminder preferences
+  static Future<void> updateReminderPreferences(Map<String, dynamic> preferences) async {
+    final api = ApiService.instance;
+    final response = await api.put('/users/me/reminder-preferences', preferences);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update reminder preferences');
+    }
+  }
 }

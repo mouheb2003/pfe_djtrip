@@ -239,6 +239,25 @@ class OnboardingService {
       console.error('Error sending approval email:', emailError);
     }
 
+    // Send push notification to organizer
+    try {
+      const notificationService = require('./notificationServiceV2');
+      await notificationService.sendPushNotification({
+        userId: organizerId,
+        title: 'Account Approved ✅',
+        body: 'Congratulations! Your organizer account has been approved. You can now start creating activities.',
+        data: {
+          type: 'organizer_approved',
+          organizerId: organizerId,
+        },
+        notificationType: 'account',
+        priority: 'high',
+      });
+      console.log('✅ Push notification sent for organizer approval');
+    } catch (notifError) {
+      console.error('Error sending approval push notification:', notifError);
+    }
+
     return {
       success: true,
       message: 'Organizer approved successfully',

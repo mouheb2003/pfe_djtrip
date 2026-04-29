@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
+import '../../../services/notification_service.dart';
 import '../../../widgets/auto_image_carousel.dart';
 import 'requests_tab.dart';
 import '../../shared/activity_detail_screen.dart';
@@ -29,11 +30,13 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadActivities();
+    _loadUnreadCount();
   }
 
   @override
@@ -63,6 +66,19 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
           SnackBar(content: Text('Failed to refresh activities: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await NotificationService.getUnreadCount(cacheFirst: false);
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = result['unread_count'] ?? 0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading unread count: $e');
     }
   }
 
@@ -257,13 +273,15 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                     children: [
                       // Notification icon
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => NotificationsScreen(),
                             ),
                           );
+                          // Reload unread count after viewing notifications
+                          _loadUnreadCount();
                         },
                         child: Container(
                           padding: const EdgeInsets.all(8),
@@ -275,7 +293,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                 color: AppColors.primary,
                                 size: 24,
                               ),
-                              if (false) // TODO: Replace with actual unread count check
+                              if (_unreadNotificationCount > 0)
                                 Positioned(
                                   top: 0,
                                   right: 0,
@@ -288,7 +306,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        '3',
+                                        _unreadNotificationCount > 9 ? '9+' : '$_unreadNotificationCount',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
@@ -425,7 +443,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
             // Activity list
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => _loadActivities(refresh: true),
+                onRefresh: () async {
+                  await _loadActivities(refresh: true);
+                  await _loadUnreadCount();
+                },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),

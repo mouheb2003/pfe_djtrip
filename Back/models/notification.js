@@ -28,6 +28,8 @@ const notificationSchema = new mongoose.Schema(
         "reaction",        // Both: someone reacted to user's post/comment
         "comment",         // Both: someone commented on user's post
         "reply",           // Both: someone replied to user's comment
+        "group_invitation", // Both: group invitation received
+        "group_update",    // Both: group updates (member joined/left, etc.)
       ],
       index: true,
     },

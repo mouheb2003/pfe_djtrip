@@ -211,8 +211,8 @@ async function sendBulkNotification({ userIds, title, body, data = {} }) {
 async function sendCheckInConfirmation({ touristId, activityTitle, bookingId, activityId }) {
   return sendPushNotification({
     userId: touristId,
-    title: 'Check-in confirmé ✅',
-    body: `Votre réservation pour "${activityTitle}" est validée. Bonne activité !`,
+    title: 'Check-in Confirmed ✅',
+    body: `Your booking for "${activityTitle}" is validated. Enjoy your activity!`,
     data: {
       type: 'checkin_confirmed',
       bookingId,
@@ -232,8 +232,8 @@ async function sendCheckInConfirmation({ touristId, activityTitle, bookingId, ac
 async function sendNewBookingNotification({ organizerId, touristName, activityTitle, bookingId }) {
   return sendPushNotification({
     userId: organizerId,
-    title: 'Nouvelle réservation 🎫',
-    body: `${touristName} a réservé "${activityTitle}"`,
+    title: 'New Booking 🎫',
+    body: `${touristName} booked "${activityTitle}" - Waiting for payment`,
     data: {
       type: 'new_booking',
       bookingId,
@@ -253,8 +253,8 @@ async function sendNewBookingNotification({ organizerId, touristName, activityTi
 async function sendBookingApprovedNotification({ touristId, activityTitle, bookingId }) {
   return sendPushNotification({
     userId: touristId,
-    title: 'Réservation approuvée ✅',
-    body: `Votre réservation pour "${activityTitle}" a été confirmée`,
+    title: 'Booking Approved ✅',
+    body: `Your booking for "${activityTitle}" has been confirmed`,
     data: {
       type: 'booking_approved',
       bookingId,
@@ -272,8 +272,8 @@ async function sendBookingApprovedNotification({ touristId, activityTitle, booki
 async function sendBookingRejectedNotification({ touristId, activityTitle, bookingId }) {
   return sendPushNotification({
     userId: touristId,
-    title: 'Réservation refusée ❌',
-    body: `Votre réservation pour "${activityTitle}" a été refusée`,
+    title: 'Booking Rejected ❌',
+    body: `Your booking for "${activityTitle}" has been rejected`,
     data: {
       type: 'booking_rejected',
       bookingId,
@@ -291,8 +291,8 @@ async function sendBookingRejectedNotification({ touristId, activityTitle, booki
 async function sendReviewReminder({ touristId, activityTitle, bookingId }) {
   return sendPushNotification({
     userId: touristId,
-    title: 'Donnez votre avis ⭐',
-    body: `Comment s'est passée "${activityTitle}" ? Laissez un review !`,
+    title: 'Leave a Review ⭐',
+    body: `How was "${activityTitle}"? Share your experience!`,
     data: {
       type: 'review_reminder',
       bookingId,

@@ -49,8 +49,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.touristId,
         type: 'booking',
-        title: 'Réservation envoyée',
-        message: `Votre réservation pour "${data.activityTitle}" est en attente d'approbation`,
+        title: 'Booking Sent',
+        message: `Your booking for "${data.activityTitle}" is waiting for payment`,
         data: { bookingId: data.bookingId },
         priority: 'medium',
         related_entity_type: 'booking',
@@ -72,8 +72,8 @@ async function initializeEventListeners() {
         const notificationData = {
           user_id: data.touristId,
           type: 'booking',
-          title: 'Réservation approuvée ✅',
-          message: `Votre réservation pour "${data.activityTitle}" a été confirmée`,
+          title: 'Booking Approved ✅',
+          message: `Your booking for "${data.activityTitle}" has been confirmed`,
           data: { bookingId: data.bookingId },
           priority: 'high',
           related_entity_type: 'booking',
@@ -112,8 +112,8 @@ async function initializeEventListeners() {
         await Notification.createNotification({
           user_id: data.touristId,
           type: 'booking',
-          title: 'Réservation refusée ❌',
-          message: `Votre réservation pour "${data.activityTitle}" a été refusée`,
+          title: 'Booking Rejected ❌',
+          message: `Your booking for "${data.activityTitle}" has been rejected`,
           data: { bookingId: data.bookingId },
           priority: 'high',
           related_entity_type: 'booking',
@@ -149,8 +149,8 @@ async function initializeEventListeners() {
         await Notification.createNotification({
           user_id: data.touristId,
           type: 'booking',
-          title: 'Réservation annulée',
-          message: `Votre réservation pour "${data.activityTitle}" a été annulée`,
+          title: 'Booking Cancelled',
+          message: `Your booking for "${data.activityTitle}" has been cancelled`,
           data: { bookingId: data.bookingId },
           priority: 'medium',
           related_entity_type: 'booking',
@@ -174,8 +174,8 @@ async function initializeEventListeners() {
         await Notification.createNotification({
           user_id: data.touristId,
           type: 'reminder',
-          title: 'Rappel de réservation ⏰',
-          message: `"${data.activityTitle}" commence bientôt`,
+          title: 'Booking Reminder ⏰',
+          message: `"${data.activityTitle}" is starting soon`,
           data: { bookingId: data.bookingId, activityId: data.activityId },
           priority: 'high',
           related_entity_type: 'booking',
@@ -219,8 +219,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.touristId,
         type: 'booking',
-        title: 'Check-in confirmé ✅',
-        message: `Votre réservation pour "${data.activityTitle}" est validée`,
+        title: 'Check-in Confirmed ✅',
+        message: `Your booking for "${data.activityTitle}" is validated`,
         data: { bookingId: data.bookingId, activityId: data.activityId },
         priority: 'high',
         related_entity_type: 'booking',
@@ -240,13 +240,13 @@ async function initializeEventListeners() {
       console.log('📨 Message received event:', data);
       console.log('📨 Listener called for message.received, messageId:', data.messageId);
 
-      const senderName = data.senderName || 'Quelqu\'un';
+      const senderName = data.senderName || 'Someone';
 
       // Send to recipient
       await notificationService.sendPushNotification({
         userId: data.recipientId,
-        title: `Nouveau message de ${senderName}`,
-        body: data.message?.substring(0, 100) || 'Vous avez un nouveau message',
+        title: `New message from ${senderName}`,
+        body: data.message?.substring(0, 100) || 'You have a new message',
         data: {
           type: 'new_message',
           conversationId: data.conversationId,
@@ -261,8 +261,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.recipientId,
         type: 'message',
-        title: `Nouveau message de ${senderName}`,
-        message: data.message?.substring(0, 100) || 'Vous avez un nouveau message',
+        title: `New message from ${senderName}`,
+        message: data.message?.substring(0, 100) || 'You have a new message',
         data: {
           conversationId: data.conversationId,
           senderId: data.senderId,
@@ -285,13 +285,13 @@ async function initializeEventListeners() {
     try {
       console.log('📨 Comment created event:', data);
       
-      const commenterName = data.commenterName || 'Quelqu\'un';
+      const commenterName = data.commenterName || 'Someone';
       
       // Send to post owner
       await notificationService.sendPushNotification({
         userId: data.postOwnerId,
-        title: 'Nouveau commentaire',
-        body: `${commenterName} a commenté votre publication`,
+        title: 'New Comment',
+        body: `${commenterName} commented on your post`,
         data: {
           type: 'new_comment',
           postId: data.postId,
@@ -305,8 +305,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.postOwnerId,
         type: 'comment',
-        title: 'Nouveau commentaire',
-        message: `${commenterName} a commenté votre publication`,
+        title: 'New Comment',
+        message: `${commenterName} commented on your post`,
         data: {
           postId: data.postId,
           commentId: data.commentId,
@@ -320,17 +320,57 @@ async function initializeEventListeners() {
     }
   });
 
+  notificationEventBus.on('post.reaction', async (data) => {
+    try {
+      console.log('📨 Post reaction event:', data);
+      
+      const reactorName = data.reactorName || 'Someone';
+      const reactionType = data.reactionType || 'like';
+      
+      // Send to post owner
+      await notificationService.sendPushNotification({
+        userId: data.postOwnerId,
+        title: 'New Reaction',
+        body: `${reactorName} reacted to your post`,
+        data: {
+          type: 'post_reaction',
+          postId: data.postId,
+          reactionType: reactionType,
+        },
+        notificationType: 'system',
+        priority: 'low',
+      });
+
+      // Create DB notification
+      await Notification.createNotification({
+        user_id: data.postOwnerId,
+        type: 'reaction',
+        title: 'New Reaction',
+        message: `${reactorName} reacted to your post`,
+        data: {
+          postId: data.postId,
+          reactionType: reactionType,
+        },
+        priority: 'low',
+        related_entity_type: 'post',
+        related_entity_id: data.postId,
+      });
+    } catch (error) {
+      console.error('Error processing post.reaction event:', error);
+    }
+  });
+
   notificationEventBus.on('comment.reply', async (data) => {
     try {
       console.log('📨 Comment reply event:', data);
       
-      const replierName = data.replierName || 'Quelqu\'un';
+      const replierName = data.replierName || 'Someone';
       
       // Send to parent comment author
       await notificationService.sendPushNotification({
         userId: data.parentCommentAuthorId,
-        title: 'Réponse à votre commentaire',
-        body: `${replierName} a répondu à votre commentaire`,
+        title: 'Reply to your comment',
+        body: `${replierName} replied to your comment`,
         data: {
           type: 'comment_reply',
           postId: data.postId,
@@ -345,8 +385,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.parentCommentAuthorId,
         type: 'reply',
-        title: 'Réponse à votre commentaire',
-        message: `${replierName} a répondu à votre commentaire`,
+        title: 'Reply to your comment',
+        message: `${replierName} replied to your comment`,
         data: {
           postId: data.postId,
           commentId: data.commentId,
@@ -382,8 +422,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.organizerId,
         type: 'review',
-        title: 'Nouvel avis reçu ⭐',
-        message: `${data.touristName} a noté "${data.activityTitle}" ${data.rating}/5`,
+        title: 'New Review Received ⭐',
+        message: `${data.touristName} rated "${data.activityTitle}" ${data.rating}/5`,
         data: { reviewId: data.reviewId, rating: data.rating },
         priority: 'medium',
         related_entity_type: 'review',
@@ -410,8 +450,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.touristId,
         type: 'review',
-        title: 'Donnez votre avis ⭐',
-        message: `Comment s'est passée "${data.activityTitle}" ? Laissez un review !`,
+        title: 'Leave a Review ⭐',
+        message: `How was "${data.activityTitle}"? Share your experience!`,
         data: { bookingId: data.bookingId, activityId: data.activityId },
         priority: 'medium',
         related_entity_type: 'booking',
@@ -430,24 +470,34 @@ async function initializeEventListeners() {
     try {
       console.log('📨 Follow created event:', data);
       
-      // Send to user being followed
-      await notificationService.sendNewFollowerNotification({
-        userId: data.userId,
-        followerName: data.followerName,
-        followerId: data.followerId,
-      });
+      // Create DB notification FIRST (ensure it's saved even if account is suspended)
+      try {
+        await Notification.createNotification({
+          user_id: data.recipientId,
+          type: 'follow',
+          title: data.title || 'New Follower 👋',
+          message: data.body || `${data.data?.followerName || 'Someone'} started following you`,
+          data: data.data || {},
+          priority: 'medium',
+          related_entity_type: 'user',
+          related_entity_id: data.data?.followerId,
+        });
+        console.log('✅ DB notification created for follow');
+      } catch (dbError) {
+        console.error('❌ Error creating DB notification for follow:', dbError);
+      }
 
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.userId,
-        type: 'follow',
-        title: 'Nouveau follower 👋',
-        message: `${data.followerName} a commencé à vous suivre`,
-        data: { followerId: data.followerId },
-        priority: 'medium',
-        related_entity_type: 'user',
-        related_entity_id: data.followerId,
-      });
+      // Send push notification (may skip if account is suspended)
+      try {
+        await notificationService.sendNewFollowerNotification({
+          userId: data.recipientId,
+          followerName: data.data?.followerName,
+          followerId: data.data?.followerId,
+        });
+      } catch (fcmError) {
+        console.error('❌ Error sending FCM notification for follow:', fcmError);
+        // Don't throw - DB notification is already saved
+      }
     } catch (error) {
       console.error('Error processing follow.created event:', error);
     }
@@ -468,8 +518,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.followerId,
         type: 'follow',
-        title: 'Follow accepté 🎉',
-        message: `${data.userName} a accepté votre follow`,
+        title: 'Follow Accepted 🎉',
+        message: `${data.userName} accepted your follow`,
         data: { userId: data.userId },
         priority: 'medium',
         related_entity_type: 'user',
@@ -500,8 +550,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'payment',
-        title: 'Paiement réussi 💳',
-        message: `Votre paiement de ${data.amount}€ pour "${data.activityTitle}" est confirmé`,
+        title: 'Payment Successful 💳',
+        message: `Your payment of ${data.amount}€ for "${data.activityTitle}" is confirmed`,
         data: { paymentId: data.paymentId, amount: data.amount },
         priority: 'urgent',
         related_entity_type: 'payment',
@@ -527,8 +577,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'payment',
-        title: 'Paiement échoué ❌',
-        message: `Le paiement de ${data.amount}€ pour "${data.activityTitle}" a échoué`,
+        title: 'Payment Failed ❌',
+        message: `Payment of ${data.amount}€ for "${data.activityTitle}" failed`,
         data: { paymentId: data.paymentId, amount: data.amount },
         priority: 'urgent',
         related_entity_type: 'payment',
@@ -553,8 +603,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'payment',
-        title: 'Remboursement effectué 💰',
-        message: `Un remboursement de ${data.amount}€ a été effectué`,
+        title: 'Refund Processed 💰',
+        message: `A refund of ${data.amount}€ has been processed`,
         data: { paymentId: data.paymentId, amount: data.amount },
         priority: 'high',
         related_entity_type: 'payment',
@@ -576,8 +626,8 @@ async function initializeEventListeners() {
       if (data.followerIds && data.followerIds.length > 0) {
         await notificationService.sendBulkNotificationQueued({
           userIds: data.followerIds,
-          title: 'Nouvelle activité 🎯',
-          body: `${data.organizerName} a publié "${data.activityTitle}"`,
+          title: 'New Activity 🎯',
+          body: `${data.organizerName} published "${data.activityTitle}"`,
           data: {
             type: 'new_activity',
             activityId: data.activityId,
@@ -590,8 +640,8 @@ async function initializeEventListeners() {
         const notifications = data.followerIds.map(followerId => ({
           user_id: followerId,
           type: 'activity',
-          title: 'Nouvelle activité 🎯',
-          message: `${data.organizerName} a publié "${data.activityTitle}"`,
+          title: 'New Activity 🎯',
+          message: `${data.organizerName} published "${data.activityTitle}"`,
           data: { activityId: data.activityId },
           priority: 'medium',
           related_entity_type: 'activity',
@@ -613,8 +663,8 @@ async function initializeEventListeners() {
       if (data.bookedUserIds && data.bookedUserIds.length > 0) {
         await notificationService.sendBulkNotificationQueued({
           userIds: data.bookedUserIds,
-          title: 'Activité mise à jour ✏️',
-          body: `"${data.activityTitle}" a été mise à jour`,
+          title: 'Activity Updated ✏️',
+          body: `"${data.activityTitle}" has been updated`,
           data: {
             type: 'activity_updated',
             activityId: data.activityId,
@@ -636,8 +686,8 @@ async function initializeEventListeners() {
       if (data.bookedUserIds && data.bookedUserIds.length > 0) {
         await notificationService.sendBulkNotificationQueued({
           userIds: data.bookedUserIds,
-          title: 'Activité annulée ❌',
-          body: `"${data.activityTitle}" a été annulée`,
+          title: 'Activity Cancelled ❌',
+          body: `"${data.activityTitle}" has been cancelled`,
           data: {
             type: 'activity_cancelled',
             activityId: data.activityId,
@@ -650,8 +700,8 @@ async function initializeEventListeners() {
         const notifications = data.bookedUserIds.map(userId => ({
           user_id: userId,
           type: 'activity',
-          title: 'Activité annulée ❌',
-          message: `"${data.activityTitle}" a été annulée`,
+          title: 'Activity Cancelled ❌',
+          message: `"${data.activityTitle}" has been cancelled`,
           data: { activityId: data.activityId },
           priority: 'urgent',
           related_entity_type: 'activity',
@@ -662,47 +712,6 @@ async function initializeEventListeners() {
       }
     } catch (error) {
       console.error('Error processing activity.cancelled event:', error);
-    }
-  });
-
-  // ============================================
-  // PROFILE EVENTS
-  // ============================================
-
-  notificationEventBus.on('profile.updated', async (data) => {
-    try {
-      console.log('📨 Profile updated event:', data);
-      
-      // Send to user
-      await notificationService.sendProfileUpdatedNotification({
-        userId: data.userId,
-        userName: data.userName,
-      });
-    } catch (error) {
-      console.error('Error processing profile.updated event:', error);
-    }
-  });
-
-  notificationEventBus.on('profile.verified', async (data) => {
-    try {
-      console.log('📨 Profile verified event:', data);
-      
-      // Send to user
-      await notificationService.sendProfileVerifiedNotification({
-        userId: data.userId,
-      });
-
-      // Create DB notification
-      await Notification.createNotification({
-        user_id: data.userId,
-        type: 'profile',
-        title: 'Profil vérifié ✓',
-        message: 'Félicitations ! Votre profil est maintenant vérifié',
-        data: {},
-        priority: 'high',
-      });
-    } catch (error) {
-      console.error('Error processing profile.verified event:', error);
     }
   });
 
@@ -724,8 +733,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'appeal',
-        title: 'Appel soumis 📋',
-        message: 'Votre appel a été soumis et sera traité sous peu',
+        title: 'Appeal Submitted 📋',
+        message: 'Your appeal has been submitted and will be processed soon',
         data: { appealId: data.appealId },
         priority: 'high',
         related_entity_type: 'appeal',
@@ -751,8 +760,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'appeal',
-        title: data.status === 'approved' ? 'Appel accepté ✅' : 'Appel rejeté ❌',
-        message: `Votre appel a été ${data.status === 'approved' ? 'accepté' : 'rejeté'}`,
+        title: data.status === 'approved' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌',
+        message: `Your appeal has been ${data.status === 'approved' ? 'accepted' : 'rejected'}`,
         data: { appealId: data.appealId, status: data.status },
         priority: 'urgent',
         related_entity_type: 'appeal',

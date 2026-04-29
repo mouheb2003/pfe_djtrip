@@ -20,7 +20,7 @@ export function DashboardContent({
 }) {
   const settings = useSettingsContext();
 
-  const isNavHorizontal = settings.state.navLayout === 'horizontal';
+  const isNavHorizontal = false; // Disabled - use vertical only
 
   return (
     <Container

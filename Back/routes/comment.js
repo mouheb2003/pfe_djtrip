@@ -10,6 +10,29 @@ const { cacheGet, invalidateCache } = require("../middleware/cache");
 const { verifyToken, verifyTouriste, verifyTouristeOrOrganisator, verifyAdmin } = require("../middleware/auth");
 const { createCommentSchema, updateCommentSchema, reactionSchema } = require("../validators/comment");
 
+// ==================== ADMIN ENDPOINTS (MUST BE FIRST TO AVOID CONFLICTS) ====================
+
+// Test endpoint
+router.get("/test", (req, res) => {
+  console.log('[TEST ENDPOINT] Called');
+  res.json({ message: "Test endpoint works" });
+});
+
+// Get all comments with filters (ADMIN)
+router.get(
+  "/admin",
+  verifyToken,
+  commentController.getAdminComments
+);
+
+// Delete any comment (ADMIN)
+router.delete(
+  "/admin/:commentId",
+  verifyToken,
+  invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
+  commentController.adminDeleteComment
+);
+
 // ==================== PUBLIC ENDPOINTS ====================
 
 // Get comments for a post with pagination
@@ -76,25 +99,6 @@ router.delete(
   verifyToken,
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.deleteComment
-);
-
-// ==================== ADMIN ENDPOINTS ====================
-
-// Get all comments with filters (ADMIN)
-router.get(
-  "/admin",
-  verifyToken,
-  verifyAdmin,
-  commentController.getAdminComments
-);
-
-// Delete any comment (ADMIN)
-router.delete(
-  "/admin/:commentId",
-  verifyToken,
-  verifyAdmin,
-  invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
-  commentController.adminDeleteComment
 );
 
 // Search users for mention autocomplete

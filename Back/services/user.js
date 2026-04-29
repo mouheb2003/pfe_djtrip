@@ -102,7 +102,7 @@ class UserService {
       );
     }
 
-    // 🚀 NEW: Validate and format phone number
+    // 🚀 NEW: Validate and format phone number (lenient validation)
     if (normalizedData.num_tel) {
       normalizedData.num_tel = this._normalizePhoneInput(
         normalizedData.num_tel,
@@ -145,15 +145,18 @@ class UserService {
             "France",
         );
 
+        // 🚀 FIX: Accept phone even if validation fails, just log a warning
         if (!phoneValidation.valid) {
-          throw new Error(phoneValidation.error);
+          console.warn(`⚠️ Phone validation failed but accepting anyway: ${phoneValidation.error}`);
+          console.warn(`📱 Original phone: ${normalizedData.num_tel}`);
+          // Don't throw error, just keep the original value
+        } else {
+          normalizedData.num_tel = phoneValidation.phone;
+          normalizedData.pays_telephone = phoneValidation.country;
+          console.log(
+            `📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`,
+          );
         }
-
-        normalizedData.num_tel = phoneValidation.phone;
-        normalizedData.pays_telephone = phoneValidation.country;
-        console.log(
-          `📱 Phone formatted: ${phoneValidation.phone} (${phoneValidation.country})`,
-        );
       } else {
         // Phone is incomplete or just country code - skip validation but keep the value
         console.log(`📱 Phone is incomplete (${normalizedData.num_tel}), skipping validation`);

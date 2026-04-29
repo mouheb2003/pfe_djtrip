@@ -16,6 +16,7 @@ const {
 router.get(
   "/",
   verifyToken,
+  invalidateCache(["notifications:user"]),
   notificationController.getUserNotifications,
 );
 
@@ -76,7 +77,6 @@ router.get(
   "/admin",
   verifyToken,
   verifyAdmin,
-  cacheGet("notifications:admin", 30),
   notificationController.getAllNotifications,
 );
 

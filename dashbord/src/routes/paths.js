@@ -53,6 +53,7 @@ export const paths = {
     logs: `${ROOTS.DASHBOARD}/logs`,
     appeals: `${ROOTS.DASHBOARD}/appeals`,
     approvals: `${ROOTS.DASHBOARD}/approvals`,
+    payments: `${ROOTS.DASHBOARD}/payments`,
     two: `${ROOTS.DASHBOARD}/two`,
     three: `${ROOTS.DASHBOARD}/three`,
   },

@@ -3,12 +3,21 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
+import '../../services/inscription_service.dart';
+import '../payment/stripe_payment_screen.dart';
 import 'tourist_main_screen.dart';
 
-class BookingConfirmationScreen extends StatelessWidget {
+class BookingConfirmationScreen extends StatefulWidget {
   final InscriptionModel inscription;
 
   const BookingConfirmationScreen({super.key, required this.inscription});
+
+  @override
+  State<BookingConfirmationScreen> createState() => _BookingConfirmationScreenState();
+}
+
+class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
+  bool _isDeleting = false;
 
   String _normalizeStatus(String rawStatus) {
     final status = rawStatus.trim().toLowerCase();
@@ -31,9 +40,9 @@ class BookingConfirmationScreen extends StatelessWidget {
 
   double _bookingTotal(Map<String, dynamic>? activity) {
     final unitPrice = (activity?['prix'] as num?)?.toDouble() ?? 0.0;
-    final computed = unitPrice * inscription.nombreParticipants;
-    if (inscription.prixTotal > 0) {
-      return inscription.prixTotal;
+    final computed = unitPrice * widget.inscription.nombreParticipants;
+    if (widget.inscription.prixTotal > 0) {
+      return widget.inscription.prixTotal;
     }
     return computed;
   }
@@ -52,9 +61,70 @@ class BookingConfirmationScreen extends StatelessWidget {
     return urls.toSet().toList(growable: false);
   }
 
+  Future<void> _deleteBooking() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Booking'),
+        content: const Text('Are you sure you want to delete this booking?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      final success = await InscriptionService.cancelInscription(widget.inscription.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const TouristMainScreen(initialIndex: 2),
+          ),
+          (route) => false,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete booking'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final activity = inscription.activite;
+    final activity = widget.inscription.activite;
     final photoUrls = _activityPhotoUrls(activity);
     final title = activity?['titre'] as String? ?? 'Activity';
     final location =
@@ -68,25 +138,28 @@ class BookingConfirmationScreen extends StatelessWidget {
         DateTime.tryParse(
           (activity?['date_debut'] ?? activity?['dateDebut'] ?? '').toString(),
         ) ??
-        inscription.dateDemande ??
+        widget.inscription.dateDemande ??
         DateTime.now();
     final dateStr = DateFormat('MMM dd, yyyy').format(date);
     final timeStr = activity?['heure'] as String? ?? '10:00 AM';
-    final status = _normalizeStatus(inscription.statut);
+    final status = _normalizeStatus(widget.inscription.statut);
     final isApproved = status == 'approuvee';
     final isPending = status == 'en_attente';
     final isRejected = status == 'refusee';
     final isCancelled = status == 'annulee';
     final isUsed = status == 'verifie';
+    final isPaymentFailed = widget.inscription.isPaymentFailed;
     final totalPrice = _bookingTotal(activity);
-    final qrData = inscription.qrData;
+    final qrData = widget.inscription.qrData;
     final hasQrData = qrData.trim().isNotEmpty;
-    final reason = inscription.organizerReason;
+    final reason = widget.inscription.organizerReason;
     final showQr = isApproved;
     final showReason = (isRejected || isCancelled) && reason != null;
-    final statusLabel = inscription.statusLabel.toUpperCase();
-    final statusColor = inscription.statusColor;
-    final headline = isApproved
+    final statusLabel = widget.inscription.statusLabel.toUpperCase();
+    final statusColor = widget.inscription.statusColor;
+    final headline = isPaymentFailed
+        ? 'Payment Failed'
+        : isApproved
         ? 'Booking Confirmed!'
         : isPending
         ? 'Waiting for approval'
@@ -95,7 +168,9 @@ class BookingConfirmationScreen extends StatelessWidget {
         : isUsed
         ? 'Checked In'
         : 'Booking Cancelled';
-    final subtitle = isApproved
+    final subtitle = isPaymentFailed
+        ? 'Your payment could not be processed. You can delete this booking and try again.'
+        : isApproved
         ? 'Your booking is approved. Keep your QR code for check-in.'
         : isPending
         ? 'Your request has been sent. The organizer will review it soon.'
@@ -282,7 +357,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                             icon: Icons.people_outline,
                             label: 'PEOPLE',
                             value:
-                                '${inscription.nombreParticipants} Participants',
+                                '${widget.inscription.nombreParticipants} Participants',
                           ),
                         ),
                         Expanded(
@@ -290,7 +365,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                             icon: Icons.confirmation_number_outlined,
                             label: 'ID',
                             value:
-                                '#DJT-${inscription.id.substring(inscription.id.length - 5).toUpperCase()}',
+                                '#DJT-${widget.inscription.id.substring(widget.inscription.id.length - 5).toUpperCase()}',
                           ),
                         ),
                       ],
@@ -415,61 +490,177 @@ class BookingConfirmationScreen extends StatelessWidget {
               ],
               const SizedBox(height: 32),
               // Buttons
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to bookings tab (index 2 in TouristMainScreen)
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const TouristMainScreen(initialIndex: 2),
+              if (isPaymentFailed || widget.inscription.statut == 'PAID_PENDING_CONFIRMATION') ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton.icon(
+                          onPressed: _isDeleting ? null : _deleteBooking,
+                          icon: _isDeleting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.delete_outline, size: 20),
+                          label: Text(
+                            _isDeleting ? 'Deleting...' : 'Delete',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                        ),
                       ),
-                      (route) => false,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final activity = widget.inscription.activite;
+                            if (activity == null) return;
+                            final activityId = activity['_id']?.toString() ?? '';
+                            final activityTitle = activity['titre']?.toString() ?? 'Activity';
+                            
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StripePaymentScreen(
+                                  inscriptionId: widget.inscription.id,
+                                  activityId: activityId,
+                                  activityTitle: activityTitle,
+                                  nombreParticipants: widget.inscription.nombreParticipants,
+                                  amount: widget.inscription.prixTotal,
+                                  currency: 'TND',
+                                  description: 'Payment for $activityTitle',
+                                ),
+                              ),
+                            );
+                            
+                            // Refresh the screen after payment
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                          child: const Text(
+                            'Pay',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              // Show cancel button for approved bookings
+              if (isApproved) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isDeleting ? null : _deleteBooking,
+                    icon: _isDeleting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cancel_outlined, size: 20),
+                    label: Text(
+                      _isDeleting ? 'Cancelling...' : 'Cancel Booking',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'View My Bookings',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const TouristMainScreen(initialIndex: 0),
+                const SizedBox(height: 12),
+              ],
+              // Only show navigation buttons for non-paid bookings
+              if (!widget.inscription.isApproved) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Navigate to bookings tab (index 2 in TouristMainScreen)
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const TouristMainScreen(initialIndex: 2),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
                       ),
-                      (route) => false,
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF64748B),
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: const Text(
+                      'View My Bookings',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  child: const Text(
-                    'Go Home',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const TouristMainScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: const Text(
+                      'Back to Home',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 40),
             ],
           ),

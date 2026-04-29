@@ -4,7 +4,7 @@ import 'api_client.dart';
 import '../models/place_model.dart';
 
 class PlaceService {
-  static const String _baseUrl = '/api/v1/places';
+  static const String _baseUrl = '/lieu';
 
   // Get all places
   static Future<List<PlaceModel>> getAllPlaces() async {
@@ -13,7 +13,7 @@ class PlaceService {
       
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final List<dynamic> placesData = body['places'] ?? body['data'] ?? [];
+        final List<dynamic> placesData = body['lieux'] ?? body['data'] ?? [];
         
         return placesData.map((placeData) => PlaceModel.fromJson(placeData)).toList();
       } else {
@@ -34,7 +34,7 @@ class PlaceService {
       
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        return PlaceModel.fromJson(body['place'] ?? body['data']);
+        return PlaceModel.fromJson(body['lieu'] ?? body['data']);
       } else {
         throw Exception('Failed to load place: ${response.statusCode}');
       }
@@ -44,22 +44,22 @@ class PlaceService {
     }
   }
 
-  // Search places
-  static Future<List<PlaceModel>> searchPlaces(String query, {String? category}) async {
+  // Search places using the backend search parameter
+  static Future<List<PlaceModel>> searchPlaces(String query, {String? type}) async {
     try {
       Map<String, String> queryParams = {
         'search': query,
       };
       
-      if (category != null && category != 'All') {
-        queryParams['category'] = category;
+      if (type != null && type != 'All') {
+        queryParams['type'] = type;
       }
       
-      final response = await ApiClient.get('$_baseUrl/search', query: queryParams);
+      final response = await ApiClient.get('$_baseUrl', query: queryParams);
       
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final List<dynamic> placesData = body['places'] ?? body['data'] ?? [];
+        final List<dynamic> placesData = body['lieux'] ?? body['data'] ?? [];
         
         return placesData.map((placeData) => PlaceModel.fromJson(placeData)).toList();
       } else {

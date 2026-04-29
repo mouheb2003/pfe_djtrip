@@ -24,14 +24,21 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import {
   getPublications,
   createPublication,
+  updatePublication,
   deletePublication,
   getAdminComments,
   adminDeleteComment,
+  getLieux,
 } from 'src/Controller/actions';
 
 import { toast } from 'src/components/snackbar';
@@ -94,6 +101,8 @@ function mapPublicationComment(comment) {
     content: String(comment?.content ?? ''),
     authorName: author?.fullname ?? author?.email ?? 'Unknown',
     createdAt: comment?.created_at ?? comment?.createdAt ?? null,
+    parent_comment_id: comment?.parent_comment_id ?? null,
+    user_id: comment?.user_id ?? null,
   };
 }
 
@@ -175,8 +184,18 @@ export function PublicationsView({ sx }) {
     audience: 'public',
     hashtags: '',
     locationLabel: '',
+    locationCoords: null,
+    locationSource: 'manual', // 'manual', 'map', 'database'
     imageUrls: '',
   });
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [lieux, setLieux] = useState([]);
+  const [loadingLieux, setLoadingLieux] = useState(false);
+  const [locationTab, setLocationTab] = useState(0); // 0: manual, 1: database, 2: map
+  const [manualLocation, setManualLocation] = useState('');
+  const [selectedLieu, setSelectedLieu] = useState(null);
+  const [imageUrls, setImageUrls] = useState([]);
+  const [imageInputUrl, setImageInputUrl] = useState('');
 
   const filters = useSetState({
     query: '',
@@ -202,6 +221,24 @@ export function PublicationsView({ sx }) {
   useEffect(() => {
     loadRows();
   }, [loadRows]);
+
+  const loadLieux = useCallback(async () => {
+    try {
+      setLoadingLieux(true);
+      const lieuxData = await getLieux();
+      setLieux(lieuxData);
+    } catch {
+      toast.error('Impossible de charger les lieux');
+    } finally {
+      setLoadingLieux(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (locationDialogOpen) {
+      loadLieux();
+    }
+  }, [locationDialogOpen, loadLieux]);
 
   const loadPostComments = useCallback(async (postId) => {
     if (!postId) {
@@ -275,14 +312,20 @@ export function PublicationsView({ sx }) {
       audience: 'public',
       hashtags: '',
       locationLabel: '',
+      locationCoords: null,
+      locationSource: 'manual',
       imageUrls: '',
     });
+    setImageUrls([]);
+    setImageInputUrl('');
     setOpenDialog(true);
   }, []);
 
   const closeDialog = useCallback(() => {
     if (submitting) return;
     setOpenDialog(false);
+    setImageUrls([]);
+    setImageInputUrl('');
   }, [submitting]);
 
   const handleChangeForm = useCallback((field, value) => {
@@ -290,7 +333,7 @@ export function PublicationsView({ sx }) {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!form.content.trim() && !form.imageUrls.trim()) {
+    if (!form.content.trim() && imageUrls.length === 0) {
       toast.error('Contenu ou image est requis');
       return;
     }
@@ -304,10 +347,7 @@ export function PublicationsView({ sx }) {
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean),
-      imageUrls: form.imageUrls
-        .split(/\r?\n|,/)
-        .map((item) => item.trim())
-        .filter(Boolean),
+      imageUrls: imageUrls,
     };
 
     try {
@@ -619,19 +659,124 @@ export function PublicationsView({ sx }) {
                 onChange={(event) => handleChangeForm('hashtags', event.target.value)}
               />
 
-              <TextField
-                label="Lieu"
-                value={form.locationLabel}
-                onChange={(event) => handleChangeForm('locationLabel', event.target.value)}
-              />
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">Lieu</Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:map-point-bold" />}
+                  onClick={() => setLocationDialogOpen(true)}
+                  fullWidth
+                >
+                  {form.locationLabel || 'Sélectionner un lieu'}
+                </Button>
+                {form.locationLabel && (
+                  <Chip
+                    label={`${form.locationLabel} (${form.locationSource === 'manual' ? 'Manuel' : form.locationSource === 'database' ? 'Base de données' : 'Carte'})`}
+                    onDelete={() => handleChangeForm('locationLabel', '')}
+                    size="small"
+                  />
+                )}
+              </Stack>
 
-              <TextField
-                multiline
-                minRows={3}
-                label="URLs images (une par ligne)"
-                value={form.imageUrls}
-                onChange={(event) => handleChangeForm('imageUrls', event.target.value)}
-              />
+              <Stack spacing={2}>
+                <Typography variant="subtitle2">Images</Typography>
+
+                {/* Add image by URL */}
+                <Stack direction="row" spacing={1}>
+                  <TextField
+                    label="URL de l'image"
+                    value={imageInputUrl}
+                    onChange={(e) => setImageInputUrl(e.target.value)}
+                    placeholder="https://..."
+                    fullWidth
+                    size="small"
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      if (imageInputUrl.trim()) {
+                        setImageUrls([...imageUrls, imageInputUrl.trim()]);
+                        setImageInputUrl('');
+                      }
+                    }}
+                    disabled={!imageInputUrl.trim()}
+                  >
+                    Ajouter
+                  </Button>
+                </Stack>
+
+                {/* Upload button */}
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="solar:upload-bold" />}
+                  component="label"
+                  fullWidth
+                >
+                  Uploader des images (max 2MB par image)
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files);
+                      files.forEach((file) => {
+                        // Check file size (max 2MB)
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error(`L'image ${file.name} est trop grande (max 2MB)`);
+                          return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setImageUrls((prev) => [...prev, reader.result]);
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                    }}
+                  />
+                </Button>
+
+                {/* Display selected images */}
+                {imageUrls.length > 0 && (
+                  <Stack spacing={1} sx={{ maxHeight: 200, overflow: 'auto' }}>
+                    {imageUrls.map((url, index) => (
+                      <Card
+                        key={index}
+                        variant="outlined"
+                        sx={{
+                          p: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={url}
+                          alt={`Image ${index + 1}`}
+                          sx={{
+                            width: 60,
+                            height: 60,
+                            objectFit: 'cover',
+                            borderRadius: 1,
+                          }}
+                        />
+                        <Typography variant="caption" sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {url}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== index))}
+                        >
+                          <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+                        </IconButton>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </Stack>
             </Stack>
           </DialogContent>
           <DialogActions>
@@ -641,6 +786,138 @@ export function PublicationsView({ sx }) {
             <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
               Créer
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Location Selection Dialog */}
+        <Dialog open={locationDialogOpen} onClose={() => setLocationDialogOpen(false)} fullWidth maxWidth="md">
+          <DialogTitle>Sélectionner un lieu</DialogTitle>
+          <DialogContent>
+            <Tabs value={locationTab} onChange={(e, v) => setLocationTab(v)} sx={{ mb: 2 }}>
+              <Tab label="Manuel" />
+              <Tab label="Base de données" />
+              <Tab label="Carte" />
+            </Tabs>
+
+            {locationTab === 0 && (
+              <Stack spacing={2}>
+                <TextField
+                  label="Nom du lieu"
+                  value={manualLocation}
+                  onChange={(e) => setManualLocation(e.target.value)}
+                  placeholder="Ex: Plage de Djerba"
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    if (manualLocation.trim()) {
+                      setForm({
+                        ...form,
+                        locationLabel: manualLocation,
+                        locationSource: 'manual',
+                      });
+                      setLocationDialogOpen(false);
+                      setManualLocation('');
+                    }
+                  }}
+                  disabled={!manualLocation.trim()}
+                >
+                  Confirmer
+                </Button>
+              </Stack>
+            )}
+
+            {locationTab === 1 && (
+              <Stack spacing={2}>
+                {loadingLieux ? (
+                  <Stack alignItems="center" sx={{ py: 4 }}>
+                    <CircularProgress />
+                  </Stack>
+                ) : lieux.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary', py: 4 }}>
+                    Aucun lieu disponible dans la base de données
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.5} sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    {lieux.map((lieu) => (
+                      <Card
+                        key={lieu._id}
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          bgcolor: selectedLieu?._id === lieu._id ? 'primary.lighter' : 'background.paper',
+                          '&:hover': { bgcolor: 'action.hover' },
+                          border: selectedLieu?._id === lieu._id ? '2px solid' : '1px solid',
+                          borderColor: selectedLieu?._id === lieu._id ? 'primary.main' : 'divider',
+                        }}
+                        onClick={() => setSelectedLieu(lieu)}
+                      >
+                        <Stack spacing={0.5}>
+                          <Typography variant="subtitle1" fontWeight={600}>
+                            {lieu.name || lieu.nom}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                            {lieu.location || lieu.localisation}
+                          </Typography>
+                          {lieu.description && (
+                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                              {lieu.description}
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    if (selectedLieu) {
+                      setForm({
+                        ...form,
+                        locationLabel: selectedLieu.name || selectedLieu.nom,
+                        locationCoords: selectedLieu.coordinates || selectedLieu.coordonnees,
+                        locationSource: 'database',
+                      });
+                      setLocationDialogOpen(false);
+                      setSelectedLieu(null);
+                    }
+                  }}
+                  disabled={!selectedLieu}
+                >
+                  Confirmer
+                </Button>
+              </Stack>
+            )}
+
+            {locationTab === 2 && (
+              <Stack spacing={2} sx={{ py: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Fonctionnalité de carte à venir. Pour l'instant, utilisez l'option manuelle ou la base de données.
+                </Typography>
+                <Box
+                  sx={{
+                    height: 300,
+                    bgcolor: 'grey.200',
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    <Iconify icon="solar:map-bold" width={48} />
+                    <br />
+                    Carte Google Maps
+                  </Typography>
+                </Box>
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setLocationDialogOpen(false)}>Annuler</Button>
           </DialogActions>
         </Dialog>
 
@@ -901,47 +1178,132 @@ export function PublicationsView({ sx }) {
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
-                    {detailsComments.map((comment) => (
-                      <Card
-                        key={comment.id}
-                        variant="outlined"
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 1.5,
-                          bgcolor: 'background.neutral',
-                        }}
-                      >
-                        <Stack direction="row" justifyContent="space-between" spacing={1}>
-                          <Stack direction="row" spacing={1.25} alignItems="center">
-                            <Avatar sx={{ width: 30, height: 30, fontSize: 13 }}>
-                              {getInitial(comment.authorName)}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="subtitle2">{comment.authorName}</Typography>
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                {formatDate(comment.createdAt)}
+                    {(() => {
+                      console.log('DEBUG: All comments received:', detailsComments);
+                      console.log('DEBUG: Sample comment structure:', detailsComments[0]);
+
+                      // Organize comments: root comments first, then replies
+                      const rootComments = detailsComments.filter(c => !c.parent_comment_id);
+                      const repliesMap = {};
+                      detailsComments.forEach(c => {
+                        if (c.parent_comment_id) {
+                          if (!repliesMap[c.parent_comment_id]) {
+                            repliesMap[c.parent_comment_id] = [];
+                          }
+                          repliesMap[c.parent_comment_id].push(c);
+                        }
+                      });
+
+                      console.log('DEBUG: Root comments count:', rootComments.length);
+                      console.log('DEBUG: Replies map:', repliesMap);
+
+                      return rootComments.map((comment) => (
+                        <Box key={comment._id || comment.id}>
+                          <Card
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1.5,
+                              bgcolor: 'background.neutral',
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" spacing={1}>
+                              <Stack direction="row" spacing={1.25} alignItems="center">
+                                <Avatar
+                                  src={comment.user_id?.avatar}
+                                  sx={{ width: 30, height: 30, fontSize: 13 }}
+                                >
+                                  {getInitial(comment.user_id?.fullname || comment.authorName)}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2">
+                                    {comment.user_id?.fullname || comment.authorName}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    {formatDate(comment.created_at || comment.createdAt)}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+
+                              <Tooltip title="Supprimer commentaire">
+                                <IconButton
+                                  color="error"
+                                  size="small"
+                                  onClick={() => handleDeleteCommentFromDetails(comment._id || comment.id)}
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+
+                            <Divider sx={{ my: 1 }} />
+
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+                              {comment.content || '-'}
+                            </Typography>
+                          </Card>
+
+                          {/* Display replies */}
+                          {repliesMap[comment._id || comment.id]?.length > 0 && (
+                            <Box sx={{ mt: 1.5, ml: 4, pl: 2, borderLeft: '2px dashed', borderLeftColor: 'divider' }}>
+                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mb: 1, display: 'block' }}>
+                                <Iconify icon="solar:reply-bold" width={14} sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                {repliesMap[comment._id || comment.id].length} Réponse(s)
                               </Typography>
+                              <Stack spacing={1}>
+                                {repliesMap[comment._id || comment.id].map((reply) => (
+                                  <Card
+                                    key={reply._id || reply.id}
+                                    variant="outlined"
+                                    sx={{
+                                      p: 1,
+                                      borderRadius: 1.5,
+                                      bgcolor: 'background.paper',
+                                      borderLeft: '3px solid',
+                                      borderLeftColor: 'primary.main',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                    }}
+                                  >
+                                    <Stack direction="row" justifyContent="space-between" spacing={1}>
+                                      <Stack direction="row" spacing={1} alignItems="center">
+                                        <Avatar
+                                          src={reply.user_id?.avatar}
+                                          sx={{ width: 24, height: 24, fontSize: 11 }}
+                                        >
+                                          {getInitial(reply.user_id?.fullname || reply.authorName)}
+                                        </Avatar>
+                                        <Box>
+                                          <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                            {reply.user_id?.fullname || reply.authorName}
+                                          </Typography>
+                                          <Typography variant="caption" sx={{ color: 'text.secondary', ml: 0.5 }}>
+                                            {formatDate(reply.created_at || reply.createdAt)}
+                                          </Typography>
+                                        </Box>
+                                      </Stack>
+
+                                      <Tooltip title="Supprimer réponse">
+                                        <IconButton
+                                          color="error"
+                                          size="small"
+                                          onClick={() => handleDeleteCommentFromDetails(reply._id || reply.id)}
+                                        >
+                                          <Iconify icon="solar:trash-bin-trash-bold" width={16} />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </Stack>
+
+                                    <Typography variant="caption" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, mt: 0.5 }}>
+                                      {reply.content || '-'}
+                                    </Typography>
+                                  </Card>
+                                ))}
+                              </Stack>
                             </Box>
-                          </Stack>
-
-                          <Tooltip title="Supprimer commentaire">
-                            <IconButton
-                              color="error"
-                              size="small"
-                              onClick={() => handleDeleteCommentFromDetails(comment.id)}
-                            >
-                              <Iconify icon="solar:trash-bin-trash-bold" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-
-                        <Divider sx={{ my: 1 }} />
-
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
-                          {comment.content || '-'}
-                        </Typography>
-                      </Card>
-                    ))}
+                          )}
+                        </Box>
+                      ));
+                    })()}
                   </Stack>
                 )}
               </Card>

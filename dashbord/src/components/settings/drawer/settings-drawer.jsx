@@ -7,7 +7,10 @@ import Drawer from '@mui/material/Drawer';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import { useColorScheme } from '@mui/material/styles';
+import { useRouter } from 'src/routes/hooks';
 
 import { themeConfig } from 'src/theme/theme-config';
 import { primaryColorPresets } from 'src/theme/with-settings';
@@ -23,11 +26,14 @@ import { useSettingsContext } from '../context/use-settings-context';
 import { NavColorOptions, NavLayoutOptions } from './nav-layout-option';
 import { OptionButton } from './styles';
 import { BACKEND_MODES, getBackendMode, setBackendMode } from 'src/services/backend';
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
 export function SettingsDrawer({ sx, defaultSettings }) {
   const settings = useSettingsContext();
+  const router = useRouter();
+  const { logout } = useAuthContext();
   const [backendMode, setBackendModeState] = useState(getBackendMode());
 
   const { mode, setMode, systemMode } = useColorScheme();
@@ -58,6 +64,21 @@ export function SettingsDrawer({ sx, defaultSettings }) {
     settings.onReset();
     setMode(defaultSettings.colorScheme);
   }, [defaultSettings.colorScheme, setMode, settings]);
+
+  const handleChangePassword = useCallback(() => {
+    settings.onCloseDrawer();
+    router.push('/dashboard/change-password');
+  }, [router, settings]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      settings.onCloseDrawer();
+      window.location.href = '/auth/jwt/sign-in';
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, [logout, settings]);
 
   const renderHead = () => (
     <Box
@@ -158,19 +179,6 @@ export function SettingsDrawer({ sx, defaultSettings }) {
 
   const renderNav = () => (
     <LargeBlock title="Nav" tooltip="Dashboard only" sx={{ gap: 2.5 }}>
-      {isNavLayoutVisible && (
-        <SmallBlock
-          label="Layout"
-          canReset={settings.state.navLayout !== defaultSettings.navLayout}
-          onReset={() => settings.setState({ navLayout: defaultSettings.navLayout })}
-        >
-          <NavLayoutOptions
-            options={['vertical', 'horizontal', 'mini']}
-            value={settings.state.navLayout}
-            onChangeOption={(newOption) => settings.setState({ navLayout: newOption })}
-          />
-        </SmallBlock>
-      )}
       {isNavColorVisible && (
         <SmallBlock
           label="Color"
@@ -265,6 +273,28 @@ export function SettingsDrawer({ sx, defaultSettings }) {
     </LargeBlock>
   );
 
+  const renderAccountActions = () => (
+    <LargeBlock title="Account" sx={{ gap: 1.5 }}>
+      <Button
+        fullWidth
+        variant="outlined"
+        startIcon={<Iconify icon="solar:lock-password-bold" />}
+        onClick={handleChangePassword}
+      >
+        Change Password
+      </Button>
+      <Button
+        fullWidth
+        variant="outlined"
+        color="error"
+        startIcon={<Iconify icon="solar:logout-2-bold" />}
+        onClick={handleLogout}
+      >
+        Sign Out
+      </Button>
+    </LargeBlock>
+  );
+
   return (
     <Drawer
       anchor="right"
@@ -308,10 +338,10 @@ export function SettingsDrawer({ sx, defaultSettings }) {
             {isCompactLayoutVisible && renderCompact()}
           </Box>
 
-          {(isNavColorVisible || isNavLayoutVisible) && renderNav()}
-          {renderBackend()}
+          {isNavColorVisible && renderNav()}
           {isPrimaryColorVisible && renderPresets()}
           {(isFontFamilyVisible || isFontSizeVisible) && renderFont()}
+          {renderAccountActions()}
         </Box>
       </Scrollbar>
     </Drawer>

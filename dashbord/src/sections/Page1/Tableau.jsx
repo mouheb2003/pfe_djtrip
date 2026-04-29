@@ -40,6 +40,7 @@ export function InvoiceTable({
   onDeleteRow,
   onDeleteSelected,
   onViewDetails,
+  onEdit,
 }) {
   const confirmDialog = useBoolean();
 
@@ -55,7 +56,7 @@ export function InvoiceTable({
 
       return (
         <TableRow key={`${row.id}__details`}>
-          <TableCell sx={{ p: 0, border: 'none' }} colSpan={11}>
+          <TableCell sx={{ p: 0, border: 'none' }} colSpan={13}>
             <Collapse in={open} timeout="auto" unmountOnExit sx={{ bgcolor: 'background.neutral' }}>
               <Paper sx={{ m: 1.5, p: 2 }}>
                 <Stack
@@ -66,37 +67,43 @@ export function InvoiceTable({
                   <Stack spacing={0.75} sx={{ minWidth: 240 }}>
                     <Typography variant="subtitle2">Description</Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {row.description || 'Aucune description disponible'}
+                      {row.short_description || row.description || 'Aucune description disponible'}
                     </Typography>
                   </Stack>
 
                   <Stack spacing={0.75} sx={{ minWidth: 240 }}>
                     <Typography variant="subtitle2">Localisation</Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {row.adresse}
+                      {row.address || row.adresse}
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Lat: {row.latitude.toFixed(4)}, Long: {row.longitude.toFixed(4)}
+                      {row.city || row.ville}, {row.country}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Lat: {row.latitude?.toFixed(4) || 0}, Long: {row.longitude?.toFixed(4) || 0}
                     </Typography>
                   </Stack>
 
                   <Stack spacing={0.75} sx={{ flexGrow: 1 }}>
                     <Typography variant="subtitle2">Informations</Typography>
-                    {row.siteWeb && (
+                    {row.website && (
                       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Site web: {row.siteWeb}
+                        Site web: {row.website}
                       </Typography>
                     )}
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Images: {row.galerieImages?.length || 0} • Avis: {row.avis?.length || 0}
+                      Images: {row.gallery?.length || row.galerieImages?.length || 0} • Avis: {row.reviews?.length || row.avis?.length || 0}
                     </Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Note moyenne: {calculateAverageNote(row.avis)} / 5
+                      Note: {row.rating?.toFixed(1) || 0} / 5 • Popularité: {row.popularity_score || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      Tags: {row.tags || '-'}
                     </Typography>
 
-                    {row.galerieImages?.length ? (
+                    {row.gallery?.length ? (
                       <Stack direction="row" spacing={1} sx={{ pt: 0.5, flexWrap: 'wrap' }}>
-                        {row.galerieImages.slice(0, 6).map((image, imageIndex) => (
+                        {row.gallery.slice(0, 6).map((image, imageIndex) => (
                           <Box
                             key={`${row.id}_img_${imageIndex}`}
                             component="img"
@@ -181,13 +188,24 @@ export function InvoiceTable({
 
                       <TableCell>{row.nom}</TableCell>
                       <TableCell>
-                        <Label variant="soft" color={categorieColor(row.categorie)}>
-                          {row.categorie}
+                        <Label variant="soft" color={categorieColor(row.type || row.categorie)}>
+                          {row.type || row.categorie}
                         </Label>
                       </TableCell>
-                      <TableCell>{row.ville}</TableCell>
-                      <TableCell>{row.prix === 0 ? 'Gratuit' : `${row.prix} TND`}</TableCell>
-                      <TableCell>{row.telephone || '-'}</TableCell>
+                      <TableCell>{row.city || row.ville}</TableCell>
+                      <TableCell>{row.country || '-'}</TableCell>
+                      <TableCell>{row.price_per_adult === 0 ? 'Gratuit' : `${row.price_per_adult || row.prix || 0} TND`}</TableCell>
+                      <TableCell>
+                        {row.telephone ? (
+                          <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                            {row.telephone}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell
                         sx={{
                           maxWidth: 200,
@@ -196,7 +214,22 @@ export function InvoiceTable({
                           textOverflow: 'ellipsis',
                         }}
                       >
-                        {row.horaires || '-'}
+                        {row.website || row.siteWeb ? (
+                          <Typography
+                            variant="body2"
+                            component="a"
+                            href={row.website || row.siteWeb}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ textDecoration: 'none', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+                          >
+                            {row.website || row.siteWeb}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                            -
+                          </Typography>
+                        )}
                       </TableCell>
 
                       <TableCell align="center">
@@ -207,14 +240,34 @@ export function InvoiceTable({
                           spacing={0.5}
                         >
                           <Iconify icon="eva:star-fill" width={16} sx={{ color: 'warning.main' }} />
-                          <Typography variant="body2">{calculateAverageNote(row.avis)}</Typography>
+                          <Typography variant="body2">{row.rating?.toFixed(1) || calculateAverageNote(row.avis)}</Typography>
                         </Stack>
+                      </TableCell>
+
+                      <TableCell align="center">
+                        {row.is_featured ? (
+                          <Iconify icon="eva:star-fill" width={16} sx={{ color: 'warning.main' }} />
+                        ) : (
+                          <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell align="center">
+                        <Typography variant="body2">{row.popularity_score || 0}</Typography>
                       </TableCell>
 
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         <Tooltip title="Voir détails">
                           <IconButton color="info" onClick={() => onViewDetails?.(row)}>
                             <Iconify icon="solar:eye-bold" />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Modifier">
+                          <IconButton color="success" onClick={() => onEdit?.(row)}>
+                            <Iconify icon="solar:pen-bold" />
                           </IconButton>
                         </Tooltip>
 

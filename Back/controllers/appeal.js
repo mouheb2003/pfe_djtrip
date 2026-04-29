@@ -1,6 +1,7 @@
 const Appeal = require("../models/appeal");
 const User = require("../models/user");
 const emailService = require("../services/appealEmailService");
+const notificationEventBus = require("../services/notificationEventBus");
 
 // ─── POST /appeals ───────────────────────────────────────────────────────────────
 // Submit a new appeal
@@ -68,6 +69,16 @@ exports.submitAppeal = async (req, res) => {
     } catch (emailError) {
       console.error("Failed to send appeal emails:", emailError);
       // Don't fail the request if email fails
+    }
+
+    // Emit appeal created event for notification
+    try {
+      notificationEventBus.emitAppealCreated({
+        userId: userId,
+        appealId: appeal._id,
+      });
+    } catch (notifError) {
+      console.warn("Failed to send appeal notification:", notifError.message);
     }
 
     res.status(201).json({
@@ -283,14 +294,20 @@ exports.updateAppealStatus = async (req, res) => {
       console.error("Failed to send appeal decision email:", emailError);
     }
 
+    // Emit appeal resolved event for notification
+    try {
+      notificationEventBus.emitAppealResolved({
+        userId: appeal.user_id._id,
+        appealId: appeal._id,
+        status: status,
+      });
+    } catch (notifError) {
+      console.warn("Failed to send appeal resolved notification:", notifError.message);
+    }
+
     res.status(200).json({
-      message: "Appeal updated successfully",
-      appeal: {
-        id: appeal._id,
-        status: appeal.status,
-        admin_response: appeal.admin_response,
-        updated_at: appeal.updatedAt,
-      },
+      message: "Appeal status updated successfully",
+      appeal,
     });
   } catch (error) {
     console.error("Error updating appeal status:", error);

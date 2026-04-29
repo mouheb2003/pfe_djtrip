@@ -39,8 +39,8 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
   const navData = slotProps?.nav?.data ?? dashboardNavData;
 
   const isNavMini = settings.state.navLayout === 'mini';
-  const isNavHorizontal = settings.state.navLayout === 'horizontal';
-  const isNavVertical = isNavMini || settings.state.navLayout === 'vertical';
+  const isNavHorizontal = false; // Disabled - use vertical only
+  const isNavVertical = true; // Always use vertical navigation
 
   const renderHeader = () => {
     const headerSlotProps = {
@@ -63,9 +63,7 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
           This is an info Alert.
         </Alert>
       ),
-      bottomArea: isNavHorizontal ? (
-        <NavHorizontal data={navData} layoutQuery={layoutQuery} cssVars={navVars.section} />
-      ) : null,
+      bottomArea: null,
       leftArea: (
         <>
           {/** @slot Nav mobile */}
@@ -74,20 +72,6 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
             sx={{ mr: 1, ml: -1, [theme.breakpoints.up(layoutQuery)]: { display: 'none' } }}
           />
           <NavMobile data={navData} open={open} onClose={onClose} cssVars={navVars.section} />
-
-          {/** @slot Logo */}
-          {isNavHorizontal && (
-            <Logo
-              sx={{
-                display: 'inline-flex',
-              }}
-            />
-          )}
-
-          {/** @slot Divider */}
-          {isNavHorizontal && (
-            <VerticalDivider sx={{ [theme.breakpoints.up(layoutQuery)]: { display: 'flex' } }} />
-          )}
         </>
       ),
       rightArea: (

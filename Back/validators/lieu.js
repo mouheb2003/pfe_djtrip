@@ -52,6 +52,7 @@ const createLieuSchema = Joi.object({
   currency: Joi.string().default("TND"),
   discounts: Joi.string(),
   booking_link: Joi.string().uri(),
+  website: Joi.string().uri(),
 
   // ================= AVIS =================
   rating: Joi.number().min(0).max(5).default(0),
@@ -119,6 +120,7 @@ const updateLieuSchema = Joi.object({
   currency: Joi.string(),
   discounts: Joi.string(),
   booking_link: Joi.string().uri(),
+  website: Joi.string().uri(),
 
   // ================= AVIS =================
   rating: Joi.number().min(0).max(5),

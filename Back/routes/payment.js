@@ -62,4 +62,12 @@ router.get("/user", authMiddleware.verifyToken, paymentController.getUserPayment
 // Get user's wallet balance
 router.get("/wallet", authMiddleware.verifyToken, paymentController.getWalletBalance);
 
+// GET /api/payments/all
+// Get all payments (admin only)
+router.get("/all", authMiddleware.verifyToken, paymentController.getAllPayments);
+
+// POST /api/payments/:paymentId/refund
+// Manual refund for admin (admin only)
+router.post("/:paymentId/refund", authMiddleware.verifyToken, paymentController.manualRefund);
+
 module.exports = router;

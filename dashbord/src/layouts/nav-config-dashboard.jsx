@@ -42,7 +42,7 @@ const ICONS = {
 
 export const navData = [
   /**
-   * CONTENU
+   * CONTENT
    */
   /**
    * HOME
@@ -57,18 +57,18 @@ export const navData = [
     ],
   },
   /**
-   * CONTENU
+   * CONTENT
    */
   {
-    subheader: 'CONTENU',
+    subheader: 'CONTENT',
     items: [
       {
-        title: 'Lieux',
+        title: 'Places',
         path: paths.dashboard.lieux.root,
         icon: ICONS.tour,
       },
       {
-        title: 'Activités',
+        title: 'Activities',
         path: paths.dashboard.activites,
         icon: ICONS.job,
       },
@@ -80,13 +80,13 @@ export const navData = [
     ],
   },
   /**
-   * UTILISATEURS
+   * USERS
    */
   {
-    subheader: 'UTILISATEURS',
+    subheader: 'USERS',
     items: [
       {
-        title: 'Utilisateurs',
+        title: 'Users',
         path: paths.dashboard.three,
         icon: ICONS.user,
       },
@@ -94,23 +94,21 @@ export const navData = [
         title: 'Appeals',
         path: paths.dashboard.appeals,
         icon: ICONS.file,
-        info: <Label color="warning">2</Label>,
       },
       {
         title: 'Approvals',
         path: paths.dashboard.approvals,
         icon: ICONS.user,
-        info: <Label color="orange">5</Label>,
       },
     ],
   },
   /**
-   * MESSAGERIE
+   * MESSAGING
    */
   {
     items: [
       {
-        title: 'Messagerie',
+        title: 'Messaging',
         path: paths.dashboard.messages,
         icon: ICONS.chat,
       },
@@ -118,6 +116,18 @@ export const navData = [
         title: 'Logs',
         path: paths.dashboard.logs,
         icon: ICONS.file,
+      },
+    ],
+  },
+  /**
+   * PAYMENTS
+   */
+  {
+    items: [
+      {
+        title: 'Payments',
+        path: paths.dashboard.payments,
+        icon: ICONS.invoice,
       },
     ],
   },

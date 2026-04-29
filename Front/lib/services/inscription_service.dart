@@ -240,7 +240,7 @@ class InscriptionService {
         }
 
         final result = {
-          'pending': parseList(data['pending'], 'pending'),
+          'pending_for_payment': parseList(data['pending_for_payment'], 'pending_for_payment'),
           'confirmed': parseList(data['confirmed'], 'confirmed'),
           'cancelled': parseList(data['cancelled'], 'cancelled'),
           'used': parseList(data['used'], 'used'),
@@ -249,7 +249,7 @@ class InscriptionService {
         return result;
       }
 
-      return {'pending': [], 'confirmed': [], 'cancelled': [], 'used': []};
+      return {'pending_for_payment': [], 'confirmed': [], 'cancelled': [], 'used': []};
     } catch (e) {
       print('Error in getMyBookings: $e');
       throw Exception(_extractErrorMessage(e.toString()));
@@ -259,6 +259,12 @@ class InscriptionService {
   /// Tourist: cancel an inscription.
   static Future<bool> cancelInscription(String inscriptionId) async {
     final res = await ApiClient.put('/inscriptions/$inscriptionId/annuler', {});
+    return res.statusCode == 200;
+  }
+
+  /// Tourist: delete an inscription.
+  static Future<bool> deleteInscription(String inscriptionId) async {
+    final res = await ApiClient.delete('/inscriptions/$inscriptionId');
     return res.statusCode == 200;
   }
 

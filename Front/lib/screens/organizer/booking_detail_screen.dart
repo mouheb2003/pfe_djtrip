@@ -34,199 +34,9 @@ class _OrganizerBookingDetailScreenState
   String _normalizeStatus(String rawStatus) {
     final s = rawStatus.trim().toLowerCase();
     if (s == 'approved') return 'approuvee';
-    if (s == 'pending') return 'en_attente';
-    if (s == 'rejected') return 'refusee';
+    if (s == 'pending' || s == 'paid_pending_confirmation') return 'PAID_PENDING_CONFIRMATION';
     if (s == 'cancelled' || s == 'canceled') return 'annulee';
     return s;
-  }
-
-  Future<void> _approveBooking() async {
-    setState(() => _isUpdating = true);
-
-    try {
-      final success = await InscriptionService.approveInscription(
-        _inscription.id,
-      );
-
-      if (success) {
-        setState(() {
-          _inscription = InscriptionModel(
-            id: _inscription.id,
-            statut: 'approuvee',
-            nombreParticipants: _inscription.nombreParticipants,
-            prixTotal: _inscription.prixTotal,
-            dateDemande: _inscription.dateDemande,
-            messageTouriste: _inscription.messageTouriste,
-            messageOrganisateur: _inscription.messageOrganisateur,
-            activite: _inscription.activite,
-            touriste: _inscription.touriste,
-            organisateur: _inscription.organisateur,
-            qrToken: _inscription.qrToken,
-            qrTokenGeneratedAt: _inscription.qrTokenGeneratedAt,
-            qrTokenExpiresAt: _inscription.qrTokenExpiresAt,
-            qrUsedAt: _inscription.qrUsedAt,
-          );
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Booking approved successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to approve booking'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _isUpdating = false);
-    }
-  }
-
-  Future<String?> _showRejectReasonDialog() async {
-    final controller = TextEditingController();
-    String? inlineError;
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Reason for rejection'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Please provide a reason. The tourist will see it in Booking Details.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    maxLines: 4,
-                    minLines: 3,
-                    maxLength: 240,
-                    decoration: InputDecoration(
-                      hintText: 'Example: No seats left for this date.',
-                      errorText: inlineError,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final reason = controller.text.trim();
-                    if (reason.isEmpty) {
-                      setDialogState(() {
-                        inlineError = 'Reason is required';
-                      });
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop(reason);
-                  },
-                  child: const Text('Reject booking'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _rejectBooking() async {
-    final reason = await _showRejectReasonDialog();
-    if (reason == null || reason.trim().isEmpty) return;
-
-    setState(() => _isUpdating = true);
-
-    try {
-      final success = await InscriptionService.rejectInscription(
-        _inscription.id,
-        message: reason.trim(),
-      );
-
-      if (success) {
-        setState(() {
-          _inscription = InscriptionModel(
-            id: _inscription.id,
-            statut: 'refusee',
-            nombreParticipants: _inscription.nombreParticipants,
-            prixTotal: _inscription.prixTotal,
-            dateDemande: _inscription.dateDemande,
-            messageTouriste: _inscription.messageTouriste,
-            messageOrganisateur: reason.trim(),
-            activite: _inscription.activite,
-            touriste: _inscription.touriste,
-            organisateur: _inscription.organisateur,
-            qrToken: _inscription.qrToken,
-            qrTokenGeneratedAt: _inscription.qrTokenGeneratedAt,
-            qrTokenExpiresAt: _inscription.qrTokenExpiresAt,
-            qrUsedAt: _inscription.qrUsedAt,
-          );
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Booking rejected successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to reject booking'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _isUpdating = false);
-    }
   }
 
   @override
@@ -258,7 +68,7 @@ class _OrganizerBookingDetailScreenState
     }
 
     final status = _normalizeStatus(_inscription.statut);
-    final isPending = status == 'en_attente';
+    final isPending = status == 'PAID_PENDING_CONFIRMATION';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -305,55 +115,12 @@ class _OrganizerBookingDetailScreenState
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _isUpdating ? null : _rejectBooking,
-                        icon: _isUpdating
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.red,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.close_outlined, size: 20),
-                        label: Text(
-                          _isUpdating ? 'Rejecting...' : 'Reject Request',
-                        ),
+                        onPressed: null, // Cannot reject payment pending
+                        icon: const Icon(Icons.block, size: 20),
+                        label: const Text('Awaiting Payment'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _isUpdating ? null : _approveBooking,
-                        icon: _isUpdating
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.check_outlined, size: 20),
-                        label: Text(
-                          _isUpdating ? 'Approving...' : 'Approve Request',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
+                          foregroundColor: const Color(0xFFF59E0B),
+                          side: const BorderSide(color: Color(0xFFFCD34D)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
@@ -686,41 +453,6 @@ class _OrganizerBookingDetailScreenState
                 ],
               ),
             ),
-            if (_normalizeStatus(_inscription.statut) == 'refusee' &&
-                (_inscription.organizerReason ?? '').isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFFECACA)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Rejection Reason',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF9F1239),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _inscription.organizerReason!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
-                        color: Color(0xFF881337),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             const SizedBox(height: 24),
 
             // Price Details
@@ -821,11 +553,10 @@ class _OrganizerBookingDetailScreenState
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'en_attente':
+      case 'PAID_PENDING_CONFIRMATION':
         return const Color(0xFFF59E0B);
       case 'approuvee':
         return const Color(0xFF22C55E);
-      case 'refusee':
       case 'annulee':
         return const Color(0xFFEF4444);
       default:
@@ -835,16 +566,14 @@ class _OrganizerBookingDetailScreenState
 
   String _getStatusLabel(String status) {
     switch (status) {
-      case 'en_attente':
-        return 'PENDING';
+      case 'PAID_PENDING_CONFIRMATION':
+        return 'PAYMENT PENDING';
       case 'approuvee':
-        return 'APPROVED';
-      case 'refusee':
-        return 'REJECTED';
+        return 'CONFIRMED';
       case 'annulee':
         return 'CANCELLED';
       default:
-        return status;
+        return status.toUpperCase();
     }
   }
 }

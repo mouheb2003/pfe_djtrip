@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import '../../widgets/ai_image_generator_widget.dart';
+import '../../widgets/place_search_widget.dart';
 import 'map_picker_screen.dart';
 import 'activity_preview_screen.dart';
 
@@ -43,6 +44,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   String? _aiGeneratedImageUrl;
 
   bool _isLoading = false;
+  bool _notifyBookedUsers = true;
 
 
   static const _categories = [
@@ -238,6 +240,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       aApporter: _itemsToBring,
       niveauDifficulte: _difficultyLevel,
       statut: widget.activity.statut,
+      notifyBookedUsers: _notifyBookedUsers,
     );
 
     if (mounted) {
@@ -332,7 +335,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                                 _buildTextField(
                                   _priceCtrl,
                                   '45',
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 ),
                               ],
                             ),
@@ -349,6 +352,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                                   keyboardType: TextInputType.number,
                                   suffixIcon: Icons.people_outline,
                                 ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Recommended: 1-50 people',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -361,13 +373,22 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                     const SizedBox(height: 32),
                     _buildSectionTitle(
                       'Location',
-                      'Where the magic happens. Use the map to pin exact coordinates.',
+                      'Where the magic happens. Search for a place or use the map to pin exact coordinates.',
                     ),
                     _buildCard([
-                      _buildTextField(
-                        _locationCtrl,
-                        'Ranch Yassmina, Houmt Souk, Djerba',
-                        prefixIcon: Icons.location_on,
+                      PlaceSearchWidget(
+                        controller: _locationCtrl,
+                        hintText: 'Search for a place...',
+                        onPlaceSelected: (place) {
+                          setState(() {
+                            if (place.latitude != null && place.longitude != null) {
+                              _pickedLatLng = LatLng(
+                                place.latitude!,
+                                place.longitude!,
+                              );
+                            }
+                          });
+                        },
                       ),
                       const SizedBox(height: 16),
                       _buildMapPreview(),
@@ -648,7 +669,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     TextEditingController ctrl,
     String hint, {
     int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
+    TextInputType? keyboardType,
     IconData? suffixIcon,
     IconData? prefixIcon,
     bool readOnly = false,
@@ -1337,49 +1358,80 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   Widget _buildSaveButton() {
     final bool isSaveDisabled = _isLoading;
-    return Container(
-      width: double.infinity,
-      height: 60,
-      decoration: BoxDecoration(
-        color: isSaveDisabled ? Colors.grey[300] : const Color(0xFF1B2452),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: isSaveDisabled
-            ? null
-            : [
-                BoxShadow(
-                  color: const Color(0xFF1B2452).withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-      ),
-      child: InkWell(
-        onTap: isSaveDisabled ? null : _save,
-        borderRadius: BorderRadius.circular(18),
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white)
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.save_outlined,
-                      color: isSaveDisabled ? Colors.grey[500] : Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Save All Changes',
-                      style: TextStyle(
-                        color: isSaveDisabled ? Colors.grey[600] : Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Notify booked users toggle
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: SwitchListTile(
+            title: const Text(
+              'Notify Booked Users',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1B2352),
+              ),
+            ),
+            subtitle: const Text(
+              'Send notification to users who booked this activity',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            value: _notifyBookedUsers,
+            onChanged: (value) {
+              setState(() {
+                _notifyBookedUsers = value;
+              });
+            },
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          height: 60,
+          decoration: BoxDecoration(
+            color: isSaveDisabled ? Colors.grey[300] : const Color(0xFF1B2452),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: isSaveDisabled
+                ? null
+                : [
+                    BoxShadow(
+                      color: const Color(0xFF1B2452).withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
                     ),
                   ],
-                ),
+          ),
+          child: InkWell(
+            onTap: isSaveDisabled ? null : _save,
+            borderRadius: BorderRadius.circular(18),
+            child: Center(
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.save_outlined,
+                          color: isSaveDisabled ? Colors.grey[500] : Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Save All Changes',
+                          style: TextStyle(
+                            color: isSaveDisabled ? Colors.grey[600] : Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 

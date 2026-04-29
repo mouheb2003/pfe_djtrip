@@ -75,6 +75,13 @@ router.get(
   cacheGet("posts:admin", 60),
   postController.getAdminPosts,
 );
+router.get(
+  "/user/:userId",
+  verifyToken,
+  verifyAdmin,
+  cacheGet("posts:user", 60),
+  postController.getUserPosts,
+);
 router.post(
   "/admin",
   verifyToken,

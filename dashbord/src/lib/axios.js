@@ -54,6 +54,7 @@ export const endpoints = {
     me: '/api/v1/users/me',
     signIn: '/api/v1/users/signin',
     signUp: '/api/v1/users/signup',
+    changePassword: '/api/v1/users/me/password',
   },
   mail: {
     list: '/api/v1/mail/list',

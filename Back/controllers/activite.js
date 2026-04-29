@@ -3,6 +3,7 @@ const Organisator = require("../models/organisator");
 const Inscription = require("../models/inscription");
 const ActiviteService = require("../services/activite");
 const cloudinary = require("../config/cloudinary");
+const notificationEventBus = require("../services/notificationEventBus");
 
 // Helper: extract Cloudinary public_id from a URL
 const extractCloudinaryPublicId = (url) => {
@@ -107,6 +108,20 @@ exports.createActivite = async (req, res) => {
       photosUrls.push(aiImageUrl);
     }
 
+    // Validate activity start date: must be at least 24 hours from now
+    const startDate = date_debut || dateDebut;
+    if (startDate) {
+      const now = new Date();
+      const activityStartDate = new Date(startDate);
+      const twentyFourHoursLater = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+
+      if (activityStartDate < twentyFourHoursLater) {
+        return res.status(400).json({
+          message: "Activity start date must be at least 24 hours from now",
+        });
+      }
+    }
+
     // Create the new activity
     const activite = new Activite({
       titre,
@@ -151,6 +166,28 @@ exports.createActivite = async (req, res) => {
       "✅ Activity created and populated:",
       JSON.stringify(activitePopulated, null, 2),
     );
+
+    // Emit activity created event for notification to followers (if enabled)
+    const notifyFollowers = req.body.notifyFollowers !== 'false';
+    if (notifyFollowers) {
+      try {
+        const Follow = require("../models/follow");
+        const followers = await Follow.find({ following_id: userId }).select('follower_id');
+        const followerIds = followers.map(f => f.follower_id);
+
+        if (followerIds.length > 0) {
+          notificationEventBus.emitActivityCreated({
+            organizerId: userId,
+            organizerName: organisator.fullname,
+            activityTitle: activite.titre,
+            activityId: activite._id,
+            followerIds: followerIds,
+          });
+        }
+      } catch (notifError) {
+        console.warn("Failed to send activity created notification:", notifError.message);
+      }
+    }
 
     res.status(201).json({
       message: "Activity created successfully",
@@ -473,6 +510,25 @@ exports.updateActivite = async (req, res) => {
       "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
     );
 
+    // Emit activity updated event for notification to booked users (if enabled)
+    const notifyBookedUsers = req.body.notifyBookedUsers !== 'false';
+    if (notifyBookedUsers) {
+      try {
+        const bookings = await Inscription.find({ activite: activiteId, statut: 'confirmed' }).select('touriste');
+        const bookedUserIds = bookings.map(b => b.touriste);
+
+        if (bookedUserIds.length > 0) {
+          notificationEventBus.emitActivityUpdated({
+            activityId: activiteId,
+            activityTitle: activiteUpdated.titre,
+            bookedUserIds: bookedUserIds,
+          });
+        }
+      } catch (notifError) {
+        console.warn("Failed to send activity updated notification:", notifError.message);
+      }
+    }
+
     res.status(200).json({
       message: "Activity updated successfully",
       activite: activiteUpdated,
@@ -551,8 +607,25 @@ exports.deleteActivite = async (req, res) => {
       },
     );
 
+    // Get booked users for notification
+    const bookings = await Inscription.find({ activite_id: activiteId }).select('touriste');
+    const bookedUserIds = bookings.map(b => b.touriste);
+
     // Delete the activity
     await Activite.findByIdAndDelete(activiteId);
+
+    // Emit activity cancelled event for notification to booked users
+    try {
+      if (bookedUserIds.length > 0) {
+        notificationEventBus.emitActivityCancelled({
+          activityId: activiteId,
+          activityTitle: activite.titre,
+          bookedUserIds: bookedUserIds,
+        });
+      }
+    } catch (notifError) {
+      console.warn("Failed to send activity cancelled notification:", notifError.message);
+    }
 
     res.status(200).json({
       message: "Activity deleted successfully",

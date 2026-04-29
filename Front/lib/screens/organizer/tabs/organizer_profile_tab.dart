@@ -500,15 +500,22 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       width: 1,
                     ),
                   ),
-                  child: const Text(
-                    'ORGANIZER',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      letterSpacing: 0.5,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified, size: 12, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'ORGANIZER',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),

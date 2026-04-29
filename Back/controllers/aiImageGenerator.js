@@ -316,95 +316,120 @@ function generateStructuredFallbackPrompt(title, description, category = 'Other'
   const specificKeywords = [];
   const combinedText = `${title} ${description}`.toLowerCase();
   
-  // Comprehensive tourism taxonomy keywords - 13 macro-categories
+  // Comprehensive tourism taxonomy keywords - 13 macro-categories with enhanced precision
   const activityKeywords = [
     // 1. ADVENTURE & EXTREME SPORTS
-    'quad', 'quad bike', 'atv', 'off-road', 'desert driving',
-    'skydiving', 'paragliding', 'zipline', 'rafting', 'white water',
-    'mountain climbing', 'trekking', 'bungee jumping', 'canyoning',
-    'abseiling', 'cliff', 'rock climbing', 'adrenaline',
+    'quad', 'quad bike', 'atv', 'off-road', 'desert driving', 'dune buggy',
+    'skydiving', 'paragliding', 'zipline', 'rafting', 'white water', 'canyoning',
+    'mountain climbing', 'trekking', 'bungee jumping', 'rock climbing', 'abseiling',
+    'cliff', 'adrenaline', 'rappelling', 'via ferrata', 'climbing harness', 'safety gear',
+    'helmets', 'ropes', 'carabiners', 'extreme sports', 'adventure tour',
     
     // 2. WATER ACTIVITIES
-    'scuba diving', 'snorkeling', 'jet ski', 'kayaking', 'canoe',
-    'surfing', 'yacht', 'cruising', 'sailing', 'sailboat', 'catamaran',
-    'water ski', 'wakeboard', 'submarine', 'aquarium',
-    'crystal clear water', 'underwater', 'tropical ocean',
+    'scuba diving', 'snorkeling', 'jet ski', 'kayaking', 'canoe', 'paddleboarding',
+    'surfing', 'windsurfing', 'kitesurfing', 'yacht', 'cruising', 'sailing',
+    'sailboat', 'catamaran', 'water ski', 'wakeboard', 'submarine', 'aquarium',
+    'crystal clear water', 'underwater', 'tropical ocean', 'coral reef', 'marine life',
+    'diving gear', 'wetsuit', 'fins', 'mask', 'snorkel', 'water sports equipment',
     
     // 3. WINTER & MOUNTAIN
-    'skiing', 'snowboarding', 'glacier trekking', 'ice climbing',
-    'camping in mountains', 'snow', 'ice', 'alpine', 'glacier',
-    'blue ice', 'snow cinematic', 'cold atmosphere',
+    'skiing', 'snowboarding', 'glacier trekking', 'ice climbing', 'snowshoeing',
+    'camping in mountains', 'snow', 'ice', 'alpine', 'glacier', 'blue ice',
+    'snow cinematic', 'cold atmosphere', 'ski lift', 'cable car', 'ski resort',
+    'winter sports', 'frozen lake', 'snowcapped mountains', 'avalanche safety',
     
     // 4. CULTURAL & HERITAGE
-    'medina', 'souk', 'market', 'bazaar', 'craft',
-    'castle', 'ruins', 'temple', 'museum', 'gallery',
-    'art', 'exhibition', 'monument', 'palace', 'fortress',
-    'archaeological', 'church', 'cathedral', 'mosque', 'shrine',
-    'historic', 'heritage', 'ancient', 'traditional', 'cultural',
-    'ancient architecture', 'golden historical light',
+    'medina', 'souk', 'market', 'bazaar', 'craft', 'artisan', 'handmade',
+    'castle', 'ruins', 'temple', 'museum', 'gallery', 'exhibition',
+    'art', 'monument', 'palace', 'fortress', 'archaeological', 'church',
+    'cathedral', 'mosque', 'shrine', 'historic', 'heritage', 'ancient',
+    'traditional', 'cultural', 'ancient architecture', 'golden historical light',
+    'tour guide', 'cultural tour', 'history tour', 'artifact', 'relic',
     
     // 5. FOOD & GASTRONOMY
-    'street food', 'fine dining', 'chef experience', 'wine tasting',
-    'vineyard', 'couscous', 'tajine', 'cooking', 'cuisine',
-    'local markets', 'restaurant', 'cafe', 'bistro', 'bakery',
-    'close-up food', 'warm lighting', 'steam', 'texture detail',
-    'authentic cuisine', 'olive oil', 'spice', 'herb',
+    'street food', 'fine dining', 'chef experience', 'wine tasting', 'cooking class',
+    'vineyard', 'couscous', 'tajine', 'cooking', 'cuisine', 'culinary',
+    'local markets', 'restaurant', 'cafe', 'bistro', 'bakery', 'food tour',
+    'close-up food', 'warm lighting', 'steam', 'texture detail', 'plating',
+    'authentic cuisine', 'olive oil', 'spice', 'herb', 'chef', 'kitchen',
+    'food preparation', 'dining experience', 'gastronomy', 'wine cellar',
     
     // 6. WELLNESS & SPA
-    'hammam', 'massage', 'spa', 'sauna', 'thermal baths',
-    'yoga retreat', 'wellness', 'soft light', 'calm atmosphere',
-    'luxury spa interior', 'steam aesthetic', 'peaceful', 'serene',
+    'hammam', 'massage', 'spa', 'sauna', 'thermal baths', 'hot springs',
+    'yoga retreat', 'wellness', 'soft light', 'calm atmosphere', 'meditation',
+    'luxury spa interior', 'steam aesthetic', 'peaceful', 'serene', 'relaxation',
+    'wellness center', 'thai massage', 'aromatherapy', 'hydrotherapy',
     
     // 7. ENTERTAINMENT & NIGHTLIFE
-    'concert', 'festival', 'club', 'theater', 'night market',
-    'neon lights', 'crowd energy', 'nightlife', 'vibrant colors',
-    'show', 'performance', 'nightclub', 'bar', 'pub', 'disco',
+    'concert', 'festival', 'club', 'theater', 'night market', 'live music',
+    'neon lights', 'crowd energy', 'nightlife', 'vibrant colors', 'dj',
+    'show', 'performance', 'nightclub', 'bar', 'pub', 'disco', 'karaoke',
+    'live entertainment', 'stage performance', 'music venue', 'dance floor',
     
     // 8. NATURE & WILDLIFE
-    'desert safari', 'jungle', 'wildlife safari', 'oasis',
-    'forest', 'rainforest', 'park', 'reserve', 'botanical garden',
-    'zoo', 'wild animals', 'natural sunlight', 'documentary style',
-    'national geographic', 'nature', 'animal', 'bird',
+    'desert safari', 'jungle', 'wildlife safari', 'oasis', 'safari park',
+    'forest', 'rainforest', 'park', 'reserve', 'botanical garden', 'nature reserve',
+    'zoo', 'wild animals', 'natural sunlight', 'documentary style', 'safari',
+    'national geographic', 'nature', 'animal', 'bird', 'wildlife viewing',
+    'nature trail', 'ecotourism', 'bird watching', 'wildlife photography',
     
     // 9. URBAN & CITY TOURISM
-    'skyline', 'architecture', 'tour', 'shopping', 'sightseeing',
-    'aerial city view', 'modern architecture', 'night skyline',
-    'urban cinematic', 'city', 'downtown', 'building', 'tower', 'bridge',
+    'skyline', 'architecture', 'tour', 'shopping', 'sightseeing', 'city tour',
+    'aerial city view', 'modern architecture', 'night skyline', 'urban exploration',
+    'urban cinematic', 'city', 'downtown', 'building', 'tower', 'bridge', 'landmark',
+    'city walk', 'urban photography', 'street art', 'public transport',
     
     // 10. SPORTS TOURISM
-    'football', 'stadium', 'tennis', 'golf', 'gym', 'marathon',
+    'football', 'stadium', 'tennis', 'golf', 'gym', 'marathon', 'triathlon',
     'action sports', 'stadium crowd', 'energetic motion', 'competition',
-    'soccer', 'basketball', 'arena', 'court', 'field',
+    'soccer', 'basketball', 'arena', 'court', 'field', 'sports event',
+    'athletics', 'sports venue', 'team sport', 'spectator sport',
     
     // 11. TRANSPORT EXPERIENCE
-    'cable car', 'train', 'scenic ride', 'gondola', 'ferry',
-    'road trip', 'cinematic travel POV', 'moving landscape',
+    'cable car', 'train', 'scenic ride', 'gondola', 'ferry', 'boat tour',
+    'road trip', 'cinematic travel POV', 'moving landscape', 'scenic route',
     'journey aesthetic', 'golden hour road', 'tram', 'bus', 'taxi', 'metro',
-    'funicular',
+    'funicular', 'helicopter tour', 'sightseeing cruise', 'boat rental',
     
     // 12. BEACH & COASTAL
-    'tropical beach', 'sunbathing', 'island', 'coral reefs',
+    'tropical beach', 'sunbathing', 'island', 'coral reefs', 'coastal',
     'turquoise water', 'palm trees', 'sunset beach', 'relaxing paradise',
-    'coast', 'snorkeling', 'beach volleyball', 'beach soccer',
-    'sun', 'sunset', 'sunrise', 'palm', 'coconut',
+    'coast', 'snorkeling', 'beach volleyball', 'beach soccer', 'beach party',
+    'sun', 'sunset', 'sunrise', 'palm', 'coconut', 'beach chair', 'umbrella',
+    'beach resort', 'coastal walk', 'sea view', 'oceanfront',
     
     // 13. PHOTOGRAPHY-DRIVEN
-    'panoramic', 'drone shots', 'cinematic landscapes', 'seascapes',
-    'travel photography', 'POV', 'ultra wide angle', '8K realistic',
-    'depth of field', 'cinematic framing', 'photography', 'photo',
+    'panoramic', 'drone shots', 'cinematic landscapes', 'seascapes', 'landscape',
+    'travel photography', 'POV', 'ultra wide angle', '8K realistic', '4K',
+    'depth of field', 'cinematic framing', 'photography', 'photo', 'camera',
+    'photography tour', 'photo walk', 'drone photography', 'aerial photography',
+    
+    // Equipment and gear terms for better precision
+    'helmet', 'harness', 'rope', 'safety gear', 'protective equipment', 'gear',
+    'equipment', 'tools', 'accessories', 'outdoor gear', 'sports equipment',
+    'water equipment', 'winter gear', 'camping gear', 'hiking boots',
+    
+    // Activity verbs and actions
+    'exploring', 'discovering', 'experiencing', 'enjoying', 'participating',
+    'learning', 'cooking', 'eating', 'drinking', 'relaxing', 'adventuring',
+    'climbing', 'diving', 'swimming', 'running', 'walking', 'hiking',
+    'sailing', 'flying', 'riding', 'driving', 'skiing', 'surfing',
+    
+    // Settings and environments
+    'outdoor', 'indoor', 'natural', 'urban', 'rural', 'remote', 'scenic',
+    'beautiful', 'breathtaking', 'spectacular', 'stunning', 'magnificent',
+    'picturesque', 'charming', 'authentic', 'traditional', 'modern',
     
     // Additional terms
-    'bike', 'bicycle', 'motorcycle', 'horse', 'camel', 'donkey',
+    'bike', 'bicycle', 'motorcycle', 'horse', 'camel', 'donkey', 'elephant',
     'jeep', '4x4', 'truck', 'car', 'boat', 'parachute', 'hot air balloon',
-    'balloon', 'surfboard', 'windsurf', 'kitesurf', 'paddleboard',
-    'dive', 'fish', 'fishing', 'waterfall', 'snowshoe', 'sleigh', 'igloo',
-    'peak', 'summit', 'hike', 'trek', 'trail', 'walk', 'camp', 'tent',
-    'rv', 'caravan', 'craft', 'wine', 'winery', 'tasting', 'sommelier',
-    'food', 'dish', 'meal', 'dining', 'gourmet', 'pizza', 'pasta', 'sushi',
-    'meditation', 'thermal', 'hot spring', 'relax', 'relaxation',
-    'music', 'cinema', 'movie', 'casino', 'desert', 'dune', 'canyon', 'valley',
-    'town', 'village', 'mall', 'boutique', 'store', 'guide', 'landmark',
-    'pool', 'fitness', 'swim', 'swimming'
+    'balloon', 'surfboard', 'dive', 'fish', 'fishing', 'waterfall', 'sleigh', 'igloo',
+    'peak', 'summit', 'trek', 'trail', 'walk', 'camp', 'tent', 'rv', 'caravan',
+    'craft', 'wine', 'winery', 'tasting', 'sommelier', 'dish', 'meal', 'dining',
+    'gourmet', 'pizza', 'pasta', 'sushi', 'meditation', 'thermal', 'hot spring',
+    'relax', 'relaxation', 'music', 'cinema', 'movie', 'casino', 'desert', 'dune',
+    'canyon', 'valley', 'town', 'village', 'mall', 'boutique', 'store', 'guide',
+    'landmark', 'pool', 'fitness', 'swim', 'swimming', 'group', 'family', 'couple'
   ];
   
   // Find matching keywords with prioritization

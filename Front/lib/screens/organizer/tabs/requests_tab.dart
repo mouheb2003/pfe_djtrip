@@ -99,8 +99,7 @@ class _RequestsTabState extends State<RequestsTab> {
   String _normalizeStatus(String rawStatus) {
     final s = rawStatus.trim().toLowerCase();
     if (s == 'approved') return 'approuvee';
-    if (s == 'pending') return 'en_attente';
-    if (s == 'rejected') return 'refusee';
+    if (s == 'pending' || s == 'paid_pending_confirmation') return 'PAID_PENDING_CONFIRMATION';
     if (s == 'cancelled' || s == 'canceled') return 'annulee';
     return s;
   }
@@ -142,9 +141,9 @@ class _RequestsTabState extends State<RequestsTab> {
   List<InscriptionModel> get _filteredRequests {
     return _inscriptions.where((item) {
       final status = _normalizeStatus(item.statut);
-      if (_tabIndex == 0) return status == 'en_attente';
+      if (_tabIndex == 0) return status == 'PAID_PENDING_CONFIRMATION';
       if (_tabIndex == 1) return status == 'approuvee';
-      if (_tabIndex == 2) return status == 'annulee' || status == 'refusee';
+      if (_tabIndex == 2) return status == 'annulee';
       return false;
     }).toList();
   }
@@ -154,9 +153,11 @@ class _RequestsTabState extends State<RequestsTab> {
       case 0:
         return 'Pending';
       case 1:
-        return 'Approved';
-      default:
+        return 'Confirmed';
+      case 2:
         return 'Cancelled';
+      default:
+        return '';
     }
   }
 
@@ -166,115 +167,35 @@ class _RequestsTabState extends State<RequestsTab> {
         return const Color(0xFF315CFF);
       case 1:
         return const Color(0xFF22C55E);
-      default:
+      case 2:
         return const Color(0xFFEF4444);
+      default:
+        return Colors.grey;
     }
   }
 
   String _badgeText(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'en_attente') return 'PENDING';
-    if (status == 'approuvee') return 'APPROVED';
+    if (status == 'PAID_PENDING_CONFIRMATION') return 'PENDING';
+    if (status == 'approuvee') return 'CONFIRMED';
     if (status == 'annulee') return 'CANCELLED';
-    if (status == 'refusee') return 'REJECTED';
     return status.toUpperCase();
   }
 
   Color _badgeColor(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'en_attente') return const Color(0xFFF59E0B);
+    if (status == 'PAID_PENDING_CONFIRMATION') return const Color(0xFFF59E0B);
     if (status == 'approuvee') return const Color(0xFF22C55E);
     if (status == 'annulee') return const Color(0xFF94A3B8);
-    return const Color(0xFFEF4444);
+    return Colors.grey;
   }
 
   Color _borderColor(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'en_attente') return const Color(0xFF315CFF);
+    if (status == 'PAID_PENDING_CONFIRMATION') return const Color(0xFF315CFF);
     if (status == 'approuvee') return const Color(0xFF22C55E);
     if (status == 'annulee') return const Color(0xFFCBD5E1);
-    return const Color(0xFFEF4444);
-  }
-
-  Future<void> _approve(String id) async {
-    final ok = await InscriptionService.approveInscription(id);
-    if (ok && mounted) _loadRequests();
-  }
-
-  Future<String?> _showRejectReasonDialog() async {
-    final controller = TextEditingController();
-    String? inlineError;
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Reason for rejection'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Please provide a reason. This will be visible in booking details.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    maxLines: 4,
-                    minLines: 3,
-                    maxLength: 240,
-                    decoration: InputDecoration(
-                      hintText: 'Example: Activity is full for this date.',
-                      errorText: inlineError,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final reason = controller.text.trim();
-                    if (reason.isEmpty) {
-                      setDialogState(() {
-                        inlineError = 'Reason is required';
-                      });
-                      return;
-                    }
-                    Navigator.of(dialogContext).pop(reason);
-                  },
-                  child: const Text('Reject booking'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _reject(String id) async {
-    final reason = await _showRejectReasonDialog();
-    if (reason == null || reason.trim().isEmpty) return;
-
-    final ok = await InscriptionService.rejectInscription(
-      id,
-      message: reason.trim(),
-    );
-    if (ok && mounted) _loadRequests();
+    return Colors.grey;
   }
 
   @override
@@ -286,9 +207,12 @@ class _RequestsTabState extends State<RequestsTab> {
     String headerLabel = todayLabel;
     String headerTitle = "New Requests";
 
-    if (_tabIndex == 1) {
-      headerLabel = "CONFIRMED REQUESTS";
-      headerTitle = ""; // Empty as per user request to remove it
+    if (_tabIndex == 0) {
+      headerLabel = "PENDING PAYMENTS";
+      headerTitle = "";
+    } else if (_tabIndex == 1) {
+      headerLabel = "CONFIRMED BOOKINGS";
+      headerTitle = "";
     } else if (_tabIndex == 2) {
       headerLabel = "CANCELLATIONS";
       headerTitle = "Cancellation Requests";
@@ -352,15 +276,13 @@ class _RequestsTabState extends State<RequestsTab> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
                           color: active
-                              ? const Color(0xFF315CFF)
+                              ? _tabColor(index)
                               : const Color(0xFFF1F4FF),
                           borderRadius: BorderRadius.circular(25),
                           boxShadow: active
                               ? [
                                   BoxShadow(
-                                    color: const Color(
-                                      0xFF315CFF,
-                                    ).withOpacity(0.3),
+                                    color: _tabColor(index).withOpacity(0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
@@ -451,14 +373,6 @@ class _RequestsTabState extends State<RequestsTab> {
                                       item.activite?['id'] ??
                                       '')
                                   .toString()],
-                          onApprove:
-                              _normalizeStatus(item.statut) == 'en_attente'
-                              ? () => _approve(item.id)
-                              : null,
-                          onReject:
-                              _normalizeStatus(item.statut) == 'en_attente'
-                              ? () => _reject(item.id)
-                              : null,
                         );
                       },
                     ),
@@ -473,14 +387,10 @@ class _RequestsTabState extends State<RequestsTab> {
 class _RequestCard extends StatelessWidget {
   final InscriptionModel inscription;
   final List<String>? cachedPhotos;
-  final VoidCallback? onApprove;
-  final VoidCallback? onReject;
 
   const _RequestCard({
     required this.inscription,
     this.cachedPhotos,
-    this.onApprove,
-    this.onReject,
   });
 
   String _formatDate(DateTime? value) {
@@ -522,14 +432,16 @@ class _RequestCard extends StatelessWidget {
 
     if (status == 'approuvee') {
       return _buildApprovedCard(context);
-    } else if (status == 'annulee' || status == 'refusee') {
+    } else if (status == 'annulee') {
       return _buildCancelledCard(context);
-    } else {
+    } else if (status == 'paid_pending_confirmation' || status == 'pending') {
       return _buildPendingCard(context);
+    } else {
+      return _buildApprovedCard(context); // Default to approved card
     }
   }
 
-  // ── PENDING CARD (IMAGE 1 STYLE) ──────────────────────────────────────────
+  // ── PENDING CARD (PAYMENT PENDING) ──────────────────────────────────────────
   Widget _buildPendingCard(BuildContext context) {
     final activity = inscription.activite ?? const {};
     final avatar = _participantAvatar;
@@ -599,12 +511,12 @@ class _RequestCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF9F2089),
+                          color: const Color(0xFFF59E0B),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
                         child: const Text(
-                          'NEW',
+                          'PENDING',
                           style: TextStyle(
                             fontSize: 8,
                             fontWeight: FontWeight.w900,
@@ -638,8 +550,8 @@ class _RequestCard extends StatelessWidget {
                                 ),
                               ),
                               const Icon(
-                                Icons.verified,
-                                color: Color(0xFF315CFF),
+                                Icons.payment,
+                                color: Color(0xFFF59E0B),
                                 size: 16,
                               ),
                             ],
@@ -683,46 +595,29 @@ class _RequestCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onReject,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFE11D48),
-                      side: const BorderSide(color: Color(0xFFFEE2E2)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: const Text(
-                      'Reject',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onApprove,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF315CFF),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      shadowColor: const Color(0xFF315CFF).withOpacity(0.5),
-                    ),
-                    child: const Text(
-                      'Approve',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCD34D)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.hourglass_empty, color: Color(0xFFF59E0B), size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'Waiting for payment confirmation',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF92400E),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

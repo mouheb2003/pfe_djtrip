@@ -1,11 +1,13 @@
 const emailWorker = require('./emailWorker');
 const notificationWorker = require('./notificationWorker');
+require('./refundWorker');
 
 console.log('=================================');
 console.log('BullMQ Workers Starting...');
 console.log('=================================');
 console.log('✓ Email worker started');
 console.log('✓ Notification worker started');
+console.log('✓ Refund worker started');
 console.log('=================================');
 console.log('Workers are running. Press Ctrl+C to stop.');
 console.log('=================================');

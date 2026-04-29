@@ -7,7 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../shared/activity_detail_screen.dart';
 import '../shared/chat_conversation_screen.dart';
-import '../shared/public_organizer_profile_screen.dart';
+import '../shared/public_profile_screen.dart';
+import '../payment/stripe_payment_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final InscriptionModel inscription;
@@ -139,6 +140,70 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
 
+  Future<void> _navigateToPayment() async {
+    final act = _inscription.activite ?? {};
+    final activityId = act['_id']?.toString() ?? act['id']?.toString();
+    final activityTitle = act['titre']?.toString() ?? 'Activity';
+    final nombreParticipants = _inscription.nombreParticipants ?? 1;
+
+    if (activityId == null || activityId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity information not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StripePaymentScreen(
+            inscriptionId: _inscription.id,
+            activityId: activityId,
+            activityTitle: activityTitle,
+            nombreParticipants: nombreParticipants,
+            amount: _inscription.prixTotal,
+            currency: 'TND',
+            description: 'Payment for $activityTitle',
+          ),
+        ),
+      );
+
+      // Refresh booking details after payment
+      setState(() {
+        _isCancelling = true;
+      });
+
+      final updatedInscription = await InscriptionService.getInscriptionById(_inscription.id);
+
+      if (updatedInscription != null && mounted) {
+        setState(() {
+          _inscription = updatedInscription;
+          _isCancelling = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _isCancelling = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCancelling = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _cancelBooking() async {
     if (!_inscription.canBeCancelledWithTime) {
       final hoursRemaining = _inscription.hoursUntilCancellationDeadline;
@@ -146,9 +211,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       
       if (hoursRemaining <= 0) {
         message = 'This booking cannot be cancelled - the activity has already started or passed.';
-      } else if (hoursRemaining < 24) {
-        message = 'Cancellation is not allowed within 24 hours of the activity start. '
-                  'Current time remaining: $hoursRemaining hour${hoursRemaining != 1 ? 's' : ''}.';
       } else {
         message = 'This booking cannot be cancelled.';
       }
@@ -168,8 +230,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Cancel Booking'),
         content: Text(
-          'Are you sure you want to cancel this booking? This action cannot be undone.\n\n'
-          'Note: Cancellation is only allowed 24+ hours before the activity start.',
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -369,6 +430,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               Text(
                 _inscription.isApproved
                     ? 'Booking Confirmed!'
+                    : _inscription.statut == 'PAID_PENDING_CONFIRMATION'
+                    ? 'Waiting for payment'
                     : _inscription.isPending
                     ? 'Waiting for approval'
                     : _inscription.isCancelled
@@ -376,14 +439,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     : 'Booking Details',
                 style: const TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF1B2452),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 _inscription.isApproved
                     ? 'Your booking is approved. Keep your QR code for check-in.'
+                    : _inscription.statut == 'PAID_PENDING_CONFIRMATION'
+                    ? 'Complete your payment to confirm your booking.'
                     : _inscription.isPending
                     ? 'Your request has been sent. The organizer will review it soon.'
                     : _inscription.isCancelled
@@ -657,8 +722,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => PublicOrganizerProfileScreen(
-                                          organizerId: organizerId,
+                                        builder: (_) => PublicProfileScreen(
+                                          userId: organizerId,
                                         ),
                                       ),
                                     );
@@ -744,16 +809,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _inscription.isApproved
+                child: _inscription.statut == 'PAID_PENDING_CONFIRMATION'
                     ? ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(
-                          Icons.confirmation_num_outlined,
-                          size: 20,
-                        ),
-                        label: const Text('View Ticket'),
+                        onPressed: _navigateToPayment,
+                        icon: const Icon(Icons.payment, size: 20),
+                        label: const Text('Pay'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFFF59E0B),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -762,7 +824,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           ),
                         ),
                       )
-                    : _inscription.canBeCancelledWithTime
+                    : _inscription.isApproved
                         ? ElevatedButton.icon(
                             onPressed: _isCancelling ? null : _cancelBooking,
                             icon: _isCancelling
@@ -788,20 +850,46 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               ),
                             ),
                           )
-                        : ElevatedButton.icon(
-                            onPressed: null,
-                            icon: const Icon(Icons.info_outline, size: 20),
-                            label: Text(_inscription.statusLabel),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
+                        : _inscription.canBeCancelledWithTime
+                            ? ElevatedButton.icon(
+                                onPressed: _isCancelling ? null : _cancelBooking,
+                                icon: _isCancelling
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.cancel_outlined, size: 20),
+                                label: Text(
+                                  _isCancelling ? 'Cancelling...' : 'Cancel Booking',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                ),
+                              )
+                            : ElevatedButton.icon(
+                                onPressed: null,
+                                icon: const Icon(Icons.info_outline, size: 20),
+                                label: Text(_inscription.statusLabel),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
               ),
             ],
           ),

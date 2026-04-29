@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/activity_model.dart';
 import '../../models/post_model.dart';
@@ -9,6 +11,7 @@ import '../../services/activity_service.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/cache_manager.dart';
+import '../../services/follow_service.dart';
 import '../../services/inscription_service.dart';
 import '../../services/post_service.dart';
 import '../../services/review_service.dart';
@@ -18,6 +21,7 @@ import '../../widgets/auto_image_carousel.dart';
 import 'activity_detail_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'comments_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// Modern Public Profile Screen
 /// Supports both Tourist and Organizer profiles with premium UI/UX
@@ -33,7 +37,7 @@ class PublicProfileScreen extends StatefulWidget {
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
 }
 
-class _PublicProfileScreenState extends State<PublicProfileScreen> {
+class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsBindingObserver {
   // State
   bool _isLoading = true;
   bool _isLoadingContent = false;
@@ -41,29 +45,92 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   UserModel? _user;
   List<ActivityModel> _activities = [];
   List<PostModel> _posts = [];
+  List<Map<String, dynamic>> _reviews = [];
   int _participatedActivities = 0;
   int _submittedReviews = 0;
   final Set<String> _likedPostIds = {}; // Track locally liked posts
-  
+
   // Pagination
   int _postsPage = 1;
   bool _hasMorePosts = true;
   final ScrollController _scrollController = ScrollController();
-  
+
+  // Activities display
+  int _shownActivitiesCount = 6;
+
+  // Reviews auto-scroll
+  late PageController _reviewsPageController;
+  Timer? _autoScrollTimer;
+
   // Current user info
   String? _currentUserId;
+  
+  // Follow status
+  bool _isFollowing = false;
+  bool _isFollowLoading = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _reviewsPageController = PageController(viewportFraction: 0.85);
     _initializeData();
     _scrollController.addListener(_onScroll);
+    _startAutoScroll();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Reload data when app is resumed
+    if (state == AppLifecycleState.resumed) {
+      _loadUserData(forceRefresh: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(PublicProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload data if userId changed or when screen is revisited
+    if (widget.userId != oldWidget.userId) {
+      _initializeData();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
+    _reviewsPageController.dispose();
+    _autoScrollTimer?.cancel();
     super.dispose();
+  }
+
+  void _startAutoScroll() {
+    _autoScrollTimer?.cancel();
+    if (_reviews.length > 1) {
+      _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+        if (_reviewsPageController.hasClients) {
+          final currentPage = _reviewsPageController.page?.round() ?? 0;
+          final nextPage = (currentPage + 1) % _reviews.length;
+          _reviewsPageController.animateToPage(
+            nextPage,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _toggleShowMoreActivities() {
+    setState(() {
+      if (_shownActivitiesCount >= _activities.length) {
+        _shownActivitiesCount = 6; // Reset to initial state
+      } else {
+        _shownActivitiesCount = (_shownActivitiesCount + 6).clamp(6, _activities.length);
+      }
+    });
   }
 
   void _onScroll() {
@@ -110,10 +177,72 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
       // Load role-specific content
       await _loadRoleSpecificContent(user);
+      
+      // Check follow status if viewing another user's profile
+      if (targetId != _currentUserId && _currentUserId != null) {
+        await _checkFollowStatus(targetId);
+      }
     } catch (e) {
       debugPrint('Error loading user data: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkFollowStatus(String targetId) async {
+    try {
+      final isFollowing = await FollowService.checkFollowStatus(targetId);
+      if (mounted) {
+        setState(() {
+          _isFollowing = isFollowing;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking follow status: $e');
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_isFollowLoading) return;
+    
+    final targetId = widget.userId ?? _currentUserId;
+    if (targetId == null || targetId == _currentUserId) return;
+
+    setState(() => _isFollowLoading = true);
+
+    try {
+      if (_isFollowing) {
+        final result = await FollowService.unfollowUser(targetId);
+        if (result['success'] == true && mounted) {
+          setState(() {
+            _isFollowing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unfollowed successfully')),
+          );
+        }
+      } else {
+        final result = await FollowService.followUser(targetId);
+        if (result['success'] == true && mounted) {
+          setState(() {
+            _isFollowing = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Followed successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling follow: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFollowLoading = false);
+      }
     }
   }
 
@@ -136,24 +265,38 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   Future<void> _loadOrganizerContent(String userId) async {
     debugPrint('Loading organizer content for userId: $userId');
     
-    // Load all activities and filter by organizer (force refresh to get real data)
-    final allActivities = await ActivityService.getActivities(refresh: true);
-    debugPrint('Total activities: ${allActivities.length}');
-    
     final targetId = (_userData?['_id'] ?? '').toString();
-    debugPrint('Target ID for organizer filtering: $targetId');
+    debugPrint('Target ID for organizer: $targetId');
     
-    final organizerActivities = allActivities.where((a) {
-      final orgId = (a.organisateur?['_id'] ?? a.organisateur?['id'] ?? '').toString();
-      final match = orgId == targetId;
-      return match;
-    }).toList();
-
-    debugPrint('Filtered organizer activities: ${organizerActivities.length}');
+    // Use dedicated backend endpoint to get organizer's activities
+    List<ActivityModel> organizerActivities = [];
+    try {
+      organizerActivities = await ActivityService.getActivitiesByOrganisateur(targetId, refresh: true);
+      debugPrint('Organizer activities loaded from backend: ${organizerActivities.length}');
+    } catch (e) {
+      debugPrint('Error loading organizer activities: $e');
+    }
+    
+    // Load reviews submitted by tourists to this organizer
+    List<Map<String, dynamic>> organizerReviews = [];
+    try {
+      organizerReviews = await ReviewService.getOrganizerReviews(targetId);
+      debugPrint('Organizer reviews loaded: ${organizerReviews.length}');
+      if (organizerReviews.isNotEmpty) {
+        debugPrint('First review data: ${organizerReviews.first}');
+      }
+    } catch (e) {
+      debugPrint('Error loading organizer reviews: $e');
+    }
     
     setState(() {
       _activities = organizerActivities;
+      _reviews = organizerReviews;
+      _shownActivitiesCount = 6; // Reset to initial state on refresh
     });
+    
+    // Restart auto-scroll with new reviews
+    _startAutoScroll();
   }
 
   Future<void> _loadTouristContent(String userId) async {
@@ -308,6 +451,80 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     Share.share('$text\n$profileUrl');
   }
 
+  void _handleEditReview(Map<String, dynamic> review) {
+    final reviewId = review['_id']?.toString() ?? '';
+    final currentNote = (review['note'] ?? 0).toDouble();
+    final currentComment = (review['commentaire'] ?? '').toString();
+    
+    showDialog(
+      context: context,
+      builder: (context) => _EditReviewDialog(
+        reviewId: reviewId,
+        initialRating: currentNote,
+        initialComment: currentComment,
+        onSave: (rating, comment) async {
+          final result = await ReviewService.updateReview(
+            avisId: reviewId,
+            note: rating,
+            commentaire: comment,
+          );
+          if (result['success'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Review updated successfully')),
+            );
+            // Reload reviews
+            if (_userData != null) {
+              await _loadOrganizerContent(_userData?['_id']?.toString() ?? '');
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result['message'] ?? 'Failed to update review')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _handleDeleteReview(Map<String, dynamic> review) {
+    final reviewId = review['_id']?.toString() ?? '';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Review'),
+        content: const Text('Are you sure you want to delete this review?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await ReviewService.deleteReview(reviewId);
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Review deleted successfully')),
+                );
+                // Reload reviews
+                if (_userData != null) {
+                  await _loadOrganizerContent(_userData?['_id']?.toString() ?? '');
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to delete review')),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -360,7 +577,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               SliverToBoxAdapter(child: _buildSpecialtiesSection()),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
               SliverToBoxAdapter(child: _buildLanguagesSection()),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
             ],
             
             // Stats Bar
@@ -370,10 +587,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             SliverToBoxAdapter(child: _buildActionButtons()),
             
             // Role-Specific Content
-            if (isOrganizer)
-              SliverToBoxAdapter(child: _buildActivitiesSection())
-            else
-              SliverToBoxAdapter(child: _buildTouristContent()),
+            if (isOrganizer) ...[
+              SliverToBoxAdapter(child: _buildActivitiesSection()),
+              SliverToBoxAdapter(child: _buildReviewsSection()),
+            ] else
+              _buildTouristContent(),
             
             // Bottom spacing
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -465,8 +683,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     final bio = (_userData?['bio']?.toString() ?? '').trim();
     final userType = _userData?['userType']?.toString() ?? '';
     final isOrganizer = userType == 'Organisator' || _userData?['isOrganisator'] == true;
-    final defaultBio = isOrganizer ? 'Activity organizer' : 'Passionate traveler';
-    final subtitle = bio.isEmpty ? defaultBio : bio;
+    final subtitle = bio.isEmpty ? '' : bio;
     final location = (_userData?['pays_origine']?.toString() ?? '').trim();
 
     return Column(
@@ -571,15 +788,64 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textGrey,
+              // Role Badge
+              if (isOrganizer)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Organizer',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified, size: 14, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Traveler',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              const SizedBox(height: 8),
+              if (subtitle.isNotEmpty)
+                Text(
+                  subtitle,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textGrey,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               const SizedBox(height: 8),
               if (location.isNotEmpty)
                 Row(
@@ -634,22 +900,41 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     // Activities created
     final activitiesCreated = _activities.length;
     
-    // Average rating from all activities
-    final avgRating = _activities.isEmpty
-        ? 0.0
-        : _activities.fold<double>(0, (sum, a) => sum + a.noteMoyenne) / _activities.length;
+    // Separate reviews by type
+    final organizerReviews = _reviews.where((r) => r['type'] == 'organisateur').toList();
+    final activityReviews = _reviews.where((r) => r['type'] == 'activite').toList();
     
-    // Reviews received - count from activities' review counts
-    final reviewsGot = _activities.fold<int>(
-      0,
-      (sum, activity) => sum + (activity.nombreAvis ?? 0),
-    );
+    // Calculate organizer rating (only organizer-type reviews)
+    double organizerRating = 0.0;
+    if (organizerReviews.isNotEmpty) {
+      final totalRating = organizerReviews.fold<double>(0, (sum, review) {
+        final note = review['note'] as num? ?? 0;
+        return sum + note.toDouble();
+      });
+      organizerRating = totalRating / organizerReviews.length;
+    }
+    
+    // Calculate activity rating (only activity-type reviews)
+    double activityRating = 0.0;
+    if (activityReviews.isNotEmpty) {
+      final totalRating = activityReviews.fold<double>(0, (sum, review) {
+        final note = review['note'] as num? ?? 0;
+        return sum + note.toDouble();
+      });
+      activityRating = totalRating / activityReviews.length;
+    }
+    
+    // Total reviews count (organizer-type only)
+    final organizerReviewsCount = organizerReviews.length;
+    final activityReviewsCount = activityReviews.length;
+
+    debugPrint('Organizer stats - Activities: $activitiesCreated, Organizer Reviews: $organizerReviewsCount, Activity Reviews: $activityReviewsCount, Organizer Rating: $organizerRating, Activity Rating: $activityRating');
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _StatItem(
-          value: avgRating.toStringAsFixed(1),
+          value: organizerRating.toStringAsFixed(1),
           label: 'Rate',
           icon: Icons.star,
           showStar: true,
@@ -662,7 +947,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         ),
         _buildDivider(),
         _StatItem(
-          value: reviewsGot.toString(),
+          value: organizerReviewsCount.toString(),
           label: 'Reviews',
           icon: Icons.rate_review,
         ),
@@ -678,13 +963,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     // This is the sum of pending + confirmed + cancelled bookings
     final totalActivities = _participatedActivities;
     
-    debugPrint('Building tourist stats - posts: ${_posts.length}, submitted reviews: $reviewsCount, participated: $totalActivities');
+    // Posts count
+    final postsCount = _posts.length;
+    
+    debugPrint('Building tourist stats - posts: $postsCount, submitted reviews: $reviewsCount, participated: $totalActivities');
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _StatItem(
-          value: _posts.length.toString(),
+          value: postsCount.toString(),
           label: 'Posts',
           icon: Icons.article,
         ),
@@ -720,32 +1008,113 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
-          if (!isOwnProfile)
+          if (!isOwnProfile) ...[
+            // Follow button
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _handleContact,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  shadowColor: AppColors.primary.withOpacity(0.3),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-                icon: const Icon(Icons.message_rounded, size: 22),
-                label: Text(
-                  isOrganizer ? 'Book Now' : 'Contact',
-                  style: AppTextStyles.labelLarge.copyWith(fontWeight: FontWeight.w600),
+                child: ElevatedButton.icon(
+                  onPressed: _isFollowLoading ? null : _toggleFollow,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: _isFollowLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : Icon(
+                          _isFollowing ? Icons.person_remove : Icons.person_add,
+                          size: 22,
+                        ),
+                  label: Text(
+                    _isFollowing ? 'Unfollow' : 'Follow',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ),
               ),
-            )
+            ),
+            const SizedBox(width: 12),
+            // Contact button
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.8),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: _handleContact,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    shadowColor: Colors.transparent,
+                  ),
+                  icon: const Icon(Icons.message_rounded, size: 22),
+                  label: Text(
+                    isOrganizer ? 'Book Now' : 'Contact',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ]
           else
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () {
-                  // TODO: Navigate to edit profile screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  );
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
@@ -790,7 +1159,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           'Specialized Activities',
           style: AppTextStyles.headlineSmall,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
         if (specialties.isEmpty)
           Container(
             width: double.infinity,
@@ -867,51 +1236,206 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 
   Widget _buildActivitiesSection() {
+    final displayCount = _shownActivitiesCount.clamp(0, _activities.length);
+    final hasMore = _activities.length > displayCount;
+    
+    // Calculate activity stats (type activite)
+    final activityReviews = _reviews.where((r) => r['type'] == 'activite').toList();
+    double activityRating = 0.0;
+    if (activityReviews.isNotEmpty) {
+      final totalRating = activityReviews.fold<double>(0, (sum, review) {
+        final note = review['note'] as num? ?? 0;
+        return sum + note.toDouble();
+      });
+      activityRating = totalRating / activityReviews.length;
+    }
+    final activityReviewsCount = activityReviews.length;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'My Activities',
-              style: AppTextStyles.headlineSmall,
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Activities',
+                style: AppTextStyles.headlineSmall,
+              ),
+              if (_activities.isNotEmpty)
+                Row(
+                  children: [
+                    // Activity rate
+                    if (activityReviewsCount > 0)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star, size: 14, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            activityRating.toStringAsFixed(1),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textGrey,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    // Activity reviews count
+                    Text(
+                      '$activityReviewsCount reviews',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                    ),
+                    const SizedBox(width: 8),
+                    // Total activities count
+                    Text(
+                      '${_activities.length} activities',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         if (_activities.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.outline),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.event_busy, size: 48, color: AppColors.textGrey),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No activities yet',
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+                  ),
+                ],
+              ),
             ),
-            child: Column(
-              children: [
-                Icon(Icons.event_busy, size: 48, color: AppColors.textGrey),
-                const SizedBox(height: 12),
-                Text(
-                  'No activities yet',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+          )
+        else
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: displayCount,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final activity = _activities[index];
+                    return _ActivityCard(activity: activity);
+                  },
                 ),
-              ],
+              ),
+              if (_activities.length > 6)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: _toggleShowMoreActivities,
+                      icon: Icon(
+                        _shownActivitiesCount >= _activities.length 
+                            ? Icons.keyboard_arrow_up 
+                            : Icons.keyboard_arrow_down, 
+                        size: 18,
+                      ),
+                      label: Text(
+                        _shownActivitiesCount >= _activities.length 
+                            ? 'Show less' 
+                            : 'Show more',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildReviewsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Reviews',
+                style: AppTextStyles.headlineSmall,
+              ),
+              if (_reviews.isNotEmpty)
+                Text(
+                  '${_reviews.length} reviews',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_reviews.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 48, color: AppColors.textGrey),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No reviews yet',
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+                  ),
+                ],
+              ),
             ),
           )
         else
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _activities.length > 6 ? 6 : _activities.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final activity = _activities[index];
-                return _ActivityCard(activity: activity);
-              },
+            child: SizedBox(
+              height: 160,
+              child: PageView.builder(
+                controller: _reviewsPageController,
+                itemCount: _reviews.length,
+                itemBuilder: (context, index) {
+                  final review = _reviews[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: _ReviewCard(
+                      review: review,
+                      currentUserId: _currentUserId,
+                      onEdit: () => _handleEditReview(review),
+                      onDelete: () => _handleDeleteReview(review),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
       ],
@@ -944,7 +1468,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 16),
           Text(
@@ -971,6 +1495,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
+            alignment: WrapAlignment.center,
             children: interests
                 .map((interest) => _InterestChip(label: interest))
                 .toList(),
@@ -1034,6 +1559,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     }
                   });
                 },
+                onCommentTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CommentsScreen(
+                        postId: post.id,
+                        postTitle: post.content,
+                        initialCommentsCount: post.commentsCount,
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -1047,18 +1584,33 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 
   List<String> _extractSpecialties() {
-    final specialties = <String>{};
-    for (final activity in _activities) {
-      if (activity.typeActivite.trim().isNotEmpty) {
-        specialties.add(activity.typeActivite.trim());
-      }
-      for (final equipment in activity.equipementsInclus) {
-        if (equipment.trim().isNotEmpty) {
-          specialties.add(equipment.trim());
+    // Use the user's specialites_activites field from backend
+    final specialtiesRaw = _userData?['specialites_activites'] as List? ?? [];
+    
+    final specialties = specialtiesRaw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    
+    debugPrint('Specialties from user data: $specialties');
+    
+    // If no specialties in user data, fallback to extracting from activities
+    if (specialties.isEmpty) {
+      final activitySpecialties = <String>{};
+      for (final activity in _activities) {
+        if (activity.typeActivite.trim().isNotEmpty) {
+          activitySpecialties.add(activity.typeActivite.trim());
         }
+        for (final equipment in activity.equipementsInclus) {
+          if (equipment.trim().isNotEmpty) {
+            activitySpecialties.add(equipment.trim());
+          }
+        }
+        if (activitySpecialties.length >= 8) break;
       }
-      if (specialties.length >= 8) break;
+      return activitySpecialties.take(8).toList();
     }
+    
     return specialties.take(8).toList();
   }
 }
@@ -1322,15 +1874,217 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
+class _ReviewCard extends StatelessWidget {
+  final Map<String, dynamic> review;
+  final String? currentUserId;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _ReviewCard({
+    required this.review,
+    this.currentUserId,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  String _getReviewerId() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      return (touriste['_id'] ?? '').toString();
+    }
+    return '';
+  }
+
+  bool _isReviewAuthor() {
+    final reviewerId = _getReviewerId();
+    return reviewerId == currentUserId;
+  }
+
+  String _getReviewerName() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      final name = (touriste['fullname'] ?? '').toString().trim();
+      if (name.isNotEmpty) return name;
+    }
+    return 'Tourist';
+  }
+
+  String _getReviewerAvatar() {
+    final touriste = review['touriste_id'];
+    if (touriste is Map<String, dynamic>) {
+      final avatar = (touriste['avatar'] ?? '').toString();
+      if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+        return avatar;
+      }
+      final serverUrl = ApiClient.baseUrl.replaceFirst(
+        RegExp(r'/api(?:/v1)?$'),
+        '',
+      );
+      if (avatar.startsWith('/')) {
+        return '$serverUrl$avatar';
+      }
+      return '$serverUrl/$avatar';
+    }
+    return '';
+  }
+
+  String _getReviewText() {
+    final text = (review['commentaire'] ?? '').toString().trim();
+    if (text.isEmpty) return 'No comment provided.';
+    return text;
+  }
+
+  String _getReviewDate() {
+    final raw = (review['createdAt'] ?? '').toString();
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return '';
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
+  }
+
+  double _getRating() {
+    final rating = review['note'] ?? review['rating'] ?? 0;
+    return rating.toDouble();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reviewerName = _getReviewerName();
+    final reviewerAvatar = _getReviewerAvatar();
+    final reviewText = _getReviewText();
+    final reviewDate = _getReviewDate();
+    final rating = _getRating();
+    final tags = review['tags'] as List? ?? [];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with avatar, name, date, and rating
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primaryLight.withOpacity(0.3),
+                backgroundImage: reviewerAvatar.isNotEmpty
+                    ? CachedNetworkImageProvider(reviewerAvatar)
+                    : null,
+                child: reviewerAvatar.isEmpty
+                    ? Icon(Icons.person, size: 20, color: AppColors.primary)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reviewerName,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (reviewDate.isNotEmpty)
+                      Text(
+                        reviewDate,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textGrey,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.star, size: 14, color: AppColors.accent),
+                    const SizedBox(width: 3),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: AppTextStyles.labelLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Review text
+          Text(
+            reviewText,
+            style: AppTextStyles.bodyMedium.copyWith(
+              height: 1.4,
+              fontSize: 13,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          // Tags if available
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: tags.take(2).map((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    tag.toString(),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _PostCard extends StatelessWidget {
   final PostModel post;
   final bool isLiked;
   final VoidCallback? onLikeToggle;
+  final VoidCallback? onCommentTap;
 
   const _PostCard({
     required this.post,
     this.isLiked = false,
     this.onLikeToggle,
+    this.onCommentTap,
   });
 
   @override
@@ -1383,8 +2137,8 @@ class _PostCard extends StatelessWidget {
                     InkWell(
                       onTap: () async {
                         onLikeToggle?.call();
-                        debugPrint('Like post ${post.id} - isLiked: $isLiked');
-                        // TODO: Call API to like/unlike post
+                        final result = await PostService.togglePostLike(post.id);
+                        debugPrint('Like post ${post.id} - result: $result');
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
@@ -1415,7 +2169,7 @@ class _PostCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     // Comments - navigate to comments screen
                     InkWell(
-                      onTap: () {
+                      onTap: onCommentTap ?? () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1475,5 +2229,105 @@ class _PostCard extends StatelessWidget {
     } else {
       return 'Just now';
     }
+  }
+}
+
+class _EditReviewDialog extends StatefulWidget {
+  final String reviewId;
+  final double initialRating;
+  final String initialComment;
+  final Function(double, String) onSave;
+
+  const _EditReviewDialog({
+    required this.reviewId,
+    required this.initialRating,
+    required this.initialComment,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditReviewDialog> createState() => _EditReviewDialogState();
+}
+
+class _EditReviewDialogState extends State<_EditReviewDialog> {
+  late double _rating;
+  late TextEditingController _commentController;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = widget.initialRating;
+    _commentController = TextEditingController(text: widget.initialComment);
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Review'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(5, (index) {
+              return IconButton(
+                icon: Icon(
+                  index < _rating.round() ? Icons.star : Icons.star_border,
+                  color: AppColors.accent,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _rating = (index + 1).toDouble();
+                  });
+                },
+              );
+            }),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _commentController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Write your review...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving
+              ? null
+              : () async {
+                  setState(() => _isSaving = true);
+                  await widget.onSave(_rating, _commentController.text);
+                  if (mounted) {
+                    setState(() => _isSaving = false);
+                    Navigator.pop(context);
+                  }
+                },
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
   }
 }

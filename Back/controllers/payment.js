@@ -4,6 +4,7 @@ const User = require("../models/user");
 const Activite = require("../models/activite");
 const stripeService = require("../services/stripeService");
 const { createActivityLog } = require("../services/activityLogService");
+const notificationEventBus = require("../services/notificationEventBus");
 
 /**
  * Payment Controller
@@ -104,6 +105,16 @@ exports.createCheckoutSession = async (req, res) => {
             checkout_url: existingPayment.payment_url,
           },
         });
+      }
+    }
+
+    // If paying for an existing inscription, check if it has PAYMENT_FAILED status and delete it
+    if (inscription_id) {
+      const existingInscription = await Inscription.findById(inscription_id).session(session);
+      if (existingInscription && existingInscription.statut === 'PAYMENT_FAILED') {
+        console.log('[STRIPE PAYMENT] Deleting PAYMENT_FAILED inscription before retry:', inscription_id);
+        await Inscription.findByIdAndDelete(inscription_id).session(session);
+        console.log('[STRIPE PAYMENT] PAYMENT_FAILED inscription deleted successfully');
       }
     }
 
@@ -401,12 +412,13 @@ exports.completePayment = async (req, res) => {
       ).session(session);
 
       if (inscription) {
-        inscription.statut = "PAID_PENDING_CONFIRMATION";
+        inscription.statut = "approuvee";
+        inscription.date_reponse = new Date();
         inscription.prix_total = payment.amount;
         await inscription.save({ session });
 
         console.log(
-          "[STRIPE PAYMENT] Inscription status updated to PAID_PENDING_CONFIRMATION"
+          "[STRIPE PAYMENT] Inscription status updated to APPROVED"
         );
       }
     }
@@ -471,11 +483,19 @@ exports.webhook = async (req, res) => {
     if (event.type === 'checkout.session.completed') {
       const sessionData = event.data.object;
       console.log("[STRIPE WEBHOOK] Checkout session completed:", sessionData.id);
+      console.log("[STRIPE WEBHOOK] Session data:", JSON.stringify(sessionData, null, 2));
 
       // Find payment by stripe_session_id
       const payment = await Payment.findOne({
         stripe_session_id: sessionData.id
       }).session(session);
+
+      console.log("[STRIPE WEBHOOK] Payment lookup result:", payment ? "Found" : "Not found");
+      if (payment) {
+        console.log("[STRIPE WEBHOOK] Payment current status:", payment.status);
+        console.log("[STRIPE WEBHOOK] Payment inscription_id:", payment.inscription_id);
+        console.log("[STRIPE WEBHOOK] Payment activity_id:", payment.activity_id);
+      }
 
       if (!payment) {
         await session.abortTransaction();
@@ -504,34 +524,69 @@ exports.webhook = async (req, res) => {
       payment.webhook_response = sessionData;
       await payment.save({ session });
 
-      // Create inscription if activity_id is present (new booking flow)
+      // Create inscription if activity_id is present (new booking flow) - AUTO APPROVED AFTER PAYMENT
       if (payment.activity_id && !payment.inscription_id) {
-        console.log("[STRIPE WEBHOOK] Creating inscription after payment");
+        console.log("[STRIPE WEBHOOK] Creating inscription after payment (auto-approved)");
 
         const activity = await Activite.findById(payment.activity_id).session(session);
         if (!activity) {
           console.error("[STRIPE WEBHOOK] Activity not found:", payment.activity_id);
         } else {
+          const nombreParticipants = payment.nombre_participants || 1;
+
+          // Atomic capacity check and increment to prevent overbooking
+          const updatedActivity = await Activite.findOneAndUpdate(
+            {
+              _id: payment.activity_id,
+              $expr: {
+                $gte: [
+                  "$capacite_max",
+                  { $add: ["$nombre_reservations", nombreParticipants] }
+                ]
+              }
+            },
+            {
+              $inc: { nombre_reservations: nombreParticipants }
+            },
+            { session, new: true }
+          );
+
+          if (!updatedActivity) {
+            console.error("[STRIPE WEBHOOK] Capacity exceeded, cannot create inscription");
+            // Payment was successful but capacity is full - refund or handle appropriately
+            // For now, still create inscription but mark for manual review
+          }
+
           const inscription = new Inscription({
             touriste_id: payment.user_id,
             activite_id: payment.activity_id,
             organisateur_id: activity.organisateur_id,
-            nombre_participants: payment.nombre_participants || 1,
+            nombre_participants: nombreParticipants,
             message_touriste: `Adults: ${payment.adults || 0}, Children: ${payment.children || 0}`,
             prix_total: payment.amount,
-            statut: "en_attente",
+            prix_unitaire: activity.prix,
+            statut: "approuvee", // Auto-approved after successful payment
+            date_reponse: new Date(),
           });
+
+          // Generate QR token
+          const createBookingQrToken = require("../controllers/inscription").createBookingQrToken;
+          const getActivityDeadline = require("../controllers/inscription").getActivityDeadline;
+          const qrToken = createBookingQrToken(inscription, updatedActivity || activity);
+          const activityDeadline = getActivityDeadline(updatedActivity || activity);
+          inscription.qr_token = qrToken;
+          inscription.qr_token_generated_at = new Date();
+          inscription.qr_token_expires_at = activityDeadline;
 
           await inscription.save({ session });
           payment.inscription_id = inscription._id;
           await payment.save({ session });
 
-          console.log("[STRIPE WEBHOOK] Inscription created:", inscription._id);
+          console.log("[STRIPE WEBHOOK] Inscription created and approved:", inscription._id);
 
-          // Send notification to tourist (payment confirmation) using existing method
+          // Send notification to tourist (payment confirmation) using event bus
           try {
-            const notificationService = require("../services/notificationServiceV2");
-            await notificationService.sendPaymentCompletedNotification({
+            notificationEventBus.emitPaymentCompleted({
               userId: payment.user_id,
               amount: payment.amount,
               activityTitle: payment.activity_title || "Activity",
@@ -542,18 +597,65 @@ exports.webhook = async (req, res) => {
             console.warn("[STRIPE WEBHOOK] Failed to send notification to tourist:", notifError.message);
           }
 
-          // Send email to tourist (payment confirmation)
+          // Send email to tourist (booking confirmation with QR code)
           try {
             const emailService = require("../services/emailService");
+            const QRCode = require("qrcode");
+            const cloudinary = require("../config/cloudinary");
             const tourist = await User.findById(payment.user_id).session(session);
+            
             if (tourist && tourist.email) {
+              const bookingCode = inscription.qr_token || `DJTRIP_BOOKING:${inscription._id}`;
+              const activityTitle = payment.activity_title || activity.titre || "Activity";
+              const bookingDate = activity.date_debut 
+                ? new Date(activity.date_debut).toLocaleDateString("en-GB")
+                : new Date().toLocaleDateString("en-GB");
+              const bookingTime = activity.date_debut
+                ? new Date(activity.date_debut).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "--:--";
+
+              let qrPublicUrl = null;
+              try {
+                const qrBuffer = await QRCode.toBuffer(bookingCode, {
+                  errorCorrectionLevel: "M",
+                  margin: 1,
+                  width: 280,
+                });
+                
+                const uploadResult = await new Promise((resolve, reject) => {
+                  cloudinary.uploader.upload_stream(
+                    {
+                      folder: "djtrip/booking-qr",
+                      public_id: `booking-qr-${inscription._id}`,
+                      resource_type: "image",
+                      format: "png",
+                    },
+                    (error, result) => {
+                      if (error) reject(error);
+                      else resolve(result);
+                    }
+                  ).end(qrBuffer);
+                });
+                
+                qrPublicUrl = uploadResult.secure_url;
+                console.log('[STRIPE WEBHOOK] QR code uploaded to Cloudinary:', qrPublicUrl);
+              } catch (qrError) {
+                console.error("[STRIPE WEBHOOK] Error generating or uploading booking QR code:", qrError);
+              }
+
               await emailService.sendBookingConfirmationEmail({
                 email: tourist.email,
                 fullname: tourist.fullname || tourist.nom || 'User',
-                bookingCode: inscription._id.toString().substring(0, 8).toUpperCase(),
-                activityTitle: payment.activity_title || "Activity",
-                bookingDate: new Date().toLocaleDateString(),
-                amount: payment.amount,
+                bookingCode,
+                activityTitle,
+                bookingDate,
+                bookingTime,
+                participants: nombreParticipants,
+                totalPrice: `${payment.amount.toFixed(2)} TND`,
+                qrPublicUrl,
               });
               console.log("[STRIPE WEBHOOK] Email sent to tourist");
             }
@@ -564,6 +666,8 @@ exports.webhook = async (req, res) => {
           // Send notification to organizer (new booking) using existing method
           try {
             const notificationService = require("../services/notificationServiceV2");
+            const notificationEventBus = require("../services/notificationEventBus");
+            
             await notificationService.sendNewBookingNotification({
               organizerId: activity.organisateur_id,
               touristName: tourist?.fullname || tourist?.nom || 'Tourist',
@@ -571,25 +675,47 @@ exports.webhook = async (req, res) => {
               bookingId: inscription._id,
             });
             console.log("[STRIPE WEBHOOK] Notification sent to organizer");
+
+            // Emit booking approved event
+            notificationEventBus.emitBookingApproved({
+              touristId: payment.user_id,
+              activityTitle: payment.activity_title || activity.titre,
+              bookingId: inscription._id.toString(),
+            });
           } catch (notifError) {
             console.warn("[STRIPE WEBHOOK] Failed to send notification to organizer:", notifError.message);
           }
         }
       }
-      // Update existing inscription status if linked (old flow)
+      // Update existing inscription status if linked
       else if (payment.inscription_id) {
         const inscription = await Inscription.findById(
           payment.inscription_id
         ).session(session);
 
         if (inscription) {
-          inscription.statut = "en_attente";
-          inscription.prix_total = payment.amount;
-          await inscription.save({ session });
+          // Always approve inscription after successful payment
+          inscription.statut = "approuvee";
+          inscription.date_reponse = new Date();
+
+          // Generate QR token
+          const activity = await Activite.findById(inscription.activite_id).session(session);
+          if (activity) {
+            const createBookingQrToken = require("../controllers/inscription").createBookingQrToken;
+            const getActivityDeadline = require("../controllers/inscription").getActivityDeadline;
+            const qrToken = createBookingQrToken(inscription, activity);
+            const activityDeadline = getActivityDeadline(activity);
+            inscription.qr_token = qrToken;
+            inscription.qr_token_generated_at = new Date();
+            inscription.qr_token_expires_at = activityDeadline;
+          }
 
           console.log(
-            "[STRIPE WEBHOOK] Inscription status updated to PENDING"
+            "[STRIPE WEBHOOK] Inscription status updated to APPROVED after payment"
           );
+
+          inscription.prix_total = payment.amount;
+          await inscription.save({ session });
 
           // Send notification to tourist (payment confirmation) using existing method
           try {
@@ -653,8 +779,8 @@ exports.webhook = async (req, res) => {
       const sessionData = event.data.object;
       console.log("[STRIPE WEBHOOK] Async payment failed:", sessionData.id);
 
-      const payment = await Payment.findOne({ 
-        stripe_session_id: sessionData.id 
+      const payment = await Payment.findOne({
+        stripe_session_id: sessionData.id
       }).session(session);
 
       if (payment) {
@@ -662,6 +788,26 @@ exports.webhook = async (req, res) => {
         payment.failed_at = new Date();
         payment.webhook_response = sessionData;
         await payment.save({ session });
+
+        // Delete inscription if it was PAID_PENDING_CONFIRMATION
+        if (payment.inscription_id) {
+          const inscription = await Inscription.findById(payment.inscription_id).session(session);
+          if (inscription && inscription.statut === "PAID_PENDING_CONFIRMATION") {
+            // Get activity title for notification
+            const activity = await Activite.findById(inscription.activite).session(session);
+            const activityTitle = activity ? activity.titre : 'an activity';
+
+            // Emit booking rejected event for notification
+            notificationEventBus.emitBookingRejected({
+              touristId: inscription.touriste,
+              activityTitle: activityTitle,
+              bookingId: payment.inscription_id,
+            });
+
+            await Inscription.findByIdAndDelete(payment.inscription_id).session(session);
+            console.log("[STRIPE WEBHOOK] Inscription deleted due to failed payment:", payment.inscription_id);
+          }
+        }
       }
 
       await session.commitTransaction();
@@ -673,8 +819,8 @@ exports.webhook = async (req, res) => {
       console.log("[STRIPE WEBHOOK] Payment intent failed:", paymentIntent.id);
 
       // Find payment by payment_intent_id
-      const payment = await Payment.findOne({ 
-        stripe_payment_intent_id: paymentIntent.id 
+      const payment = await Payment.findOne({
+        stripe_payment_intent_id: paymentIntent.id
       }).session(session);
 
       if (payment) {
@@ -682,10 +828,91 @@ exports.webhook = async (req, res) => {
         payment.failed_at = new Date();
         payment.webhook_response = paymentIntent;
         await payment.save({ session });
+
+        // Delete inscription if it was PAID_PENDING_CONFIRMATION
+        if (payment.inscription_id) {
+          const inscription = await Inscription.findById(payment.inscription_id).session(session);
+          if (inscription && inscription.statut === "PAID_PENDING_CONFIRMATION") {
+            // Get activity title for notification
+            const activity = await Activite.findById(inscription.activite).session(session);
+            const activityTitle = activity ? activity.titre : 'an activity';
+
+            // Emit booking rejected event for notification
+            notificationEventBus.emitBookingRejected({
+              touristId: inscription.touriste,
+              activityTitle: activityTitle,
+              bookingId: payment.inscription_id,
+            });
+
+            await Inscription.findByIdAndDelete(payment.inscription_id).session(session);
+            console.log("[STRIPE WEBHOOK] Inscription deleted due to failed payment:", payment.inscription_id);
+          }
+        }
       }
 
       await session.commitTransaction();
       console.log("[STRIPE WEBHOOK] Payment marked as failed");
+    }
+    // Handle charge.refunded (Stripe refund completed)
+    else if (event.type === 'charge.refunded') {
+      const charge = event.data.object;
+      console.log("[STRIPE WEBHOOK] Charge refunded:", charge.id);
+      
+      const payment = await Payment.findOne({
+        stripe_payment_intent_id: charge.payment_intent
+      }).session(session);
+      
+      if (payment) {
+        payment.status = "refunded";
+        payment.refunded_at = new Date();
+        payment.webhook_response = charge;
+        await payment.save({ session });
+
+        // Emit payment refunded event for notification
+        try {
+          notificationEventBus.emitPaymentRefunded({
+            userId: payment.user_id,
+            amount: payment.amount,
+            paymentId: payment._id,
+          });
+        } catch (notifError) {
+          console.warn("[STRIPE WEBHOOK] Failed to send refund notification:", notifError.message);
+        }
+
+        // Update booking refund processed flag
+        if (payment.inscription_id) {
+          await Inscription.findByIdAndUpdate(
+            payment.inscription_id,
+            { 'cancellationPolicy.refundProcessed': true },
+            { session }
+          );
+        }
+
+        console.log("[STRIPE WEBHOOK] Payment marked as refunded");
+      } else {
+        console.log("[STRIPE WEBHOOK] Payment not found for charge:", charge.payment_intent);
+      }
+      
+      await session.commitTransaction();
+    }
+    // Handle refund.created (Refund initiated)
+    else if (event.type === 'refund.created') {
+      const refund = event.data.object;
+      console.log("[STRIPE WEBHOOK] Refund created:", refund.id);
+      
+      const payment = await Payment.findOne({
+        stripe_payment_intent_id: refund.payment_intent
+      }).session(session);
+      
+      if (payment) {
+        // Log refund creation but don't mark as refunded yet
+        payment.webhook_response = refund;
+        await payment.save({ session });
+        
+        console.log("[STRIPE WEBHOOK] Refund creation logged");
+      }
+      
+      await session.commitTransaction();
     }
     else {
       await session.abortTransaction();
@@ -1134,5 +1361,186 @@ exports.getWalletBalance = async (req, res) => {
       message: "Error fetching wallet balance",
       error: error.message,
     });
+  }
+};
+
+/**
+ * GET /api/payments/all
+ * Get all payments (admin only)
+ * Query params: page, limit, status
+ */
+exports.getAllPayments = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const status = req.query.status;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+
+    const payments = await Payment.find(query)
+      .populate('user_id', 'fullname email')
+      .populate('inscription_id', 'statut')
+      .populate('activity_id', 'titre')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Payment.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: payments.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      payments,
+    });
+  } catch (error) {
+    console.error("[STRIPE PAYMENT] Error fetching all payments:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching payments",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * POST /api/payments/:paymentId/refund
+ * Manual refund for admin (admin only)
+ */
+exports.manualRefund = async (req, res) => {
+  const session = await require("mongoose").startSession();
+  session.startTransaction();
+
+  try {
+    const { paymentId } = req.params;
+    const { reason } = req.body;
+
+    console.log("[MANUAL REFUND] Refund requested for payment:", paymentId);
+
+    // Find payment
+    const payment = await Payment.findById(paymentId).session(session);
+    if (!payment) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    // Check if payment is already refunded
+    if (payment.status === "refunded") {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Payment already refunded",
+      });
+    }
+
+    // Check if payment is paid
+    if (payment.status !== "paid") {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: "Can only refund paid payments",
+      });
+    }
+
+    // Process Stripe refund if payment_intent_id exists
+    if (payment.stripe_payment_intent_id) {
+      try {
+        const amountInCents = Math.round(payment.amount * 100);
+        await stripeService.refundPayment(payment.stripe_payment_intent_id, amountInCents);
+        console.log("[MANUAL REFUND] Stripe refund processed");
+      } catch (refundError) {
+        console.error("[MANUAL REFUND] Stripe refund failed:", refundError.message);
+        // Continue with wallet refund as fallback
+      }
+    }
+
+    // Refund to user wallet (as backup/primary)
+    const user = await User.findById(payment.user_id).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.wallet_balance += payment.amount;
+    await user.save({ session });
+
+    // Mark payment as refunded
+    payment.status = "refunded";
+    payment.refunded_at = new Date();
+    await payment.save({ session });
+
+    // Update inscription status if linked
+    if (payment.inscription_id) {
+      const inscription = await Inscription.findById(payment.inscription_id).session(session);
+      if (inscription) {
+        inscription.statut = "refusee";
+        inscription.date_reponse = new Date();
+        if (reason) {
+          inscription.message_organisateur = reason;
+        }
+        await inscription.save({ session });
+      }
+    }
+
+    await session.commitTransaction();
+
+    // Emit payment refunded event for notification
+    try {
+      notificationEventBus.emitPaymentRefunded({
+        userId: payment.user_id,
+        amount: payment.amount,
+        paymentId: payment._id,
+      });
+    } catch (notifError) {
+      console.warn("[MANUAL REFUND] Failed to send refund notification:", notifError.message);
+    }
+
+    // Log activity
+    try {
+      await createActivityLog({
+        actorId: req.user.userId,
+        action: "manual_refund",
+        targetType: "payment",
+        targetId: payment._id,
+        templateKey: "manual_refund",
+        metadata: {
+          amount: payment.amount,
+          currency: payment.currency,
+          reason: reason,
+        },
+      });
+    } catch (logError) {
+      console.warn("Activity log failed for manual refund:", logError.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Payment refunded successfully",
+      refund_amount: payment.amount,
+      currency: payment.currency,
+      new_wallet_balance: user.wallet_balance,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("[MANUAL REFUND] Error processing refund:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error processing refund",
+      error: error.message,
+    });
+  } finally {
+    session.endSession();
   }
 };

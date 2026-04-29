@@ -176,7 +176,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       case 'phone':
         stepData = {
           'num_tel': _phoneController.text.trim(),
-          'pays_telephone': _selectedCountry ?? 'France',
+          'pays_telephone': _selectedCountry ?? '',
         };
         break;
       case 'profile_picture':
@@ -186,12 +186,12 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         break;
       case 'country':
         stepData = {
-          'pays_origine': _selectedCountry,
+          'pays_origine': _selectedCountry ?? '',
         };
         break;
       case 'language':
         stepData = {
-          'langue_preferee': _selectedLanguage ?? 'English',
+          'langue_preferee': _selectedLanguage ?? '',
         };
         break;
       case 'specialized_activities':

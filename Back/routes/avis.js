@@ -3,7 +3,7 @@ const router = express.Router();
 const avisController = require("../controllers/avis");
 const wrapRouter = require("../middleware/wrapRouter");
 const { cacheGet, invalidateCache } = require("../middleware/cache");
-const { verifyToken, verifyTouriste } = require("../middleware/auth");
+const { verifyToken, verifyTouriste, verifyAdmin } = require("../middleware/auth");
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 // Get all reviews for an activity
@@ -16,7 +16,6 @@ router.get(
 // Get all ratings for an organizer
 router.get(
   "/organisateur/:organisateurId",
-  cacheGet("avis:organisateur", 60),
   avisController.getOrganisateurRatings,
 );
 
@@ -78,6 +77,15 @@ router.delete(
   verifyTouriste,
   invalidateCache(["avis", "activites", "organisators"]),
   avisController.deleteAvis,
+);
+
+// Delete review by admin
+router.delete(
+  "/admin/:avisId",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["avis", "activites", "organisators"]),
+  avisController.deleteAvisAdmin,
 );
 
 module.exports = wrapRouter(router);

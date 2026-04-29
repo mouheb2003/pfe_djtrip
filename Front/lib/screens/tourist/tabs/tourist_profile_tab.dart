@@ -1082,7 +1082,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
+                      horizontal: 12,
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
@@ -1093,15 +1093,22 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                         width: 1,
                       ),
                     ),
-                    child: Text(
-                      _isOrganizer ? 'ORGANIZER' : 'TOURIST',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        letterSpacing: 0.5,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified, size: 12, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isOrganizer ? 'ORGANIZER' : 'TOURIST',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1386,9 +1393,9 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                   },
                 ),
             const SizedBox(height: 20),
-            // Featured Places Section
+            // Favorites Places Section
             const Text(
-              'FEATURED PLACES',
+              'FAVORITES PLACES',
               style: TextStyle(
                 fontSize: 10,
                 letterSpacing: 1,
@@ -1400,7 +1407,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
             Row(
               children: [
                 const Text(
-                  'Discover Amazing Places',
+                  'Your Favorite Places',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -1431,7 +1438,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                 ),
                 child: const Center(
                   child: Text(
-                    'No featured places available',
+                    'No favorite places yet',
                     style: TextStyle(
                       color: AppColors.textGrey,
                       fontWeight: FontWeight.w600,
