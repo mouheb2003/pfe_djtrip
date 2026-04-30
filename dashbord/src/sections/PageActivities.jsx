@@ -960,6 +960,7 @@ export function ActivitiesView({ sx }) {
               </Card>
 
               <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+<<<<<<< HEAD
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Participants ({participants.length})
                 </Typography>
@@ -1055,6 +1056,8 @@ export function ActivitiesView({ sx }) {
               </Card>
 
               <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+=======
+>>>>>>> backend/djtripx2
                 <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
                   Informations techniques
                 </Typography>

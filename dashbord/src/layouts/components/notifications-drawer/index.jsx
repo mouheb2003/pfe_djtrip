@@ -31,9 +31,19 @@ const TAB_LABELS = {
 export function NotificationsDrawer({ data = [], sx, ...other }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentTab, setCurrentTab] = useState('all');
+<<<<<<< HEAD
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
 
+=======
+  const [notifications, setNotifications] = useState(data);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setNotifications(data);
+  }, [data]);
+
+>>>>>>> backend/djtripx2
   const open = Boolean(anchorEl);
 
   const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
@@ -121,7 +131,10 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
       setNotifications(rows.map(normalizeNotification));
     } catch (error) {
       console.error('Error fetching notifications for popover:', error);
+<<<<<<< HEAD
       setNotifications([]);
+=======
+>>>>>>> backend/djtripx2
     } finally {
       setLoading(false);
     }

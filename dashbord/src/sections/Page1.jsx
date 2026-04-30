@@ -200,11 +200,15 @@ export function BlankView({ title = 'Lieux', sx }) {
   const [pendingFiles, setPendingFiles] = useState([]);
   const [selectedLieu, setSelectedLieu] = useState(null);
   const [openLieuDetails, setOpenLieuDetails] = useState(false);
+<<<<<<< HEAD
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // 'single' or 'multiple'
   const [deleteId, setDeleteId] = useState(null);
   const [editForm, setEditForm] = useState({
     id: '',
+=======
+  const [addForm, setAddForm] = useState({
+>>>>>>> backend/djtripx2
     nom: '',
     slug: '',
     type: 'hotel',
@@ -324,6 +328,7 @@ export function BlankView({ title = 'Lieux', sx }) {
     setOpenAddDialog(true);
   }, []);
 
+<<<<<<< HEAD
   const handleOpenEditDialog = useCallback((row) => {
     setEditForm({
       id: row.id,
@@ -414,6 +419,8 @@ export function BlankView({ title = 'Lieux', sx }) {
     });
   }, []);
 
+=======
+>>>>>>> backend/djtripx2
   const handleOpenLieuDetails = useCallback((lieu) => {
     setSelectedLieu(lieu);
     setOpenLieuDetails(true);
@@ -885,6 +892,7 @@ export function BlankView({ title = 'Lieux', sx }) {
             onDeleteRow={handleDeleteRow}
             onDeleteSelected={handleDeleteRows}
             onViewDetails={handleOpenLieuDetails}
+<<<<<<< HEAD
             onEdit={handleOpenEditDialog}
           />
         </Card>
@@ -1218,6 +1226,14 @@ export function BlankView({ title = 'Lieux', sx }) {
         </Dialog>
 
         <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="lg">
+=======
+          />
+        </Card>
+
+        <LieuDetailsDialog open={openLieuDetails} onClose={handleCloseLieuDetails} lieu={selectedLieu} />
+
+        <Dialog open={openAddDialog} onClose={handleCloseAddDialog} fullWidth maxWidth="sm">
+>>>>>>> backend/djtripx2
           <DialogTitle>Ajouter un lieu</DialogTitle>
 
           <DialogContent>

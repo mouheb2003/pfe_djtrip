@@ -99,6 +99,10 @@ export const navData = [
         title: 'Approvals',
         path: paths.dashboard.approvals,
         icon: ICONS.user,
+<<<<<<< HEAD
+=======
+        info: <Label color="orange">5</Label>,
+>>>>>>> backend/djtripx2
       },
     ],
   },

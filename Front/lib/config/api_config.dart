@@ -32,8 +32,13 @@ class ApiConfig {
       return 'https://backdjtrip.onrender.com';
     }
 
+<<<<<<< HEAD
     // Default local API target for development on physical devices.
     return _ensureScheme('http://192.168.55.99:3000');
+=======
+    // Default local API target for Android emulator.
+    return _ensureScheme(devUrls.first);
+>>>>>>> backend/djtripx2
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

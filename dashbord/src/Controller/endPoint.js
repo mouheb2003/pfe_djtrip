@@ -23,6 +23,7 @@ export const END_POINT = {
   activityLogs: buildApiPath('/logs'),
   adminComments: buildApiPath('/comments/admin'),
   adminCommentById: (id) => buildApiPath(`/comments/admin/${id}`),
+<<<<<<< HEAD
   inscriptions: buildApiPath('/inscriptions'),
   inscriptionsByActivity: (activityId) => buildApiPath(`/inscriptions/admin/activity-participants?activite_id=${activityId}`),
   userReviews: (userId) => buildApiPath(`/avis/touriste/${userId}`),
@@ -30,4 +31,6 @@ export const END_POINT = {
   deleteReview: (reviewId) => buildApiPath(`/avis/admin/${reviewId}`),
   postComments: (postId) => buildApiPath(`/comments/${postId}/comments`),
   deleteComment: (commentId) => buildApiPath(`/comments/admin/${commentId}`),
+=======
+>>>>>>> backend/djtripx2
 };

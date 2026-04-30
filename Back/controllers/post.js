@@ -705,8 +705,13 @@ exports.getAdminPosts = async (_req, res) => {
       .limit(200)
       .populate(basePopulate)
       .populate({
+<<<<<<< HEAD
         path: "liked_by",
         select: "fullname avatar userType",
+=======
+        path: 'liked_by',
+        select: 'fullname avatar userType',
+>>>>>>> backend/djtripx2
       })
       .lean();
 

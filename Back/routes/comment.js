@@ -35,6 +35,32 @@ router.delete(
 
 // ==================== PUBLIC ENDPOINTS ====================
 
+// Search users for mention autocomplete
+router.get(
+  "/users/search",
+  verifyToken,
+  commentController.searchUsersForMention
+);
+
+// ==================== ADMIN ENDPOINTS ====================
+
+// Get all comments with filters (ADMIN)
+router.get(
+  "/admin",
+  verifyToken,
+  verifyAdmin,
+  commentController.getAdminComments
+);
+
+// Delete any comment (ADMIN)
+router.delete(
+  "/admin/:commentId",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
+  commentController.adminDeleteComment
+);
+
 // Get comments for a post with pagination
 router.get(
   "/:postId/comments",
@@ -101,6 +127,7 @@ router.delete(
   commentController.deleteComment
 );
 
+<<<<<<< HEAD
 // Search users for mention autocomplete
 router.get(
   "/users/search",
@@ -108,6 +135,8 @@ router.get(
   commentController.searchUsersForMention
 );
 
+=======
+>>>>>>> backend/djtripx2
 console.log('[COMMENT ROUTES] All routes defined, wrapping router...');
 module.exports = wrapRouter(router);
 console.log('[COMMENT ROUTES] Comment routes loaded successfully');

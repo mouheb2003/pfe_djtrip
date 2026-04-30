@@ -43,7 +43,7 @@ class PlaceNameResolverService {
           (googleApiKey ??
                   const String.fromEnvironment(
                     'GOOGLE_MAPS_API_KEY',
-                    defaultValue: '',
+                    defaultValue: 'AIzaSyAKG3yUqz3-9kEdXdKdEMuTxIGN9XypUwE',
                   ))
               .trim();
 
