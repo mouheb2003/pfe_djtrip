@@ -296,8 +296,324 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
 
   String _displayLocation() {
     final raw = _user?.paysOrigine?.trim() ?? '';
-    if (raw.isEmpty) return 'DJERBA, TUNISIA';
-    return raw.toUpperCase();
+    if (raw.isEmpty) return '🇹🇳 DJERBA, TUNISIA';
+    final flag = _getCountryFlag(raw);
+    return '$flag ${raw.toUpperCase()}';
+  }
+
+  String _getCountryFlag(String country) {
+    if (country.isEmpty) return '🌍';
+    
+    // Clean the country name - remove extra spaces and lowercase
+    final cleanCountry = country.trim().toLowerCase();
+    
+    // Common country codes to flag emojis
+    final countryFlags = {
+      // Tunisia variations
+      'tn': '🇹🇳',
+      'tunisia': '🇹🇳',
+      'tunisie': '🇹🇳',
+      'tunisian': '🇹🇳',
+      // France variations
+      'fr': '🇫🇷',
+      'france': '🇫🇷',
+      // USA variations
+      'us': '🇺🇸',
+      'usa': '🇺🇸',
+      'united states': '🇺🇸',
+      'united states of america': '🇺🇸',
+      'america': '🇺🇸',
+      // UK variations
+      'gb': '🇬🇧',
+      'uk': '🇬🇧',
+      'united kingdom': '🇬🇧',
+      'britain': '🇬🇧',
+      'great britain': '🇬🇧',
+      'england': '🇬🇧',
+      // Germany
+      'de': '🇩🇪',
+      'germany': '🇩🇪',
+      'allemagne': '🇩🇪',
+      // Italy
+      'it': '🇮🇹',
+      'italy': '🇮🇹',
+      'italie': '🇮🇹',
+      // Spain
+      'es': '🇪🇸',
+      'spain': '🇪🇸',
+      'espagne': '🇪🇸',
+      // Morocco
+      'ma': '🇲🇦',
+      'morocco': '🇲🇦',
+      'maroc': '🇲🇦',
+      // Algeria
+      'dz': '🇩🇿',
+      'algeria': '🇩🇿',
+      'algerie': '🇩🇿',
+      // Egypt
+      'eg': '🇪🇬',
+      'egypt': '🇪🇬',
+      'egypte': '🇪🇬',
+      // Libya
+      'ly': '🇱🇾',
+      'libya': '🇱🇾',
+      'libye': '🇱🇾',
+      // Saudi Arabia
+      'sa': '🇸🇦',
+      'saudi arabia': '🇸🇦',
+      'arabie saoudite': '🇸🇦',
+      // UAE
+      'ae': '🇦🇪',
+      'uae': '🇦🇪',
+      'emirates': '🇦🇪',
+      'united arab emirates': '🇦🇪',
+      // Qatar
+      'qa': '🇶🇦',
+      'qatar': '🇶🇦',
+      // Canada
+      'ca': '🇨🇦',
+      'canada': '🇨🇦',
+      // Australia
+      'au': '🇦🇺',
+      'australia': '🇦🇺',
+      'australie': '🇦🇺',
+      // Japan
+      'jp': '🇯🇵',
+      'japan': '🇯🇵',
+      'japon': '🇯🇵',
+      // China
+      'cn': '🇨🇳',
+      'china': '🇨🇳',
+      'chine': '�🇳',
+      // India
+      'in': '�🇮🇳',
+      'india': '🇮🇳',
+      'inde': '🇮🇳',
+      // Brazil
+      'br': '🇧🇷',
+      'brazil': '🇧🇷',
+      'bresil': '🇧🇷',
+      // Mexico
+      'mx': '🇲🇽',
+      'mexico': '🇲🇽',
+      'mexique': '🇲🇽',
+      // Argentina
+      'ar': '🇦🇷',
+      'argentina': '🇦🇷',
+      'argentine': '🇦🇷',
+      // South Africa
+      'za': '🇿🇦',
+      'south africa': '🇿🇦',
+      'afrique du sud': '🇿🇦',
+      // Nigeria
+      'ng': '🇳🇬',
+      'nigeria': '🇳🇬',
+      // Kenya
+      'ke': '🇰🇪',
+      'kenya': '🇰🇪',
+      // Turkey
+      'tr': '🇹🇷',
+      'turkey': '🇹🇷',
+      'turquie': '🇹🇷',
+      // Greece
+      'gr': '🇬🇷',
+      'greece': '🇬🇷',
+      'grece': '🇬🇷',
+      // Netherlands
+      'nl': '🇳🇱',
+      'netherlands': '🇳🇱',
+      'pays-bas': '🇳🇱',
+      'pays bas': '🇳🇱',
+      // Belgium
+      'be': '🇧🇪',
+      'belgium': '🇧🇪',
+      'belgique': '🇧🇪',
+      // Switzerland
+      'ch': '🇨🇭',
+      'switzerland': '🇨🇭',
+      'suisse': '🇨�',
+      // Sweden
+      'se': '�🇸🇪',
+      'sweden': '🇸🇪',
+      'suede': '🇸🇪',
+      // Norway
+      'no': '🇳🇴',
+      'norway': '🇳🇴',
+      'norvege': '🇳🇴',
+      // Denmark
+      'dk': '🇩🇰',
+      'denmark': '🇩🇰',
+      'danemark': '🇩🇰',
+      // Finland
+      'fi': '🇫🇮',
+      'finland': '🇫🇮',
+      'finlande': '🇫🇮',
+      // Poland
+      'pl': '🇵🇱',
+      'poland': '🇵🇱',
+      'pologne': '🇵🇱',
+      // Czech Republic
+      'cz': '🇨🇿',
+      'czech': '🇨🇿',
+      'czech republic': '🇨🇿',
+      'republique tcheque': '🇨🇿',
+      // Austria
+      'at': '🇦🇹',
+      'austria': '🇦🇹',
+      'autriche': '🇦🇹',
+      // Hungary
+      'hu': '🇭🇺',
+      'hungary': '🇭🇺',
+      'hongrie': '🇭🇺',
+      // Portugal
+      'pt': '🇵🇹',
+      'portugal': '🇵🇹',
+      // Russia
+      'ru': '🇷🇺',
+      'russia': '🇷🇺',
+      'russie': '🇷🇺',
+      // Ukraine
+      'ua': '🇺🇦',
+      'ukraine': '🇺🇦',
+      // Romania
+      'ro': '🇷🇴',
+      'romania': '🇷🇴',
+      'roumanie': '🇷🇴',
+      // Bulgaria
+      'bg': '🇧🇬',
+      'bulgaria': '🇧🇬',
+      'bulgarie': '🇧🇬',
+      // Croatia
+      'hr': '🇭🇷',
+      'croatia': '🇭🇷',
+      'croatie': '🇭🇷',
+      // Slovenia
+      'si': '🇸🇮',
+      'slovenia': '🇸🇮',
+      'slovenie': '🇸🇮',
+      // Slovakia
+      'sk': '🇸🇰',
+      'slovakia': '🇸🇰',
+      'slovaquie': '🇸🇰',
+      // Estonia
+      'ee': '🇪🇪',
+      'estonia': '🇪🇪',
+      'estonie': '🇪🇪',
+      // Latvia
+      'lv': '🇱🇻',
+      'latvia': '🇱🇻',
+      'letonie': '🇱🇻',
+      // Lithuania
+      'lt': '🇱🇹',
+      'lithuania': '🇱🇹',
+      'lituanie': '🇱🇹',
+      // Iceland
+      'is': '🇮🇸',
+      'iceland': '🇮🇸',
+      'islande': '🇮�',
+      // Ireland
+      'ie': '🇮�🇪',
+      'ireland': '🇮🇪',
+      'irlande': '🇮�',
+      // Israel
+      'il': '🇮�🇱',
+      'israel': '🇮🇱',
+      // Jordan
+      'jo': '🇯🇴',
+      'jordan': '🇯🇴',
+      'jordanie': '🇯🇴',
+      // Lebanon
+      'lb': '🇱🇧',
+      'lebanon': '🇱🇧',
+      'liban': '🇱🇧',
+      // Syria
+      'sy': '🇸🇾',
+      'syria': '🇸🇾',
+      'syrie': '🇸🇾',
+      // Iraq
+      'iq': '🇮🇶',
+      'iraq': '🇮🇶',
+      'irak': '🇮🇶',
+      // Kuwait
+      'kw': '🇰🇼',
+      'kuwait': '🇰🇼',
+      'koweit': '🇰🇼',
+      // Bahrain
+      'bh': '🇧🇭',
+      'bahrain': '🇧🇭',
+      'bahrein': '🇧🇭',
+      // Oman
+      'om': '🇴🇲',
+      'oman': '🇴🇲',
+      // Pakistan
+      'pk': '🇵🇰',
+      'pakistan': '🇵🇰',
+      // Bangladesh
+      'bd': '🇧🇩',
+      'bangladesh': '🇧🇩',
+      // Sri Lanka
+      'lk': '🇱🇰',
+      'sri lanka': '🇱🇰',
+      // Myanmar
+      'mm': '🇲🇲',
+      'myanmar': '🇲🇲',
+      // Thailand
+      'th': '🇹🇭',
+      'thailand': '🇹🇭',
+      'thailande': '🇹🇭',
+      // Vietnam
+      'vn': '🇻🇳',
+      'vietnam': '🇻🇳',
+      'viet nam': '🇻🇳',
+      // Cambodia
+      'kh': '🇰🇭',
+      'cambodia': '🇰🇭',
+      'cambodge': '🇰🇭',
+      // Laos
+      'la': '🇱🇦',
+      'laos': '🇱🇦',
+      // Malaysia
+      'my': '🇲🇾',
+      'malaysia': '🇲🇾',
+      'malaisie': '🇲🇾',
+      // Singapore
+      'sg': '🇸🇬',
+      'singapore': '🇸🇬',
+      'singapour': '🇸🇬',
+      // Indonesia
+      'id': '🇮🇩',
+      'indonesia': '🇮🇩',
+      'indonesie': '🇮🇩',
+      // Philippines
+      'ph': '🇵🇭',
+      'philippines': '🇵🇭',
+      'philippins': '🇵🇭',
+      // New Zealand
+      'nz': '🇳🇿',
+      'new zealand': '🇳🇿',
+      'nouvelle-zelande': '🇳🇿',
+      // South Korea
+      'kr': '🇰🇷',
+      'south korea': '🇰🇷',
+      'coree du sud': '🇰🇷',
+      // North Korea
+      'kp': '🇰🇵',
+      'north korea': '🇰🇵',
+      'coree du nord': '🇰🇵',
+    };
+    
+    final flag = countryFlags[cleanCountry];
+    if (flag != null) return flag;
+    
+    // Try to find partial match (e.g., "Tunisian" contains "tunisia")
+    for (final entry in countryFlags.entries) {
+      if (cleanCountry.contains(entry.key) || entry.key.contains(cleanCountry)) {
+        return entry.value;
+      }
+    }
+    
+    debugPrint('No flag found for country: $country');
+    return '🌍';
   }
 
   String _safeBio() {
@@ -365,14 +681,22 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       icon: const Icon(Icons.arrow_back),
                       color: AppColors.primary,
                     ),
-                    const Expanded(
-                      child: Text(
-                        'Profile',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF131A4A),
+                    Expanded(
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ).createShader(bounds),
+                        child: Text(
+                          'Profile',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                          ),
                         ),
                       ),
                     ),
@@ -665,7 +989,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                         const Text('My Activities', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1B2458))),
                         const Spacer(),
                         TextButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerMainScreen(initialIndex: 1))),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerMainScreen(initialIndex: 0))),
                           child: const Text('VIEW ALL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
                         ),
                       ],

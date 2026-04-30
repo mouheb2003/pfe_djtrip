@@ -4,13 +4,12 @@ import '../../theme/app_theme.dart';
 import '../../services/onboarding_service.dart';
 import '../../config/app_routes.dart';
 import 'tabs/my_activities_tab.dart';
-import 'tabs/archive_tab.dart';
 import 'tabs/organizer_profile_tab.dart';
 import '../tourist/tabs/screen_network.dart';
 import '../shared/messages_screen.dart';
 import '../notifications_screen.dart';
+import 'explore_activities_screen.dart';
 import '../../services/activity_service.dart';
-import '../../services/inscription_service.dart';
 import '../../services/message_service.dart';
 import '../../services/post_service.dart';
 import '../../services/novelty_badge_service.dart';
@@ -27,7 +26,6 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   static const Duration _noveltyRefreshInterval = Duration(seconds: 12);
 
   static const String _sectionActivities = 'organizer_activities';
-  static const String _sectionRequests = 'organizer_requests';
   static const String _sectionNetwork = 'organizer_network';
   static const String _sectionMessages = 'organizer_messages';
 
@@ -35,21 +33,16 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   Timer? _noveltyTimer;
 
   bool _showActivitiesDot = false;
-  bool _showRequestsDot = false;
   bool _showNetworkDot = false;
   bool _showMessagesDot = false;
 
   String _activitiesSignature = '';
-  String _requestsSignature = '';
   String _networkSignature = '';
   String _messagesSignature = '';
 
   List<Widget> get _pages => [
-    MyActivitiesTab(
-      showRequestsDot: _showRequestsDot,
-      onOpenRequests: _markRequestsSeen,
-    ),
-    const ArchiveTab(),
+    const MyActivitiesTab(),
+    const ExploreActivitiesScreen(),
     const ScreenNetwork(),
     const MessagesScreen(),
     const OrganizerProfileTab(),
@@ -105,14 +98,6 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
     return 'count:${items.length}|${items.join(',')}';
   }
 
-  Future<String> _buildRequestsSignature() async {
-    final requests = await InscriptionService.getOrganizerPendingRequests();
-    if (requests.isEmpty) return 'none';
-    final items = requests.map((r) => r.id).where((e) => e.isNotEmpty).toList()
-      ..sort();
-    return 'count:${items.length}|${items.join(',')}';
-  }
-
   Future<String> _buildNetworkSignature() async {
     final posts = await PostService.getFeedPosts();
     if (posts.isEmpty) return 'none';
@@ -153,20 +138,17 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
     try {
       final signatures = await Future.wait<String>([
         _buildActivitiesSignature(),
-        _buildRequestsSignature(),
         _buildNetworkSignature(),
         _buildMessagesSignature(),
       ]);
       if (!mounted) return;
 
       _activitiesSignature = signatures[0];
-      _requestsSignature = signatures[1];
-      _networkSignature = signatures[2];
-      _messagesSignature = signatures[3];
+      _networkSignature = signatures[1];
+      _messagesSignature = signatures[2];
 
       final unseen = await Future.wait<bool>([
         NoveltyBadgeService.hasUnseen(_sectionActivities, _activitiesSignature),
-        NoveltyBadgeService.hasUnseen(_sectionRequests, _requestsSignature),
         NoveltyBadgeService.hasUnseen(_sectionNetwork, _networkSignature),
         NoveltyBadgeService.hasUnseen(_sectionMessages, _messagesSignature),
       ]);
@@ -174,21 +156,11 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
 
       setState(() {
         _showActivitiesDot = _currentIndex != 0 && unseen[0];
-        _showRequestsDot = unseen[1];
-        _showNetworkDot = _currentIndex != 2 && unseen[2];
-        _showMessagesDot = _currentIndex != 3 && unseen[3];
+        _showNetworkDot = _currentIndex != 2 && unseen[1];
+        _showMessagesDot = _currentIndex != 3 && unseen[2];
       });
     } catch (_) {
       // Best-effort badges: ignore service errors.
-    }
-  }
-
-  void _markRequestsSeen() {
-    if (_requestsSignature.isNotEmpty) {
-      NoveltyBadgeService.markSeen(_sectionRequests, _requestsSignature);
-    }
-    if (mounted) {
-      setState(() => _showRequestsDot = false);
     }
   }
 
@@ -231,6 +203,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
+                  // Activities (Index 0)
                   Expanded(
                     child: _NavItem(
                       icon: Icons.calendar_today_outlined,
@@ -241,21 +214,23 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                       onTap: _goToTab,
                       activeColor: navActive,
                       inactiveColor: navInactive,
-                      showDot: _showActivitiesDot || _showRequestsDot,
+                      showDot: _showActivitiesDot,
                     ),
                   ),
+                  // Explore (Index 1)
                   Expanded(
                     child: _NavItem(
-                      icon: Icons.inventory_2_outlined,
-                      activeIcon: Icons.inventory_2,
-                      label: 'Archive',
+                      icon: Icons.explore_outlined,
+                      activeIcon: Icons.explore,
+                      label: 'Explore',
                       index: 1,
                       currentIndex: _currentIndex,
-                      onTap: (i) => setState(() => _currentIndex = i),
+                      onTap: _goToTab,
                       activeColor: navActive,
                       inactiveColor: navInactive,
                     ),
                   ),
+                  // Network (Index 2)
                   Expanded(
                     child: GestureDetector(
                       onTap: () => _goToTab(2),
@@ -301,6 +276,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                       ),
                     ),
                   ),
+                  // Messages (Index 3)
                   Expanded(
                     child: _NavItem(
                       icon: Icons.chat_bubble_outline,
@@ -314,6 +290,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                       showDot: _showMessagesDot,
                     ),
                   ),
+                  // Profile (Index 4)
                   Expanded(
                     child: _NavItem(
                       icon: Icons.person_outline,

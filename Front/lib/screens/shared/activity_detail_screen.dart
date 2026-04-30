@@ -44,6 +44,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
   bool _loadingActivity = true;
   bool _isBooking = false;
   InscriptionModel? _bookingForActivity;
+  List<InscriptionModel> _participants = [];
+  bool _loadingParticipants = false;
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingReviews = false;
 
@@ -333,6 +335,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
 
       // Load reviews after activity is loaded
       _loadReviews();
+      _loadParticipants();
     } catch (e) {
       print('❌ Error loading activity: $e');
       if (mounted) {
@@ -515,6 +518,32 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     }
   }
 
+  Future<void> _loadParticipants() async {
+    if (_activity == null || !_isActivityOrganizer) return;
+    if (!(_activity!.isOngoing || _activity!.isPast)) return;
+    
+    setState(() => _loadingParticipants = true);
+    try {
+      print('🔍 Loading participants for activity: ${widget.activityId}');
+      final participants = await InscriptionService.getOrganizerInscriptions(
+        activiteId: widget.activityId,
+        statut: 'approuvee',
+      );
+      print('🔍 Participants loaded: ${participants.length} participants');
+      if (mounted) {
+        setState(() {
+          _participants = participants;
+          _loadingParticipants = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading participants: $e');
+      if (mounted) {
+        setState(() => _loadingParticipants = false);
+      }
+    }
+  }
+
   Future<void> _loadReviews() async {
     setState(() => _loadingReviews = true);
     try {
@@ -579,12 +608,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                         onTap: () => Navigator.pop(context),
                       ),
                     ),
-                    Positioned(
-                      top: 380,
-                      left: 20,
-                      right: 20,
-                      child: _HeroSummaryCard(activity: activity),
-                    ),
                   ],
                 ),
               ),
@@ -594,28 +617,18 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 460),
+                      const SizedBox(height: 20),
+                      _HeroSummaryCard(activity: activity),
+                      const SizedBox(height: 20),
                       _SectionTitle('Description'),
                       Text(
-                        _showFullDesc
-                            ? _description
-                            : (_description.length > 200
-                                  ? '${_description.substring(0, 200)}...'
-                                  : _description),
+                        _description,
                         style: const TextStyle(
                           fontSize: 15,
                           height: 1.6,
                           color: Color(0xFF4B5563),
                         ),
                       ),
-                      if (_description.length > 200)
-                        TextButton(
-                          onPressed: () =>
-                              setState(() => _showFullDesc = !_showFullDesc),
-                          child: Text(
-                            _showFullDesc ? 'Show less' : 'Read more',
-                          ),
-                        ),
                       _SectionTitle('Included Equipment'),
                       _TagListSection(
                         items: activity.equipementsInclus,
@@ -628,9 +641,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                       _TagListSection(
                         items: activity.aApporter,
                         emptyLabel: 'Nothing special is required',
-                        icon: Icons.inventory_2_outlined,
-                        chipColor: const Color(0xFFF4F4FB),
-                        iconColor: const Color(0xFF6B7280),
+                        icon: Icons.shopping_basket_outlined,
+                        chipColor: const Color(0xFFE9E8F7),
+                        iconColor: const Color(0xFF3049D9),
                       ),
                       _SectionTitle('Location'),
                       _LocationCard(
@@ -687,6 +700,36 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                         },
                       ),
                       const SizedBox(height: 24),
+                      // Participants section (only for organizer's ongoing/past activities)
+                      if (_isActivityOrganizer && (_activity?.isOngoing == true || _activity?.isPast == true)) ...[
+                        _SectionTitle('Participants'),
+                        if (_loadingParticipants)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_participants.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: const Text(
+                              'No participants yet for this activity.',
+                              style: TextStyle(color: Color(0xFF6B7280)),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        else
+                          ..._participants.map((participant) => _ParticipantCard(
+                            participant: participant,
+                          )).toList(),
+                        const SizedBox(height: 24),
+                      ],
                       _SectionTitle('Reviews'),
                       if (_activity?.isPast == true)
                         if (_loadingReviews)
@@ -892,9 +935,6 @@ class _HeroSummaryCard extends StatelessWidget {
     final participants = activity.capaciteMax > 0
         ? '${activity.capaciteMax} max'
         : '-';
-    final difficulty = activity.niveauDifficulte.trim().isEmpty
-        ? '-'
-        : activity.niveauDifficulte;
     final reviewsCount = activity.nombreAvis > 0
         ? '(${activity.nombreAvis} avis)'
         : '(0 avis)';
@@ -1040,17 +1080,135 @@ class _HeroSummaryCard extends StatelessWidget {
                     value: languages,
                     width: itemWidth,
                   ),
-                  _infoTile(
-                    icon: Icons.fitness_center,
-                    label: 'Niveau',
-                    value: difficulty,
-                    width: itemWidth,
-                  ),
                 ],
               );
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ParticipantCard extends StatelessWidget {
+  final InscriptionModel participant;
+
+  const _ParticipantCard({required this.participant});
+
+  String _participantName() {
+    final touriste = participant.touriste;
+    if (touriste is Map<String, dynamic>) {
+      final name = (touriste['fullname'] ?? '').toString().trim();
+      if (name.isNotEmpty) return name;
+    }
+    return 'Participant';
+  }
+
+  String _participantAvatar() {
+    final touriste = participant.touriste;
+    if (touriste is Map<String, dynamic>) {
+      return (touriste['avatar'] ?? '').toString();
+    }
+    return '';
+  }
+
+  String _participantId() {
+    final touriste = participant.touriste;
+    if (touriste is Map<String, dynamic>) {
+      return (touriste['_id'] ?? touriste['id'] ?? '').toString().trim();
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _participantName();
+    final avatar = _participantAvatar();
+    final participantId = _participantId();
+    final nbParticipants = participant.nombreParticipants ?? 1;
+    final bookingDate = participant.dateDemande;
+
+    return InkWell(
+      onTap: () {
+        if (participantId.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PublicProfileScreen(
+                userId: participantId,
+              ),
+            ),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundImage: avatar.isNotEmpty
+                  ? NetworkImage(avatar)
+                  : null,
+              child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.people, size: 14, color: AppColors.textGrey),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$nbParticipants participant${nbParticipants > 1 ? 's' : ''}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (bookingDate != null) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${bookingDate.day}/${bookingDate.month}/${bookingDate.year}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

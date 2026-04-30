@@ -9,6 +9,7 @@ import '../../models/activity_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
+import '../shared/public_profile_screen.dart';
 
 class ActivityPreviewScreen extends StatefulWidget {
   final String title;
@@ -209,15 +210,17 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
 
                     // Hero Card
                     Positioned(
-                      top: 380,
+                      top: 340,
                       left: 20,
                       right: 20,
                       child: _HeroSummaryCard(
                         title: widget.title,
                         category: widget.category,
-                        difficulty: widget.difficulty,
                         dateLabel: _fmtDate(widget.startDateTime),
                         durationLabel: widget.durationLabel,
+                        capacity: widget.capacity,
+                        languages: widget.languages,
+                        price: widget.price,
                       ),
                     ),
                   ],
@@ -229,7 +232,7 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 120), // Spacing for Hero Card overlap
+                      const SizedBox(height: 420), // Spacing for Hero Card overlap - ensures description starts after box ends
                       _SectionTitle('Description'),
                       Text(
                         _showFullDesc ? widget.description : (widget.description.length > 200 ? '${widget.description.substring(0, 200)}...' : widget.description),
@@ -241,16 +244,50 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
                           child: Text(_showFullDesc ? 'Show less' : 'Read more'),
                         ),
                       
+                      _SectionTitle('Included Equipment'),
+                      _TagListSection(
+                        items: widget.requirements,
+                        emptyLabel: 'No equipment specified',
+                        icon: Icons.check_circle,
+                        chipColor: const Color(0xFFE9E8F7),
+                        iconColor: const Color(0xFF3049D9),
+                      ),
+                      
+                      _SectionTitle('What to Bring'),
+                      _TagListSection(
+                        items: widget.optional,
+                        emptyLabel: 'Nothing special is required',
+                        icon: Icons.shopping_basket_outlined,
+                        chipColor: const Color(0xFFE9E8F7),
+                        iconColor: const Color(0xFF3049D9),
+                      ),
+
                       _SectionTitle('Location'),
-                      _LocationCard(placeLabel: widget.location),
+                      _LocationCard(
+                        placeLabel: widget.location,
+                        latLng: widget.pickedLatLng,
+                      ),
 
                       _SectionTitle('Organizer (You)'),
                       _OrganizerCard(
                         organizer: _currentUser,
                         loading: _loadingUser,
+                        onViewProfile: () {
+                          if (_currentUser != null) {
+                            final userId = (_currentUser!['_id'] ?? _currentUser!['id'] ?? '').toString();
+                            if (userId.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PublicProfileScreen(userId: userId),
+                                ),
+                              );
+                            }
+                          }
+                        },
                       ),
                       
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
@@ -258,13 +295,12 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
             ],
           ),
 
-          // Sticky Bottom Bar
+          // Sticky Bottom Bar - Back to Edit only
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: _StickyBottomBar(
-              price: '${widget.price.toStringAsFixed(0)} TND',
               onBack: () => Navigator.pop(context),
             ),
           ),
@@ -294,31 +330,83 @@ class _TopIconButton extends StatelessWidget {
 class _HeroSummaryCard extends StatelessWidget {
   final String title;
   final String category;
-  final String difficulty;
   final String dateLabel;
   final String durationLabel;
+  final int capacity;
+  final List<String> languages;
+  final double price;
 
   const _HeroSummaryCard({
     required this.title,
     required this.category,
-    required this.difficulty,
     required this.dateLabel,
     required this.durationLabel,
+    required this.capacity,
+    required this.languages,
+    required this.price,
   });
+
+  Widget _infoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    double? width,
+  }) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE9E8F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF3049D9)),
+          const SizedBox(height: 6),
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 9,
+              letterSpacing: 0.8,
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final participants = capacity > 0 ? '$capacity max' : '-';
+    final languagesText = languages.isEmpty ? '-' : languages.join(', ');
+    final priceText = '${price.toStringAsFixed(0)} TND';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFF3F2FA),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
+            color: const Color(0xFF0F172A).withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
         ],
       ),
       child: Column(
@@ -329,47 +417,97 @@ class _HeroSummaryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                  color: const Color(0xFF3049D9).withOpacity(0.14),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  category.toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF3B82F6),
-                    fontSize: 10,
+                child: const Text(
+                  'PREVIEW',
+                  style: TextStyle(
+                    color: Color(0xFF3049D9),
+                    fontSize: 9,
+                    letterSpacing: 0.8,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              const Spacer(),
-              const Icon(Icons.flash_on, size: 14, color: Colors.amber),
-              const SizedBox(width: 4),
-              Text(
-                difficulty,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCE8FF),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      category.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF3049D9),
+                        fontSize: 9,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(
             title.isEmpty ? 'Untitled Activity' : title,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 38,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF1B2452),
+              height: 1.02,
+              color: Color(0xFF17183D),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-              const SizedBox(width: 6),
-              Text(dateLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(width: 16),
-              const Icon(Icons.timer, size: 14, color: Colors.grey),
-              const SizedBox(width: 6),
-              Text(durationLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = (constraints.maxWidth - 24) / 3; // 3 items per row
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _infoTile(
+                    icon: Icons.event,
+                    label: 'Date debut',
+                    value: dateLabel,
+                    width: itemWidth,
+                  ),
+                  _infoTile(
+                    icon: Icons.timer,
+                    label: 'Duree',
+                    value: durationLabel,
+                    width: itemWidth,
+                  ),
+                  _infoTile(
+                    icon: Icons.attach_money,
+                    label: 'Prix',
+                    value: priceText,
+                    width: itemWidth,
+                  ),
+                  _infoTile(
+                    icon: Icons.group,
+                    label: 'Capacite',
+                    value: participants,
+                    width: itemWidth,
+                  ),
+                  _infoTile(
+                    icon: Icons.language,
+                    label: 'Langues',
+                    value: languagesText,
+                    width: itemWidth,
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -396,15 +534,169 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _LocationCard extends StatelessWidget {
-  final String placeLabel;
-  const _LocationCard({required this.placeLabel});
+class _TagListSection extends StatelessWidget {
+  final List<String> items;
+  final String emptyLabel;
+  final IconData icon;
+  final Color chipColor;
+  final Color iconColor;
+
+  const _TagListSection({
+    required this.items,
+    required this.emptyLabel,
+    required this.icon,
+    required this.chipColor,
+    required this.iconColor,
+  });
+
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          emptyLabel,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: items.map((item) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: chipColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 8),
+              Text(
+                item,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: iconColor,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _LocationCard extends StatelessWidget {
+  final String placeLabel;
+  final LatLng? latLng;
+  const _LocationCard({required this.placeLabel, this.latLng});
+
+  @override
+  Widget build(BuildContext context) {
+    // If we have coordinates, show actual map
+    if (latLng != null) {
+      return Container(
+        height: 200,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: latLng!,
+                  zoom: 14,
+                ),
+                markers: {
+                  Marker(
+                    markerId: const MarkerId('location'),
+                    position: latLng!,
+                    infoWindow: InfoWindow(
+                      title: placeLabel,
+                      snippet: 'Meeting point',
+                    ),
+                  ),
+                },
+                zoomGesturesEnabled: true,
+                scrollGesturesEnabled: true,
+                rotateGesturesEnabled: false,
+                tiltGesturesEnabled: false,
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                mapToolbarEnabled: false,
+                zoomControlsEnabled: false,
+              ),
+              // Overlay with location label at bottom
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.6),
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          placeLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Fallback: show placeholder when no coordinates
     return Container(
       height: 150,
       width: double.infinity,
-      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -426,7 +718,8 @@ class _LocationCard extends StatelessWidget {
 class _OrganizerCard extends StatelessWidget {
   final Map<String, dynamic>? organizer;
   final bool loading;
-  const _OrganizerCard({required this.organizer, required this.loading});
+  final VoidCallback? onViewProfile;
+  const _OrganizerCard({required this.organizer, required this.loading, this.onViewProfile});
 
   @override
   Widget build(BuildContext context) {
@@ -459,7 +752,28 @@ class _OrganizerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const Text('Your public profile', style: TextStyle(color: Colors.blue, fontSize: 12)),
+                InkWell(
+                  onTap: onViewProfile,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Voir mon profil public',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 10,
+                        color: Colors.blue[400],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -470,38 +784,40 @@ class _OrganizerCard extends StatelessWidget {
 }
 
 class _StickyBottomBar extends StatelessWidget {
-  final String price;
   final VoidCallback onBack;
-  const _StickyBottomBar({required this.price, required this.onBack});
+  const _StickyBottomBar({required this.onBack});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
       decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
+        color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 25, offset: Offset(0, -5))
+          BoxShadow(color: Colors.black12, blurRadius: 25, offset: Offset(0, -5))
         ],
       ),
-      child: SizedBox(
-        height: 56,
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: onBack,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3B82F6),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            elevation: 8,
-            shadowColor: const Color(0xFF3B82F6).withOpacity(0.4),
-          ),
-          child: const Text(
-            'Back to Edit',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: onBack,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              elevation: 4,
+            ),
+            icon: const Icon(Icons.arrow_back, size: 20),
+            label: const Text(
+              'Back to Edit',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

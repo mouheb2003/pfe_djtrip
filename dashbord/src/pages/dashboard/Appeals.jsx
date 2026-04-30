@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Table, Button, Badge, Modal, Form, Input, Select, message, Space, Typography, Tag, Tooltip, Descriptions, Empty, ConfigProvider, theme } from 'antd';
-import { ExclamationCircleOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Badge, Modal, Form, Input, Select, message, Space, Typography, Tag, Tooltip, Descriptions, Empty, ConfigProvider, Avatar, theme } from 'antd';
+import { ExclamationCircleOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, CheckOutlined, CloseOutlined, ClockCircleOutlined, UserOutlined, PhoneOutlined, EnvironmentOutlined, GlobalOutlined, FileTextOutlined, IdcardOutlined } from '@ant-design/icons';
 
 import { appealService } from 'src/services/appealService.js';
 
@@ -327,105 +327,185 @@ const Appeals = () => {
           </Button>
         </div>
 
-        {/* Statistics Cards (Horizontal scroll) */}
-        <Space size={16} style={{ display: 'flex', overflowX: 'auto', paddingBottom: 12, marginBottom: 32 }}>
-          <Card 
-            style={{ width: 260, flex: '0 0 auto', background: isDarkMode ? '#1e1e1e' : '#fff' }} 
-            className="border-0 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            bodyStyle={{ padding: '24px' }}
+        {/* Statistics Cards - Enhanced */}
+        <Space size={20} style={{ display: 'flex', overflowX: 'auto', paddingBottom: 12, marginBottom: 32 }}>
+          <Card
+            style={{
+              width: 280,
+              flex: '0 0 auto',
+              background: isDarkMode ? '#1e1e1e' : '#fff',
+              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
+              borderRadius: 20,
+              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
+            }}
+            className="hover:scale-105 transition-all duration-300 cursor-pointer"
+            bodyStyle={{ padding: '28px' }}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Pending</Text>
-                <Title level={2} className="mb-0 text-orange-500 font-extrabold mt-1" style={{ color: '#f97316' }}>{stats.pending || 0}</Title>
+                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Pending</Text>
+                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#f97316', fontSize: '36px', lineHeight: 1 }}>{stats.pending || 0}</Title>
+                <div className="mt-2 flex items-center gap-1">
+                  <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 600, background: isDarkMode ? 'rgba(249, 115, 22, 0.15)' : '#fff7ed', padding: '4px 8px', borderRadius: '6px' }}>
+                    Awaiting review
+                  </span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center border border-orange-100" style={{ background: isDarkMode ? 'rgba(249, 115, 22, 0.1)' : '#fff7ed', borderColor: isDarkMode ? 'rgba(249, 115, 22, 0.2)' : '#ffedd5' }}>
-                <ClockCircleOutlined style={{ fontSize: 22, color: '#f97316' }} />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                boxShadow: '0 8px 16px rgba(249, 115, 22, 0.3)'
+              }}>
+                <ClockCircleOutlined style={{ fontSize: 28, color: '#fff' }} />
               </div>
             </div>
-            <div className="mt-4 flex items-center">
-              <Badge color="#f97316" />
-              <Text className="text-xs text-orange-600 ml-2 font-semibold">Awaiting initial review</Text>
+            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
+              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
+                Initial review needed
+              </Text>
             </div>
           </Card>
 
-          <Card 
-            style={{ width: 260, flex: '0 0 auto', background: isDarkMode ? '#1e1e1e' : '#fff' }} 
-            className="border-0 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            bodyStyle={{ padding: '24px' }}
+          <Card
+            style={{
+              width: 280,
+              flex: '0 0 auto',
+              background: isDarkMode ? '#1e1e1e' : '#fff',
+              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
+              borderRadius: 20,
+              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
+            }}
+            className="hover:scale-105 transition-all duration-300 cursor-pointer"
+            bodyStyle={{ padding: '28px' }}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Reviewed</Text>
-                <Title level={2} className="mb-0 text-blue-500 font-extrabold mt-1" style={{ color: '#3b82f6' }}>{stats.reviewed || 0}</Title>
+                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Reviewed</Text>
+                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#3b82f6', fontSize: '36px', lineHeight: 1 }}>{stats.reviewed || 0}</Title>
+                <div className="mt-2 flex items-center gap-1">
+                  <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 600, background: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff', padding: '4px 8px', borderRadius: '6px' }}>
+                    In progress
+                  </span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100" style={{ background: isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#dbeafe' }}>
-                <EyeOutlined style={{ fontSize: 22, color: '#3b82f6' }} />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
+              }}>
+                <EyeOutlined style={{ fontSize: 28, color: '#fff' }} />
               </div>
             </div>
-            <div className="mt-4 flex items-center">
-              <Badge color="#3b82f6" />
-              <Text className="text-xs text-blue-600 ml-2 font-semibold">Currently in progress</Text>
+            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
+              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
+                Being processed
+              </Text>
             </div>
           </Card>
 
-          <Card 
-            style={{ width: 260, flex: '0 0 auto', background: isDarkMode ? '#1e1e1e' : '#fff' }} 
-            className="border-0 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            bodyStyle={{ padding: '24px' }}
+          <Card
+            style={{
+              width: 280,
+              flex: '0 0 auto',
+              background: isDarkMode ? '#1e1e1e' : '#fff',
+              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
+              borderRadius: 20,
+              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
+            }}
+            className="hover:scale-105 transition-all duration-300 cursor-pointer"
+            bodyStyle={{ padding: '28px' }}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Accepted</Text>
-                <Title level={2} className="mb-0 text-emerald-500 font-extrabold mt-1" style={{ color: '#10b981' }}>{stats.accepted || 0}</Title>
+                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Accepted</Text>
+                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#10b981', fontSize: '36px', lineHeight: 1 }}>{stats.accepted || 0}</Title>
+                <div className="mt-2 flex items-center gap-1">
+                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5', padding: '4px 8px', borderRadius: '6px' }}>
+                    Resolved
+                  </span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-100" style={{ background: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5' }}>
-                <CheckOutlined style={{ fontSize: 22, color: '#10b981' }} />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                boxShadow: '0 8px 16px rgba(16, 185, 129, 0.3)'
+              }}>
+                <CheckOutlined style={{ fontSize: 28, color: '#fff' }} />
               </div>
             </div>
-            <div className="mt-4 flex items-center">
-              <Badge color="#10b981" />
-              <Text className="text-xs text-emerald-600 ml-2 font-semibold">Successfully resolved</Text>
+            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
+              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
+                Successfully resolved
+              </Text>
             </div>
           </Card>
 
-          <Card 
-            style={{ width: 260, flex: '0 0 auto', background: isDarkMode ? '#1e1e1e' : '#fff' }} 
-            className="border-0 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            bodyStyle={{ padding: '24px' }}
+          <Card
+            style={{
+              width: 280,
+              flex: '0 0 auto',
+              background: isDarkMode ? '#1e1e1e' : '#fff',
+              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
+              borderRadius: 20,
+              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
+            }}
+            className="hover:scale-105 transition-all duration-300 cursor-pointer"
+            bodyStyle={{ padding: '28px' }}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Rejected</Text>
-                <Title level={2} className="mb-0 text-rose-500 font-extrabold mt-1" style={{ color: '#f43f5e' }}>{stats.rejected || 0}</Title>
+                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Rejected</Text>
+                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#f43f5e', fontSize: '36px', lineHeight: 1 }}>{stats.rejected || 0}</Title>
+                <div className="mt-2 flex items-center gap-1">
+                  <span style={{ fontSize: '12px', color: '#f43f5e', fontWeight: 600, background: isDarkMode ? 'rgba(244, 63, 94, 0.15)' : '#fff1f2', padding: '4px 8px', borderRadius: '6px' }}>
+                    Denied
+                  </span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100" style={{ background: isDarkMode ? 'rgba(244, 63, 94, 0.1)' : '#fff1f2', borderColor: isDarkMode ? 'rgba(244, 63, 94, 0.2)' : '#ffe4e6' }}>
-                <CloseOutlined style={{ fontSize: 22, color: '#f43f5e' }} />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+                boxShadow: '0 8px 16px rgba(244, 63, 94, 0.3)'
+              }}>
+                <CloseOutlined style={{ fontSize: 28, color: '#fff' }} />
               </div>
             </div>
-            <div className="mt-4 flex items-center">
-              <Badge color="#f43f5e" />
-              <Text className="text-xs text-rose-600 ml-2 font-semibold">Denied or closed</Text>
+            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
+              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
+                Denied or closed
+              </Text>
             </div>
           </Card>
 
-          <Card 
-            style={{ width: 260, flex: '0 0 auto', background: isDarkMode ? '#1e1e1e' : '#fff' }} 
-            className="border-0 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            bodyStyle={{ padding: '24px' }}
+          <Card
+            style={{
+              width: 280,
+              flex: '0 0 auto',
+              background: isDarkMode ? '#1e1e1e' : '#fff',
+              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
+              borderRadius: 20,
+              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
+            }}
+            className="hover:scale-105 transition-all duration-300 cursor-pointer"
+            bodyStyle={{ padding: '28px' }}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Last 24h</Text>
-                <Title level={2} className="mb-0 text-violet-500 font-extrabold mt-1" style={{ color: '#8b5cf6' }}>{stats.last24h || 0}</Title>
+                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Last 24h</Text>
+                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#8b5cf6', fontSize: '36px', lineHeight: 1 }}>{stats.last24h || 0}</Title>
+                <div className="mt-2 flex items-center gap-1">
+                  <span style={{ fontSize: '12px', color: '#8b5cf6', fontWeight: 600, background: isDarkMode ? 'rgba(139, 92, 246, 0.15)' : '#f5f3ff', padding: '4px 8px', borderRadius: '6px' }}>
+                    New submissions
+                  </span>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center border border-violet-100" style={{ background: isDarkMode ? 'rgba(139, 92, 246, 0.1)' : '#f5f3ff', borderColor: isDarkMode ? 'rgba(139, 92, 246, 0.2)' : '#ede9fe' }}>
-                <ReloadOutlined style={{ fontSize: 22, color: '#8b5cf6' }} />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                boxShadow: '0 8px 16px rgba(139, 92, 246, 0.3)'
+              }}>
+                <ReloadOutlined style={{ fontSize: 28, color: '#fff' }} />
               </div>
             </div>
-            <div className="mt-4 flex items-center">
-              <Badge color="#8b5cf6" />
-              <Text className="text-xs text-violet-600 ml-2 font-semibold">New submissions</Text>
+            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
+              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
+                Recent activity
+              </Text>
             </div>
           </Card>
         </Space>
@@ -529,7 +609,7 @@ const Appeals = () => {
           />
         </Card>
 
-        {/* Details Modal */}
+        {/* Details Modal - Enhanced */}
         <Modal
           title={<span style={{ fontWeight: 700 }}>Appeal Details</span>}
           open={detailsModalVisible}
@@ -552,38 +632,46 @@ const Appeals = () => {
               </Button>
             ),
           ]}
-          width={800}
+          width={900}
         >
           {selectedAppeal && (
             <div className="space-y-6 pt-4">
+              {/* User Profile Header */}
+              <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: isDarkMode ? '#2c2c2c' : '#f8fafc', border: isDarkMode ? '1px solid #3c3c3c' : '1px solid #e2e8f0' }}>
+                <Avatar size={64} style={{ backgroundColor: '#f97316' }} icon={<UserOutlined />} />
+                <div className="flex-1">
+                  <Title level={4} className="mb-1" style={{ fontWeight: 700, color: isDarkMode ? '#fff' : 'inherit' }}>
+                    {selectedAppeal.user_id?.fullname || 'Unknown User'}
+                  </Title>
+                  <Text type="secondary" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>
+                    {selectedAppeal.user_id?.email}
+                  </Text>
+                </div>
+                <Tag
+                  color={
+                    (selectedAppeal.user_id?.accountStatus ||
+                      selectedAppeal.current_user_account_status ||
+                      selectedAppeal.metadata?.user_account_status) === 'banned'
+                      ? 'red'
+                      : 'orange'
+                  }
+                  style={{ fontWeight: 600, fontSize: 14 }}
+                >
+                  {(
+                    selectedAppeal.user_id?.accountStatus ||
+                    selectedAppeal.current_user_account_status ||
+                    selectedAppeal.metadata?.user_account_status
+                  )?.toUpperCase()}
+                </Tag>
+              </div>
+
+              {/* Detailed Information */}
               <Descriptions bordered column={2} labelStyle={{ fontWeight: 600, background: isDarkMode ? '#2c2c2c' : '#fafafa', color: isDarkMode ? '#fff' : 'inherit' }} contentStyle={{ background: isDarkMode ? '#1e1e1e' : '#fff', color: isDarkMode ? '#fff' : 'inherit' }}>
                 <Descriptions.Item label="Appeal ID">
                   <Text copyable style={{ color: isDarkMode ? '#fff' : 'inherit' }}>{selectedAppeal._id}</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Subject">
                   <Tag color="blue" style={{ fontWeight: 600 }}>{selectedAppeal.subject}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="User">
-                  <div style={{ fontWeight: 600 }}>{selectedAppeal.user_id?.fullname}</div>
-                  <Text type="secondary" style={{ fontSize: '12px', color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>{selectedAppeal.user_id?.email}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Account Status">
-                  <Tag
-                    color={
-                      (selectedAppeal.user_id?.accountStatus ||
-                        selectedAppeal.current_user_account_status ||
-                        selectedAppeal.metadata?.user_account_status) === 'banned'
-                        ? 'red'
-                        : 'orange'
-                    }
-                    style={{ fontWeight: 600 }}
-                  >
-                    {(
-                      selectedAppeal.user_id?.accountStatus ||
-                      selectedAppeal.current_user_account_status ||
-                      selectedAppeal.metadata?.user_account_status
-                    )?.toUpperCase()}
-                  </Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Status">
                   <Badge
@@ -596,8 +684,23 @@ const Appeals = () => {
                   />
                 </Descriptions.Item>
                 <Descriptions.Item label="Submitted">
-                  <span style={{ fontSize: '13px' }}>{new Date(selectedAppeal.created_at).toLocaleString()}</span>
+                  <Space>
+                    <ClockCircleOutlined />
+                    <span style={{ fontSize: '13px' }}>{new Date(selectedAppeal.created_at).toLocaleString()}</span>
+                  </Space>
                 </Descriptions.Item>
+                {selectedAppeal.metadata?.ip_address && (
+                  <Descriptions.Item label="IP Address">
+                    <Text code style={{ color: isDarkMode ? '#93c5fd' : 'inherit', background: isDarkMode ? '#2c2c2c' : '#f0f0f0' }}>{selectedAppeal.metadata.ip_address}</Text>
+                  </Descriptions.Item>
+                )}
+                {selectedAppeal.metadata?.user_agent && (
+                  <Descriptions.Item label="User Agent">
+                    <Text code className="break-all" style={{ fontSize: '11px', color: isDarkMode ? '#93c5fd' : 'inherit', background: isDarkMode ? '#2c2c2c' : '#f0f0f0' }}>
+                      {selectedAppeal.metadata.user_agent.substring(0, 50)}...
+                    </Text>
+                  </Descriptions.Item>
+                )}
                 {selectedAppeal.metadata?.original_ban_reason && (
                   <Descriptions.Item label="Ban Reason" span={2}>
                     <div className="p-4 rounded-xl" style={{ background: isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fff1f2', border: isDarkMode ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid #ffe4e6', color: isDarkMode ? '#fca5a5' : '#e11d48' }}>
@@ -612,7 +715,7 @@ const Appeals = () => {
                     </div>
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Message" span={2}>
+                <Descriptions.Item label="Appeal Message" span={2}>
                   <div className="p-4 rounded-xl" style={{ background: isDarkMode ? '#2c2c2c' : '#f8fafc', border: isDarkMode ? '1px solid #3c3c3c' : '1px solid #e2e8f0' }}>
                     {selectedAppeal.message}
                   </div>
@@ -622,18 +725,6 @@ const Appeals = () => {
                     <div className="p-4 rounded-xl" style={{ background: isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff', border: isDarkMode ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid #dbeafe', color: isDarkMode ? '#93c5fd' : '#2563eb' }}>
                       {selectedAppeal.admin_response}
                     </div>
-                  </Descriptions.Item>
-                )}
-                {selectedAppeal.metadata?.ip_address && (
-                  <Descriptions.Item label="IP Address">
-                    <Text code style={{ color: isDarkMode ? '#93c5fd' : 'inherit', background: isDarkMode ? '#2c2c2c' : '#f0f0f0' }}>{selectedAppeal.metadata.ip_address}</Text>
-                  </Descriptions.Item>
-                )}
-                {selectedAppeal.metadata?.user_agent && (
-                  <Descriptions.Item label="User Agent" span={2}>
-                    <Text code className="break-all" style={{ fontSize: '11px', color: isDarkMode ? '#93c5fd' : 'inherit', background: isDarkMode ? '#2c2c2c' : '#f0f0f0' }}>
-                      {selectedAppeal.metadata.user_agent}
-                    </Text>
                   </Descriptions.Item>
                 )}
               </Descriptions>

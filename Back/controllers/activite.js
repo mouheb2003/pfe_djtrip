@@ -215,6 +215,8 @@ exports.getAllActivites = async (req, res) => {
       temporalite, // 'en_cours', 'a_venir', 'passees', 'disponibles'
       search, // text search across titre, description, lieu
       sort, // 'prix_asc', 'prix_desc', 'note_desc', 'date_asc', 'recent' (default)
+      page = 1,
+      limit = 10,
     } = req.query;
 
     const filter = {};
@@ -260,16 +262,29 @@ exports.getAllActivites = async (req, res) => {
     else if (sort === "note_desc") sortOption = { note_moyenne: -1 };
     else if (sort === "date_asc") sortOption = { date_debut: 1 };
 
-    const activites = await Activite.find(filter)
-      .populate(
-        "organisateur_id",
-        "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
-      )
-      .sort(sortOption);
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [activites, total] = await Promise.all([
+      Activite.find(filter)
+        .populate(
+          "organisateur_id",
+          "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+        )
+        .sort(sortOption)
+        .skip(skip)
+        .limit(limitNum),
+      Activite.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       success: true,
       count: activites.length,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
       activities: activites,
     });
   } catch (error) {
@@ -346,14 +361,6 @@ exports.updateActivite = async (req, res) => {
     if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to modify this activity",
-      });
-    }
-
-    // Prevent modification of completed activities
-    const maintenant = new Date();
-    if (activite.date_fin < maintenant) {
-      return res.status(400).json({
-        message: "Cannot modify a completed activity",
       });
     }
 
@@ -548,13 +555,6 @@ exports.deleteActivite = async (req, res) => {
     const activiteId = req.params.id;
     const cancellationMessage = String(req.query.cancel_message || "").trim();
 
-    if (!cancellationMessage) {
-      return res.status(400).json({
-        message:
-          "A cancellation message is required to notify tourists before deleting this activity",
-      });
-    }
-
     // Find the activity
     const activite = await Activite.findById(activiteId);
     if (!activite) {
@@ -568,6 +568,17 @@ exports.deleteActivite = async (req, res) => {
     if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to delete this activity",
+      });
+    }
+
+    // Check if there are any bookings
+    const bookings = await Inscription.find({ activite_id: activiteId, statut: { $ne: "annulee" } });
+    
+    // If there are bookings, cancellation message is required
+    if (bookings.length > 0 && !cancellationMessage) {
+      return res.status(400).json({
+        message:
+          "A cancellation message is required to notify tourists before deleting this activity",
       });
     }
 
@@ -607,8 +618,7 @@ exports.deleteActivite = async (req, res) => {
       },
     );
 
-    // Get booked users for notification
-    const bookings = await Inscription.find({ activite_id: activiteId }).select('touriste');
+    // Get booked users for notification (reuse existing bookings variable)
     const bookedUserIds = bookings.map(b => b.touriste);
 
     // Delete the activity

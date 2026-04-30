@@ -181,23 +181,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     // 🚀 Add scroll listener to track scroll position
     _scrollCtrl.addListener(_onScroll);
-
-    // 🚀 Add focus listener to auto-scroll when keyboard opens
-    _msgFocus.addListener(() {
-      if (_msgFocus.hasFocus && _scrollCtrl.hasClients) {
-        // Wait for keyboard to open
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (!mounted) return;
-          if (_scrollCtrl.hasClients) {
-            _scrollCtrl.animateTo(
-              _scrollCtrl.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    });
   }
 
   @override
@@ -861,20 +844,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       if (!_hasInitialLoadCompleted) {
         _messages = visibleMessages;
         _hasInitialLoadCompleted = true;
-        // 🚀 Auto-scroll to bottom on initial load (account for keyboard)
+        // 🚀 Auto-scroll to bottom on initial load
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollCtrl.hasClients) {
-            // Wait for keyboard to potentially open
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (!mounted) return;
-              if (_scrollCtrl.hasClients) {
-                _scrollCtrl.animateTo(
-                  _scrollCtrl.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              }
-            });
+            _scrollCtrl.animateTo(
+              _scrollCtrl.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
           }
         });
       } else if (visibleMessages.length != _messages.length) {
@@ -1661,17 +1638,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     icon: const Icon(Icons.info_outline_rounded),
                     color: cs.outline,
                   ),
-                IconButton(
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => _buildMoreSheet(cs),
-                    );
-                  },
-                  icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-                  tooltip: 'More',
-                ),
+                if (!widget.isSupportChat)
+                  IconButton(
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => _buildMoreSheet(cs),
+                      );
+                    },
+                    icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+                    tooltip: 'More',
+                  ),
               ],
             ),
           ),
@@ -1750,8 +1728,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     return ListView.builder(
       controller: _scrollCtrl,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(14, 12, 14, MediaQuery.of(context).viewInsets.bottom + 100),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
       itemCount: displayMessages.length + (hasSupportCard ? 1 : 0),
       itemBuilder: (_, i) {
         if (hasSupportCard && i == 0) {
@@ -3138,55 +3116,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       backgroundColor: widget.isSupportChat
           ? const Color(0xFFF7FAFF)
           : cs.surfaceVariant,
-      body: Stack(
+      resizeToAvoidBottomInset: true,
+      body: Column(
         children: [
-          if (widget.isSupportChat)
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFEFF6FF), Color(0xFFF8FAFC)],
-                  ),
-                ),
-              ),
-            ),
-          Column(
-            children: [
-              _buildHeader(cs),
-              Expanded(child: _buildMessageList(cs)),
-              if (!_isRecordingVoice) _buildBottomComposer(cs),
-            ],
-          ),
-          if (_isRecordingVoice)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(color: Colors.white.withOpacity(0.18)),
-                ),
-              ),
-            ),
-          if (_isRecordingVoice)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(top: false, child: _buildRecordingComposer(cs)),
-            ),
-          // 🚀 Floating down arrow button
-          if (!_isAtBottom)
-            Positioned(
-              right: 16,
-              bottom: 100,
-              child: FloatingActionButton(
-                mini: true,
-                backgroundColor: AppColors.primary,
-                onPressed: _scrollToBottom,
-                child: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-              ),
-            ),
+          _buildHeader(cs),
+          Expanded(child: _buildMessageList(cs)),
+          if (!_isRecordingVoice) _buildBottomComposer(cs),
         ],
       ),
     );

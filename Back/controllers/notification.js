@@ -168,6 +168,29 @@ exports.getUnreadCount = async (req, res) => {
   }
 };
 
+// ─── GET /notifications/total-count ────────────────────────────────────────────
+// Get total notifications count (all notifications including pushed and not pushed)
+exports.getTotalCount = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Count all notifications for this user (both pushed and not pushed, both read and unread)
+    const totalCount = await Notification.countDocuments({ user_id: userId });
+
+    res.status(200).json({
+      success: true,
+      total_count: totalCount,
+    });
+  } catch (error) {
+    console.error("Error getting total count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting total notification count",
+      error: error.message,
+    });
+  }
+};
+
 // ─── DELETE /notifications/:id ─────────────────────────────────────────────────────
 // Delete a notification
 exports.deleteNotification = async (req, res) => {

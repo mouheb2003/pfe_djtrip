@@ -371,7 +371,6 @@ class ActivityService {
     List<String> equipementsInclus = const [],
     List<String> aApporter = const [],
     List<String> languesDisponibles = const [],
-    String? niveauDifficulte,
     String? statut,
     Map<String, dynamic>? coordonnees,
     bool notifyFollowers = true,
@@ -412,10 +411,6 @@ class ActivityService {
 
       if (languesDisponibles.isNotEmpty) {
         request.fields['langues_disponibles'] = jsonEncode(languesDisponibles);
-      }
-
-      if (niveauDifficulte != null && niveauDifficulte.isNotEmpty) {
-        request.fields['niveau_difficulte'] = niveauDifficulte;
       }
 
       if (statut != null && statut.isNotEmpty) {
@@ -479,7 +474,6 @@ class ActivityService {
     List<String> equipementsInclus = const [],
     List<String> aApporter = const [],
     List<String> languesDisponibles = const [],
-    String? niveauDifficulte,
     String? statut,
     Map<String, dynamic>? coordonnees,
     bool notifyBookedUsers = true,
@@ -520,10 +514,6 @@ class ActivityService {
 
       if (languesDisponibles.isNotEmpty) {
         request.fields['langues_disponibles'] = jsonEncode(languesDisponibles);
-      }
-
-      if (niveauDifficulte != null && niveauDifficulte.isNotEmpty) {
-        request.fields['niveau_difficulte'] = niveauDifficulte;
       }
 
       if (statut != null && statut.isNotEmpty) {
@@ -575,21 +565,63 @@ class ActivityService {
   // Get all activities
   static Future<List<ActivityModel>> getAllActivities() async {
     try {
-      final response = await ApiClient.get('/activites');
+      print('[ActivityService] Fetching all activities from /activites');
+      final response = await ApiClient.get('/activites', cacheFirst: false);
+      
+      print('[ActivityService] Response status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final List<dynamic> activitiesData = body['activites'] ?? body['data'] ?? [];
+        final List<dynamic> activitiesData = body['activities'] ?? body['activites'] ?? body['data'] ?? [];
+        
+        print('[ActivityService] Found ${activitiesData.length} activities');
         
         return activitiesData.map((activityData) => ActivityModel.fromJson(activityData)).toList();
       } else {
-        throw Exception('Failed to load activities: ${response.statusCode}');
+        throw Exception('Failed to load activities: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('Error loading activities: $e');
+      print('[ActivityService] Error loading activities: $e');
+      rethrow;
+    }
+  }
+
+  // Get all activities with pagination
+  static Future<Map<String, dynamic>> getAllActivitiesPaginated({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      print('[ActivityService] Fetching activities page $page (limit: $limit)');
+      final response = await ApiClient.get(
+        '/activites',
+        query: {'page': page.toString(), 'limit': limit.toString()},
+        cacheFirst: false,
+      );
       
-      // Return mock data for development
-      return _getMockActivities();
+      print('[ActivityService] Response status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final List<dynamic> activitiesData = body['activities'] ?? body['activites'] ?? body['data'] ?? [];
+        final total = body['total'] ?? 0;
+        final pages = body['pages'] ?? 1;
+        
+        print('[ActivityService] Found ${activitiesData.length} activities on page $page (total: $total, pages: $pages)');
+        
+        final activities = activitiesData.map((activityData) => ActivityModel.fromJson(activityData)).toList();
+        
+        return {
+          'activities': activities,
+          'total': total,
+          'pages': pages,
+        };
+      } else {
+        throw Exception('Failed to load activities: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('[ActivityService] Error loading activities: $e');
+      rethrow;
     }
   }
 

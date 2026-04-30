@@ -58,12 +58,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     'Other',
   ];
 
-  static const _difficultyLevels = ['Easy', 'Moderate', 'Difficult', 'Expert'];
-
   final List<String> _languages = [];
   final List<String> _includedEquipment = [];
   final List<String> _itemsToBring = [];
-  String _difficultyLevel = 'Intermediate';
 
   @override
   void initState() {
@@ -108,9 +105,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     cleanList(a.equipementsInclus ?? [], _includedEquipment);
     cleanList(a.aApporter ?? [], _itemsToBring);
     cleanList(a.languesDisponibles ?? [], _languages);
-    _difficultyLevel = _difficultyLevels.contains(a.niveauDifficulte)
-        ? a.niveauDifficulte
-        : 'Intermediate';
 
     // Duration handling
     final durationPresets = [1.0, 2.0, 3.0, 4.0];
@@ -213,9 +207,50 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // Validate dates
+    final creationDate = widget.activity.createdAt ?? DateTime.now();
+    
+    // Start date must be >= creation date
+    if (_startDateTime != null && _startDateTime!.isBefore(creationDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity start date must be after the creation date'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // End date must be > start date
+    if (_startDateTime != null && _endDateTime != null) {
+      if (_endDateTime!.isAtSameMomentAs(_startDateTime!) || _endDateTime!.isBefore(_startDateTime!)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activity end date must be after the start date'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+    
     setState(() => _isLoading = true);
 
     final duree = _currentDurationHours();
+    
+    // Validate duration - must be at least 1 hour
+    if (duree <= 0 || duree < 1) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity duration must be at least 1 hour'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     final endDateTime =
         _endDateTime ??
         _startDateTime?.add(const Duration(hours: 1)) ??
@@ -238,7 +273,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       languesDisponibles: _languages,
       equipementsInclus: _includedEquipment,
       aApporter: _itemsToBring,
-      niveauDifficulte: _difficultyLevel,
       statut: widget.activity.statut,
       notifyBookedUsers: _notifyBookedUsers,
     );
@@ -299,9 +333,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       const SizedBox(height: 20),
                       _buildLabel('ACTIVITY TYPE'),
                       _buildDropdown(),
-                      const SizedBox(height: 20),
-                      _buildLabel('DIFFICULTY LEVEL'),
-                      _buildDifficultySegment(),
+                      // Difficulty level removed as requested
                     ]),
                     const SizedBox(height: 20),
                     AIImageGeneratorWidget(
@@ -325,46 +357,29 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       'Define the price, duration, and guest capacity.',
                     ),
                     _buildCard([
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('PRICE PER PERSON (TND)'),
-                                _buildTextField(
-                                  _priceCtrl,
-                                  '45',
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('MAX CAPACITY'),
-                                _buildTextField(
-                                  _capacityCtrl,
-                                  '12',
-                                  keyboardType: TextInputType.number,
-                                  suffixIcon: Icons.people_outline,
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Recommended: 1-50 people',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      // Price and Capacity stacked vertically instead of side by side
+                      _buildLabel('PRICE PER PERSON (TND)'),
+                      _buildTextField(
+                        _priceCtrl,
+                        '45',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildLabel('MAX CAPACITY'),
+                      _buildTextField(
+                        _capacityCtrl,
+                        '12',
+                        keyboardType: TextInputType.number,
+                        suffixIcon: Icons.people_outline,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Recommended: 1-50 people',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       _buildLabel('LANGUAGES SUPPORTED'),
@@ -723,53 +738,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               .toList(),
           onChanged: (v) => setState(() => _category = v),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDifficultySegment() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F3FF),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: _difficultyLevels.map((lvl) {
-          final isSel = _difficultyLevel == lvl;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _difficultyLevel = lvl),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSel ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSel
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    lvl,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                      color: isSel
-                          ? const Color(0xFF3858C8)
-                          : const Color(0xFF717BBC),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }
@@ -1458,7 +1426,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               startDateTime: _startDateTime,
               endDateTime: _endDateTime,
               pickedLatLng: _pickedLatLng,
-              difficulty: _difficultyLevel,
               languages: _languages,
               durationLabel: _selectedDuration == -1.0 
                   ? '${_customHours}h${_customMinutes > 0 ? ' ${_customMinutes}min' : ''}'

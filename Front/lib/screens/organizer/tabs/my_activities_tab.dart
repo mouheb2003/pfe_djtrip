@@ -1,33 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../theme/app_theme.dart';
 import '../../../models/activity_model.dart';
 import '../../../services/activity_service.dart';
 import '../../../services/notification_service.dart';
-import '../../../widgets/auto_image_carousel.dart';
-import 'requests_tab.dart';
+import '../../../services/api_client.dart';
 import '../../shared/activity_detail_screen.dart';
-import '../verify_booking_screen.dart';
+import '../../notifications_screen.dart';
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
-import '../../notifications_screen.dart';
+import '../verify_booking_screen.dart';
 
 class MyActivitiesTab extends StatefulWidget {
-  final bool showRequestsDot;
-  final VoidCallback? onOpenRequests;
-
-  const MyActivitiesTab({
-    super.key,
-    this.showRequestsDot = false,
-    this.onOpenRequests,
-  });
+  const MyActivitiesTab({super.key});
 
   @override
   State<MyActivitiesTab> createState() => _MyActivitiesTabState();
 }
 
-class _MyActivitiesTabState extends State<MyActivitiesTab> {
-  List<ActivityModel> _activeActivities = [];
+class _MyActivitiesTabState extends State<MyActivitiesTab>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  
+  List<ActivityModel> _activities = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _unreadNotificationCount = 0;
@@ -35,37 +34,62 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _loadActivities();
     _loadUnreadCount();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      HapticFeedback.selectionClick();
+    }
+  }
+
   Future<void> _loadActivities({bool refresh = false}) async {
+    if (!mounted) return;
+    
+    setState(() {
+      if (refresh) {
+        _isRefreshing = true;
+      } else {
+        _isLoading = true;
+      }
+    });
+
     try {
       final allActivities = await ActivityService.getAllMyActivities(refresh: refresh);
-      debugPrint('Loaded ${allActivities.length} all my activities (refresh: $refresh)');
-
-      if (mounted) {
-        setState(() {
-          _activeActivities = allActivities;
-          _isLoading = false;
-        });
-      }
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _activities = allActivities;
+        _isLoading = false;
+        _isRefreshing = false;
+      });
     } catch (e) {
-      debugPrint('Error loading activities: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to refresh activities: $e')),
-        );
-      }
+      debugPrint('❌ Error loading activities: $e');
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+        _isRefreshing = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load activities: $e'),
+          backgroundColor: const Color(0xFFFF4757),
+        ),
+      );
     }
   }
 
@@ -82,31 +106,95 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
     }
   }
 
-  List<String> get _tabs => ['Active (${_activeActivities.length})'];
-
-  List<ActivityModel> get _currentActivities {
-    return _activeActivitiesFiltered;
+  List<ActivityModel> get _activeActivities {
+    return _activities.where((a) => a.isUpcoming).toList();
   }
 
-  List<ActivityModel> get _activeActivitiesFiltered {
-    List<ActivityModel> activities = _activeActivities;
+  List<ActivityModel> get _ongoingActivities {
+    return _activities.where((a) => a.isOngoing).toList();
+  }
 
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      activities = activities
-          .where(
-            (a) =>
-                a.titre.toLowerCase().contains(q) ||
-                a.lieu.toLowerCase().contains(q) ||
-                a.typeActivite.toLowerCase().contains(q) ||
-                a.categorie.toLowerCase().contains(q),
-          )
-          .toList();
-    }
-    return activities;
+  List<ActivityModel> get _completedActivities {
+    return _activities.where((a) => a.isPast).toList();
+  }
+
+  List<ActivityModel> _getFilteredActivities(List<ActivityModel> source) {
+    if (_searchQuery.isEmpty) return source;
+    
+    final q = _searchQuery.toLowerCase();
+    return source.where((a) {
+      return a.titre.toLowerCase().contains(q) ||
+             a.lieu.toLowerCase().contains(q) ||
+             a.typeActivite.toLowerCase().contains(q);
+    }).toList();
   }
 
   Future<void> _deleteActivity(ActivityModel activity) async {
+    final hasReservations = activity.nombreReservations != null && activity.nombreReservations! > 0;
+    
+    // If no reservations, show simple confirmation dialog
+    if (!hasReservations) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Delete Activity?',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${activity.titre}"? This action cannot be undone.',
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed != true) return;
+      
+      setState(() => _isLoading = true);
+      final success = await ActivityService.deleteActivity(activity.id);
+      
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activity deleted successfully.'),
+              backgroundColor: Color(0xFF22C55E),
+            ),
+          );
+          _loadActivities(refresh: true);
+        } else {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to delete activity.'),
+              backgroundColor: Color(0xFFFF4757),
+            ),
+          );
+        }
+      }
+      return;
+    }
+    
+    // If there are reservations, show reason dialog
     final reasonController = TextEditingController();
     String? inlineError;
 
@@ -116,25 +204,35 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Delete Activity?'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              'Delete Activity?',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Deleting "${activity.titre}" will cancel all related bookings. Please provide a cancellation reason for tourists.',
+                  'Deleting "${activity.titre}" will cancel all related bookings (${activity.nombreReservations}). Please provide a cancellation reason for tourists.',
+                  style: const TextStyle(fontSize: 14),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 TextField(
                   controller: reasonController,
                   maxLines: 4,
                   minLines: 3,
                   maxLength: 280,
                   decoration: InputDecoration(
-                    hintText:
-                        'Example: Activity removed due to weather conditions.',
+                    hintText: 'Example: Activity removed due to weather conditions.',
                     errorText: inlineError,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -161,7 +259,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                 },
                 child: const Text(
                   'Delete',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -181,97 +279,185 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Activity deleted successfully.')),
+          const SnackBar(
+            content: Text('Activity deleted successfully.'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
         );
         _loadActivities(refresh: true);
       } else {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete activity.')),
+          const SnackBar(
+            content: Text('Failed to delete activity.'),
+            backgroundColor: Color(0xFFFF4757),
+          ),
         );
       }
     }
   }
 
-  Widget _buildBottomSearchDock() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search, color: Color(0xFF64748B), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val.trim();
-                });
-              },
-              style: const TextStyle(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search activities...',
-                hintStyle: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 14,
+  void _showActivityOptions(ActivityModel activity) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                suffixIcon: _searchQuery.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(
-                          Icons.close,
-                          size: 18,
-                          color: Color(0xFF94A3B8),
+                const SizedBox(height: 20),
+                Text(
+                  activity.titre,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1B2458),
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+                _OptionTile(
+                  icon: Icons.visibility_outlined,
+                  title: 'View Details',
+                  subtitle: 'See full activity information',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ActivityDetailScreen(
+                          activityId: activity.id,
+                          viewOnly: true,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          });
-                        },
                       ),
-              ),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                _OptionTile(
+                  icon: Icons.edit_outlined,
+                  title: 'Edit Activity',
+                  subtitle: 'Modify activity details',
+                  iconColor: AppColors.primary,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final updated = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditActivityScreen(activity: activity),
+                      ),
+                    );
+                    if (updated == true) _loadActivities(refresh: true);
+                  },
+                ),
+                const Divider(height: 1),
+                _OptionTile(
+                  icon: Icons.delete_outline,
+                  title: 'Delete Activity',
+                  subtitle: 'Remove this activity permanently',
+                  iconColor: Colors.red,
+                  textColor: Colors.red,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteActivity(activity);
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'UPCOMING':
+        return const Color(0xFF22C55E); // Green
+      case 'ONGOING':
+        return const Color(0xFFF59E0B); // Orange
+      case 'PAST':
+        return const Color(0xFF94A3B8); // Grey
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  String _formatDate(ActivityModel activity) {
+    if (activity.dateDebut == null) return 'Date TBD';
+    final date = activity.dateDebut!;
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
+      backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Activities',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                  Row(
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              // App Bar with Title
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                  child: Row(
                     children: [
-                      // Notification icon
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ).createShader(bounds),
+                              child: const Text(
+                                'My Activities',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Manage your created experiences',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Notification Icon
                       GestureDetector(
                         onTap: () async {
                           await Navigator.push(
@@ -280,709 +466,908 @@ class _MyActivitiesTabState extends State<MyActivitiesTab> {
                               builder: (_) => NotificationsScreen(),
                             ),
                           );
-                          // Reload unread count after viewing notifications
                           _loadUnreadCount();
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
                           child: Stack(
-                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
                             children: [
                               Icon(
                                 Icons.notifications_outlined,
                                 color: AppColors.primary,
-                                size: 24,
+                                size: 22,
                               ),
                               if (_unreadNotificationCount > 0)
                                 Positioned(
-                                  top: 0,
-                                  right: 0,
+                                  top: 8,
+                                  right: 8,
                                   child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
                                       color: Colors.red,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        _unreadNotificationCount > 9 ? '9+' : '$_unreadNotificationCount',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                 ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            widget.onOpenRequests?.call();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const RequestsTab(),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(22),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.notifications_none_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'Requests',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (widget.showRequestsDot)
-                                Positioned(
-                                  top: -4,
-                                  right: -4,
-                                  child: Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFF3B30),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      const SizedBox(width: 12),
                     ],
                   ),
-                ],
-              ),
-            ),
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildBottomSearchDock(),
-            ),
-            const SizedBox(height: 8),
-            // Filter tabs
-            Container(
-              padding: const EdgeInsets.only(left: 16, top: 12),
-              height: 48,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _tabs.length,
-                itemBuilder: (ctx, i) {
-                  const active = true;
-                  return GestureDetector(
-                    onTap: () {}, // Single tab, no action needed
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 32),
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              _tabs[i],
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: active
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: active
-                                    ? AppColors.primary
-                                    : AppColors.textGrey,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            height: 2,
-                            width: 60,
-                            color: active
-                                ? AppColors.primary
-                                : Colors.transparent,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            // Activity list
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  await _loadActivities(refresh: true);
-                  await _loadUnreadCount();
-                },
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_isLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_currentActivities.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 60),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.event_busy,
-                                size: 64,
-                                color: Colors.grey[200],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchQuery.isNotEmpty
-                                    ? 'No results for "$_searchQuery"'
-                                    : 'No activities',
-                                style: const TextStyle(
-                                  color: AppColors.textGrey,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      ..._currentActivities.map(
-                        (a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: _ActivityCard(
-                            activity: a,
-                            onTap: () {
-                              // 🚀 Navigate to detailed activity screen
-                              print(
-                                '🚀 [DEBUG] Activity card tapped: ${a.id} - ${a.titre}',
-                              );
-
-                              // Validate activity ID
-                              if (a.id == null || a.id.isEmpty) {
-                                print('❌ [DEBUG] Invalid activity ID');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('ID d\'activité invalide'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                                return;
-                              }
-
-                              try {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        ActivityDetailScreen(
-                                          activityId: a.id,
-                                          viewOnly: true,
-                                        ),
-                                  ),
-                                );
-                              } catch (e) {
-                                print('❌ [DEBUG] Navigation error: $e');
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Erreur de navigation: $e'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            onEditTap: () async {
-                              final updated = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      EditActivityScreen(activity: a),
-                                ),
-                              );
-                              if (updated == true)
-                                _loadActivities(refresh: true);
-                            },
-                            onDeleteTap: () => _deleteActivity(a),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 32),
-                    if (_searchQuery.isEmpty)
-                      Column(
-                        children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.05),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.event_note,
-                              size: 40,
-                              color: AppColors.primary.withOpacity(0.4),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Planning more outings?',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textGrey,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Boost your visibility by creating new experiences.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textGrey,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 90),
-                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 2, right: 2),
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width - 32,
-          child: Row(
-            children: [
-              const Spacer(),
-              Material(
-                color: Colors.transparent,
-                elevation: 8,
-                borderRadius: BorderRadius.circular(24),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const VerifyBookingScreen(),
-                      ),
-                    );
-                  },
+              
+              // Search Bar
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Container(
-                    height: 46,
-                    padding: const EdgeInsets.symmetric(horizontal: 17),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
-                      ),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2E9D45).withOpacity(0.38),
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 12,
-                          offset: const Offset(0, 6),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'Verify Booking',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val.trim();
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search your activities...',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFF6B7280),
+                          size: 22,
+                        ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Color(0xFF9CA3AF),
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Hero(
-                tag: 'organizer_fab',
-                child: Material(
-                  color: AppColors.primary,
-                  shape: const CircleBorder(),
-                  elevation: 6,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () async {
-                      final created = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CreateActivityScreen(),
-                        ),
-                      );
-                      if (created == true) _loadActivities(refresh: true);
-                    },
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.primary, AppColors.primaryDark],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.add,
+              
+              // Tab Bar
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
                         color: Colors.white,
-                        size: 30,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: const Color(0xFF6B7280),
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      tabs: [
+                        _buildTab('Active', _activeActivities.length),
+                        _buildTab('Ongoing', _ongoingActivities.length),
+                        _buildTab('Completed', _completedActivities.length),
+                      ],
                     ),
                   ),
                 ),
               ),
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildActivityList(_getFilteredActivities(_activeActivities), 'active'),
+              _buildActivityList(_getFilteredActivities(_ongoingActivities), 'ongoing'),
+              _buildActivityList(_getFilteredActivities(_completedActivities), 'completed'),
             ],
           ),
         ),
       ),
+      floatingActionButton: _buildFloatingButtons(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildTab(String label, int count) {
+    return Tab(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            if (count > 0) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityList(List<ActivityModel> activities, String type) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        ),
+      );
+    }
+
+    if (activities.isEmpty) {
+      return _buildEmptyState(type);
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _loadActivities(refresh: true),
+      color: AppColors.primary,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 100),
+        itemCount: activities.length,
+        itemBuilder: (context, index) {
+          final activity = activities[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _MyActivityCard(
+              activity: activity,
+              formattedDate: _formatDate(activity),
+              statusColor: _getStatusColor(activity.timelineStatus),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ActivityDetailScreen(
+                      activityId: activity.id,
+                      viewOnly: true,
+                    ),
+                  ),
+                );
+              },
+              onOptionsTap: () => _showActivityOptions(activity),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String type) {
+    String title;
+    String subtitle;
+    IconData icon;
+
+    switch (type) {
+      case 'active':
+        title = 'No Active Activities';
+        subtitle = 'Create a new activity to get started';
+        icon = Icons.event_available_outlined;
+        break;
+      case 'ongoing':
+        title = 'No Ongoing Activities';
+        subtitle = 'Activities happening now will appear here';
+        icon = Icons.event_busy_outlined;
+        break;
+      case 'completed':
+        title = 'No Completed Activities';
+        subtitle = 'Past activities will appear here';
+        icon = Icons.history_outlined;
+        break;
+      default:
+        title = 'No Activities';
+        subtitle = 'Start by creating your first activity';
+        icon = Icons.event_note_outlined;
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _loadActivities(refresh: true),
+      color: AppColors.primary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 40,
+                      color: const Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1B2458),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _searchQuery.isNotEmpty
+                        ? 'Try adjusting your search'
+                        : subtitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  if (type == 'active' && _searchQuery.isEmpty) ...[
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final created = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CreateActivityScreen(),
+                          ),
+                        );
+                        if (created == true) _loadActivities(refresh: true);
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Create Activity'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingButtons() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2, right: 2),
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width - 32,
+        child: Row(
+          children: [
+            const Spacer(),
+            // Verify Booking Button
+            Material(
+              color: Colors.transparent,
+              elevation: 8,
+              borderRadius: BorderRadius.circular(24),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VerifyBookingScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 46,
+                  padding: const EdgeInsets.symmetric(horizontal: 17),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2E9D45).withOpacity(0.38),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Verify Booking',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Create Activity FAB
+            Hero(
+              tag: 'organizer_fab',
+              child: Material(
+                color: AppColors.primary,
+                shape: const CircleBorder(),
+                elevation: 6,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () async {
+                    final created = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CreateActivityScreen(),
+                      ),
+                    );
+                    if (created == true) _loadActivities(refresh: true);
+                  },
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.primary, AppColors.primaryDark],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _ActivityCard extends StatelessWidget {
+// Modern Airbnb-style Activity Card with CRUD actions
+class _MyActivityCard extends StatefulWidget {
   final ActivityModel activity;
-  final VoidCallback onEditTap;
-  final VoidCallback onDeleteTap;
-  final VoidCallback? onTap;
+  final String formattedDate;
+  final Color statusColor;
+  final VoidCallback onTap;
+  final VoidCallback onOptionsTap;
 
-  const _ActivityCard({
+  const _MyActivityCard({
     required this.activity,
-    required this.onEditTap,
-    required this.onDeleteTap,
-    this.onTap,
+    required this.formattedDate,
+    required this.statusColor,
+    required this.onTap,
+    required this.onOptionsTap,
   });
 
-  String _getTimelineBadge() {
-    final status = activity.timelineStatus;
-    switch (status) {
-      case 'UPCOMING':
-        return 'UPCOMING';
-      case 'ONGOING':
-        return 'ONGOING';
-      case 'PAST':
-        return 'COMPLETED';
-      default:
-        return activity.statut.toUpperCase();
-    }
-  }
+  @override
+  State<_MyActivityCard> createState() => _MyActivityCardState();
+}
 
-  Color _getTimelineBadgeColor() {
-    final status = activity.timelineStatus;
-    switch (status) {
-      case 'UPCOMING':
-        return const Color(0xFF5D71FF);
-      case 'ONGOING':
-        return const Color(0xFF22C55E);
-      case 'PAST':
-        return const Color(0xFF94A3B8);
-      default:
-        return activity.statut == 'active'
-            ? const Color(0xFF22C55E)
-            : activity.statut == 'brouillon'
-            ? const Color(0xFF94A3B8)
-            : const Color(0xFF6B7280);
-    }
+class _MyActivityCardState extends State<_MyActivityCard> {
+  int _currentImageIndex = 0;
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http')) return url;
+    return '${ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '')}/$url';
   }
 
   @override
   Widget build(BuildContext context) {
-    final numReservations = activity.nombreReservations;
-    final capacity = activity.capaciteMax;
-    final statusColor = _getTimelineBadgeColor();
-    final durationHours = activity.duree ~/ 60;
-    final durationMinutes = activity.duree % 60;
-    final durationText = durationHours > 0
-        ? '${durationHours}H ${durationMinutes}H'
-        : '${durationMinutes}H';
+    final photos = widget.activity.photos;
+    final hasMultiplePhotos = photos.length > 1;
+    final numReservations = widget.activity.nombreReservations;
+    final capacity = widget.activity.capaciteMax;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+    return GestureDetector(
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: -4,
             ),
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image with status badge
-            GestureDetector(
-              onTap: onTap,
-              child: Stack(
-                children: [
-                  // Image carousel
-                  AutoImageCarousel(
-                    imageUrls: activity.photos,
-                    aspectRatio: 16 / 9,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(18),
-                    ),
-                    fit: BoxFit.cover,
-                    showIndicators: activity.photos.length > 1,
-                    interval: const Duration(seconds: 3),
-                  ),
-                  // Badge
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        _getTimelineBadge(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
+            // Large Cover Image
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 180,
+                child: Stack(
+                  children: [
+                    // Image or Placeholder
+                    photos.isEmpty
+                        ? Container(
+                            color: const Color(0xFFF3F4F6),
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_outlined,
+                                size: 48,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          )
+                        : PageView.builder(
+                            itemCount: photos.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentImageIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final resolvedUrl = _resolveImageUrl(photos[index]);
+                              return CachedNetworkImage(
+                                imageUrl: resolvedUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFFF3F4F6),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: const Color(0xFFF3F4F6),
+                                  child: const Icon(
+                                    Icons.image_not_supported_outlined,
+                                    color: Color(0xFF9CA3AF),
+                                    size: 48,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                    // Status Badge (Top Left)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.statusColor,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          widget.activity.timelineStatus,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+
+                    // Options Button (Top Right) - Always shows
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: GestureDetector(
+                        onTap: widget.onOptionsTap,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.more_vert,
+                            color: Color(0xFF1B2458),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Photo Counter (if multiple photos) - Below options button
+                    if (hasMultiplePhotos)
+                      Positioned(
+                        top: 12,
+                        right: 50,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${_currentImageIndex + 1}/${photos.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Page Indicators
+                    if (hasMultiplePhotos)
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            photos.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: _currentImageIndex == index ? 20 : 6,
+                              height: 6,
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(3),
+                                color: _currentImageIndex == index
+                                    ? Colors.white
+                                    : Colors.white.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-            // Content
+
+            // Content Section
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title
+                  Text(
+                    widget.activity.titre,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1B2458),
+                      letterSpacing: -0.3,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Location & Date Row
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Location
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.activity.formattedLieu,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF6B7280),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      // Date
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 12,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.formattedDate,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Stats Row (Bookings & Price)
+                  Row(
+                    children: [
+                      // Bookings Badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2563EB).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.confirmation_num_rounded,
-                              size: 12,
+                              size: 14,
                               color: Color(0xFF2563EB),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '$numReservations/$capacity PLACES BOOKED',
+                              '$numReservations/$capacity',
                               style: const TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF2563EB),
-                                letterSpacing: 0.25,
                               ),
                             ),
                           ],
                         ),
                       ),
+
                       const Spacer(),
-                      InkWell(
-                        onTap: activity.timelineStatus == 'ONGOING'
-                            ? null
-                            : onEditTap,
-                        child: Icon(
-                          Icons.edit_rounded,
-                          size: 18,
-                          color: activity.timelineStatus == 'ONGOING'
-                              ? Colors.grey.shade400
-                              : AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      InkWell(
-                        onTap: onDeleteTap,
-                        child: const Icon(
-                          Icons.delete_rounded,
-                          size: 18,
-                          color: Color(0xFFDC2248),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Title
-                  Text(
-                    activity.titre,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1E225E),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  // Description (if available)
-                  if ((activity.description ?? '').isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
-                        activity.description ?? '',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  // Duration and price
-                  Row(
-                    children: [
-                      // Duration
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.schedule_rounded,
-                            size: 16,
-                            color: Color(0xFF64748B),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            durationText,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
+
                       // Price
-                      Text(
-                        activity.prixFormatted,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          widget.activity.prixFormatted,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
+
+                      const SizedBox(width: 8),
+
+                      // Rating
+                      if (widget.activity.noteMoyenne > 0) ...[
+                        const Icon(
+                          Icons.star,
+                          size: 14,
+                          color: Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          widget.activity.noteMoyenne.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B2458),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '(${widget.activity.nombreAvis})',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Reviews and Rating section (show for completed activities)
-                  if (activity.timelineStatus == 'PAST' || activity.statut == 'completed')
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F9FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE7E9F7)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            color: Colors.amber[600],
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            activity.noteMoyenne > 0
-                                ? '${activity.noteMoyenne.toStringAsFixed(1)} (${activity.nombreAvis} review${activity.nombreAvis == 1 ? '' : 's'})'
-                                : 'No reviews yet',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.rate_review,
-                            color: const Color(0xFF4B63FF),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'View Reviews',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF4B63FF),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// Option tile for bottom sheet
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? textColor;
+
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.iconColor,
+    this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? AppColors.primary,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: textColor ?? const Color(0xFF1B2458),
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Color(0xFF6B7280),
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }

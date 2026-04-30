@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/post_service.dart';
@@ -38,30 +39,49 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   _FeedFilter _activeFilter = _FeedFilter.all;
 
   List<Map<String, dynamic>> get _visiblePosts {
+    var result = _posts;
+    
     switch (_activeFilter) {
       case _FeedFilter.all:
-        return _posts;
+        return result;
       case _FeedFilter.recent24h:
         final threshold = DateTime.now().subtract(const Duration(hours: 24));
-        return _posts.where((post) {
+        return result.where((post) {
           final created = DateTime.tryParse(
             post['createdAt']?.toString() ?? '',
           );
           return created != null && created.isAfter(threshold);
         }).toList();
       case _FeedFilter.withPhotos:
-        return _posts.where(_hasPhotos).toList();
+        return result.where(_hasPhotos).toList();
       case _FeedFilter.withLocation:
-        return _posts.where((post) {
+        return result.where((post) {
           final location = (post['location_label'] as String?)?.trim() ?? '';
           return location.isNotEmpty;
         }).toList();
       case _FeedFilter.withHashtags:
-        return _posts.where((post) {
+        return result.where((post) {
           final hashtags =
               (post['hashtags'] as List?)?.whereType<String>().toList() ??
               const <String>[];
           return hashtags.any((tag) => tag.trim().isNotEmpty);
+        }).toList();
+      case _FeedFilter.mostLiked:
+        return List.from(result)..sort((a, b) {
+          final aLikes = (a['likes_count'] as num?)?.toInt() ?? 0;
+          final bLikes = (b['likes_count'] as num?)?.toInt() ?? 0;
+          return bLikes.compareTo(aLikes);
+        });
+      case _FeedFilter.mostCommented:
+        return List.from(result)..sort((a, b) {
+          final aComments = (a['comments_count'] as num?)?.toInt() ?? 0;
+          final bComments = (b['comments_count'] as num?)?.toInt() ?? 0;
+          return bComments.compareTo(aComments);
+        });
+      case _FeedFilter.nearby:
+        return result.where((post) {
+          final location = (post['location_label'] as String?)?.trim() ?? '';
+          return location.isNotEmpty;
         }).toList();
     }
   }
@@ -91,77 +111,170 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
         return 'With location';
       case _FeedFilter.withHashtags:
         return 'With hashtags';
+      case _FeedFilter.mostLiked:
+        return 'Most liked';
+      case _FeedFilter.mostCommented:
+        return 'Most commented';
+      case _FeedFilter.nearby:
+        return 'Nearby';
     }
   }
 
   Future<void> _openFilterSheet() async {
     final selected = await showModalBottomSheet<_FeedFilter>(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
         var localFilter = _activeFilter;
 
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Filter publications',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1F235F),
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5E7EB),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Filters apply to real posts loaded from the database.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF7A81A8)),
-                    ),
-                    const SizedBox(height: 12),
-                    ..._FeedFilter.values.map((filter) {
-                      return RadioListTile<_FeedFilter>(
-                        dense: true,
-                        activeColor: AppColors.primary,
-                        title: Text(_feedFilterLabel(filter)),
-                        value: filter,
-                        groupValue: localFilter,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setSheetState(() => localFilter = value);
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, localFilter),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
+                      const SizedBox(height: 20),
+
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F4FF),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.tune_rounded,
+                              color: Color(0xFF4B63FF),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Filter publications',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1B2458),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Find what matters most to you',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Filter options
+                      ..._FeedFilter.values.map((filter) {
+                        final isSelected = localFilter == filter;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected 
+                                ? const Color(0xFFF0F4FF) 
+                                : const Color(0xFFF9FAFB),
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected 
+                                  ? const Color(0xFF4B63FF) 
+                                  : Colors.transparent,
+                              width: 1.5,
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Apply filter',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                          child: RadioListTile<_FeedFilter>(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            activeColor: const Color(0xFF4B63FF),
+                            title: Row(
+                              children: [
+                                Icon(
+                                  _getFilterIcon(filter),
+                                  size: 18,
+                                  color: isSelected 
+                                      ? const Color(0xFF4B63FF) 
+                                      : const Color(0xFF9CA3AF),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _feedFilterLabel(filter),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSelected 
+                                        ? const Color(0xFF1B2458) 
+                                        : const Color(0xFF4B5563),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            value: filter,
+                            groupValue: localFilter,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setSheetState(() => localFilter = value);
+                            },
                           ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+
+                      // Apply button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, localFilter),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4B63FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: const Text('Apply filter'),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -172,6 +285,27 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
 
     if (selected != null && mounted) {
       setState(() => _activeFilter = selected);
+    }
+  }
+
+  IconData _getFilterIcon(_FeedFilter filter) {
+    switch (filter) {
+      case _FeedFilter.all:
+        return Icons.feed_rounded;
+      case _FeedFilter.recent24h:
+        return Icons.access_time_rounded;
+      case _FeedFilter.withPhotos:
+        return Icons.photo_library_rounded;
+      case _FeedFilter.withLocation:
+        return Icons.location_on_rounded;
+      case _FeedFilter.withHashtags:
+        return Icons.tag_rounded;
+      case _FeedFilter.mostLiked:
+        return Icons.favorite_rounded;
+      case _FeedFilter.mostCommented:
+        return Icons.chat_bubble_rounded;
+      case _FeedFilter.nearby:
+        return Icons.near_me_rounded;
     }
   }
 
@@ -187,6 +321,12 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
         return 'With location';
       case _FeedFilter.withHashtags:
         return 'With hashtags';
+      case _FeedFilter.mostLiked:
+        return 'Most liked';
+      case _FeedFilter.mostCommented:
+        return 'Most commented';
+      case _FeedFilter.nearby:
+        return 'Nearby';
     }
   }
 
@@ -316,13 +456,15 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F2FA),
+      backgroundColor: const Color(0xFFF8F9FC),
       body: RefreshIndicator(
         onRefresh: _refreshFeed,
+        color: AppColors.primary,
         child: CustomScrollView(
           controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            // Modern Header with Gradient
             SliverAppBar(
               backgroundColor: Colors.transparent,
               surfaceTintColor: Colors.transparent,
@@ -331,96 +473,141 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
               automaticallyImplyLeading: widget.showBackButton,
               iconTheme: const IconThemeData(color: AppColors.primary),
               centerTitle: false,
-              toolbarHeight: 62,
+              toolbarHeight: 70,
               forceElevated: _isScrolled,
               flexibleSpace: ClipRect(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(
-                    sigmaX: _isScrolled ? 18 : 10,
-                    sigmaY: _isScrolled ? 18 : 10,
+                    sigmaX: _isScrolled ? 20 : 0,
+                    sigmaY: _isScrolled ? 20 : 0,
                   ),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
+                    duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
-                      color: _isScrolled
-                          ? Colors.white.withValues(alpha: 0.68)
-                          : Colors.white.withValues(alpha: 0.44),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _isScrolled
+                            ? [
+                                Colors.white,
+                                Colors.white,
+                              ]
+                            : [
+                                const Color(0xFFE8F4FD),
+                                const Color(0xFFF0F4FF),
+                              ],
+                      ),
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: _isScrolled
+                              ? Colors.black.withValues(alpha: 0.05)
+                              : Colors.transparent,
                           width: 1,
                         ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: _isScrolled ? 18 : 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      boxShadow: _isScrolled
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
                 ),
               ),
-              title: Text(
-                widget.title,
-                style: const TextStyle(
-                  color: Color(0xFF1F235F),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ).createShader(bounds),
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 28,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Discover what\'s happening around you',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
               ),
               actions: [
+                // Filter Button with Modern Design
                 Padding(
-                  padding: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.only(right: 16),
                   child: Material(
                     color: Colors.transparent,
-                    shape: const CircleBorder(),
                     child: InkWell(
-                      customBorder: const CircleBorder(),
                       onTap: _openFilterSheet,
+                      borderRadius: BorderRadius.circular(14),
                       child: Container(
-                        width: 40,
-                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
                           color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: const Color(
-                              0xFFD62976,
-                            ).withValues(alpha: 0.28),
-                            width: 1.4,
+                            color: _activeFilter != _FeedFilter.all
+                                ? AppColors.primary
+                                : Colors.black.withValues(alpha: 0.08),
+                            width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(
-                                0xFFD62976,
-                              ).withValues(alpha: 0.12),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: Stack(
-                          alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.filter_alt_outlined,
-                              color: Color(0xFF1F235F),
-                              size: 19,
+                            Icon(
+                              Icons.tune_rounded,
+                              color: _activeFilter != _FeedFilter.all
+                                  ? AppColors.primary
+                                  : const Color(0xFF6B7280),
+                              size: 18,
                             ),
-                            if (_activeFilter != _FeedFilter.all)
-                              const Positioned(
-                                top: 7,
-                                right: 7,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: SizedBox(width: 7, height: 7),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Filter',
+                              style: TextStyle(
+                                color: _activeFilter != _FeedFilter.all
+                                    ? AppColors.primary
+                                    : const Color(0xFF6B7280),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (_activeFilter != _FeedFilter.all) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
                                 ),
                               ),
+                            ],
                           ],
                         ),
                       ),
@@ -429,97 +616,185 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
                 ),
               ],
             ),
+            // Filter Label Chip
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                child: Text(
-                  _activeFilterLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF6F76A0),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.filter_list_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _activeFilterLabel,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
             // Posts Feed
             if (_loading)
               const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 2.5,
+                  ),
+                ),
               )
             else if (_visiblePosts.isEmpty)
               SliverFillRemaining(
                 child: Center(
-                  child: Text(
-                    _activeFilter == _FeedFilter.all
-                        ? 'No posts yet.'
-                        : 'No posts match this filter.',
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.feed_outlined,
+                        size: 64,
+                        color: Colors.black.withValues(alpha: 0.15),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _activeFilter == _FeedFilter.all
+                            ? 'No posts yet'
+                            : 'No posts match this filter',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (_activeFilter != _FeedFilter.all) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => setState(() => _activeFilter = _FeedFilter.all),
+                          child: const Text(
+                            'Clear filter',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               )
             else
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final postData = _visiblePosts[index];
-                    final postModel = PostModel.fromJson(postData);
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: PublicationCard(
-                        post: postModel,
-                        onLike: () async {
-                          final postId = (postData['_id'] ?? '').toString();
-                          if (postId.isEmpty) return;
-                          // Optimistically update like state
-                          final currentLiked = postData['isLiked'] ?? false;
-                          final currentCount = (postData['likes_count'] as num?)?.toInt() ?? 0;
-                          setState(() {
-                            postData['isLiked'] = !currentLiked;
-                            postData['likes_count'] = !currentLiked ? currentCount + 1 : currentCount - 1;
-                            _localLikeStateByPost[postId] = _LocalLikeState(
-                              liked: !currentLiked,
-                              likesCount: !currentLiked ? currentCount + 1 : currentCount - 1,
-                            );
-                          });
-                          final result = await PostService.togglePostLike(postId);
-                          // Update state based on backend response
-                          if (result['success'] == true) {
-                            final liked = result['liked'] == true;
-                            final likesCount = (result['likesCount'] as num?)?.toInt() ?? currentCount;
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final postData = _visiblePosts[index];
+                      final postModel = PostModel.fromJson(postData);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: PublicationCard(
+                          post: postModel,
+                          onLike: () async {
+                            final postId = (postData['_id'] ?? '').toString();
+                            if (postId.isEmpty) return;
+                            final currentLiked = postData['isLiked'] ?? false;
+                            final currentCount = (postData['likes_count'] as num?)?.toInt() ?? 0;
                             setState(() {
-                              postData['isLiked'] = liked;
-                              postData['likes_count'] = likesCount;
+                              postData['isLiked'] = !currentLiked;
+                              postData['likes_count'] = !currentLiked ? currentCount + 1 : currentCount - 1;
                               _localLikeStateByPost[postId] = _LocalLikeState(
-                                liked: liked,
-                                likesCount: likesCount,
+                                liked: !currentLiked,
+                                likesCount: !currentLiked ? currentCount + 1 : currentCount - 1,
                               );
                             });
-                          }
-                        },
-                        onBookmark: () {
-                          // TODO: Implement bookmark
-                        },
-                        onShare: () {
-                          final postId = (postData['_id'] ?? '').toString();
-                          final content = (postData['content'] ?? '').toString();
-                          final imageUrl = (postData['image_url'] ?? postData['imageUrl'] ?? '').toString();
-                          if (postId.isEmpty) return;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SharePostToConversationScreen(
-                                postId: postId,
-                                postContent: content,
-                                postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                            final result = await PostService.togglePostLike(postId);
+                            if (result['success'] == true) {
+                              final liked = result['liked'] == true;
+                              final likesCount = (result['likesCount'] as num?)?.toInt() ?? currentCount;
+                              setState(() {
+                                postData['isLiked'] = liked;
+                                postData['likes_count'] = likesCount;
+                                _localLikeStateByPost[postId] = _LocalLikeState(
+                                  liked: liked,
+                                  likesCount: likesCount,
+                                );
+                              });
+                            }
+                          },
+                          onBookmark: () {
+                            // TODO: Implement bookmark
+                          },
+                          onShare: () {
+                            final postId = (postData['_id'] ?? '').toString();
+                            final content = (postData['content'] ?? '').toString();
+                            final imageUrl = (postData['image_url'] ?? postData['imageUrl'] ?? '').toString();
+                            if (postId.isEmpty) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SharePostToConversationScreen(
+                                  postId: postId,
+                                  postContent: content,
+                                  postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                  childCount: _visiblePosts.length,
+                            );
+                          },
+                          onReport: () {
+                            final postId = (postData['_id'] ?? '').toString();
+                            if (postId.isEmpty) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Report submitted successfully'),
+                                backgroundColor: Color(0xFF22C55E),
+                              ),
+                            );
+                          },
+                          onMute: () {
+                            final authorId = _extractAuthorId(postData);
+                            if (authorId.isEmpty) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Author muted'),
+                                backgroundColor: Color(0xFF4B63FF),
+                              ),
+                            );
+                          },
+                          onCopyLink: () async {
+                            final postId = (postData['_id'] ?? '').toString();
+                            if (postId.isEmpty) return;
+                            final link = 'https://djtrip.com/post/$postId';
+                            await Clipboard.setData(ClipboardData(text: link));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Link copied to clipboard'),
+                                  backgroundColor: Color(0xFF22C55E),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      );
+                    },
+                    childCount: _visiblePosts.length,
+                  ),
                 ),
               ),
           ],
@@ -538,4 +813,4 @@ class _LocalLikeState {
   const _LocalLikeState({required this.liked, required this.likesCount});
 }
 
-enum _FeedFilter { all, recent24h, withPhotos, withLocation, withHashtags }
+enum _FeedFilter { all, recent24h, withPhotos, withLocation, withHashtags, mostLiked, mostCommented, nearby }

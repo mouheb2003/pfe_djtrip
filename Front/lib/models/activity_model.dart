@@ -13,7 +13,6 @@ class ActivityModel {
   final List<String> languesDisponibles;
   final List<String> equipementsInclus;
   final List<String> aApporter;
-  final String niveauDifficulte;
   final double noteMoyenne;
   final int nombreAvis;
   final String statut;
@@ -40,7 +39,6 @@ class ActivityModel {
     this.languesDisponibles = const ['French'],
     this.equipementsInclus = const [],
     this.aApporter = const [],
-    this.niveauDifficulte = 'Easy',
     this.noteMoyenne = 0,
     this.nombreAvis = 0,
     this.statut = 'active',
@@ -118,9 +116,8 @@ class ActivityModel {
           ? const ['French']
           : parseList(json['langues_disponibles']),
       equipementsInclus: parseList(json['equipements_inclus']),
-      aApporter: parseList(json['a_apporter']),
-      niveauDifficulte: json['niveau_difficulte']?.toString() ?? 'Moderate',
-      noteMoyenne: toDouble(json['note_moyenne']),
+      aApporter: parseList(json['a_apporter'] ?? json['aApporter']),
+      noteMoyenne: toDouble(json['note_moyenne'] ?? json['noteMoyenne']),
       nombreAvis: nToInt(json['nombre_avis']),
       statut: json['statut']?.toString() ?? 'active',
       dateDebut: json['date_debut'] != null
@@ -166,7 +163,6 @@ class ActivityModel {
       'langues_disponibles': languesDisponibles,
       'equipements_inclus': equipementsInclus,
       'a_apporter': aApporter,
-      'niveau_difficulte': niveauDifficulte,
       'note_moyenne': noteMoyenne,
       'nombre_avis': nombreAvis,
       'statut': statut,
@@ -198,6 +194,40 @@ class ActivityModel {
   }
 
   String get languesFormatted => languesDisponibles.join(' / ');
+
+  // Format lieu to show place name instead of coordinates
+  String get formattedLieu {
+    if (lieu.isEmpty) return 'Location not specified';
+    
+    final trimmed = lieu.trim();
+    
+    // Strict GPS coordinate pattern: two decimal numbers separated by comma or space
+    // Valid coordinates: lat between -90 and 90, lng between -180 and 180
+    final coordPattern = RegExp(
+      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s*,\s*-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$'
+    );
+    
+    // Alternative pattern with space separator
+    final coordPatternSpace = RegExp(
+      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s+-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$'
+    );
+    
+    // Check if it's clearly GPS coordinates (two numbers with decimals)
+    final isCoordinates = coordPattern.hasMatch(trimmed) || coordPatternSpace.hasMatch(trimmed);
+    
+    if (isCoordinates) {
+      // It's GPS coordinates - try to use coordinates map if available
+      if (coordonnees != null && coordonnees!.containsKey('name')) {
+        final name = coordonnees!['name']?.toString() ?? '';
+        if (name.isNotEmpty) return name;
+      }
+      // If no name available, show the actual coordinates
+      return lieu;
+    }
+    
+    // Not coordinates - return the original value
+    return lieu;
+  }
 
   // English getters for compatibility
   String get title => titre;

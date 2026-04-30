@@ -63,6 +63,26 @@ class NotificationService {
     }
   }
 
+  static Future<Map<String, dynamic>> getTotalCount({bool cacheFirst = true}) async {
+    try {
+      final response = await ApiClient.get('/notifications/total-count', cacheFirst: cacheFirst);
+      
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(response.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': response.statusCode == 200,
+        'total_count': body['total_count'] ?? 0,
+      };
+    } catch (_) {
+      return {'success': false, 'total_count': 0};
+    }
+  }
+
   static Future<Map<String, dynamic>> markAsRead(String notificationId) async {
     try {
       final response = await ApiClient.patch('/notifications/$notificationId/read', {});

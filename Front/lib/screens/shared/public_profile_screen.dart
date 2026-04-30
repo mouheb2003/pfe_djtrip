@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
@@ -421,6 +422,53 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     return '$serverUrl/$value';
   }
 
+  void _showAvatarFullScreen(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Avatar Full Screen',
+      barrierColor: Colors.black.withOpacity(0.7),
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, anim1, anim2) {
+        return FadeTransition(
+          opacity: anim1,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(color: Colors.transparent),
+                  ),
+                  Center(
+                    child: Hero(
+                      tag: 'public_profile_avatar',
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.70,
+                        height: MediaQuery.of(context).size.width * 0.70,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          image: DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _handleContact() {
     if (_userData == null) return;
 
@@ -610,9 +658,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         icon: Icon(Icons.arrow_back_ios_new, color: AppColors.primary),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Text(
-        'Profile',
-        style: AppTextStyles.headlineSmall.copyWith(color: AppColors.textPrimary),
+      title: ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(bounds),
+        child: Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
       ),
       centerTitle: true,
       actions: [
@@ -720,38 +780,41 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: avatarUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: avatarUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
+                  GestureDetector(
+                    onLongPress: () => _showAvatarFullScreen(avatarUrl),
+                    child: Container(
+                      width: 110,
+                      height: 110,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: avatarUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: avatarUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(
+                                  color: AppColors.outline,
+                                  child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: AppColors.outline,
+                                  child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
+                                ),
+                              )
+                            : Container(
                                 color: AppColors.outline,
                                 child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
                               ),
-                              errorWidget: (_, __, ___) => Container(
-                                color: AppColors.outline,
-                                child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
-                              ),
-                            )
-                          : Container(
-                              color: AppColors.outline,
-                              child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
-                            ),
+                      ),
                     ),
                   ),
                   // Online Status Indicator
@@ -854,7 +917,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     Icon(Icons.location_on, size: 16, color: AppColors.textGrey),
                     const SizedBox(width: 4),
                     Text(
-                      location,
+                      '${_getCountryFlag(location)} $location',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textGrey,
                       ),
@@ -1107,7 +1170,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           ]
           else
             Expanded(
-              child: OutlinedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -1116,19 +1179,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     ),
                   );
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary, width: 2),
-                  elevation: 0,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3049D9),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                icon: const Icon(Icons.edit_rounded, size: 22),
+                icon: const Icon(Icons.edit_rounded, size: 22, color: Colors.white),
                 label: Text(
                   'Edit Profile',
-                  style: AppTextStyles.labelLarge.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTextStyles.labelLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -1613,6 +1679,321 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     
     return specialties.take(8).toList();
   }
+
+  String _getCountryFlag(String country) {
+    if (country.isEmpty) return '🌍';
+    
+    // Clean the country name - remove extra spaces and lowercase
+    final cleanCountry = country.trim().toLowerCase();
+    
+    // Common country codes to flag emojis
+    final countryFlags = {
+      // Tunisia variations
+      'tn': '🇹🇳',
+      'tunisia': '🇹🇳',
+      'tunisie': '🇹🇳',
+      'tunisian': '🇹🇳',
+      // France variations
+      'fr': '🇫🇷',
+      'france': '🇫🇷',
+      // USA variations
+      'us': '🇺🇸',
+      'usa': '🇺🇸',
+      'united states': '🇺🇸',
+      'united states of america': '🇺🇸',
+      'america': '🇺🇸',
+      // UK variations
+      'gb': '🇬🇧',
+      'uk': '🇬🇧',
+      'united kingdom': '🇬🇧',
+      'britain': '🇬🇧',
+      'great britain': '🇬🇧',
+      'england': '🇬🇧',
+      // Germany
+      'de': '🇩🇪',
+      'germany': '🇩🇪',
+      'allemagne': '🇩🇪',
+      // Italy
+      'it': '🇮🇹',
+      'italy': '🇮🇹',
+      'italie': '🇮🇹',
+      // Spain
+      'es': '🇪🇸',
+      'spain': '🇪🇸',
+      'espagne': '🇪🇸',
+      // Morocco
+      'ma': '🇲🇦',
+      'morocco': '🇲🇦',
+      'maroc': '🇲🇦',
+      // Algeria
+      'dz': '🇩🇿',
+      'algeria': '🇩🇿',
+      'algerie': '🇩🇿',
+      // Egypt
+      'eg': '🇪🇬',
+      'egypt': '🇪🇬',
+      'egypte': '🇪🇬',
+      // Libya
+      'ly': '🇱🇾',
+      'libya': '🇱🇾',
+      'libye': '🇱🇾',
+      // Saudi Arabia
+      'sa': '🇸🇦',
+      'saudi arabia': '🇸🇦',
+      'arabie saoudite': '🇸🇦',
+      // UAE
+      'ae': '🇦🇪',
+      'uae': '🇦🇪',
+      'emirates': '🇦🇪',
+      'united arab emirates': '🇦🇪',
+      // Qatar
+      'qa': '🇶🇦',
+      'qatar': '🇶🇦',
+      // Canada
+      'ca': '🇨🇦',
+      'canada': '🇨🇦',
+      // Australia
+      'au': '🇦🇺',
+      'australia': '🇦🇺',
+      'australie': '🇦🇺',
+      // Japan
+      'jp': '🇯🇵',
+      'japan': '🇯🇵',
+      'japon': '🇯🇵',
+      // China
+      'cn': '🇨🇳',
+      'china': '🇨🇳',
+      'chine': '�🇳',
+      // India
+      'in': '�🇮🇳',
+      'india': '🇮🇳',
+      'inde': '🇮🇳',
+      // Brazil
+      'br': '🇧🇷',
+      'brazil': '🇧🇷',
+      'bresil': '🇧🇷',
+      // Mexico
+      'mx': '🇲🇽',
+      'mexico': '🇲🇽',
+      'mexique': '🇲🇽',
+      // Argentina
+      'ar': '🇦🇷',
+      'argentina': '🇦🇷',
+      'argentine': '🇦🇷',
+      // South Africa
+      'za': '🇿🇦',
+      'south africa': '🇿🇦',
+      'afrique du sud': '🇿🇦',
+      // Nigeria
+      'ng': '🇳🇬',
+      'nigeria': '🇳🇬',
+      // Kenya
+      'ke': '🇰🇪',
+      'kenya': '🇰🇪',
+      // Turkey
+      'tr': '🇹🇷',
+      'turkey': '🇹🇷',
+      'turquie': '🇹🇷',
+      // Greece
+      'gr': '🇬🇷',
+      'greece': '🇬🇷',
+      'grece': '🇬🇷',
+      // Netherlands
+      'nl': '🇳🇱',
+      'netherlands': '🇳🇱',
+      'pays-bas': '🇳🇱',
+      'pays bas': '🇳🇱',
+      // Belgium
+      'be': '🇧🇪',
+      'belgium': '🇧🇪',
+      'belgique': '🇧🇪',
+      // Switzerland
+      'ch': '🇨🇭',
+      'switzerland': '🇨🇭',
+      'suisse': '🇨�',
+      // Sweden
+      'se': '�🇸🇪',
+      'sweden': '🇸🇪',
+      'suede': '🇸🇪',
+      // Norway
+      'no': '🇳🇴',
+      'norway': '🇳🇴',
+      'norvege': '🇳🇴',
+      // Denmark
+      'dk': '🇩🇰',
+      'denmark': '🇩🇰',
+      'danemark': '🇩🇰',
+      // Finland
+      'fi': '🇫🇮',
+      'finland': '🇫🇮',
+      'finlande': '🇫🇮',
+      // Poland
+      'pl': '🇵🇱',
+      'poland': '🇵🇱',
+      'pologne': '🇵🇱',
+      // Czech Republic
+      'cz': '🇨🇿',
+      'czech': '🇨🇿',
+      'czech republic': '🇨🇿',
+      'republique tcheque': '🇨🇿',
+      // Austria
+      'at': '🇦🇹',
+      'austria': '🇦🇹',
+      'autriche': '🇦🇹',
+      // Hungary
+      'hu': '🇭🇺',
+      'hungary': '🇭🇺',
+      'hongrie': '🇭🇺',
+      // Portugal
+      'pt': '🇵🇹',
+      'portugal': '🇵🇹',
+      // Russia
+      'ru': '🇷🇺',
+      'russia': '🇷🇺',
+      'russie': '🇷🇺',
+      // Ukraine
+      'ua': '🇺🇦',
+      'ukraine': '🇺🇦',
+      // Romania
+      'ro': '🇷🇴',
+      'romania': '🇷🇴',
+      'roumanie': '🇷🇴',
+      // Bulgaria
+      'bg': '🇧🇬',
+      'bulgaria': '🇧🇬',
+      'bulgarie': '🇧🇬',
+      // Croatia
+      'hr': '🇭🇷',
+      'croatia': '🇭🇷',
+      'croatie': '🇭🇷',
+      // Slovenia
+      'si': '🇸🇮',
+      'slovenia': '🇸🇮',
+      'slovenie': '🇸🇮',
+      // Slovakia
+      'sk': '🇸🇰',
+      'slovakia': '🇸🇰',
+      'slovaquie': '🇸🇰',
+      // Estonia
+      'ee': '🇪🇪',
+      'estonia': '🇪🇪',
+      'estonie': '🇪🇪',
+      // Latvia
+      'lv': '🇱🇻',
+      'latvia': '🇱🇻',
+      'letonie': '🇱🇻',
+      // Lithuania
+      'lt': '🇱🇹',
+      'lithuania': '🇱🇹',
+      'lituanie': '🇱🇹',
+      // Iceland
+      'is': '🇮🇸',
+      'iceland': '🇮🇸',
+      'islande': '🇮�',
+      // Ireland
+      'ie': '🇮�🇪',
+      'ireland': '🇮🇪',
+      'irlande': '🇮�',
+      // Israel
+      'il': '🇮�🇱',
+      'israel': '🇮🇱',
+      // Jordan
+      'jo': '🇯🇴',
+      'jordan': '🇯🇴',
+      'jordanie': '🇯🇴',
+      // Lebanon
+      'lb': '🇱🇧',
+      'lebanon': '🇱🇧',
+      'liban': '🇱🇧',
+      // Syria
+      'sy': '🇸🇾',
+      'syria': '🇸🇾',
+      'syrie': '🇸🇾',
+      // Iraq
+      'iq': '🇮🇶',
+      'iraq': '🇮🇶',
+      'irak': '🇮🇶',
+      // Kuwait
+      'kw': '🇰🇼',
+      'kuwait': '🇰🇼',
+      'koweit': '🇰🇼',
+      // Bahrain
+      'bh': '🇧🇭',
+      'bahrain': '🇧🇭',
+      'bahrein': '🇧🇭',
+      // Oman
+      'om': '🇴🇲',
+      'oman': '🇴🇲',
+      // Pakistan
+      'pk': '🇵🇰',
+      'pakistan': '🇵🇰',
+      // Bangladesh
+      'bd': '🇧🇩',
+      'bangladesh': '🇧🇩',
+      // Sri Lanka
+      'lk': '🇱🇰',
+      'sri lanka': '🇱🇰',
+      // Myanmar
+      'mm': '🇲🇲',
+      'myanmar': '🇲🇲',
+      // Thailand
+      'th': '🇹🇭',
+      'thailand': '🇹🇭',
+      'thailande': '🇹🇭',
+      // Vietnam
+      'vn': '🇻🇳',
+      'vietnam': '🇻🇳',
+      'viet nam': '🇻🇳',
+      // Cambodia
+      'kh': '🇰🇭',
+      'cambodia': '🇰🇭',
+      'cambodge': '🇰🇭',
+      // Laos
+      'la': '🇱🇦',
+      'laos': '🇱🇦',
+      // Malaysia
+      'my': '🇲🇾',
+      'malaysia': '🇲🇾',
+      'malaisie': '🇲🇾',
+      // Singapore
+      'sg': '🇸🇬',
+      'singapore': '🇸🇬',
+      'singapour': '🇸🇬',
+      // Indonesia
+      'id': '🇮🇩',
+      'indonesia': '🇮🇩',
+      'indonesie': '🇮🇩',
+      // Philippines
+      'ph': '🇵🇭',
+      'philippines': '🇵🇭',
+      'philippins': '🇵🇭',
+      // New Zealand
+      'nz': '🇳🇿',
+      'new zealand': '🇳🇿',
+      'nouvelle-zelande': '🇳🇿',
+      // South Korea
+      'kr': '🇰🇷',
+      'south korea': '🇰🇷',
+      'coree du sud': '🇰🇷',
+      // North Korea
+      'kp': '🇰🇵',
+      'north korea': '🇰🇵',
+      'coree du nord': '🇰🇵',
+    };
+    
+    final flag = countryFlags[cleanCountry];
+    if (flag != null) return flag;
+    
+    // Try to find partial match (e.g., "Tunisian" contains "tunisia")
+    for (final entry in countryFlags.entries) {
+      if (cleanCountry.contains(entry.key) || entry.key.contains(cleanCountry)) {
+        return entry.value;
+      }
+    }
+    
+    debugPrint('No flag found for country: $country');
+    return '🌍';
+  }
 }
 
 // ============================================================================
@@ -1741,19 +2122,27 @@ class _InterestChip extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
+class _ActivityCard extends StatefulWidget {
   final ActivityModel activity;
 
   const _ActivityCard({required this.activity});
 
   @override
+  State<_ActivityCard> createState() => _ActivityCardState();
+}
+
+class _ActivityCardState extends State<_ActivityCard> {
+  int _currentImageIndex = 0;
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http')) return url;
+    return '${ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '')}/$url';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final imageUrl = activity.photos.isNotEmpty
-        ? activity.photos.first
-        : '';
-    final resolvedUrl = imageUrl.startsWith('http')
-        ? imageUrl
-        : '${ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '')}/$imageUrl';
+    final photos = widget.activity.photos;
+    final hasMultiplePhotos = photos.length > 1;
 
     return Container(
       decoration: BoxDecoration(
@@ -1773,98 +2162,158 @@ class _ActivityCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => ActivityDetailScreen(
-                activityId: activity.id,
+                activityId: widget.activity.id,
                 viewOnly: true,
               ),
             ),
           );
         },
         borderRadius: BorderRadius.circular(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // Image carousel on top
             ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(16),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
               ),
               child: SizedBox(
-                width: 120,
-                height: 120,
-                child: resolvedUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: resolvedUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: AppColors.outline,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: AppColors.outline,
-                          child: Icon(Icons.image, color: AppColors.textGrey),
-                        ),
-                      )
-                    : Container(
+                width: double.infinity,
+                height: 140,
+                child: photos.isEmpty
+                    ? Container(
                         color: AppColors.outline,
                         child: Icon(Icons.image, color: AppColors.textGrey),
+                      )
+                    : Stack(
+                        children: [
+                          // Carousel
+                          PageView.builder(
+                            itemCount: photos.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentImageIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final resolvedUrl = _resolveImageUrl(photos[index]);
+                              return CachedNetworkImage(
+                                imageUrl: resolvedUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(
+                                  color: AppColors.outline,
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: AppColors.outline,
+                                  child: Icon(Icons.image, color: AppColors.textGrey),
+                                ),
+                              );
+                            },
+                          ),
+                          // Page indicators
+                          if (hasMultiplePhotos)
+                            Positioned(
+                              bottom: 8,
+                              left: 0,
+                              right: 0,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                  photos.length,
+                                  (index) => Container(
+                                    width: 6,
+                                    height: 6,
+                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _currentImageIndex == index
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Photo count badge
+                          if (hasMultiplePhotos)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${photos.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
               ),
             ),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      activity.titre,
-                      style: AppTextStyles.titleMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, size: 14, color: AppColors.textGrey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            activity.lieu,
-                            style: AppTextStyles.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+            // Content below
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.activity.titre,
+                    style: AppTextStyles.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 14, color: AppColors.textGrey),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.activity.formattedLieu,
+                          style: AppTextStyles.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.star, size: 14, color: AppColors.accent),
-                        const SizedBox(width: 4),
-                        Text(
-                          activity.noteMoyenne.toStringAsFixed(1),
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.star, size: 14, color: AppColors.accent),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.activity.noteMoyenne.toStringAsFixed(1),
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textPrimary,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '(${activity.nombreAvis})',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textGrey,
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${widget.activity.nombreAvis})',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textGrey,
                         ),
-                        const Spacer(),
-                        Text(
-                          activity.prixFormatted,
-                          style: AppTextStyles.titleMedium.copyWith(
-                            color: AppColors.primary,
-                          ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        widget.activity.prixFormatted,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.primary,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],

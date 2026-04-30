@@ -41,7 +41,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   String? _category;
-  String _difficultyLevel = 'Moderate';
 
   // Logistics
   final _priceCtrl = TextEditingController(text: '0.00');
@@ -70,8 +69,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   DateTime? _startDateTime;
   DateTime? _endDateTime;
   _DurOption? _selectedDuration;
+  int _customDays = 0;
   int _customHours = 0;
   int _customMinutes = 30;
+  int _customSeconds = 0;
   bool _isCustomDuration = false;
 
   bool _isLoading = false;
@@ -186,10 +187,18 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   void _recalcEndDate() {
     if (_startDateTime != null) {
-      final h = _isCustomDuration
-          ? (_customHours + _customMinutes / 60.0)
-          : (_selectedDuration?.hours ?? 3.0);
-      _endDateTime = _startDateTime!.add(Duration(minutes: (h * 60).round()));
+      if (_isCustomDuration) {
+        // Custom duration with days, hours, minutes, seconds
+        _endDateTime = _startDateTime!.add(Duration(
+          days: _customDays,
+          hours: _customHours,
+          minutes: _customMinutes,
+          seconds: _customSeconds,
+        ));
+      } else {
+        final h = _selectedDuration?.hours ?? 3.0;
+        _endDateTime = _startDateTime!.add(Duration(minutes: (h * 60).round()));
+      }
     }
   }
 
@@ -217,15 +226,14 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           time.minute,
         );
 
-        // Validate: activity must start at least 24 hours from now
+        // Validate: activity start date must be >= creation date (current time)
         final now = DateTime.now();
-        final twentyFourHoursLater = now.add(const Duration(hours: 24));
 
-        if (selectedDateTime.isBefore(twentyFourHoursLater)) {
+        if (selectedDateTime.isBefore(now)) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Activity start date must be at least 24 hours from now'),
+                content: Text('Activity start date must be after the creation date'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -242,8 +250,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   }
 
   void _openCustomDuration() {
+    int tempD = _customDays;
     int tempH = _customHours;
     int tempM = _customMinutes;
+    int tempS = _customSeconds;
 
     showModalBottomSheet(
       context: context,
@@ -253,7 +263,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 36),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -274,25 +284,81 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   color: Color(0xFF1B2352),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 8),
+              Text(
+                'Format: days dd:hh:mm:ss',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
               Row(
                 children: [
+                  // Days
                   Expanded(
                     child: Column(
                       children: [
                         const Text(
-                          'Hours',
+                          'Days',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: Colors.grey,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         SizedBox(
-                          height: 140,
+                          height: 120,
                           child: ListWheelScrollView.useDelegate(
-                            itemExtent: 44,
+                            itemExtent: 40,
+                            perspective: 0.005,
+                            physics: const FixedExtentScrollPhysics(),
+                            controller: FixedExtentScrollController(
+                              initialItem: tempD,
+                            ),
+                            onSelectedItemChanged: (i) =>
+                                setModal(() => tempD = i),
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 30, // Up to 29 days
+                              builder: (ctx, i) => Center(
+                                child: Text(
+                                  i.toString().padLeft(2, '0'),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: tempD == i
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: tempD == i
+                                        ? const Color(0xFF4A65E6)
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Text(':', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  // Hours
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Hrs',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 120,
+                          child: ListWheelScrollView.useDelegate(
+                            itemExtent: 40,
                             perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
                             controller: FixedExtentScrollController(
@@ -304,9 +370,9 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                               childCount: 24,
                               builder: (ctx, i) => Center(
                                 child: Text(
-                                  '$i h',
+                                  i.toString().padLeft(2, '0'),
                                   style: TextStyle(
-                                    fontSize: 22,
+                                    fontSize: 18,
                                     fontWeight: tempH == i
                                         ? FontWeight.bold
                                         : FontWeight.w500,
@@ -322,56 +388,94 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                       ],
                     ),
                   ),
-                  const Text(
-                    ':',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
+                  const Text(':', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  // Minutes
                   Expanded(
                     child: Column(
                       children: [
                         const Text(
-                          'Minutes',
+                          'Min',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: Colors.grey,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         SizedBox(
-                          height: 140,
+                          height: 120,
                           child: ListWheelScrollView.useDelegate(
-                            itemExtent: 44,
+                            itemExtent: 40,
                             perspective: 0.005,
                             physics: const FixedExtentScrollPhysics(),
                             controller: FixedExtentScrollController(
-                              initialItem: tempM ~/ 5,
+                              initialItem: tempM,
                             ),
                             onSelectedItemChanged: (i) =>
-                                setModal(() => tempM = i * 5),
+                                setModal(() => tempM = i),
                             childDelegate: ListWheelChildBuilderDelegate(
-                              childCount: 12,
-                              builder: (ctx, i) {
-                                final mins = i * 5;
-                                return Center(
-                                  child: Text(
-                                    '${mins.toString().padLeft(2, '0')} min',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: tempM == mins
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: tempM == mins
-                                          ? const Color(0xFF4A65E6)
-                                          : Colors.grey[500],
-                                    ),
+                              childCount: 60,
+                              builder: (ctx, i) => Center(
+                                child: Text(
+                                  i.toString().padLeft(2, '0'),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: tempM == i
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: tempM == i
+                                        ? const Color(0xFF4A65E6)
+                                        : Colors.grey[500],
                                   ),
-                                );
-                              },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Text(':', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  // Seconds
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Sec',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 120,
+                          child: ListWheelScrollView.useDelegate(
+                            itemExtent: 40,
+                            perspective: 0.005,
+                            physics: const FixedExtentScrollPhysics(),
+                            controller: FixedExtentScrollController(
+                              initialItem: tempS,
+                            ),
+                            onSelectedItemChanged: (i) =>
+                                setModal(() => tempS = i),
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 60,
+                              builder: (ctx, i) => Center(
+                                child: Text(
+                                  i.toString().padLeft(2, '0'),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: tempS == i
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: tempS == i
+                                        ? const Color(0xFF4A65E6)
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -380,17 +484,19 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
                   onPressed: () {
-                    if (tempH == 0 && tempM == 0) return;
+                    if (tempD == 0 && tempH == 0 && tempM == 0 && tempS == 0) return;
                     Navigator.pop(ctx);
                     setState(() {
+                      _customDays = tempD;
                       _customHours = tempH;
                       _customMinutes = tempM;
+                      _customSeconds = tempS;
                       _isCustomDuration = true;
                       _selectedDuration = null;
                       _recalcEndDate();
@@ -431,14 +537,49 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       return;
     }
 
+    // Validate dates
+    final now = DateTime.now();
+    
+    // Start date must be >= creation date
+    if (_startDateTime!.isBefore(now)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity start date must be after the creation date'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // End date must be > start date
+    final endDateTime = _endDateTime ?? _startDateTime!.add(const Duration(hours: 3));
+    if (endDateTime.isAtSameMomentAs(_startDateTime!) || endDateTime.isBefore(_startDateTime!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity end date must be after the start date'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final double durationHours = _isCustomDuration
-        ? _customHours + (_customMinutes / 60.0)
+        ? (_customDays * 24) + _customHours + (_customMinutes / 60.0) + (_customSeconds / 3600.0)
         : (_selectedDuration?.hours ?? 3.0);
 
-    final endDateTime =
-        _endDateTime ?? _startDateTime!.add(const Duration(hours: 3));
+    // Validate duration - must be at least 1 hour
+    if (durationHours <= 0 || durationHours < 1) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activity duration must be at least 1 hour'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     final result = await ActivityService.createActivity(
       titre: _titleCtrl.text.trim(),
@@ -455,7 +596,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       equipementsInclus: List.from(_includedEquipment),
       aApporter: List.from(_itemsToBring),
       languesDisponibles: List.from(_languages),
-      niveauDifficulte: _difficultyLevel,
       statut: _isPublish ? 'active' : 'inactive',
       coordonnees: _pickedLatLng != null
           ? {
@@ -517,7 +657,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                     _buildPreparation(),
                     const SizedBox(height: 30),
                     _buildAvailability(),
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 100), // Padding for bottom bar buttons only
                   ],
                 ),
               ),
@@ -551,10 +691,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Color(0xFF2E3192)),
-            onPressed: () {},
-          ),
+          // Info button removed as requested
         ],
       ),
     );
@@ -626,8 +763,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildMetric('BOOKINGS', '0'),
-              Container(width: 1, height: 30, color: Colors.grey[200]),
               _buildMetric(
                 'CREATED',
                 DateFormat('MMM dd, yyyy').format(DateTime.now()),
@@ -752,65 +887,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               .toList(),
           onChanged: (v) => setState(() => _category = v),
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'DIFFICULTY LEVEL',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: ['Easy', 'Moderate', 'Difficult', 'Expert']
-              .map(
-                (lvl) => Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _difficultyLevel = lvl),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _difficultyLevel == lvl
-                            ? Colors.white
-                            : const Color(0xFFF3F4FE),
-                        borderRadius: BorderRadius.circular(12),
-                        border: _difficultyLevel == lvl
-                            ? Border.all(
-                                color: const Color(0xFF4A65E6),
-                                width: 1.5,
-                              )
-                            : null,
-                        boxShadow: _difficultyLevel == lvl
-                            ? [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF4A65E6,
-                                  ).withOpacity(0.1),
-                                  blurRadius: 4,
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Text(
-                        lvl,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _difficultyLevel == lvl
-                              ? const Color(0xFF4A65E6)
-                              : Colors.grey[500],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+        // Difficulty level removed as requested
         const SizedBox(height: 20),
         AIImageGeneratorWidget(
           titleController: _titleCtrl,
@@ -837,6 +914,54 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
+              // Display AI generated image if available
+              if (_aiGeneratedImageUrl != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  width: 140,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF4A65E6),
+                      width: 3,
+                    ),
+                    image: DecorationImage(
+                      image: NetworkImage(_aiGeneratedImageUrl!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Container(
+                          margin: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A65E6),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'AI',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                          onPressed: () => setState(() => _aiGeneratedImageUrl = null),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ..._photos.map(
                 (p) => Container(
                   margin: const EdgeInsets.only(right: 12),
@@ -1256,7 +1381,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         ),
         const SizedBox(height: 16),
         const Text(
-          'DURATION (HOURS)',
+          'DURATION',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
@@ -1275,8 +1400,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             children: [
               Text(
                 _isCustomDuration
-                    ? '$_customHours h ${_customMinutes > 0 ? '$_customMinutes min' : ''}'
-                          .trim()
+                    ? '${_customDays > 0 ? '${_customDays}d ' : ''}${_customHours.toString().padLeft(2, '0')}:${_customMinutes.toString().padLeft(2, '0')}:${_customSeconds.toString().padLeft(2, '0')}'
                     : (_selectedDuration?.label ?? 'Select'),
                 style: const TextStyle(
                   fontSize: 14,
@@ -1363,6 +1487,38 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   ),
                 ),
         ),
+        const SizedBox(height: 24),
+        // Notify followers section moved here (under Duration)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF3F4FE), width: 2),
+          ),
+          child: SwitchListTile(
+            title: const Text(
+              'Notify Followers',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1B2352),
+              ),
+            ),
+            subtitle: const Text(
+              'Send notification to your followers about this new activity',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            value: _notifyFollowers,
+            onChanged: (value) {
+              setState(() {
+                _notifyFollowers = value;
+              });
+            },
+            contentPadding: EdgeInsets.zero,
+            activeColor: const Color(0xFF4A65E6),
+          ),
+        ),
       ],
     );
   }
@@ -1441,32 +1597,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Notify followers toggle
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SwitchListTile(
-              title: const Text(
-                'Notify Followers',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1B2352),
-                ),
-              ),
-              subtitle: const Text(
-                'Send notification to your followers about this new activity',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              value: _notifyFollowers,
-              onChanged: (value) {
-                setState(() {
-                  _notifyFollowers = value;
-                });
-              },
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-          const SizedBox(height: 8),
           Container(
             height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -1495,7 +1625,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                               capacity: int.tryParse(_capacityCtrl.text) ?? 0,
                               location: _locationCtrl.text.trim(),
                               duration: _isCustomDuration
-                                  ? (_customHours + _customMinutes / 60.0)
+                                  ? (_customDays * 24) + _customHours + (_customMinutes / 60.0) + (_customSeconds / 3600.0)
                               : (_selectedDuration?.hours ?? 3.0),
                               durationLabel: _selectedDuration?.label ?? 'Custom',
                               startDateTime: _startDateTime,
@@ -1505,7 +1635,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                               requirements: List.from(_includedEquipment),
                               optional: List.from(_itemsToBring),
                               pickedLatLng: _pickedLatLng,
-                              difficulty: _difficultyLevel,
                               languages: List.from(_languages),
                             ),
                           ),

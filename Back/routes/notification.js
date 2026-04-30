@@ -28,6 +28,14 @@ router.get(
   notificationController.getUnreadCount,
 );
 
+// Get total notification count (all notifications including pushed and not pushed)
+router.get(
+  "/total-count",
+  verifyToken,
+  cacheGet("notifications:total", 60),
+  notificationController.getTotalCount,
+);
+
 // Mark notification as read
 router.patch(
   "/:id/read",
