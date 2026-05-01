@@ -64,6 +64,18 @@ router.put("/config/google-maps-key", verifyToken, verifyAdmin, async (req, res)
   }
 });
 
+// Bookmark routes (for both Tourist and Organizer)
+router.post(
+  "/:lieuId/bookmark",
+  verifyToken,
+  lieuController.toggleLieuBookmark,
+);
+router.get(
+  "/bookmarks",
+  verifyToken,
+  lieuController.getBookmarkedLieux,
+);
+
 console.log('[LIEU ROUTES] All routes defined, wrapping router...');
 module.exports = wrapRouter(router);
 console.log('[LIEU ROUTES] Lieu routes loaded successfully');

@@ -244,3 +244,78 @@ exports.uploadImages = async (req, res) => {
     });
   }
 };
+
+// Toggle bookmark on a place
+exports.toggleLieuBookmark = async (req, res) => {
+  try {
+    const userId = String(req.user.userId || "");
+    const { lieuId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const lieu = await Lieu.findById(lieuId);
+    if (!lieu) {
+      return res.status(404).json({ message: "Place not found" });
+    }
+
+    const bookmarkedBy = Array.isArray(lieu.bookmarked_by)
+      ? lieu.bookmarked_by.map((id) => String(id))
+      : [];
+    const alreadyBookmarked = bookmarkedBy.includes(userId);
+
+    if (alreadyBookmarked) {
+      // Remove bookmark
+      lieu.bookmarked_by = lieu.bookmarked_by.filter(
+        (id) => String(id) !== userId
+      );
+      lieu.bookmarks_count = Math.max(0, lieu.bookmarks_count - 1);
+    } else {
+      // Add bookmark
+      lieu.bookmarked_by = [...(lieu.bookmarked_by || []), userId];
+      lieu.bookmarks_count = lieu.bookmarked_by.length;
+    }
+
+    await lieu.save();
+
+    return res.status(200).json({
+      message: alreadyBookmarked ? "Bookmark removed" : "Bookmark added",
+      bookmarked: !alreadyBookmarked,
+      bookmarksCount: lieu.bookmarks_count,
+      lieuId: String(lieu._id),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating bookmark",
+      error: error.message,
+    });
+  }
+};
+
+// Get bookmarked places for current user
+exports.getBookmarkedLieux = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const lieux = await Lieu.find({
+      bookmarked_by: userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    // Add isBookmarked field (always true for bookmarked places)
+    const lieuxWithBookmarkStatus = lieux.map(lieu => ({
+      ...lieu,
+      isBookmarked: true,
+    }));
+
+    return res.status(200).json({ lieux: lieuxWithBookmarkStatus });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error loading bookmarked places",
+      error: error.message,
+    });
+  }
+};

@@ -1200,10 +1200,47 @@ class _ExploreActivityCard extends StatefulWidget {
 
 class _ExploreActivityCardState extends State<_ExploreActivityCard> {
   int _currentImageIndex = 0;
+  bool _isBookmarked = false;
+  int _bookmarksCount = 0;
 
   String _resolveImageUrl(String url) {
     if (url.startsWith('http')) return url;
     return '${ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '')}/$url';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _isBookmarked = widget.activity.isBookmarked ?? false;
+    _bookmarksCount = widget.activity.bookmarksCount ?? 0;
+  }
+
+  Future<void> _toggleBookmark() async {
+    final activityId = widget.activity.id;
+    if (activityId.isEmpty) return;
+
+    final currentBookmarked = _isBookmarked;
+    final currentCount = _bookmarksCount;
+
+    setState(() {
+      _isBookmarked = !currentBookmarked;
+      _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+    });
+
+    final result = await ActivityService.toggleActivityBookmark(activityId);
+    if (result['success'] == true) {
+      final bookmarked = result['bookmarked'] == true;
+      final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
+      setState(() {
+        _isBookmarked = bookmarked;
+        _bookmarksCount = bookmarksCount;
+      });
+    } else {
+      setState(() {
+        _isBookmarked = currentBookmarked;
+        _bookmarksCount = currentCount;
+      });
+    }
   }
 
   @override
@@ -1342,6 +1379,34 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
                           ),
                         ),
                       ),
+
+                    // Bookmark Button (Top Right - always visible)
+                    Positioned(
+                      top: 12,
+                      right: hasMultiplePhotos ? 60 : 12,
+                      child: GestureDetector(
+                        onTap: _toggleBookmark,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                            color: _isBookmarked ? AppColors.primary : const Color(0xFF6B7280),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
                     
                     // Page Indicators (Bottom - only if multiple photos)
                     if (hasMultiplePhotos)

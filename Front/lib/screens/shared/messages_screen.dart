@@ -7,7 +7,6 @@ import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/message_service.dart';
 import 'chat_conversation_screen.dart';
-import '../notifications_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -229,17 +228,6 @@ class _MessagesScreenState extends State<MessagesScreen>
                   ),
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined, color: Color(0xFF4F6BFF)),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationsScreen(),
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
 

@@ -241,13 +241,15 @@ exports.getFeedPosts = async (req, res) => {
       .populate(basePopulate)
       .lean();
 
-    // Add isLiked field for current user
-    const postsWithLikeStatus = posts.map(post => ({
+    // Add isLiked and isBookmarked fields for current user
+    const postsWithStatus = posts.map(post => ({
       ...post,
       isLiked: currentUserId && post.liked_by ? post.liked_by.some(id => id.toString() === currentUserId.toString()) : false,
+      isBookmarked: currentUserId && post.bookmarked_by ? post.bookmarked_by.some(id => id.toString() === currentUserId.toString()) : false,
+      bookmarks_count: post.bookmarks_count || 0,
     }));
 
-    return res.status(200).json({ posts: postsWithLikeStatus });
+    return res.status(200).json({ posts: postsWithStatus });
   } catch (error) {
     return res.status(500).json({
       message: "Error loading posts feed",
@@ -265,13 +267,15 @@ exports.getMyPosts = async (req, res) => {
       .populate(basePopulate)
       .lean();
 
-    // Add isLiked field for current user
-    const postsWithLikeStatus = posts.map(post => ({
+    // Add isLiked and isBookmarked fields for current user
+    const postsWithStatus = posts.map(post => ({
       ...post,
       isLiked: post.liked_by ? post.liked_by.some(id => id.toString() === userId.toString()) : false,
+      isBookmarked: post.bookmarked_by ? post.bookmarked_by.some(id => id.toString() === userId.toString()) : false,
+      bookmarks_count: post.bookmarks_count || 0,
     }));
 
-    return res.status(200).json({ posts: postsWithLikeStatus });
+    return res.status(200).json({ posts: postsWithStatus });
   } catch (error) {
     return res.status(500).json({
       message: "Error loading my posts",
@@ -671,6 +675,84 @@ exports.togglePostLike = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error updating reaction",
+      error: error.message,
+    });
+  }
+};
+
+// Toggle bookmark on a post
+exports.togglePostBookmark = async (req, res) => {
+  try {
+    const userId = String(req.user.userId || "");
+    const { postId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const bookmarkedBy = Array.isArray(post.bookmarked_by)
+      ? post.bookmarked_by.map((id) => String(id))
+      : [];
+    const alreadyBookmarked = bookmarkedBy.includes(userId);
+
+    if (alreadyBookmarked) {
+      // Remove bookmark
+      post.bookmarked_by = post.bookmarked_by.filter(
+        (id) => String(id) !== userId
+      );
+      post.bookmarks_count = Math.max(0, post.bookmarks_count - 1);
+    } else {
+      // Add bookmark
+      post.bookmarked_by = [...(post.bookmarked_by || []), userId];
+      post.bookmarks_count = post.bookmarked_by.length;
+    }
+
+    await post.save();
+
+    return res.status(200).json({
+      message: alreadyBookmarked ? "Bookmark removed" : "Bookmark added",
+      bookmarked: !alreadyBookmarked,
+      bookmarksCount: post.bookmarks_count,
+      postId: String(post._id),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating bookmark",
+      error: error.message,
+    });
+  }
+};
+
+// Get bookmarked posts for current user
+exports.getBookmarkedPosts = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const posts = await Post.find({
+      bookmarked_by: userId,
+      is_active: true,
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate(basePopulate)
+      .lean();
+
+    // Add isBookmarked field (always true for bookmarked posts)
+    const postsWithBookmarkStatus = posts.map(post => ({
+      ...post,
+      isBookmarked: true,
+      isLiked: post.liked_by ? post.liked_by.some(id => id.toString() === userId.toString()) : false,
+    }));
+
+    return res.status(200).json({ posts: postsWithBookmarkStatus });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error loading bookmarked posts",
       error: error.message,
     });
   }

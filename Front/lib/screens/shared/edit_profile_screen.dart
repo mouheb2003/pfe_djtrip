@@ -27,8 +27,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String _originCountry = ''; // 🚀 Separate country of origin (no default)
   String _language = ''; // 🚀 No default language
   String? _avatarUrl;
+  String? _coverPhotoUrl;
   bool _isSaving = false;
   bool _isAvatarUploading = false;
+  bool _isCoverPhotoUploading = false;
   bool _isPhoneValid = false;
   String _userType = ''; // 🚀 NEW: Stocker le type d'utilisateur
   Map<String, dynamic>?
@@ -186,6 +188,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _avatarUrl =
             _toAbsoluteUrl(user['avatar']?.toString()) ??
             _toAbsoluteUrl(user['avatar_url']?.toString());
+        _coverPhotoUrl = _toAbsoluteUrl(user['cover_photo']?.toString());
         _userType = user['userType'] ?? '';
 
         // Handle phone country separately from origin country
@@ -588,6 +591,58 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return flags[language] ?? '🌐';
   }
 
+  // 🚀 NEW: Get region information for country
+  String _getRegionInfo(String countryKey) {
+    if (countryKey.isEmpty) return '';
+    const regions = {
+      'FR': 'Western Europe',
+      'TN': 'North Africa',
+      'IT': 'Southern Europe',
+      'ES': 'Southern Europe',
+      'DE': 'Western Europe',
+      'GB': 'Western Europe',
+      'US': 'North America',
+      'CA': 'North America',
+      'AU': 'Oceania',
+      'JP': 'East Asia',
+      'KR': 'East Asia',
+      'CN': 'East Asia',
+      'IN': 'South Asia',
+      'BR': 'South America',
+      'AR': 'South America',
+      'MX': 'North America',
+      'RU': 'Eastern Europe',
+      'TR': 'Western Asia',
+      'EG': 'North Africa',
+      'MA': 'North Africa',
+      'DZ': 'North Africa',
+      'SA': 'Western Asia',
+      'AE': 'Western Asia',
+      'NL': 'Western Europe',
+      'BE': 'Western Europe',
+      'CH': 'Western Europe',
+      'AT': 'Western Europe',
+      'SE': 'Northern Europe',
+      'NO': 'Northern Europe',
+      'DK': 'Northern Europe',
+      'FI': 'Northern Europe',
+      'PL': 'Eastern Europe',
+      'CZ': 'Eastern Europe',
+      'HU': 'Eastern Europe',
+      'GR': 'Southern Europe',
+      'PT': 'Southern Europe',
+      'LY': 'North Africa',
+      'LB': 'Western Asia',
+      'JO': 'Western Asia',
+      'SY': 'Western Asia',
+      'IQ': 'Western Asia',
+      'IR': 'Western Asia',
+      'IL': 'Western Asia',
+      'PS': 'Western Asia',
+    };
+    return regions[countryKey] ?? 'Unknown Region';
+  }
+
   // 🚀 NEW: Get maximum digits allowed for each country
   int _getMaxDigits(String countryKey) {
     const maxDigits = {
@@ -842,6 +897,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () => Navigator.pop(context, ImageSource.camera),
                 ),
+                const Divider(height: 1),
+                // Delete option (only show if avatar exists)
+                if (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.delete_outline, color: Colors.red),
+                    ),
+                    title: const Text(
+                      'Delete Profile Photo',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red),
+                    ),
+                    subtitle: const Text(
+                      'Remove current profile photo',
+                      style: TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _deleteAvatar();
+                    },
+                  ),
                 const SizedBox(height: 10),
                 // Cancel button
                 SizedBox(
@@ -904,6 +984,268 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         backgroundColor: Colors.green,
       ),
     );
+  }
+
+  Future<void> _pickAndUploadCoverPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 20),
+            const Text(
+              'Cover Photo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Gallery option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.photo_library, color: AppColors.primary),
+              ),
+              title: const Text(
+                'From Gallery',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              subtitle: const Text(
+                'Choose from your photos',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const Divider(height: 1),
+            // Camera option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.camera_alt, color: AppColors.primary),
+              ),
+              title: const Text(
+                'Take a Photo',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              subtitle: const Text(
+                'Use your camera',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const Divider(height: 1),
+            // Delete option (only show if cover photo exists)
+            if (_coverPhotoUrl != null && _coverPhotoUrl!.isNotEmpty)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+                title: const Text(
+                  'Delete Cover Photo',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red),
+                ),
+                subtitle: const Text(
+                  'Remove current cover photo',
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteCoverPhoto();
+                },
+              ),
+            const SizedBox(height: 10),
+            // Cancel button
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1200,
+    );
+    if (file == null) return;
+
+    setState(() => _isCoverPhotoUploading = true);
+    final ok = await UserService.updateCoverPhoto(File(file.path));
+    if (!mounted) return;
+    setState(() => _isCoverPhotoUploading = false);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error updating cover photo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await _loadProfile();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cover photo updated.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _deleteCoverPhoto() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Cover Photo'),
+        content: const Text('Are you sure you want to delete your cover photo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isCoverPhotoUploading = true);
+    
+    try {
+      final ok = await UserService.updateCoverPhoto(null);
+      if (!mounted) return;
+      
+      if (ok) {
+        setState(() {
+          _coverPhotoUrl = null;
+          _isCoverPhotoUploading = false;
+        });
+        await _loadProfile();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cover photo deleted.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Failed to delete cover photo');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCoverPhotoUploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error deleting cover photo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteAvatar() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Profile Photo'),
+        content: const Text('Are you sure you want to delete your profile photo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isAvatarUploading = true);
+    
+    try {
+      final ok = await UserService.deleteAvatar();
+      if (!mounted) return;
+      
+      if (ok) {
+        setState(() {
+          _avatarUrl = null;
+          _isAvatarUploading = false;
+        });
+        await _loadProfile();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile photo deleted.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Failed to delete avatar');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAvatarUploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error deleting profile photo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -1145,6 +1487,104 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             Center(
               child: Column(
                 children: [
+                  // Cover Photo Section
+                  Container(
+                    height: 120,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE4E8FF),
+                      borderRadius: BorderRadius.circular(12),
+                      image: _coverPhotoUrl != null && _coverPhotoUrl!.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(_coverPhotoUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: Stack(
+                      children: [
+                        if (_coverPhotoUrl == null || _coverPhotoUrl!.isEmpty)
+                          const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_outlined,
+                                  color: Color(0xFFA5ACC8),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Add Cover Photo',
+                                  style: TextStyle(
+                                    color: Color(0xFFA5ACC8),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_coverPhotoUrl != null && _coverPhotoUrl!.isNotEmpty)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: GestureDetector(
+                              onTap: _isCoverPhotoUploading
+                                  ? null
+                                  : _deleteCoverPhoto,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: _isCoverPhotoUploading
+                                ? null
+                                : _pickAndUploadCoverPhoto,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: _isCoverPhotoUploading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.camera_alt_rounded,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Avatar Section
                   Stack(
                     children: [
                       CircleAvatar(
@@ -1157,20 +1597,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               (_avatarUrl != null &&
                                   _avatarUrl!.isNotEmpty &&
                                   !_hasNetworkError)
-                              ? NetworkImage(_avatarUrl!)
-                              : null,
+                                  ? NetworkImage(_avatarUrl!)
+                                  : null,
                           child:
                               (_avatarUrl == null ||
                                   _avatarUrl!.isEmpty ||
                                   _hasNetworkError)
-                              ? const Icon(
-                                  Icons.person,
-                                  color: Color(0xFFA5ACC8),
-                                  size: 40,
-                                )
-                              : null,
+                                  ? const Icon(
+                                      Icons.person,
+                                      color: Color(0xFFA5ACC8),
+                                      size: 40,
+                                    )
+                                  : null,
                         ),
                       ),
+                      if (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                        Positioned(
+                          left: -2,
+                          bottom: -2,
+                          child: GestureDetector(
+                            onTap: _isAvatarUploading
+                                ? null
+                                : _deleteAvatar,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         right: -2,
                         bottom: -2,
@@ -1329,6 +1793,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 setState(() => _originCountry = v);
               },
             ),
+            // Detailed location display under country
+            if (_originCountry.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F4FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD5DEEE)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.place, size: 16, color: AppColors.primary.withOpacity(0.7)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${_getCountryName(_originCountry)}, ${_getRegionInfo(_originCountry)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF5B6190),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             _touristSectionLabel('NATIVE LANGUAGE'),
             DropdownButtonFormField<String>(
@@ -1454,7 +1946,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   color: Color(0xFF4B63FF),
                                 ),
                                 const SizedBox(width: 4),
-                                Flexible(
+                                Expanded(
                                   child: Text(
                                     interest,
                                     style: const TextStyle(
@@ -1762,6 +2254,90 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ],
                 ),
               ),
+
+            // Cover Photo Section
+            Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                image: _coverPhotoUrl != null && _coverPhotoUrl!.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(_coverPhotoUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                gradient: (_coverPhotoUrl == null || _coverPhotoUrl!.isEmpty)
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withOpacity(0.3),
+                          AppColors.primary.withOpacity(0.1),
+                        ],
+                      )
+                    : null,
+              ),
+              child: Stack(
+                children: [
+                  if (_coverPhotoUrl == null || _coverPhotoUrl!.isEmpty)
+                    const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_outlined,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Add Cover Photo',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: GestureDetector(
+                      onTap: _isCoverPhotoUploading
+                          ? null
+                          : _pickAndUploadCoverPhoto,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: _isCoverPhotoUploading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // Profile photo
             Center(
@@ -2946,7 +3522,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       color: Colors.white,
                                     ),
                                   ),
-                                Flexible(
+                                Expanded(
                                   child: Text(
                                     '$emoji $name',
                                     style: TextStyle(

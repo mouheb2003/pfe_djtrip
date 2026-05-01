@@ -23,6 +23,8 @@ class ActivityModel {
   final Map<String, dynamic>? coordonnees;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isBookmarked;
+  final int bookmarksCount;
 
   const ActivityModel({
     required this.id,
@@ -49,6 +51,8 @@ class ActivityModel {
     this.coordonnees,
     this.createdAt,
     this.updatedAt,
+    this.isBookmarked = false,
+    this.bookmarksCount = 0,
   });
 
   factory ActivityModel.fromJson(Map<String, dynamic> json) {
@@ -144,6 +148,9 @@ class ActivityModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
+    ).copyWith(
+      isBookmarked: json['isBookmarked'] == true,
+      bookmarksCount: (json['bookmarks_count'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -274,4 +281,67 @@ class ActivityModel {
   bool get isUpcoming => timelineStatus == 'UPCOMING';
   bool get isOngoing => timelineStatus == 'ONGOING';
   bool get isPast => timelineStatus == 'PAST';
+
+  // Bookmark functionality
+  // bool get isBookmarked => false; // Now using field instead of getter
+  // int get bookmarksCount => 0; // Now using field instead of getter
+
+  // CopyWith method for updating bookmark state
+  ActivityModel copyWith({
+    String? id,
+    String? titre,
+    String? description,
+    String? typeActivite,
+    String? categorie,
+    String? lieu,
+    double? duree,
+    double? prix,
+    int? capaciteMax,
+    int? nombreReservations,
+    List<String>? photos,
+    List<String>? languesDisponibles,
+    List<String>? equipementsInclus,
+    List<String>? aApporter,
+    double? noteMoyenne,
+    int? nombreAvis,
+    String? statut,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+    List<DateTime>? datesDisponibles,
+    Map<String, dynamic>? organisateur,
+    Map<String, dynamic>? coordonnees,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isBookmarked,
+    int? bookmarksCount,
+  }) {
+    return ActivityModel(
+      id: id ?? this.id,
+      titre: titre ?? this.titre,
+      description: description ?? this.description,
+      typeActivite: typeActivite ?? this.typeActivite,
+      categorie: categorie ?? this.categorie,
+      lieu: lieu ?? this.lieu,
+      duree: duree ?? this.duree,
+      prix: prix ?? this.prix,
+      capaciteMax: capaciteMax ?? this.capaciteMax,
+      nombreReservations: nombreReservations ?? this.nombreReservations,
+      photos: photos ?? this.photos,
+      languesDisponibles: languesDisponibles ?? this.languesDisponibles,
+      equipementsInclus: equipementsInclus ?? this.equipementsInclus,
+      aApporter: aApporter ?? this.aApporter,
+      noteMoyenne: noteMoyenne ?? this.noteMoyenne,
+      nombreAvis: nombreAvis ?? this.nombreAvis,
+      statut: statut ?? this.statut,
+      dateDebut: dateDebut ?? this.dateDebut,
+      dateFin: dateFin ?? this.dateFin,
+      datesDisponibles: datesDisponibles ?? this.datesDisponibles,
+      organisateur: organisateur ?? this.organisateur,
+      coordonnees: coordonnees ?? this.coordonnees,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      bookmarksCount: bookmarksCount ?? this.bookmarksCount,
+    );
+  }
 }

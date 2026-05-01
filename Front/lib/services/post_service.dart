@@ -243,6 +243,43 @@ class PostService {
     }
   }
 
+  static Future<Map<String, dynamic>> togglePostBookmark(String postId) async {
+    try {
+      final res = await ApiClient.post('/posts/$postId/bookmark', {});
+
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update bookmark',
+        'bookmarked': body['bookmarked'] == true,
+        'bookmarksCount': (body['bookmarksCount'] as num?)?.toInt() ?? 0,
+        'postId': body['postId']?.toString() ?? postId,
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update bookmark right now.'};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getBookmarkedPosts() async {
+    try {
+      final res = await ApiClient.get('/posts/bookmarks', cacheFirst: false);
+      if (res.statusCode != 200) return [];
+      final body = _safeObject(res.body);
+      if (body['posts'] is List) {
+        return _safeMapList(body['posts']);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<Map<String, dynamic>> reactToComment(String commentId, String reactionType) async {
     try {
       final res = await ApiClient.post('/comments/$commentId/react', {

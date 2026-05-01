@@ -675,4 +675,43 @@ class ActivityService {
       ),
     ];
   }
+
+  // Toggle bookmark on an activity
+  static Future<Map<String, dynamic>> toggleActivityBookmark(String activityId) async {
+    try {
+      final res = await ApiClient.post('/activites/$activityId/bookmark', {});
+
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update bookmark',
+        'bookmarked': body['bookmarked'] == true,
+        'bookmarksCount': (body['bookmarksCount'] as num?)?.toInt() ?? 0,
+        'activityId': body['activityId']?.toString() ?? activityId,
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update bookmark right now.'};
+    }
+  }
+
+  // Get bookmarked activities for current user
+  static Future<List<Map<String, dynamic>>> getBookmarkedActivities() async {
+    try {
+      final res = await ApiClient.get('/activites/bookmarks', cacheFirst: false);
+      if (res.statusCode != 200) return [];
+      final body = _safeObject(res.body);
+      if (body['activities'] is List) {
+        return _safeMapList(body['activities']);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }

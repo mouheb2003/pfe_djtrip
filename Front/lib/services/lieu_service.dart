@@ -174,4 +174,46 @@ class LieuService {
         .where((l) => l.id.trim().isNotEmpty && l.titre.trim().isNotEmpty)
         .toList(growable: false);
   }
+
+  // Toggle bookmark on a place
+  static Future<Map<String, dynamic>> toggleLieuBookmark(String lieuId) async {
+    try {
+      final res = await ApiClient.post('/lieux/$lieuId/bookmark', {});
+
+      Map<String, dynamic> body = {};
+      try {
+        body = jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (_) {
+        body = {};
+      }
+
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update bookmark',
+        'bookmarked': body['bookmarked'] == true,
+        'bookmarksCount': (body['bookmarksCount'] as num?)?.toInt() ?? 0,
+        'lieuId': body['lieuId']?.toString() ?? lieuId,
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to update bookmark right now.'};
+    }
+  }
+
+  // Get bookmarked places for current user
+  static Future<List<Map<String, dynamic>>> getBookmarkedLieux() async {
+    try {
+      final res = await ApiClient.get('/lieux/bookmarks', cacheFirst: false);
+      if (res.statusCode != 200) return [];
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (body['lieux'] is List) {
+        return (body['lieux'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }

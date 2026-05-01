@@ -376,6 +376,27 @@ class UserService {
     return null;
   }
 
+  /// Delete avatar
+  static Future<bool> deleteAvatar() async {
+    try {
+      _devLog('🗑️ [DELETE_AVATAR] Deleting avatar...');
+
+      final response = await ApiClient.delete('/users/me/avatar');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _devLog('✅ [DELETE_AVATAR] Success');
+        _invalidateProfileCache();
+        return true;
+      } else {
+        _devLog('❌ [DELETE_AVATAR] Failed: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _devLog('❌ [DELETE_AVATAR] Exception: $e');
+      return false;
+    }
+  }
+
   /// Delete user account permanently
   static Future<Map<String, dynamic>> deleteAccount() async {
     try {
@@ -464,6 +485,65 @@ class UserService {
       }
     } catch (e) {
       _devLog('Error updating notification settings: $e');
+      return false;
+    }
+  }
+
+  /// Update cover photo
+  static Future<bool> updateCoverPhoto(File? imageFile) async {
+    try {
+      _devLog('Updating cover photo...');
+      
+      // If imageFile is null, delete cover photo
+      if (imageFile == null) {
+        final response = await ApiClient.delete('/users/me/cover-photo');
+        
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          _devLog('Cover photo deleted successfully');
+          _invalidateProfileCache();
+          return true;
+        } else {
+          _devLog('Failed to delete cover photo: ${response.statusCode}');
+          return false;
+        }
+      }
+      
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('${ApiClient.baseUrl}/users/me/cover-photo'),
+      );
+      
+      // Add auth token
+      final token = await AuthService.getAccessToken();
+      if (token != null) {
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'multipart/form-data',
+        });
+      }
+      
+      // Add image file
+      final imageBytes = await imageFile.readAsBytes();
+      final multipartFile = http.MultipartFile.fromBytes(
+        'coverPhoto',
+        imageBytes,
+        filename: 'cover_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      request.files.add(multipartFile);
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _devLog('Cover photo updated successfully');
+        _invalidateProfileCache();
+        return true;
+      } else {
+        _devLog('Failed to update cover photo: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _devLog('Error updating cover photo: $e');
       return false;
     }
   }

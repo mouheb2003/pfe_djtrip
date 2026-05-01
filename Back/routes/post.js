@@ -26,6 +26,19 @@ router.post(
   invalidateCache(["posts:feed", "posts:me"]),
   postController.togglePostLike,
 );
+router.post(
+  "/:postId/bookmark",
+  verifyToken,
+  invalidateCache(["posts:feed", "posts:me", "posts:bookmarks"]),
+  postController.togglePostBookmark,
+);
+router.get(
+  "/bookmarks",
+  verifyToken,
+  verifyTouristeOrOrganisator,
+  cacheGet("posts:bookmarks", 60),
+  postController.getBookmarkedPosts,
+);
 
 // Tourist and Organizer post management
 router.get(

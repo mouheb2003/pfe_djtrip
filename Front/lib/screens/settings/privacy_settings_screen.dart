@@ -3,6 +3,7 @@ import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/user_service.dart';
 import 'privacy_policy_screen.dart';
+import '../auth/login_screen.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   const PrivacySettingsScreen({super.key});
@@ -21,6 +22,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   bool _allowDirectMessages = true;
   bool _showPhone = false;
   bool _showEmail = false;
+  bool _allowPhoneCalls = true;
   bool _allowLocationSharing = false;
   bool _allowDataAnalytics = false;
 
@@ -43,6 +45,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             _allowDirectMessages = settings['allow_direct_messages'] ?? true;
             _showPhone = settings['show_phone'] ?? false;
             _showEmail = settings['show_email'] ?? false;
+            _allowPhoneCalls = settings['allow_phone_calls'] ?? true;
             _allowLocationSharing = settings['allow_location_sharing'] ?? false;
             _allowDataAnalytics = settings['allow_data_analytics'] ?? false;
           });
@@ -75,6 +78,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           case 'show_email':
             _showEmail = value;
             break;
+          case 'allow_phone_calls':
+            _allowPhoneCalls = value;
+            break;
           case 'allow_location_sharing':
             _allowLocationSharing = value;
             break;
@@ -106,6 +112,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               break;
             case 'show_email':
               _showEmail = !value;
+              break;
+            case 'allow_phone_calls':
+              _allowPhoneCalls = !value;
               break;
             case 'allow_location_sharing':
               _allowLocationSharing = !value;
@@ -207,6 +216,14 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               subtitle: 'Display your email on your profile',
               value: _showEmail,
               onChanged: (value) => _updatePrivacySetting('show_email', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
+              icon: Icons.phone,
+              title: 'Allow Phone Calls',
+              subtitle: 'Let users call you directly',
+              value: _allowPhoneCalls,
+              onChanged: (value) => _updatePrivacySetting('allow_phone_calls', value),
             ),
 
             const SizedBox(height: 24),
@@ -366,7 +383,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           height: 50,
           child: OutlinedButton.icon(
             onPressed: () {
-              // Navigate to delete account screen
+              _showDeleteAccountDialog();
             },
             icon: const Icon(Icons.delete_forever, size: 20),
             label: const Text(
@@ -387,5 +404,154 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         ),
       ],
     );
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete your account?',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'This action cannot be undone and will permanently delete:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '• Your profile and personal information\n'
+              '• All your activities and bookings\n'
+              '• Your messages and conversations\n'
+              '• Your photos and files',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    try {
+      setState(() => _isLoading = true);
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Deleting account...'),
+            ],
+          ),
+        ),
+      );
+
+      final result = await UserService.deleteAccount();
+
+      if (!mounted) return;
+
+      // Close loading dialog
+      Navigator.pop(context);
+
+      if (result['success'] == true) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Sign out and navigate to login
+        await AuthService.logout();
+        
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to delete account'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading dialog if open
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('An error occurred while deleting your account'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }

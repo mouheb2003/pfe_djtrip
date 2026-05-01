@@ -106,6 +106,22 @@ const lieuSchema = new mongoose.Schema(
       default: false,
     },
     tags: [String],
+    // Bookmark functionality
+    bookmarked_by: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          index: true,
+        },
+      ],
+      default: [],
+    },
+    bookmarks_count: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true, // createdAt / updatedAt

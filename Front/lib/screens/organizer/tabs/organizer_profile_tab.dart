@@ -623,8 +623,14 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   }
 
   // ─── Cover Photo URL ──────────────────────────────────────────────
-  static const String _coverImage =
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80';
+  String _getCoverPhotoUrl() {
+    final coverPhoto = _user?.coverPhoto;
+    if (coverPhoto != null && coverPhoto.isNotEmpty) {
+      return coverPhoto;
+    }
+    // Fallback to default image
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -731,7 +737,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                         height: 160,
                         width: double.infinity,
                         child: Image.network(
-                          _coverImage,
+                          _getCoverPhotoUrl(),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             decoration: const BoxDecoration(

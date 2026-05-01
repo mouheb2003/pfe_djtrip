@@ -20,6 +20,8 @@ class LieuModel {
   final String? openingHours;
   final String? closingHours;
   final bool? bookingRequired;
+  final bool isBookmarked;
+  final int bookmarksCount;
 
   String get displayImage {
     if (imagePortrait.isNotEmpty) return imagePortrait;
@@ -49,6 +51,8 @@ class LieuModel {
     this.openingHours,
     this.closingHours,
     this.bookingRequired,
+    this.isBookmarked = false,
+    this.bookmarksCount = 0,
   });
 
   factory LieuModel.fromJson(Map<String, dynamic> json) {
@@ -133,6 +137,9 @@ class LieuModel {
       openingHours: json['opening_hours'] as String?,
       closingHours: json['closing_hours'] as String?,
       bookingRequired: json['booking_required'] as bool?,
+    ).copyWith(
+      isBookmarked: json['isBookmarked'] == true,
+      bookmarksCount: (json['bookmarks_count'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -179,5 +186,58 @@ class LieuModel {
       default:
         return 'Other';
     }
+  }
+
+  // CopyWith method for updating bookmark state
+  LieuModel copyWith({
+    String? id,
+    String? titre,
+    String? sousTitre,
+    String? description,
+    String? imagePortrait,
+    String? imagePaysage,
+    List<String>? images,
+    double? noteMoyenne,
+    int? nombreAvis,
+    String? categorie,
+    bool? topDestination,
+    String? prix,
+    double? latitude,
+    double? longitude,
+    String? activiteLieeId,
+    String? video,
+    List<String>? amenities,
+    List<String>? activities,
+    String? openingHours,
+    String? closingHours,
+    bool? bookingRequired,
+    bool? isBookmarked,
+    int? bookmarksCount,
+  }) {
+    return LieuModel(
+      id: id ?? this.id,
+      titre: titre ?? this.titre,
+      sousTitre: sousTitre ?? this.sousTitre,
+      description: description ?? this.description,
+      imagePortrait: imagePortrait ?? this.imagePortrait,
+      imagePaysage: imagePaysage ?? this.imagePaysage,
+      images: images ?? this.images,
+      noteMoyenne: noteMoyenne ?? this.noteMoyenne,
+      nombreAvis: nombreAvis ?? this.nombreAvis,
+      categorie: categorie ?? this.categorie,
+      topDestination: topDestination ?? this.topDestination,
+      prix: prix ?? this.prix,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      activiteLieeId: activiteLieeId ?? this.activiteLieeId,
+      video: video ?? this.video,
+      amenities: amenities ?? this.amenities,
+      activities: activities ?? this.activities,
+      openingHours: openingHours ?? this.openingHours,
+      closingHours: closingHours ?? this.closingHours,
+      bookingRequired: bookingRequired ?? this.bookingRequired,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      bookmarksCount: bookmarksCount ?? this.bookmarksCount,
+    );
   }
 }

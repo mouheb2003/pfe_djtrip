@@ -6,6 +6,7 @@ class UserModel {
   final String email;
   final String userType; // 'Touriste' | 'Organisator'
   final String? avatar;
+  final String? coverPhoto;
   final String? bio;
   final String? numTel;
   final String? paysOrigine;
@@ -21,6 +22,7 @@ class UserModel {
     required this.email,
     required this.userType,
     this.avatar,
+    this.coverPhoto,
     this.bio,
     this.numTel,
     this.paysOrigine,
@@ -45,6 +47,7 @@ class UserModel {
       email: json['email'] ?? '',
       userType: json['userType'] ?? '',
       avatar: json['avatar'] as String?,
+      coverPhoto: json['cover_photo'] as String?,
       bio: json['bio'] as String?,
       numTel: json['num_tel'] as String?,
       paysOrigine: json['pays_origine'] as String?,
@@ -65,6 +68,7 @@ class UserModel {
       'email': email,
       'userType': userType,
       'avatar': avatar,
+      'cover_photo': coverPhoto,
       'bio': bio,
       'num_tel': numTel,
       'pays_origine': paysOrigine,

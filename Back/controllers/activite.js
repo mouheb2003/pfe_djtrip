@@ -976,3 +976,83 @@ exports.getGlobalActivitiesByTimeline = async (req, res) => {
     });
   }
 };
+
+// Toggle bookmark on an activity
+exports.toggleActivityBookmark = async (req, res) => {
+  try {
+    const userId = String(req.user.userId || "");
+    const { activityId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const activity = await Activite.findById(activityId);
+    if (!activity) {
+      return res.status(404).json({ message: "Activity not found" });
+    }
+
+    const bookmarkedBy = Array.isArray(activity.bookmarked_by)
+      ? activity.bookmarked_by.map((id) => String(id))
+      : [];
+    const alreadyBookmarked = bookmarkedBy.includes(userId);
+
+    if (alreadyBookmarked) {
+      // Remove bookmark
+      activity.bookmarked_by = activity.bookmarked_by.filter(
+        (id) => String(id) !== userId
+      );
+      activity.bookmarks_count = Math.max(0, activity.bookmarks_count - 1);
+    } else {
+      // Add bookmark
+      activity.bookmarked_by = [...(activity.bookmarked_by || []), userId];
+      activity.bookmarks_count = activity.bookmarked_by.length;
+    }
+
+    await activity.save();
+
+    return res.status(200).json({
+      message: alreadyBookmarked ? "Bookmark removed" : "Bookmark added",
+      bookmarked: !alreadyBookmarked,
+      bookmarksCount: activity.bookmarks_count,
+      activityId: String(activity._id),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating bookmark",
+      error: error.message,
+    });
+  }
+};
+
+// Get bookmarked activities for current user
+exports.getBookmarkedActivities = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const activities = await Activite.find({
+      bookmarked_by: userId,
+      statut: { $ne: "archived" },
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate(
+        "organisateur_id",
+        "fullname email avatar num_tel note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
+      )
+      .lean();
+
+    // Add isBookmarked field (always true for bookmarked activities)
+    const activitiesWithBookmarkStatus = activities.map(activity => ({
+      ...activity,
+      isBookmarked: true,
+    }));
+
+    return res.status(200).json({ activities: activitiesWithBookmarkStatus });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error loading bookmarked activities",
+      error: error.message,
+    });
+  }
+};

@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema(
     },
     date_inscription: { type: Date, default: Date.now },
     avatar: String,
+    cover_photo: String,
     bio: String,
     pays_origine: String,
     // 🚀 NEW: Language and interests fields
@@ -30,6 +31,7 @@ const userSchema = new mongoose.Schema(
     allowDirectMessages: { type: Boolean, default: true },
     showPhone: { type: Boolean, default: false },
     showEmail: { type: Boolean, default: false },
+    allowPhoneCalls: { type: Boolean, default: true },
     allowLocationSharing: { type: Boolean, default: false },
     allowDataAnalytics: { type: Boolean, default: false },
     // 🚀 NEW: Advanced privacy settings

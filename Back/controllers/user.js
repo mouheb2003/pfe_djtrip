@@ -1192,6 +1192,95 @@ exports.removeFavorite = async (req, res) => {
   }
 };
 
+// Update cover photo (PUT /users/me/cover-photo)
+exports.updateCoverPhoto = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("📸 Update cover photo request from user:", userId);
+
+    const AvatarService = require("../services/avatar");
+    const User = require("../models/user");
+    
+    // Upload to Cloudinary
+    const uploadResult = await AvatarService.uploadToCloudinary(req.file.buffer, {
+      folder: "DJTrip/cover-photos",
+      transformation: {
+        width: 1200,
+        height: 400,
+        crop: "fill",
+        quality: "auto",
+      },
+    });
+
+    // Update user in database
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { cover_photo: uploadResult.secure_url },
+      { new: true }
+    ).select("-mot_de_passe");
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ Cover photo updated successfully:", uploadResult.secure_url);
+
+    res.status(200).json({
+      message: "Cover photo updated successfully",
+      coverPhoto: user.cover_photo,
+    });
+  } catch (err) {
+    console.error("❌ Error updating cover photo:", err);
+    res.status(500).json({
+      message: "Error updating cover photo",
+      error: err.message,
+    });
+  }
+};
+
+// Delete cover photo (DELETE /users/me/cover-photo)
+exports.deleteCoverPhoto = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("🗑️ Delete cover photo request from user:", userId);
+
+    const User = require("../models/user");
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Delete from Cloudinary if cover photo exists
+    if (user.cover_photo) {
+      const AvatarService = require("../services/avatar");
+      try {
+        await AvatarService.deleteFromCloudinary(user.cover_photo);
+        console.log("✅ Cover photo deleted from Cloudinary");
+      } catch (cloudinaryError) {
+        console.log("⚠️ Failed to delete from Cloudinary:", cloudinaryError.message);
+        // Continue with database deletion even if Cloudinary deletion fails
+      }
+    }
+
+    // Remove cover photo from database
+    user.cover_photo = undefined;
+    await user.save();
+
+    console.log("✅ Cover photo deleted successfully from database");
+
+    res.status(200).json({
+      message: "Cover photo deleted successfully",
+    });
+  } catch (err) {
+    console.error("❌ Error deleting cover photo:", err);
+    res.status(500).json({
+      message: "Error deleting cover photo",
+      error: err.message,
+    });
+  }
+};
+
 // Delete avatar (DELETE /users/me/avatar)
 exports.deleteAvatar = async (req, res) => {
   try {
@@ -1658,8 +1747,11 @@ exports.unbanUser = async (req, res) => {
 // 🚀 NEW: Privacy settings endpoints
 exports.updatePrivacySettings = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.userId;
     const privacyData = req.body;
+
+    console.log("🔒 Updating privacy settings for user:", userId);
+    console.log("🔒 Privacy data:", privacyData);
 
     const updatedUser = await UserService.updatePrivacySettings(
       userId,

@@ -147,4 +147,18 @@ router.post(
   aiImageGenerator.generateActivityImage,
 );
 
+// Bookmark routes (for both Tourist and Organizer)
+router.post(
+  "/:activityId/bookmark",
+  verifyToken,
+  invalidateCache(["activites"]),
+  activiteController.toggleActivityBookmark,
+);
+router.get(
+  "/bookmarks",
+  verifyToken,
+  cacheGet("activites:bookmarks", 60),
+  activiteController.getBookmarkedActivities,
+);
+
 module.exports = wrapRouter(router);

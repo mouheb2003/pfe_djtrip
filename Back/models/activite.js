@@ -157,6 +157,22 @@ const activiteSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Bookmark functionality
+    bookmarked_by: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          index: true,
+        },
+      ],
+      default: [],
+    },
+    bookmarks_count: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt

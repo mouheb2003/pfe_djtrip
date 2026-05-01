@@ -135,6 +135,23 @@ router.delete(
   userController.deleteAvatar,
 );
 
+// PUT /me/cover-photo - Update current user cover photo (protected route)
+router.put(
+  "/me/cover-photo",
+  verifyToken,
+  upload.single("coverPhoto"),
+  invalidateCache(["users", "users:me", "posts"]),
+  userController.updateCoverPhoto,
+);
+
+// DELETE /me/cover-photo - Delete current user cover photo (protected route)
+router.delete(
+  "/me/cover-photo",
+  verifyToken,
+  invalidateCache(["users", "users:me", "posts"]),
+  userController.deleteCoverPhoto,
+);
+
 // DELETE /me - Delete current user account (protected route)
 router.delete(
   "/me",
@@ -194,6 +211,12 @@ router.get("/all", cacheGet("users:all", 60), userController.getAllUsersPublic);
 // GET /admin - Get admin user (optimized for chat support)
 router.get("/admin", cacheGet("users:admin:single", 30), userController.getAdminUser);
 router.put("/privacy", verifyToken, userController.updatePrivacySettings);
+router.patch(
+  "/privacy-settings",
+  verifyToken,
+  invalidateCache(["users", "users:me", "posts"]),
+  userController.updatePrivacySettings,
+);
 router.put(
   "/advanced-privacy",
   verifyToken,

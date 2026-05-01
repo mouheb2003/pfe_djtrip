@@ -84,6 +84,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   bool _isPartnerBlocked = false;
   bool _isBlockedByPartner = false;
   bool _isConversationMuted = false;
+  
+  // 🚀 Privacy settings tracking
+  bool _allowDirectMessages = true;
+  bool _allowPhoneCalls = true;
+  Map<String, dynamic>? _partnerPrivacySettings;
 
   Future<void> _checkBlockMuteStatus() async {
     try {
@@ -98,23 +103,44 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         final blockedByUsers = result['blockedByUsers'] as List<dynamic>;
         
         print('DEBUG: Blocked users: $blockedUsers');
-        print('DEBUG: Blocked by users: $blockedByUsers');
-        print('DEBUG: Partner ID: ${widget.partnerId}');
-        print('DEBUG: Is partner blocked: ${blockedUsers.any((id) => id.toString() == widget.partnerId)}');
-        print('DEBUG: Is current user blocked by partner: ${blockedByUsers.any((id) => id.toString() == widget.partnerId)}');
         
+        // Check block status
         setState(() {
-          _isPartnerBlocked = blockedUsers.any((id) => id.toString() == widget.partnerId);
-          _isBlockedByPartner = blockedByUsers.any((id) => id.toString() == widget.partnerId);
-          _isConversationMuted = mutedPartners.any((id) => id.toString() == widget.partnerId);
+          _isPartnerBlocked = blockedUsers.contains(widget.partnerId);
+          _isBlockedByPartner = blockedByUsers.contains(widget.partnerId);
+          _isConversationMuted = mutedPartners.contains(widget.partnerId);
         });
-        
-        print('DEBUG: _isPartnerBlocked set to: $_isPartnerBlocked');
-        print('DEBUG: _isBlockedByPartner set to: $_isBlockedByPartner');
       }
     } catch (e) {
-      // Silently fail - block/mute status is not critical
-      print('Error checking block/mute status: $e');
+      print('DEBUG: Error checking block/mute status: $e');
+    }
+  }
+
+  Future<void> _loadPartnerPrivacySettings() async {
+    try {
+      // Get partner user data to check privacy settings
+      final response = await ApiClient.get('/users/${widget.partnerId}');
+      if (!mounted) return;
+      
+      if (response.statusCode == 200) {
+        final userData = response.body as Map<String, dynamic>;
+        final privacySettings = userData['privacy_settings'] as Map<String, dynamic>? ?? {};
+        
+        setState(() {
+          _partnerPrivacySettings = privacySettings;
+          _allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
+          _allowPhoneCalls = privacySettings['allow_phone_calls'] ?? true;
+        });
+        
+        print('DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings');
+      }
+    } catch (e) {
+      print('DEBUG: Error loading partner privacy settings: $e');
+      // Default to enabled if we can't load settings
+      setState(() {
+        _allowDirectMessages = true;
+        _allowPhoneCalls = true;
+      });
     }
   }
 
@@ -175,6 +201,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     _initVoicePlayer();
     _checkBlockMuteStatus();
+    _loadPartnerPrivacySettings();
     _loadMessages();
     _initSocket();
     _startAutoRefresh();
@@ -1563,80 +1590,103 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   color: cs.onSurface,
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    if (!widget.isSupportChat && !_isDjTripAdminThread) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PublicProfileScreen(userId: widget.partnerId),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (!widget.isSupportChat && !_isDjTripAdminThread) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PublicProfileScreen(userId: widget.partnerId),
+                          ),
+                        );
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: cs.surfaceVariant,
+                          backgroundImage: partnerAvatarProvider,
+                          child: partnerAvatarProvider == null
+                              ? Icon(Icons.person, color: cs.onSurfaceVariant, size: 18)
+                              : null,
                         ),
-                      );
-                    }
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: cs.surfaceVariant,
-                        backgroundImage: partnerAvatarProvider,
-                        child: partnerAvatarProvider == null
-                            ? Icon(Icons.person, color: cs.onSurfaceVariant, size: 18)
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 200),
-                            child: Text(
-                              headerTitle,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                headerTitle,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _partnerOnline ? 'Online' : 'Offline',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _partnerOnline ? Colors.green : Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _partnerOnline ? 'Online' : 'Offline',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _partnerOnline ? Colors.green : Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 if (!widget.isSupportChat && !_isWarningInboxMode && !_isConversationBlocked) ...[
-                  IconButton(
-                    onPressed: () => _onCallTap(isVideo: false),
-                    icon: const Icon(Icons.phone_rounded),
-                    color: cs.onSurface,
-                    tooltip: 'Voice call',
-                  ),
-                  IconButton(
-                    onPressed: () => _onCallTap(isVideo: true),
-                    icon: const Icon(Icons.videocam_rounded),
-                    color: cs.onSurface,
-                    tooltip: 'Video call',
-                  ),
+                  if (_allowPhoneCalls) ...[
+                    IconButton(
+                      onPressed: () => _onCallTap(isVideo: false),
+                      icon: const Icon(Icons.phone_rounded),
+                      color: cs.onSurface,
+                      tooltip: 'Voice call',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    IconButton(
+                      onPressed: () => _onCallTap(isVideo: true),
+                      icon: const Icon(Icons.videocam_rounded),
+                      color: cs.onSurface,
+                      tooltip: 'Video call',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ] else ...[
+                    IconButton(
+                      onPressed: () => _showPhoneCallsDisabledDialog(),
+                      icon: Icon(Icons.phone_disabled_rounded, color: cs.outline),
+                      tooltip: 'Phone calls disabled',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    IconButton(
+                      onPressed: () => _showPhoneCallsDisabledDialog(),
+                      icon: Icon(Icons.videocam_off_rounded, color: cs.outline),
+                      tooltip: 'Video calls disabled',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
                 ],
                 if (showAdminIdentity)
                   IconButton(
                     onPressed: () {},
                     icon: const Icon(Icons.info_outline_rounded),
                     color: cs.outline,
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                   ),
                 if (!widget.isSupportChat)
                   IconButton(
@@ -1649,6 +1699,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     },
                     icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
                     tooltip: 'More',
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                   ),
               ],
             ),
@@ -2827,6 +2879,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final isReplacing = _replacingMessageId.isNotEmpty;
     final isReplyLocked = _isReplyLocked;
     final isBlocked = _isConversationBlocked;
+    final isMessagingDisabled = !_allowDirectMessages || isBlocked;
     final composerFill = widget.isSupportChat
         ? const Color(0xFFF1F5FF)
         : const Color(0xFFE8EDF5);
@@ -2843,6 +2896,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       children: [
         if (isReplyLocked)
           _buildLockedNoticeBanner(margin: const EdgeInsets.only(bottom: 8)),
+        if (isMessagingDisabled && !isBlocked)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFED7AA)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.privacy_tip,
+                  size: 16,
+                  color: Color(0xFFEA580C),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'This user has disabled direct messages. You cannot send messages.',
+                    style: const TextStyle(
+                      color: Color(0xFF9A3412),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (isBlocked)
           Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -3033,14 +3116,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               // avec la base du champ de texte
               padding: const EdgeInsets.only(bottom: 2),
               child: InkWell(
-                onTap: isReplyLocked || isBlocked
+                onTap: isReplyLocked || isMessagingDisabled
                     ? null
                     : canSend
                     ? (isEditing ? _updateMessage : _send)
                     : (widget.isSupportChat
                           ? null // 🔧 DISABLE: No audio in support chat
                           : _startRecordingUi),
-                onLongPress: !isReplyLocked && !isBlocked && !canSend && !widget.isSupportChat
+                onLongPress: !isReplyLocked && !isMessagingDisabled && !canSend && !widget.isSupportChat
                     ? _startRecordingUi
                     : null, // 🔧 DISABLE: No audio in support chat
                 borderRadius: BorderRadius.circular(actionButtonSize / 2),
@@ -3048,19 +3131,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   width: actionButtonSize,
                   height: actionButtonSize,
                   decoration: BoxDecoration(
-                    color: isBlocked ? Colors.grey : sendButtonColor,
+                    color: isMessagingDisabled ? Colors.grey : sendButtonColor,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: sendButtonColor.withOpacity(0.18),
+                        color: isMessagingDisabled ? Colors.grey.withOpacity(0.18) : sendButtonColor.withOpacity(0.18),
                         blurRadius: 10,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Icon(
-                    isBlocked
-                        ? Icons.block
+                    isMessagingDisabled
+                        ? Icons.privacy_tip
                         : (isReplyLocked
                             ? Icons.lock_rounded
                             : canSend
@@ -3122,6 +3205,55 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           _buildHeader(cs),
           Expanded(child: _buildMessageList(cs)),
           if (!_isRecordingVoice) _buildBottomComposer(cs),
+        ],
+      ),
+    );
+  }
+
+  void _showPhoneCallsDisabledDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.phone_disabled_rounded, color: Colors.orange, size: 24),
+            const SizedBox(width: 12),
+            const Text('Phone Calls Disabled'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This user has disabled phone calls in their privacy settings.',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'You can still send messages if they have enabled direct messages, or contact them through other means.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Got it',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );

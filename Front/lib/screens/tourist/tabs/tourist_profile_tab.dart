@@ -1250,6 +1250,16 @@ List<Map<String, dynamic>> _featuredPlaces = [];
     return 'Curating unique experiences across Djerba.';
   }
 
+  // ─── Cover Photo URL ──────────────────────────────────────────────
+  String _getCoverPhotoUrl() {
+    final coverPhoto = _user?.coverPhoto;
+    if (coverPhoto != null && coverPhoto.isNotEmpty) {
+      return coverPhoto;
+    }
+    // Fallback to default image
+    return 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1400&q=80';
+  }
+
   List<String> _profileInterests() {
     final raw = _user?.centresInteret ?? const <String>[];
     return raw.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
@@ -1321,7 +1331,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                       height: 160,
                       width: double.infinity,
                       child: Image.network(
-                        'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1400&q=80',
+                        _getCoverPhotoUrl(),
                         fit: BoxFit.cover,
                         filterQuality: FilterQuality.high,
                         errorBuilder: (_, __, ___) => Container(
