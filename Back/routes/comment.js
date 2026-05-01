@@ -18,21 +18,6 @@ router.get("/test", (req, res) => {
   res.json({ message: "Test endpoint works" });
 });
 
-// Get all comments with filters (ADMIN)
-router.get(
-  "/admin",
-  verifyToken,
-  commentController.getAdminComments
-);
-
-// Delete any comment (ADMIN)
-router.delete(
-  "/admin/:commentId",
-  verifyToken,
-  invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
-  commentController.adminDeleteComment
-);
-
 // ==================== PUBLIC ENDPOINTS ====================
 
 // Search users for mention autocomplete
@@ -127,16 +112,6 @@ router.delete(
   commentController.deleteComment
 );
 
-<<<<<<< HEAD
-// Search users for mention autocomplete
-router.get(
-  "/users/search",
-  verifyToken,
-  commentController.searchUsersForMention
-);
-
-=======
->>>>>>> backend/djtripx2
 console.log('[COMMENT ROUTES] All routes defined, wrapping router...');
 module.exports = wrapRouter(router);
 console.log('[COMMENT ROUTES] Comment routes loaded successfully');

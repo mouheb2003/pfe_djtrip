@@ -200,7 +200,7 @@ function QuickActionCard({ icon, label, color, path }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const colorValue = typeof color === 'function' ? color(theme) : color;
-  
+
   const handleClick = () => {
     if (path) {
       navigate(path);
@@ -277,7 +277,7 @@ function HealthBar({ label, value, color }) {
 function ActivityDistribution({ users, lieux, appeals, activites, publications, approvals }) {
   const theme = useTheme();
   const total = users + lieux + appeals + activites + publications + approvals;
-  
+
   const data = [
     { label: 'Users', value: users, color: theme.palette.primary.main },
     { label: 'Places', value: lieux, color: theme.palette.success.main },
@@ -445,7 +445,7 @@ export function HomeFeedView({ sx }) {
                     icon="solar:user-plus-bold"
                     label="Users"
                     color={(theme) => theme.palette.primary.main}
-                    path={paths.dashboard.three}
+                    path={paths.dashboard.users}
                   />
                   <QuickActionCard
                     icon="solar:map-point-wave-bold"

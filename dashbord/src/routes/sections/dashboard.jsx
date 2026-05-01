@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { Outlet } from 'react-router-dom';
-=======
 import { Outlet, useLocation } from 'react-router-dom';
->>>>>>> backend/djtripx2
 
 import { CONFIG } from 'src/global-config';
 import { DashboardLayout } from 'src/layouts/dashboard';
@@ -21,20 +17,12 @@ import UsersPage from 'src/pages/dashboard/Users';
 import LogsPage from 'src/pages/dashboard/Logs';
 import AppealsPage from 'src/pages/dashboard/Appeals';
 import ApprovalsPage from 'src/pages/dashboard/Approvals';
-<<<<<<< HEAD
 import PaymentsPage from 'src/pages/dashboard/Payments';
 import ChangePasswordPage from 'src/pages/dashboard/ChangePassword';
-=======
->>>>>>> backend/djtripx2
 
 // ----------------------------------------------------------------------
 
 function DashboardOutlet() {
-<<<<<<< HEAD
-  return (
-  <DashboardLayout>
-    <Outlet />
-=======
   const { pathname } = useLocation();
 
   return (
@@ -42,7 +30,6 @@ function DashboardOutlet() {
     <div key={pathname}>
       <Outlet />
     </div>
->>>>>>> backend/djtripx2
   </DashboardLayout>
   );
 }
@@ -75,11 +62,8 @@ export const dashboardRoutes = [
       { path: 'three', element: <UsersPage /> },
       { path: 'appeals', element: <AppealsPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
-<<<<<<< HEAD
       { path: 'payments', element: <PaymentsPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },
-=======
->>>>>>> backend/djtripx2
     ],
   },
 ];

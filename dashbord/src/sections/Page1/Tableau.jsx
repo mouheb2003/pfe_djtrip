@@ -40,10 +40,7 @@ export function InvoiceTable({
   onDeleteRow,
   onDeleteSelected,
   onViewDetails,
-<<<<<<< HEAD
   onEdit,
-=======
->>>>>>> backend/djtripx2
 }) {
   const confirmDialog = useBoolean();
 

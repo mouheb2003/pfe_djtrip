@@ -38,10 +38,7 @@ import {
   deletePublication,
   getAdminComments,
   adminDeleteComment,
-<<<<<<< HEAD
   getLieux,
-=======
->>>>>>> backend/djtripx2
 } from 'src/Controller/actions';
 
 import { toast } from 'src/components/snackbar';
@@ -104,11 +101,8 @@ function mapPublicationComment(comment) {
     content: String(comment?.content ?? ''),
     authorName: author?.fullname ?? author?.email ?? 'Unknown',
     createdAt: comment?.created_at ?? comment?.createdAt ?? null,
-<<<<<<< HEAD
     parent_comment_id: comment?.parent_comment_id ?? null,
     user_id: comment?.user_id ?? null,
-=======
->>>>>>> backend/djtripx2
   };
 }
 
@@ -228,7 +222,6 @@ export function PublicationsView({ sx }) {
     loadRows();
   }, [loadRows]);
 
-<<<<<<< HEAD
   const loadLieux = useCallback(async () => {
     try {
       setLoadingLieux(true);
@@ -247,8 +240,6 @@ export function PublicationsView({ sx }) {
     }
   }, [locationDialogOpen, loadLieux]);
 
-=======
->>>>>>> backend/djtripx2
   const loadPostComments = useCallback(async (postId) => {
     if (!postId) {
       setDetailsComments([]);
@@ -798,7 +789,6 @@ export function PublicationsView({ sx }) {
           </DialogActions>
         </Dialog>
 
-<<<<<<< HEAD
         {/* Location Selection Dialog */}
         <Dialog open={locationDialogOpen} onClose={() => setLocationDialogOpen(false)} fullWidth maxWidth="md">
           <DialogTitle>Sélectionner un lieu</DialogTitle>
@@ -956,33 +946,6 @@ export function PublicationsView({ sx }) {
                   </Typography>
                 </Box>
               </Stack>
-=======
-        <Dialog open={openDetailsDialog} onClose={closeDetails} fullWidth maxWidth="lg">
-          <DialogTitle sx={{ pb: 1.5 }}>
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1.25}
-              justifyContent="space-between"
-              alignItems={{ md: 'center' }}
-            >
-              <Stack direction="row" spacing={1.25} alignItems="center">
-                <Avatar
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    bgcolor: 'primary.main',
-                  }}
-                >
-                  <Iconify icon="solar:document-text-bold" width={18} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h6">Détails publication</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    Vue complète du post et de ses commentaires
-                  </Typography>
-                </Box>
-              </Stack>
->>>>>>> backend/djtripx2
 
               <Stack direction="row" spacing={1} flexWrap="wrap">
                 <Chip size="small" color="primary" variant="soft" label={detailsRow?.postType ?? '-'} />
@@ -1215,7 +1178,6 @@ export function PublicationsView({ sx }) {
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
-<<<<<<< HEAD
                     {(() => {
                       console.log('DEBUG: All comments received:', detailsComments);
                       console.log('DEBUG: Sample comment structure:', detailsComments[0]);
@@ -1342,49 +1304,6 @@ export function PublicationsView({ sx }) {
                         </Box>
                       ));
                     })()}
-=======
-                    {detailsComments.map((comment) => (
-                      <Card
-                        key={comment.id}
-                        variant="outlined"
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 1.5,
-                          bgcolor: 'background.neutral',
-                        }}
-                      >
-                        <Stack direction="row" justifyContent="space-between" spacing={1}>
-                          <Stack direction="row" spacing={1.25} alignItems="center">
-                            <Avatar sx={{ width: 30, height: 30, fontSize: 13 }}>
-                              {getInitial(comment.authorName)}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="subtitle2">{comment.authorName}</Typography>
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                {formatDate(comment.createdAt)}
-                              </Typography>
-                            </Box>
-                          </Stack>
-
-                          <Tooltip title="Supprimer commentaire">
-                            <IconButton
-                              color="error"
-                              size="small"
-                              onClick={() => handleDeleteCommentFromDetails(comment.id)}
-                            >
-                              <Iconify icon="solar:trash-bin-trash-bold" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-
-                        <Divider sx={{ my: 1 }} />
-
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
-                          {comment.content || '-'}
-                        </Typography>
-                      </Card>
-                    ))}
->>>>>>> backend/djtripx2
                   </Stack>
                 )}
               </Card>
@@ -1400,3 +1319,5 @@ export function PublicationsView({ sx }) {
     </DashboardContent>
   );
 }
+
+

@@ -960,7 +960,6 @@ export function ActivitiesView({ sx }) {
               </Card>
 
               <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-<<<<<<< HEAD
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Participants ({participants.length})
                 </Typography>
@@ -979,7 +978,7 @@ export function ActivitiesView({ sx }) {
                         {participants.map((participant) => {
                           const isPaid = participant.payment_id || participant.statut === 'approuvee' || participant.statut === 'verifie';
                           const isCheckedIn = !!participant.qr_used_at;
-                          
+
                           return (
                             <TableRow key={participant._id}>
                               <TableCell>
@@ -1056,8 +1055,6 @@ export function ActivitiesView({ sx }) {
               </Card>
 
               <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-=======
->>>>>>> backend/djtripx2
                 <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
                   Informations techniques
                 </Typography>
@@ -1344,7 +1341,7 @@ export function ActivitiesView({ sx }) {
                                   </Typography>
                                 </Box>
                               </Stack>
-                              
+
                               {/* Images */}
                               {(post.imageUrl || (post.imageUrls && post.imageUrls.length > 0)) && (
                                 <Box
@@ -1377,24 +1374,24 @@ export function ActivitiesView({ sx }) {
 
                               {/* Reactions - Clickable to expand */}
                               <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                                <Chip 
-                                  size="small" 
-                                  label={`❤️ ${post.likes_count || 0}`} 
+                                <Chip
+                                  size="small"
+                                  label={`❤️ ${post.likes_count || 0}`}
                                   variant="outlined"
                                   onClick={() => handleTogglePostExpansion(post._id)}
                                   sx={{ cursor: 'pointer' }}
                                 />
-                                <Chip 
-                                  size="small" 
-                                  label={`💬 ${post.comments_count || 0}`} 
+                                <Chip
+                                  size="small"
+                                  label={`💬 ${post.comments_count || 0}`}
                                   variant="outlined"
                                   onClick={() => handleTogglePostExpansion(post._id)}
                                   sx={{ cursor: 'pointer' }}
                                 />
                                 {post.total_reactions && (
-                                  <Chip 
-                                    size="small" 
-                                    label={`👍 ${post.total_reactions}`} 
+                                  <Chip
+                                    size="small"
+                                    label={`👍 ${post.total_reactions}`}
                                     variant="outlined"
                                     onClick={() => handleTogglePostExpansion(post._id)}
                                     sx={{ cursor: 'pointer' }}

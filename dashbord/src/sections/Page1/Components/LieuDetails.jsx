@@ -17,14 +17,11 @@ import { useState, useCallback } from 'react';
 
 import { Iconify } from 'src/components/iconify';
 import { Carousel, useCarousel, CarouselArrowBasicButtons } from 'src/components/carousel';
-<<<<<<< HEAD
 import { useAuthContext } from 'src/auth/hooks';
 import { toast } from 'src/components/snackbar';
 import { Delete } from 'src/Controller/function';
 import { END_POINT } from 'src/Controller/endPoint';
 import { getUserById, getUserReviews } from 'src/Controller/actions';
-=======
->>>>>>> backend/djtripx2
 
 function categorieColor(categorie) {
   switch (categorie) {
@@ -69,22 +66,6 @@ function calculateAverageNote(avis) {
 function getInitial(text) {
   return (text || 'L').trim().charAt(0).toUpperCase();
 }
-<<<<<<< HEAD
-=======
-
-function priceLabel(price) {
-  return price === 0 ? 'Gratuit' : `${price} TND`;
-}
-
-function normalizeImages(images) {
-  return (Array.isArray(images) ? images : [])
-    .map((image) => {
-      if (typeof image === 'string') return image;
-      return image?.imageUrl || image?.url || '';
-    })
-    .filter(Boolean);
-}
->>>>>>> backend/djtripx2
 
 function priceLabel(price) {
   return price === 0 ? 'Gratuit' : `${price} TND`;
@@ -115,10 +96,10 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
     try {
       const userData = await getUserById(userId);
       setSelectedUser(userData);
-      
+
       const reviews = await getUserReviews(userId);
       setUserReviews(reviews);
-      
+
       setUserProfileOpen(true);
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -147,11 +128,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
 
   if (!lieu) return null;
 
-<<<<<<< HEAD
   const images = normalizeImages(lieu.galerieImages || lieu.images || lieu.gallery);
-=======
-  const images = normalizeImages(lieu.galerieImages);
->>>>>>> backend/djtripx2
   const hasImages = images.length > 0;
   const averageRating = calculateAverageNote(lieu.avis);
   const totalReviews = lieu.avis?.length || 0;
@@ -265,7 +242,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                     <Stack spacing={1.5}>
                       <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                         <Chip
-<<<<<<< HEAD
                           label={`${images.length} photo${images.length > 1 ? 's' : ''}`}
                           sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white' }}
                         />
@@ -300,117 +276,11 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                       </Stack>
                     </Stack>
                   </Box>
-=======
-                          label={lieu.categorie}
-                          color={categorieColor(lieu.categorie)}
-                          icon={<Iconify icon={categorieIcon(lieu.categorie)} width={16} />}
-                          sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white' }}
-                        />
-                        {lieu.prix === 0 && (
-                          <Chip
-                            label="Gratuit"
-                            sx={{ bgcolor: 'rgba(46, 125, 50, 0.9)', color: 'common.white' }}
-                          />
-                        )}
-                        <Chip
-                          label={`${images.length} photo${images.length > 1 ? 's' : ''}`}
-                          sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white' }}
-                        />
-                      </Stack>
-
-                      <Box>
-                        <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                          Vue détaillée du lieu
-                        </Typography>
-                        <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
-                          {lieu.nom}
-                        </Typography>
-                      </Box>
-
-                      <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
-                        <Stack direction="row" alignItems="center" spacing={0.75}>
-                          <Rating value={averageRating} precision={0.1} readOnly size="small" />
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.82)' }}>
-                            {averageRating.toFixed(1)} ({totalReviews} avis)
-                          </Typography>
-                        </Stack>
-                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.45)' }} />
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.82)' }}>
-                          {lieu.ville || 'Ville non renseignée'}
-                        </Typography>
-                      </Stack>
-                    </Stack>
-                  </Box>
-
-                  {images.length > 1 && (
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        bottom: 104,
-                        left: 24,
-                        right: 24,
-                        display: 'flex',
-                        gap: 1,
-                        overflowX: 'auto',
-                        pb: 0.5,
-                        '&::-webkit-scrollbar': { height: 4 },
-                      }}
-                    >
-                      {images.slice(0, 5).map((image, index) => (
-                        <Box
-                          key={`${image}-thumb-${index}`}
-                          component="img"
-                          src={image}
-                          alt={`Miniature ${index + 1}`}
-                          onClick={() => handleImageClick(index)}
-                          sx={{
-                            width: 64,
-                            height: 64,
-                            objectFit: 'cover',
-                            borderRadius: 2,
-                            cursor: 'pointer',
-                            border: (theme) =>
-                              carousel.dots.selectedIndex === index
-                                ? `2px solid ${theme.palette.common.white}`
-                                : '2px solid rgba(255,255,255,0.25)',
-                            opacity: carousel.dots.selectedIndex === index ? 1 : 0.62,
-                            transition: 'all 0.2s ease',
-                            '&:hover': { opacity: 1, transform: 'translateY(-1px)' },
-                            flexShrink: 0,
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.24)',
-                          }}
-                        />
-                      ))}
-                      {images.length > 5 && (
-                        <Box
-                          sx={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: 2,
-                            bgcolor: 'rgba(255,255,255,0.16)',
-                            border: '1px solid rgba(255,255,255,0.22)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            flexShrink: 0,
-                            backdropFilter: 'blur(12px)',
-                          }}
-                        >
-                          <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                            +{images.length - 5}
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
-                  )}
->>>>>>> backend/djtripx2
                 </Box>
               </Grid>
             )}
 
             <Grid size={{ xs: 12, md: hasImages ? 6 : 12 }}>
-<<<<<<< HEAD
               <Box
                 sx={{
                   p: { xs: 2.5, md: 4 },
@@ -422,9 +292,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                 }}
               >
                 <Stack spacing={3}>
-=======
-              <Stack spacing={3} sx={{ p: { xs: 2.5, md: 4 }, minHeight: hasImages ? 760 : 'auto' }}>
->>>>>>> backend/djtripx2
                 {!hasImages && (
                   <Box
                     sx={{
@@ -444,15 +311,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           icon={<Iconify icon={categorieIcon(lieu.categorie)} width={16} />}
                           sx={{ bgcolor: 'rgba(255,255,255,0.14)', color: 'common.white' }}
                         />
-<<<<<<< HEAD
-=======
-                        {lieu.prix === 0 && (
-                          <Chip
-                            label="Gratuit"
-                            sx={{ bgcolor: 'rgba(46, 125, 50, 0.9)', color: 'common.white' }}
-                          />
-                        )}
->>>>>>> backend/djtripx2
                       </Stack>
 
                       <Typography variant="h4" sx={{ fontWeight: 800 }}>
@@ -462,11 +320,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                       <Stack direction="row" alignItems="center" spacing={1.25} flexWrap="wrap">
                         <Rating value={averageRating} precision={0.1} readOnly size="small" />
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.82)' }}>
-<<<<<<< HEAD
                           {averageRating.toFixed(1)} out of 5, based on {totalReviews} review{totalReviews > 1 ? 's' : ''}
-=======
-                          {averageRating.toFixed(1)} sur 5, basé sur {totalReviews} avis
->>>>>>> backend/djtripx2
                         </Typography>
                       </Stack>
                     </Stack>
@@ -474,7 +328,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                 )}
 
                 <Box>
-<<<<<<< HEAD
                   <Stack spacing={1} sx={{ mb: 2 }}>
                     <Typography variant="overline" sx={{ color: 'text.secondary' }}>
                       Complete Overview
@@ -559,7 +412,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Coordinates</Typography>
                               <Typography variant="body2">
-                                {lieu.latitude && lieu.longitude 
+                                {lieu.latitude && lieu.longitude
                                   ? `${lieu.latitude.toFixed(4)}, ${lieu.longitude.toFixed(4)}`
                                   : '-'}
                               </Typography>
@@ -845,83 +698,11 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                     <Typography variant="h5">Contact Details</Typography>
                   </Stack>
 
-=======
-                  <Stack spacing={1} sx={{ mb: 1.5 }}>
-                    <Typography variant="overline" sx={{ color: 'text.secondary' }}>
-                      Aperçu rapide
-                    </Typography>
-                    <Typography variant="h5">Informations principales</Typography>
-                  </Stack>
-
->>>>>>> backend/djtripx2
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <Card variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2.5, bgcolor: 'background.neutral' }}>
                         <Stack spacing={1.2}>
                           <Stack direction="row" alignItems="center" spacing={1}>
-<<<<<<< HEAD
-=======
-                            <Avatar sx={{ width: 36, height: 36, bgcolor: 'error.lighter', color: 'error.main' }}>
-                              <Iconify icon="mdi:map-marker" width={18} />
-                            </Avatar>
-                            <Typography variant="subtitle2">Localisation</Typography>
-                          </Stack>
-                          <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                            {lieu.adresse || 'Adresse non renseignée'}
-                          </Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap">
-                            <Chip label={lieu.ville || 'Ville inconnue'} size="small" icon={<Iconify icon="mdi:city" width={16} />} />
-                            <Chip
-                              variant="outlined"
-                              size="small"
-                              label={`${lieu.latitude.toFixed(4)}, ${lieu.longitude.toFixed(4)}`}
-                              icon={<Iconify icon="mdi:crosshairs-gps" width={16} />}
-                            />
-                          </Stack>
-                        </Stack>
-                      </Card>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Card variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2.5, bgcolor: 'background.neutral' }}>
-                        <Stack spacing={1.2}>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Avatar sx={{ width: 36, height: 36, bgcolor: 'warning.lighter', color: 'warning.main' }}>
-                              <Iconify icon="mdi:cash" width={18} />
-                            </Avatar>
-                            <Typography variant="subtitle2">Prix</Typography>
-                          </Stack>
-                          <Typography variant="h5" sx={{ color: 'primary.main', fontWeight: 800 }}>
-                            {priceLabel(lieu.prix)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                            {lieu.prix === 0 ? 'Accès gratuit au lieu' : 'Tarif affiché pour l’accès au lieu'}
-                          </Typography>
-                        </Stack>
-                      </Card>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Card variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2.5, bgcolor: 'background.neutral' }}>
-                        <Stack spacing={1.2}>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Avatar sx={{ width: 36, height: 36, bgcolor: 'info.lighter', color: 'info.main' }}>
-                              <Iconify icon="mdi:clock-outline" width={18} />
-                            </Avatar>
-                            <Typography variant="subtitle2">Horaires</Typography>
-                          </Stack>
-                          <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.7 }}>
-                            {lieu.horaires || 'Non spécifié'}
-                          </Typography>
-                        </Stack>
-                      </Card>
-                    </Grid>
-
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Card variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 2.5, bgcolor: 'background.neutral' }}>
-                        <Stack spacing={1.2}>
-                          <Stack direction="row" alignItems="center" spacing={1}>
->>>>>>> backend/djtripx2
                             <Avatar sx={{ width: 36, height: 36, bgcolor: 'success.lighter', color: 'success.main' }}>
                               <Iconify icon="mdi:phone" width={18} />
                             </Avatar>
@@ -934,28 +715,16 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                               </Link>
                             ) : (
                               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-<<<<<<< HEAD
                                 Phone not specified
-=======
-                                Téléphone non renseigné
->>>>>>> backend/djtripx2
                               </Typography>
                             )}
                             {lieu.siteWeb ? (
                               <Link href={lieu.siteWeb} target="_blank" rel="noopener" variant="body2" underline="hover">
-<<<<<<< HEAD
                                 Visit website
                               </Link>
                             ) : (
                               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                                 No website associated
-=======
-                                Visiter le site web
-                              </Link>
-                            ) : (
-                              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                Aucun site web associé
->>>>>>> backend/djtripx2
                               </Typography>
                             )}
                           </Stack>
@@ -965,7 +734,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                   </Grid>
                 </Box>
 
-<<<<<<< HEAD
                 {lieu.avis?.length > 0 && (
                   <Box>
                     <Divider sx={{ mb: 2 }} />
@@ -974,29 +742,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                         Visitor Reviews
                       </Typography>
                       <Typography variant="h5">User Feedback</Typography>
-=======
-                {lieu.description && (
-                  <Box>
-                    <Typography variant="overline" sx={{ color: 'text.secondary' }}>
-                      Description
-                    </Typography>
-                    <Card variant="outlined" sx={{ mt: 1, p: 2.5, borderRadius: 2.5, bgcolor: 'background.neutral' }}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.9 }}>
-                        {lieu.description}
-                      </Typography>
-                    </Card>
-                  </Box>
-                )}
-
-                {lieu.avis?.length > 0 && (
-                  <Box>
-                    <Divider sx={{ mb: 2 }} />
-                    <Stack spacing={1} sx={{ mb: 1.5 }}>
-                      <Typography variant="overline" sx={{ color: 'text.secondary' }}>
-                        Avis des visiteurs
-                      </Typography>
-                      <Typography variant="h5">Retour des utilisateurs</Typography>
->>>>>>> backend/djtripx2
                     </Stack>
 
                     <Stack spacing={2}>
@@ -1007,7 +752,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           sx={{ p: 2, borderRadius: 2.5, bgcolor: 'background.neutral' }}
                         >
                           <Stack direction="row" spacing={2} alignItems="flex-start">
-<<<<<<< HEAD
                             <IconButton
                               onClick={() => handleOpenUserProfile(avis.user?._id || avis.touriste_id)}
                               sx={{ p: 0 }}
@@ -1019,11 +763,6 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                                 {getInitial(avis.user?.nom || avis.user?.name || avis.user?.prenom || avis.user?.fullname || String(index + 1))}
                               </Avatar>
                             </IconButton>
-=======
-                            <Avatar sx={{ bgcolor: 'primary.main', width: 44, height: 44 }}>
-                              {getInitial(avis.user?.nom || avis.user?.name || avis.user?.prenom || String(index + 1))}
-                            </Avatar>
->>>>>>> backend/djtripx2
                             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                               <Stack
                                 direction={{ xs: 'column', sm: 'row' }}
@@ -1033,44 +772,11 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                                 sx={{ mb: 0.75 }}
                               >
                                 <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-<<<<<<< HEAD
                                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                     {avis.user?.nom || avis.user?.name || avis.user?.prenom || avis.user?.fullname || 'User'}
                                   </Typography>
-=======
->>>>>>> backend/djtripx2
-                                  <Rating value={Number(avis.note) || 0} readOnly size="small" />
-                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                    {Number(avis.note || 0).toFixed(1)}/5
-                                  </Typography>
-                                </Stack>
-<<<<<<< HEAD
-                                <Stack direction="row" alignItems="center" spacing={1}>
-                                  {isAdmin && avis._id && (
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleDeleteReview(avis._id)}
-                                      sx={{ color: 'error.main' }}
-                                      title="Delete review"
-                                    >
-                                      <Iconify icon="solar:trash-bin-trash-bold" width={16} />
-                                    </IconButton>
-                                  )}
                                 </Stack>
                               </Stack>
-
-                              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
-                                {avis.avis || avis.comment || 'No comment provided.'}
-=======
-                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                  Avis {index + 1}
-                                </Typography>
-                              </Stack>
-
-                              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
-                                {avis.avis || 'Aucun commentaire fourni.'}
->>>>>>> backend/djtripx2
-                              </Typography>
                             </Box>
                           </Stack>
                         </Card>
@@ -1078,11 +784,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
 
                       {lieu.avis.length > 3 && (
                         <Box sx={{ py: 0.5, textAlign: 'center', color: 'text.secondary' }}>
-<<<<<<< HEAD
                           <Typography variant="caption">+ {lieu.avis.length - 3} more review{lieu.avis.length - 3 > 1 ? 's' : ''}</Typography>
-=======
-                          <Typography variant="caption">+ {lieu.avis.length - 3} autres avis</Typography>
->>>>>>> backend/djtripx2
                         </Box>
                       )}
                     </Stack>
