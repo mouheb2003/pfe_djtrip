@@ -140,7 +140,8 @@ class GooglePlacesService {
     // Places API v1 details endpoint.
     final response = await _sendGet(
       uri: uri,
-      fieldMask: 'id,displayName,location,rating,formattedAddress,primaryType',
+      fieldMask:
+          'id,displayName,location,rating,formattedAddress,primaryType,photos',
     );
 
     final decoded = _decodeAsMap(response.body);
@@ -175,7 +176,7 @@ class GooglePlacesService {
       uri: uri,
       body: body,
       fieldMask:
-          'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.primaryType',
+          'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.primaryType,places.photos',
     );
 
     final decoded = _decodeAsMap(response.body);
@@ -323,6 +324,58 @@ class GooglePlacesService {
       );
     }
 
+    String? photoUrl;
+    try {
+      final photos = data['photos'];
+      if (photos is List && photos.isNotEmpty) {
+        final first = photos.first;
+        if (first is Map<String, dynamic>) {
+          final photoRef = (first['photoReference'] ?? first['photo_reference'])
+              ?.toString();
+          if (photoRef != null && photoRef.isNotEmpty) {
+            final encodedRef = Uri.encodeComponent(photoRef);
+            photoUrl =
+                'https://maps.googleapis.com/maps/api/place/photo?maxheight=400&photoreference=$encodedRef&key=${Uri.encodeComponent(_apiKey)}';
+          } else {
+            final rawName = (first['name'] ?? first['photo'] ?? '')
+                .toString()
+                .trim();
+            if (rawName.isNotEmpty) {
+              try {
+                final lower = rawName.toLowerCase();
+                if (lower.contains('/photos/')) {
+                  final parts = rawName.split('/');
+                  final photosIndex = parts.indexWhere(
+                    (p) => p.toLowerCase() == 'photos',
+                  );
+                  if (photosIndex >= 0 && photosIndex + 1 < parts.length) {
+                    final photoId = parts[photosIndex + 1];
+                    final encodedRef = Uri.encodeComponent(photoId);
+                    photoUrl =
+                        'https://maps.googleapis.com/maps/api/place/photo?maxheight=400&photoreference=$encodedRef&key=${Uri.encodeComponent(_apiKey)}';
+                  }
+                }
+              } catch (_) {}
+
+              if (photoUrl == null) {
+                final encoded = Uri.encodeComponent(rawName);
+                photoUrl =
+                    'https://places.googleapis.com/v1/$encoded:get?alt=media&key=${Uri.encodeComponent(_apiKey)}';
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      photoUrl = null;
+    }
+
+    // Debug: print the resolved photoUrl (if any)
+    try {
+      // ignore: avoid_print
+      print('[PlacesService] resolved photoUrl for place $id -> $photoUrl');
+    } catch (_) {}
+
     return MapPlace(
       placeId: id,
       name: name,
@@ -330,6 +383,7 @@ class GooglePlacesService {
       address: (data['formattedAddress'] ?? '').toString().trim(),
       rating: (data['rating'] as num?)?.toDouble(),
       primaryType: (data['primaryType'] ?? '').toString().trim(),
+      photoUrl: photoUrl,
     );
   }
 

@@ -2,12 +2,68 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:typed_data';
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/map_place.dart';
 import '../models/map_place_suggestion.dart';
 import '../services/google_directions_service.dart';
 import '../services/google_places_service.dart';
+
+// A small widget that attempts to fetch the image bytes via http
+// and displays them with Image.memory. This helps when Image.network
+// fails due to redirects or other issues with direct network image loading.
+class NetworkImageWithFallback extends StatelessWidget {
+  const NetworkImageWithFallback({Key? key, required this.url})
+    : super(key: key);
+
+  final String url;
+
+  Future<Uint8List?> _fetchBytes(String u) async {
+    try {
+      final uri = Uri.parse(u);
+      final resp = await http.get(uri).timeout(const Duration(seconds: 10));
+      try {
+        // ignore: avoid_print
+        print(
+          '[NetworkImageWithFallback] GET ${uri.toString()} -> ${resp.statusCode}',
+        );
+      } catch (_) {}
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        return resp.bodyBytes;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List?>(
+      future: _fetchBytes(url),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final bytes = snapshot.data;
+        if (bytes != null && bytes.isNotEmpty) {
+          return Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+          );
+        }
+        return Container(
+          color: Colors.grey.shade200,
+          child: const Center(child: Icon(Icons.broken_image)),
+        );
+      },
+    );
+  }
+}
 
 class MapExplorerScreen extends StatefulWidget {
   const MapExplorerScreen({super.key});
@@ -73,10 +129,12 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     'store',
     'mosque',
   ];
+  late List<String> _selectedPlaceTypes;
 
   @override
   void initState() {
     super.initState();
+    _selectedPlaceTypes = List<String>.from(_broadPlaceTypes);
     _autocompleteSessionToken = _createSessionToken();
     unawaited(_loadNearby(center: _djerbaCenter));
   }
@@ -99,6 +157,24 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
 
   String _createSessionToken() =>
       DateTime.now().microsecondsSinceEpoch.toString();
+
+  void _updateSelectedTypes(String type) {
+    setState(() {
+      if (_selectedPlaceTypes.contains(type)) {
+        _selectedPlaceTypes.remove(type);
+      } else {
+        _selectedPlaceTypes.add(type);
+      }
+    });
+    unawaited(_loadNearby(center: _currentCenter));
+  }
+
+  void _resetTypeFilters() {
+    setState(() {
+      _selectedPlaceTypes = List<String>.from(_broadPlaceTypes);
+    });
+    unawaited(_loadNearby(center: _currentCenter));
+  }
 
   Future<void> _onSearchChanged(String value) async {
     _debounce?.cancel();
@@ -181,6 +257,11 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       }
 
       _selectedPlace = place;
+      // Debug: print generated photo URL for troubleshooting
+      try {
+        // ignore: avoid_print
+        print('[Places] selected place photoUrl: ${place.photoUrl}');
+      } catch (_) {}
       _currentCenter = place.position;
       _clearItinerary();
 
@@ -230,7 +311,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       final nearby = await _placesService.fetchNearbyPlaces(
         latitude: center.latitude,
         longitude: center.longitude,
-        includedTypes: _broadPlaceTypes,
+        includedTypes: _selectedPlaceTypes,
         radiusMeters: 7000,
         maxResultCount: 40,
       );
@@ -245,6 +326,14 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         _lastNearbyFetchCenter = center;
         _isLoadingNearby = false;
       });
+      try {
+        // Debug print first few photoUrls
+        for (var i = 0; i < (nearby.length < 3 ? nearby.length : 3); i++) {
+          final p = nearby[i];
+          // ignore: avoid_print
+          print('[Places] nearby[${i}] photoUrl: ${p.photoUrl}');
+        }
+      } catch (_) {}
     } on PlacesApiException catch (error) {
       if (!mounted) {
         return;
@@ -309,7 +398,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             (point) => _placesService.fetchNearbyPlaces(
               latitude: point.latitude,
               longitude: point.longitude,
-              includedTypes: _broadPlaceTypes,
+              includedTypes: _selectedPlaceTypes,
               radiusMeters: 3500,
               maxResultCount: 20,
             ),
@@ -987,6 +1076,9 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                   if (_suggestions.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     _buildSuggestionsDropdown(),
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    _buildTypeFilters(),
                   ],
                 ],
               ),
@@ -1213,6 +1305,17 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if ((place.photoUrl ?? '').isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: NetworkImageWithFallback(url: place.photoUrl!),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Text(
             place.name,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -1281,6 +1384,97 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildTypeFilters() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Filtrer par type',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              if (_selectedPlaceTypes.length != _broadPlaceTypes.length)
+                GestureDetector(
+                  onTap: _resetTypeFilters,
+                  child: const Text(
+                    'Réinitialiser',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1768AC),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _broadPlaceTypes.map((type) {
+              final isSelected = _selectedPlaceTypes.contains(type);
+              return GestureDetector(
+                onTap: () => _updateSelectedTypes(type),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF1768AC)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF1768AC)
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    _formatPlaceType(type),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatPlaceType(String type) {
+    final formatted = type
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) {
+          return word[0].toUpperCase() + word.substring(1);
+        })
+        .join(' ');
+    return formatted;
   }
 
   Widget _buildManualItineraryPanel() {

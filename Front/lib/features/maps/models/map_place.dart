@@ -8,6 +8,7 @@ class MapPlace {
     this.address,
     this.rating,
     this.primaryType,
+    this.photoUrl,
   });
 
   final String placeId;
@@ -16,4 +17,5 @@ class MapPlace {
   final String? address;
   final double? rating;
   final String? primaryType;
+  final String? photoUrl;
 }
