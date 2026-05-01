@@ -631,6 +631,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             // Stats Bar
             SliverToBoxAdapter(child: _buildStatsBar()),
             
+            // Contact Information (respect privacy)
+            SliverToBoxAdapter(child: _buildContactInfo()),
+            
             // Action Buttons
             SliverToBoxAdapter(child: _buildActionButtons()),
             
@@ -735,7 +738,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Widget _buildProfileHeader() {
     final avatarUrl = _resolveUrl(_userData?['avatar']?.toString());
-    final coverUrl = _resolveUrl(_userData?['coverImage']?.toString());
+    final coverUrl = _resolveUrl(_userData?['cover_photo']?.toString());
     
     // Use _userData directly for name, bio, and location
     final fullname = (_userData?['fullname']?.toString() ?? '').trim();
@@ -745,6 +748,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final isOrganizer = userType == 'Organisator' || _userData?['isOrganisator'] == true;
     final subtitle = bio.isEmpty ? '' : bio;
     final location = (_userData?['pays_origine']?.toString() ?? '').trim();
+    
+    // Privacy settings
+    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
+    final profileVisibility = privacySettings['profile_visibility'] ?? true;
+    final showOnlineStatus = privacySettings['show_online_status'] ?? true;
+    final showLastSeen = privacySettings['show_last_seen'] ?? false;
+    final allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
+    final showPhone = privacySettings['show_phone'] ?? false;
+    final showEmail = privacySettings['show_email'] ?? false;
+    final allowLocationSharing = privacySettings['allow_location_sharing'] ?? false;
+
+    // If profile is not visible, show restricted message
+    if (!profileVisibility) {
+      return _buildRestrictedProfile();
+    }
 
     return Column(
       children: [
@@ -771,7 +789,25 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                         color: AppColors.primaryLight.withOpacity(0.2),
                       ),
                     )
-                  : null,
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primary.withOpacity(0.3),
+                            AppColors.primary.withOpacity(0.1),
+                          ],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                      ),
+                    ),
             ),
             
             // Avatar with Online Status
@@ -779,125 +815,180 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               bottom: -50,
               child: Stack(
                 clipBehavior: Clip.none,
+                alignment: Alignment.center,
                 children: [
+                  // Blurred Glow Background
+                  if (avatarUrl.isNotEmpty)
+                    ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: 12,
+                        sigmaY: 12,
+                      ),
+                      child: Container(
+                        width: 104,
+                        height: 104,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary.withOpacity(0.15),
+                          image: DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                            opacity: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Main Avatar with White Border
                   GestureDetector(
-                    onLongPress: () => _showAvatarFullScreen(avatarUrl),
+                    onTap: () => _showAvatarFullScreen(avatarUrl),
                     child: Container(
-                      width: 110,
-                      height: 110,
+                      width: 100,
+                      height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
+                        border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: ClipOval(
-                        child: avatarUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: avatarUrl,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
+                      child: Hero(
+                        tag: 'profile_avatar',
+                        child: ClipOval(
+                          child: avatarUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: avatarUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: AppColors.outline,
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: AppColors.outline,
+                                    child: Icon(Icons.person, color: Colors.grey[600]),
+                                  ),
+                                )
+                              : Container(
                                   color: AppColors.outline,
-                                  child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
+                                  child: Icon(Icons.person, color: Colors.grey[600]),
                                 ),
-                                errorWidget: (_, __, ___) => Container(
-                                  color: AppColors.outline,
-                                  child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
-                                ),
-                              )
-                            : Container(
-                                color: AppColors.outline,
-                                child: Icon(Icons.person, size: 40, color: AppColors.textGrey),
-                              ),
+                        ),
                       ),
                     ),
                   ),
-                  // Online Status Indicator
-                  Positioned(
-                    right: 0,
-                    bottom: 8,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: (_userData?['isOnline'] == true) ? AppColors.online : AppColors.offline,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
+                  
+                  // Online Status Indicator (respect privacy)
+                  if (_userData?['isOnline'] == true && showOnlineStatus)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
           ],
         ),
         
-        // Profile Info (Name, Bio, Location)
-        SizedBox(height: 60),
+        const SizedBox(height: 56),
+        
+        // Profile Info
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              Text(
-                displayName,
-                style: AppTextStyles.headlineMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
+              // Name and Badge
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // Name with flexible width
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    child: Text(
+                      displayName,
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Badge
+                  if (isOrganizer)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Organizer',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.green, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, size: 12, color: Colors.green),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Traveler',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.green,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 8),
-              // Role Badge
-              if (isOrganizer)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, size: 14, color: AppColors.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Organizer',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.verified, size: 14, color: Colors.green),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Traveler',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               const SizedBox(height: 8),
               if (subtitle.isNotEmpty)
                 Text(
@@ -910,17 +1001,38 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 8),
-              if (location.isNotEmpty)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              // Location (respect privacy)
+              if (location.isNotEmpty && allowLocationSharing)
+                Column(
                   children: [
-                    Icon(Icons.location_on, size: 16, color: AppColors.textGrey),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_getCountryFlag(location)} $location',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textGrey,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.location_on, size: 16, color: AppColors.textGrey),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_getCountryFlag(location)} $location',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Detailed location under country
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.place, size: 14, color: AppColors.textGrey.withOpacity(0.7)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Tunisia, North Africa',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1063,9 +1175,219 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     );
   }
 
+  Widget _buildRestrictedProfile() {
+    return Container(
+      height: 400,
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.outline.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.lock_outline,
+              size: 40,
+              color: AppColors.textGrey,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Private Profile',
+            style: AppTextStyles.headlineSmall.copyWith(
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This user has set their profile to private. Only they can see their full profile information.',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textGrey,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Profile visibility is disabled',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactInfo() {
+    // Privacy settings
+    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
+    final showPhone = privacySettings['show_phone'] ?? false;
+    final showEmail = privacySettings['show_email'] ?? false;
+    final showLastSeen = privacySettings['show_last_seen'] ?? false;
+    
+    final phone = _userData?['num_tel']?.toString() ?? '';
+    final email = _userData?['email']?.toString() ?? '';
+    final lastSeenString = _userData?['derniere_connexion']?.toString();
+    final lastSeen = lastSeenString != null && lastSeenString.isNotEmpty
+        ? DateTime.tryParse(lastSeenString)
+        : null;
+    
+    final hasPhone = phone.isNotEmpty && showPhone;
+    final hasEmail = email.isNotEmpty && showEmail;
+    final hasLastSeen = lastSeen != null && showLastSeen;
+    
+    if (!hasPhone && !hasEmail && !hasLastSeen) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.contact_page, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Contact Information',
+                style: AppTextStyles.headlineSmall.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (hasPhone) ...[
+            Row(
+              children: [
+                Icon(Icons.phone, color: Colors.green, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    phone,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textDark,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    // Copy phone number
+                    // TODO: Implement copy functionality
+                  },
+                  icon: Icon(Icons.copy, size: 18, color: AppColors.textGrey),
+                ),
+              ],
+            ),
+            if (hasEmail) const SizedBox(height: 12),
+          ],
+          if (hasEmail) ...[
+            Row(
+              children: [
+                Icon(Icons.email, color: AppColors.primary, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    email,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textDark,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    // Copy email
+                    // TODO: Implement copy functionality
+                  },
+                  icon: Icon(Icons.copy, size: 18, color: AppColors.textGrey),
+                ),
+              ],
+            ),
+          ],
+          if (hasLastSeen) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.access_time, color: AppColors.textGrey, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Last seen',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textGrey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatLastSeen(lastSeen!),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textDark,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     final isOwnProfile = _userData?['_id']?.toString() == _currentUserId;
     final isOrganizer = _userData?['userType']?.toString() == 'Organisateur' || _userData?['isOrganisator'] == true;
+    
+    // Privacy settings
+    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
+    final allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1122,7 +1444,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               ),
             ),
             const SizedBox(width: 12),
-            // Contact button
+            // Contact button (respect privacy)
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -1144,10 +1466,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   ],
                 ),
                 child: ElevatedButton.icon(
-                  onPressed: _handleContact,
+                  onPressed: allowDirectMessages ? _handleContact : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: allowDirectMessages ? Colors.white : Colors.grey,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
@@ -1155,13 +1477,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     ),
                     shadowColor: Colors.transparent,
                   ),
-                  icon: const Icon(Icons.message_rounded, size: 22),
+                  icon: Icon(
+                    allowDirectMessages ? Icons.message_rounded : Icons.message_outlined, 
+                    size: 22,
+                  ),
                   label: Text(
                     isOrganizer ? 'Book Now' : 'Contact',
                     style: AppTextStyles.labelLarge.copyWith(
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
-                      color: Colors.white,
+                      color: allowDirectMessages ? Colors.white : Colors.grey,
                     ),
                   ),
                 ),
@@ -1257,10 +1582,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   Widget _buildLanguagesSection() {
     final languages = _userData?['langues_proposees'] as List? ?? [];
     
-    debugPrint('Languages: $languages');
-
-    if (languages.isEmpty) {
-      return const SizedBox.shrink();
+    // Privacy settings
+    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
+    final profileVisibility = privacySettings['profile_visibility'] ?? true;
+    
+    // If profile is not visible, show restricted message
+    if (!profileVisibility) {
+      return _buildRestrictedProfile();
     }
 
     final languageList = languages.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
@@ -1993,6 +2321,31 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     
     debugPrint('No flag found for country: $country');
     return '🌍';
+  }
+
+  String _formatLastSeen(DateTime lastSeen) {
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+
+    if (difference.inDays > 30) {
+      return '${lastSeen.day}/${lastSeen.month}/${lastSeen.year}';
+    } else if (difference.inDays > 7) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays > 1) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inHours > 1) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inHours == 1) {
+      return '1 hour ago';
+    } else if (difference.inMinutes > 1) {
+      return '${difference.inMinutes} minutes ago';
+    } else if (difference.inMinutes == 1) {
+      return '1 minute ago';
+    } else {
+      return 'Just now';
+    }
   }
 }
 

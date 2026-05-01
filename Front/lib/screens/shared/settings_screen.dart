@@ -12,6 +12,7 @@ import 'change_password_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'help_center_screen.dart';
 import '../settings/privacy_settings_screen.dart';
+import '../../services/user_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -23,6 +24,74 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = ThemeService.isDark;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+    // Listen to theme changes
+    ThemeService.themeMode.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeService.themeMode.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) {
+      setState(() {
+        _darkModeEnabled = ThemeService.isDark;
+      });
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final user = await UserService.getProfile();
+      if (user != null && mounted) {
+        setState(() {
+          // Load notification preference from backend
+          _notificationsEnabled = user['notifications_email'] ?? true;
+          // Dark mode is handled by ThemeService listener
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error loading settings: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateNotificationSetting(bool value) async {
+    setState(() => _notificationsEnabled = value);
+    try {
+      final result = await UserService.updateProfile({
+        'notifications_email': value,
+      });
+      if (!result['success'] && mounted) {
+        // Revert on failure
+        setState(() => _notificationsEnabled = !value);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update notification setting'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating notification setting: $e');
+      if (mounted) {
+        setState(() => _notificationsEnabled = !value);
+      }
+    }
+  }
 
   void _showInfo(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -274,7 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.notifications,
               label: 'Notifications',
               value: _notificationsEnabled,
-              onChanged: (val) => setState(() => _notificationsEnabled = val),
+              onChanged: _updateNotificationSetting,
             ),
             _SettingsTileSwitch(
               icon: Icons.dark_mode,
