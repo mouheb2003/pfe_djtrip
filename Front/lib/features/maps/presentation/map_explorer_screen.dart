@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -61,6 +61,100 @@ class NetworkImageWithFallback extends StatelessWidget {
           child: const Center(child: Icon(Icons.broken_image)),
         );
       },
+    );
+  }
+}
+
+class PlaceListItem extends StatelessWidget {
+  const PlaceListItem({Key? key, required this.place, required this.onTap})
+    : super(key: key);
+
+  final MapPlace place;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Photo
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.grey.shade200,
+              ),
+              child: place.photoUrl != null && place.photoUrl!.isNotEmpty
+                  ? NetworkImageWithFallback(url: place.photoUrl!)
+                  : Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name
+                  Text(
+                    place.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Rating
+                  if (place.rating != null)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.star,
+                          size: 14,
+                          color: Colors.amber.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          place.rating!.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 4),
+                  // Address
+                  if (place.address != null)
+                    Text(
+                      place.address!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -134,7 +228,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedPlaceTypes = List<String>.from(_broadPlaceTypes);
+    _selectedPlaceTypes = [];
     _autocompleteSessionToken = _createSessionToken();
     unawaited(_loadNearby(center: _djerbaCenter));
   }
@@ -158,21 +252,43 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   String _createSessionToken() =>
       DateTime.now().microsecondsSinceEpoch.toString();
 
-  void _updateSelectedTypes(String type) {
+  Future<void> _updateSelectedTypes(String type) async {
     setState(() {
       if (_selectedPlaceTypes.contains(type)) {
         _selectedPlaceTypes.remove(type);
       } else {
+        // Only keep the selected type (single select)
+        _selectedPlaceTypes.clear();
         _selectedPlaceTypes.add(type);
       }
     });
-    unawaited(_loadNearby(center: _currentCenter));
+    // Debug: log selected types so we can trace filter behavior
+    try {
+      // ignore: avoid_print
+      print(
+        '[MapExplorer] _updateSelectedTypes -> toggled: $type, selectedTypes: $_selectedPlaceTypes',
+      );
+    } catch (_) {}
+
+    await _loadNearby(center: _currentCenter);
+
+    // Show the bottom sheet with filtered places
+    if (mounted && _selectedPlaceTypes.isNotEmpty) {
+      _showPlacesForTypeSheet(_selectedPlaceTypes);
+    }
   }
 
   void _resetTypeFilters() {
     setState(() {
-      _selectedPlaceTypes = List<String>.from(_broadPlaceTypes);
+      _selectedPlaceTypes = [];
     });
+    try {
+      // ignore: avoid_print
+      print(
+        '[MapExplorer] _resetTypeFilters -> reset to: $_selectedPlaceTypes',
+      );
+    } catch (_) {}
+
     unawaited(_loadNearby(center: _currentCenter));
   }
 
@@ -308,6 +424,13 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     });
 
     try {
+      // ignore: avoid_print
+      print(
+        '[MapExplorer] _loadNearby -> center: ${center.latitude}, ${center.longitude}, includedTypes: $_selectedPlaceTypes',
+      );
+    } catch (_) {}
+
+    try {
       final nearby = await _placesService.fetchNearbyPlaces(
         latitude: center.latitude,
         longitude: center.longitude,
@@ -327,11 +450,13 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         _isLoadingNearby = false;
       });
       try {
-        // Debug print first few photoUrls
-        for (var i = 0; i < (nearby.length < 3 ? nearby.length : 3); i++) {
+        // Debug print first few places: name, primaryType and photoUrl
+        for (var i = 0; i < (nearby.length < 5 ? nearby.length : 5); i++) {
           final p = nearby[i];
           // ignore: avoid_print
-          print('[Places] nearby[${i}] photoUrl: ${p.photoUrl}');
+          print(
+            '[Places] nearby[${i}] name: ${p.name}, primaryType: ${p.primaryType}, photoUrl: ${p.photoUrl}',
+          );
         }
       } catch (_) {}
     } on PlacesApiException catch (error) {
@@ -517,6 +642,273 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showPlacesForTypeSheet(List<String> selectedTypes) {
+    // Debug: log selected types & nearby count before showing sheet
+    try {
+      // ignore: avoid_print
+      print(
+        '[MapExplorer] showPlacesForTypeSheet -> selectedTypes: $selectedTypes, nearbyCount: ${_nearbyPlaces.length}',
+      );
+    } catch (_) {}
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            final filteredPlaces = selectedTypes.isEmpty
+                ? _nearbyPlaces
+                : _nearbyPlaces.where((place) {
+                    return place.primaryType != null &&
+                        selectedTypes.contains(place.primaryType);
+                  }).toList();
+
+            return Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Lieux trouvés (${filteredPlaces.length})',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                // Places list
+                Expanded(
+                  child: filteredPlaces.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Aucun lieu trouvé pour les filtres sélectionnés',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          itemCount: filteredPlaces.length,
+                          itemBuilder: (context, index) {
+                            final place = filteredPlaces[index];
+                            return PlaceListItem(
+                              place: place,
+                              onTap: () {
+                                _mapController?.animateCamera(
+                                  CameraUpdate.newLatLng(place.position),
+                                );
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showPlaceDetailsModal(MapPlace place) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with close button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Détails du lieu',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Large photo
+                    if ((place.photoUrl ?? '').isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          height: 240,
+                          width: double.infinity,
+                          child: NetworkImageWithFallback(url: place.photoUrl!),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Name
+                    Text(
+                      place.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Type
+                    if ((place.primaryType ?? '').isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1768AC).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          place.primaryType!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1768AC),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Rating
+                    if (place.rating != null) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: Colors.amber.shade600,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${place.rating!.toStringAsFixed(1)} / 5.0',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Address
+                    if ((place.address ?? '').trim().isNotEmpty) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            color: Color(0xFF1768AC),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              place.address!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _buildItineraryToSelectedPlace();
+                              Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.route),
+                            label: const Text('Itinéraire'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              // Action for sharing or copying address
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Lieu sauvegardé'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.bookmark_outline),
+                            label: const Text('Enregistrer'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _clearItinerary() {
@@ -1003,6 +1395,26 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     return BitmapDescriptor.hueOrange;
   }
 
+  Future<void> _hideSelectedPlaceInfoWindow() async {
+    final controller = _mapController;
+    if (controller == null) {
+      return;
+    }
+
+    try {
+      await controller.hideMarkerInfoWindow(const MarkerId('selected_place'));
+    } catch (_) {}
+
+    final selectedPlace = _selectedPlace;
+    if (selectedPlace != null) {
+      try {
+        await controller.hideMarkerInfoWindow(
+          MarkerId('nearby_${selectedPlace.placeId}'),
+        );
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final markers = _buildMarkers();
@@ -1023,13 +1435,14 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                 _searchFocusNode.unfocus();
                 _originFocusNode.unfocus();
                 _destinationFocusNode.unfocus();
-                if (_suggestions.isNotEmpty) {
-                  setState(() {
-                    _suggestions = const [];
-                    _originSuggestions = const [];
-                    _destinationSuggestions = const [];
-                  });
-                }
+                unawaited(_hideSelectedPlaceInfoWindow());
+                setState(() {
+                  _suggestions = const [];
+                  _originSuggestions = const [];
+                  _destinationSuggestions = const [];
+                  _selectedPlace = null;
+                  _showManualItineraryPanel = false;
+                });
               },
               onCameraIdle: () async {
                 final controller = _mapController;
@@ -1368,6 +1781,15 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               ],
             ],
           ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showPlaceDetailsModal(place),
+              icon: const Icon(Icons.info_outline),
+              label: const Text('Plus de détails'),
+            ),
+          ),
           if (_routeDistanceText != null || _routeDurationText != null) ...[
             const SizedBox(height: 10),
             Text(
@@ -1387,81 +1809,71 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   }
 
   Widget _buildTypeFilters() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Filtrer par type',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              if (_selectedPlaceTypes.length != _broadPlaceTypes.length)
-                GestureDetector(
+    return SizedBox(
+      height: 50,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: _broadPlaceTypes.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _broadPlaceTypes.length) {
+            // Reset button at the end
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Align(
+                alignment: Alignment.center,
+                child: GestureDetector(
                   onTap: _resetTypeFilters,
-                  child: const Text(
-                    'Réinitialiser',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF1768AC),
-                      fontWeight: FontWeight.w600,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      '✕ Réinit',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: _broadPlaceTypes.map((type) {
-              final isSelected = _selectedPlaceTypes.contains(type);
-              return GestureDetector(
-                onTap: () => _updateSelectedTypes(type),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF1768AC)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF1768AC)
-                          : Colors.grey.shade300,
-                    ),
-                  ),
-                  child: Text(
-                    _formatPlaceType(type),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+              ),
+            );
+          }
+
+          final type = _broadPlaceTypes[index];
+          final isSelected = _selectedPlaceTypes.contains(type);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FilterChip(
+              label: Text(
+                _formatPlaceType(type),
+                style: const TextStyle(fontSize: 11),
+              ),
+              selected: isSelected,
+              selectedColor: Colors.white,
+              checkmarkColor: const Color(0xFF1768AC),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+              side: BorderSide(
+                color: isSelected ? const Color(0xFF1768AC) : Colors.black,
+                width: isSelected ? 2 : 1,
+              ),
+              onSelected: (_) => unawaited(_updateSelectedTypes(type)),
+            ),
+          );
+        },
       ),
     );
   }
