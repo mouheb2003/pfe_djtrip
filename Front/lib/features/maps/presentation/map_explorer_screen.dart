@@ -436,7 +436,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         longitude: center.longitude,
         includedTypes: _selectedPlaceTypes,
         radiusMeters: 7000,
-        maxResultCount: 40,
+        maxResultCount: 20,
       );
 
       if (!mounted) {
@@ -466,7 +466,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       setState(() {
         _isLoadingNearby = false;
       });
-      _showError(error.message);
+      // Error suppressed
     } catch (_) {
       if (!mounted) {
         return;
@@ -559,7 +559,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       setState(() {
         _isLoadingNearby = false;
       });
-      _showError(error.message);
+      // Error suppressed
     } catch (_) {
       if (!mounted) {
         return;
@@ -567,7 +567,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       setState(() {
         _isLoadingNearby = false;
       });
-      _showError('Failed to load places on the visible area.');
+      // Error suppressed
     }
   }
 

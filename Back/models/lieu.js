@@ -13,7 +13,7 @@ const lieuSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["beach", "hotel", "restaurant", "activity", "landmark"],
+      enum: ["beach", "accommodation", "food", "activity", "museum", "shopping", "other"],
       required: true,
     },
 

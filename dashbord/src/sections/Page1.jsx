@@ -15,7 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 
-import { getLieux, createLieu, updateLieu, uploadLieuImages } from 'src/Controller/actions';
+import { getLieux, createLieu, updateLieu, deleteLieu, uploadLieuImages } from 'src/Controller/actions';
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
@@ -45,18 +45,90 @@ const TABLE_HEAD = [
 ];
 
 function categorieColor(categorie) {
-  switch (categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
+
+  switch (normalized) {
     case 'beach':
       return 'info';
+    case 'accommodation':
     case 'hotel':
       return 'success';
+    case 'food':
     case 'restaurant':
       return 'warning';
-    case 'landmark':
-      return 'error';
+    case 'museum':
+    case 'musee':
+      return 'secondary';
+    case 'shopping':
+      return 'primary';
+    case 'monument':
+      return 'default';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'success';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'warning';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'secondary';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'primary';
       return 'default';
   }
+}
+
+function normalizeLieuType(value) {
+  const normalized = String(value ?? '').toLowerCase();
+
+  if (
+    normalized.includes('accommodation') ||
+    normalized.includes('hotel') ||
+    normalized.includes('lodging') ||
+    normalized.includes('motel') ||
+    normalized.includes('hostel') ||
+    normalized.includes('resort') ||
+    normalized.includes('guest') ||
+    normalized.includes('heberg')
+  ) {
+    return 'accommodation';
+  }
+
+  if (
+    normalized.includes('food') ||
+    normalized.includes('restaurant') ||
+    normalized.includes('cafe') ||
+    normalized.includes('bakery') ||
+    normalized.includes('bar') ||
+    normalized.includes('meal_takeaway') ||
+    normalized.includes('meal_delivery') ||
+    normalized.includes('fast_food')
+  ) {
+    return 'food';
+  }
+
+  if (normalized.includes('museum') || normalized.includes('musee')) {
+    return 'museum';
+  }
+
+  if (
+    normalized.includes('shopping') ||
+    normalized.includes('shop') ||
+    normalized.includes('store') ||
+    normalized.includes('mall') ||
+    normalized.includes('market') ||
+    normalized.includes('supermarket')
+  ) {
+    return 'shopping';
+  }
+
+  if (normalized.includes('beach') || normalized.includes('plage')) {
+    return 'beach';
+  }
+
+  if (normalized.includes('activity') || normalized.includes('activ') || normalized.includes('tourist_attraction')) {
+    return 'activity';
+  }
+
+  if (normalized.includes('landmark') || normalized.includes('monument') || normalized.includes('site') || normalized.includes('historic')) {
+    return 'other';
+  }
+
+  return 'other';
 }
 
 function calculateAverageNote(avis) {
@@ -108,7 +180,7 @@ function parseImageUrls(value) {
 }
 
 function mapLieuToRow(lieu) {
-  const type = (lieu.categorie ?? lieu.type ?? 'autre').toString().toLowerCase();
+  const type = normalizeLieuType(lieu.categorie ?? lieu.type ?? 'other');
   const opening = lieu.opening_hours ?? lieu.openingHours ?? lieu.horaire?.ouverture ?? '';
   const closing = lieu.closing_hours ?? lieu.closingHours ?? lieu.horaire?.fermeture ?? '';
   const horaires = (opening && closing) ? `${opening} - ${closing}` : opening || closing || '';
@@ -153,10 +225,9 @@ function mapLieuToRow(lieu) {
     languages_spoken: Array.isArray(lieu.languages_spoken) ? lieu.languages_spoken.join(', ') : '',
     wheelchair_access: lieu.wheelchair_access ?? false,
     opening_hours: opening,
-    closing_hours: closing,
+
     horaires: horaires,
-    seasonal: lieu.seasonal ?? '',
-    booking_required: lieu.booking_required ?? false,
+
     price_range: lieu.price_range ?? '',
     price_per_adult: lieu.price_per_adult ?? lieu.prix ?? 0,
     min_price: lieu.min_price ?? 0,
@@ -207,7 +278,7 @@ export function BlankView({ title = 'Lieux', sx }) {
     id: '',
     nom: '',
     slug: '',
-    type: 'hotel',
+    type: 'accommodation',
     address: '',
     city: '',
     country: '',
@@ -230,9 +301,6 @@ export function BlankView({ title = 'Lieux', sx }) {
     languages_spoken: '',
     wheelchair_access: false,
     opening_hours: '',
-    closing_hours: '',
-    seasonal: '',
-    booking_required: false,
     price_range: '',
     price_per_adult: '',
     min_price: '',
@@ -248,7 +316,7 @@ export function BlankView({ title = 'Lieux', sx }) {
   const [addForm, setAddForm] = useState({
     nom: '',
     slug: '',
-    type: 'hotel',
+    type: 'accommodation',
     address: '',
     city: '',
     country: '',
@@ -271,9 +339,6 @@ export function BlankView({ title = 'Lieux', sx }) {
     languages_spoken: '',
     wheelchair_access: false,
     opening_hours: '',
-    closing_hours: '',
-    seasonal: '',
-    booking_required: false,
     price_range: '',
     price_per_adult: '',
     min_price: '',
@@ -320,16 +385,12 @@ export function BlankView({ title = 'Lieux', sx }) {
     fetchLieux();
   }, [fetchLieux]);
 
-  const handleOpenAddDialog = useCallback(() => {
-    setOpenAddDialog(true);
-  }, []);
-
   const handleOpenEditDialog = useCallback((row) => {
     setEditForm({
       id: row.id,
       nom: row.nom,
       slug: row.slug || '',
-      type: row.type || row.categorie || 'hotel',
+      type: row.type || row.categorie || 'accommodation',
       address: row.address || row.adresse || '',
       city: row.city || row.ville || '',
       country: row.country || '',
@@ -352,9 +413,6 @@ export function BlankView({ title = 'Lieux', sx }) {
       languages_spoken: row.languages_spoken || '',
       wheelchair_access: row.wheelchair_access || false,
       opening_hours: row.opening_hours || row.openingHours || '',
-      closing_hours: row.closing_hours || row.closingHours || '',
-      seasonal: row.seasonal || '',
-      booking_required: row.booking_required || false,
       price_range: row.price_range || '',
       price_per_adult: row.price_per_adult || row.prix || '',
       min_price: row.min_price || '',
@@ -375,7 +433,7 @@ export function BlankView({ title = 'Lieux', sx }) {
       id: '',
       nom: '',
       slug: '',
-      type: 'hotel',
+      type: 'accommodation',
       address: '',
       city: '',
       country: '',
@@ -398,9 +456,6 @@ export function BlankView({ title = 'Lieux', sx }) {
       languages_spoken: '',
       wheelchair_access: false,
       opening_hours: '',
-      closing_hours: '',
-      seasonal: '',
-      booking_required: false,
       price_range: '',
       price_per_adult: '',
       min_price: '',
@@ -562,9 +617,6 @@ export function BlankView({ title = 'Lieux', sx }) {
         ...(addForm.languages_spoken.trim() ? { languages_spoken: addForm.languages_spoken.split(',').map(l => l.trim()).filter(Boolean) } : {}),
         wheelchair_access: addForm.wheelchair_access,
         ...(addForm.opening_hours.trim() ? { opening_hours: addForm.opening_hours.trim() } : {}),
-        ...(addForm.closing_hours.trim() ? { closing_hours: addForm.closing_hours.trim() } : {}),
-        ...(addForm.seasonal.trim() ? { seasonal: addForm.seasonal.trim() } : {}),
-        booking_required: addForm.booking_required,
         ...(addForm.price_range.trim() ? { price_range: addForm.price_range.trim() } : {}),
         ...(addForm.price_per_adult ? { price_per_adult: parseFloat(addForm.price_per_adult) } : {}),
         ...(addForm.min_price ? { min_price: parseFloat(addForm.min_price) } : {}),
@@ -584,7 +636,7 @@ export function BlankView({ title = 'Lieux', sx }) {
       setAddForm({
         nom: '',
         slug: '',
-        type: 'hotel',
+        type: 'accommodation',
         address: '',
         city: '',
         country: '',
@@ -607,9 +659,6 @@ export function BlankView({ title = 'Lieux', sx }) {
         languages_spoken: '',
         wheelchair_access: false,
         opening_hours: '',
-        closing_hours: '',
-        seasonal: '',
-        booking_required: false,
         price_range: '',
         price_per_adult: '',
         min_price: '',
@@ -688,9 +737,6 @@ export function BlankView({ title = 'Lieux', sx }) {
         ...(editForm.languages_spoken.trim() ? { languages_spoken: editForm.languages_spoken.split(',').map(l => l.trim()).filter(Boolean) } : {}),
         wheelchair_access: editForm.wheelchair_access,
         ...(editForm.opening_hours.trim() ? { opening_hours: editForm.opening_hours.trim() } : {}),
-        ...(editForm.closing_hours.trim() ? { closing_hours: editForm.closing_hours.trim() } : {}),
-        ...(editForm.seasonal.trim() ? { seasonal: editForm.seasonal.trim() } : {}),
-        booking_required: editForm.booking_required,
         ...(editForm.price_range.trim() ? { price_range: editForm.price_range.trim() } : {}),
         ...(editForm.price_per_adult ? { price_per_adult: parseFloat(editForm.price_per_adult) } : {}),
         ...(editForm.min_price ? { min_price: parseFloat(editForm.min_price) } : {}),
@@ -711,7 +757,7 @@ export function BlankView({ title = 'Lieux', sx }) {
         id: '',
         nom: '',
         slug: '',
-        type: 'hotel',
+        type: 'accommodation',
         address: '',
         city: '',
         country: '',
@@ -734,9 +780,6 @@ export function BlankView({ title = 'Lieux', sx }) {
         languages_spoken: '',
         wheelchair_access: false,
         opening_hours: '',
-        closing_hours: '',
-        seasonal: '',
-        booking_required: false,
         price_range: '',
         price_per_adult: '',
         min_price: '',
@@ -782,19 +825,11 @@ export function BlankView({ title = 'Lieux', sx }) {
     () => [
       { value: 'all', label: 'All', color: 'default', count: tableData.length },
       { value: 'beach', label: 'Beach', color: 'info', count: getLengthByCategorie('beach') },
-      { value: 'hotel', label: 'Hotel', color: 'success', count: getLengthByCategorie('hotel') },
-      {
-        value: 'restaurant',
-        label: 'Restaurant',
-        color: 'warning',
-        count: getLengthByCategorie('restaurant'),
-      },
-      {
-        value: 'landmark',
-        label: 'Landmark',
-        color: 'error',
-        count: getLengthByCategorie('landmark'),
-      },
+      { value: 'accommodation', label: 'Accommodation', color: 'success', count: getLengthByCategorie('accommodation') },
+      { value: 'food', label: 'Food', color: 'warning', count: getLengthByCategorie('food') },
+      { value: 'museum', label: 'Museum', color: 'secondary', count: getLengthByCategorie('museum') },
+      { value: 'shopping', label: 'Shopping', color: 'primary', count: getLengthByCategorie('shopping') },
+      { value: 'other', label: 'Other', color: 'default', count: getLengthByCategorie('other') },
     ],
     [getLengthByCategorie, tableData.length]
   );
@@ -821,22 +856,30 @@ export function BlankView({ title = 'Lieux', sx }) {
     setDeleteDialogOpen(true);
   }, []);
 
-  const handleConfirmDelete = useCallback(() => {
-    if (deleteTarget === 'single' && deleteId) {
-      const next = tableData.filter((row) => row.id !== deleteId);
-      setTableData(next);
+  const handleConfirmDelete = useCallback(async () => {
+    try {
+      if (deleteTarget === 'single' && deleteId) {
+        await deleteLieu(deleteId);
+        table.onUpdatePageDeleteRow(dataInPage?.length ?? 0);
+      } else if (deleteTarget === 'multiple') {
+        const deletableIds = [...table.selected];
+        await Promise.all(deletableIds.map((id) => deleteLieu(id)));
+        table.onUpdatePageDeleteRows(dataInPage?.length ?? 0, safeFiltered.length);
+      } else {
+        return;
+      }
+
+      await fetchLieux();
       toast.success('Suppression effectuée');
-      table.onUpdatePageDeleteRow(dataInPage?.length ?? 0);
-    } else if (deleteTarget === 'multiple') {
-      const next = tableData.filter((row) => !table.selected.includes(row.id));
-      setTableData(next);
-      toast.success('Suppression effectuée');
-      table.onUpdatePageDeleteRows(dataInPage?.length ?? 0, safeFiltered.length);
+    } catch (error) {
+      console.error('Erreur lors de la suppression du lieu:', error);
+      toast.error('Échec de la suppression');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      setDeleteId(null);
     }
-    setDeleteDialogOpen(false);
-    setDeleteTarget(null);
-    setDeleteId(null);
-  }, [deleteTarget, deleteId, tableData, dataInPage?.length, table, safeFiltered.length]);
+  }, [deleteTarget, deleteId, table, dataInPage?.length, safeFiltered.length, fetchLieux]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteDialogOpen(false);
@@ -860,7 +903,7 @@ export function BlankView({ title = 'Lieux', sx }) {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <DashboardContent maxWidth="xl" sx={sx}>
-        <PageHeader title={String(title)} onAdd={handleOpenAddDialog} />
+        <PageHeader title={String(title)} />
 
         <Card>
           <InvoiceFilters
@@ -942,11 +985,13 @@ export function BlankView({ title = 'Lieux', sx }) {
                 onChange={(e) => handleChangeEditForm('type', e.target.value)}
                 fullWidth
               >
-                <MenuItem value="hotel">Hotel</MenuItem>
+                <MenuItem value="accommodation">Accommodation</MenuItem>
                 <MenuItem value="beach">Beach</MenuItem>
-                <MenuItem value="restaurant">Restaurant</MenuItem>
+                <MenuItem value="food">Food</MenuItem>
                 <MenuItem value="activity">Activity</MenuItem>
-                <MenuItem value="landmark">Landmark</MenuItem>
+                <MenuItem value="museum">Museum</MenuItem>
+                <MenuItem value="shopping">Shopping</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
               </TextField>
 
               <TextField
@@ -1125,20 +1170,6 @@ export function BlankView({ title = 'Lieux', sx }) {
                 fullWidth
               />
 
-              <TextField
-                label="Heures de fermeture"
-                placeholder="e.g., 18:00"
-                value={editForm.closing_hours}
-                onChange={(e) => handleChangeEditForm('closing_hours', e.target.value)}
-                fullWidth
-              />
-
-              <TextField
-                label="Saisonnalité"
-                value={editForm.seasonal}
-                onChange={(e) => handleChangeEditForm('seasonal', e.target.value)}
-                fullWidth
-              />
 
               <TextField
                 label="Gamme de prix"
@@ -1251,11 +1282,13 @@ export function BlankView({ title = 'Lieux', sx }) {
                 onChange={(e) => handleChangeAddForm('type', e.target.value)}
                 fullWidth
               >
-                <MenuItem value="hotel">Hotel</MenuItem>
+                <MenuItem value="accommodation">Accommodation</MenuItem>
                 <MenuItem value="beach">Beach</MenuItem>
-                <MenuItem value="restaurant">Restaurant</MenuItem>
+                <MenuItem value="food">Food</MenuItem>
                 <MenuItem value="activity">Activity</MenuItem>
-                <MenuItem value="landmark">Landmark</MenuItem>
+                <MenuItem value="museum">Museum</MenuItem>
+                <MenuItem value="shopping">Shopping</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
               </TextField>
 
               <TextField
@@ -1434,20 +1467,6 @@ export function BlankView({ title = 'Lieux', sx }) {
                 fullWidth
               />
 
-              <TextField
-                label="Heures de fermeture"
-                placeholder="e.g., 18:00"
-                value={addForm.closing_hours}
-                onChange={(e) => handleChangeAddForm('closing_hours', e.target.value)}
-                fullWidth
-              />
-
-              <TextField
-                label="Saisonnalité"
-                value={addForm.seasonal}
-                onChange={(e) => handleChangeAddForm('seasonal', e.target.value)}
-                fullWidth
-              />
 
               <TextField
                 label="Gamme de prix"

@@ -45,7 +45,15 @@ export const paths = {
     root: ROOTS.DASHBOARD,
     lieux: {
       root: `${ROOTS.DASHBOARD}/lieux`,
+      add: `${ROOTS.DASHBOARD}/lieux/add`,
       details: (id) => `${ROOTS.DASHBOARD}/lieux/${id}`,
+    },
+    users: {
+      root: `${ROOTS.DASHBOARD}/users`,
+      details: (id) => `${ROOTS.DASHBOARD}/users/${id}`,
+    },
+    facteurs: {
+      root: `${ROOTS.DASHBOARD}/facteurs`,
     },
     activites: `${ROOTS.DASHBOARD}/activites`,
     publications: `${ROOTS.DASHBOARD}/publications`,

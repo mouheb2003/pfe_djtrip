@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _logoFadeAnimation;
   late Animation<double> _subtitleFadeAnimation;
   late Animation<int> _characterCountAnimation;
-  final String _logoText = 'DTrip';
+  final String _logoText = 'DJTrip';
 
   @override
   void initState() {
@@ -119,7 +119,9 @@ class _SplashScreenState extends State<SplashScreen>
             if (status['success'] == true && isApproved == false) {
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const WaitingApprovalScreen(),
+                ),
                 (route) => false,
               );
               return;
@@ -140,10 +142,18 @@ class _SplashScreenState extends State<SplashScreen>
             : AppRoutes.touristMain;
         Navigator.pushNamedAndRemoveUntil(context, route, (route) => false);
       } else {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.welcome, (route) => false);
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.welcome,
+          (route) => false,
+        );
       }
     } else {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.welcome, (route) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.welcome,
+        (route) => false,
+      );
     }
   }
 

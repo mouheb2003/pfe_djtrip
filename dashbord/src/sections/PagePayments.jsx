@@ -167,8 +167,8 @@ export function PaymentsView({ sx }) {
   }, [fetchPayments]);
 
   const dataFiltered = useMemo(
-    () => applyFilter({ inputData: payments, comparator: table.order, filters: currentFilters }),
-    [payments, table.order, currentFilters]
+    () => applyFilter({ inputData: payments, comparator: getComparator(table.order, table.orderBy), filters: currentFilters }),
+    [payments, table.order, table.orderBy, currentFilters]
   );
 
   const denseHeight = table.dense ? 52 : 72;

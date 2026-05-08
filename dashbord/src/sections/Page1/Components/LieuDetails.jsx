@@ -24,35 +24,63 @@ import { END_POINT } from 'src/Controller/endPoint';
 import { getUserById, getUserReviews } from 'src/Controller/actions';
 
 function categorieColor(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'info';
+    case 'museum':
     case 'musee':
       return 'secondary';
+    case 'shopping':
+      return 'primary';
+    case 'accommodation':
     case 'hotel':
       return 'success';
+    case 'food':
     case 'restaurant':
       return 'warning';
+    case 'landmark':
     case 'monument':
-      return 'error';
+      return 'default';
+    case 'other':
+      return 'default';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'success';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'warning';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'secondary';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'primary';
       return 'default';
   }
 }
 
 function categorieIcon(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'fluent:beach-20-filled';
+    case 'museum':
     case 'musee':
       return 'mdi:bank';
+    case 'shopping':
+      return 'mdi:shopping';
+    case 'accommodation':
     case 'hotel':
       return 'fa-solid:hotel';
+    case 'food':
     case 'restaurant':
       return 'mdi:silverware-fork-knife';
+    case 'landmark':
     case 'monument':
-      return 'mdi:castle';
+      return 'mdi:map-marker';
+    case 'other':
+      return 'mdi:map-marker';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'fa-solid:hotel';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'mdi:silverware-fork-knife';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'mdi:bank';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'mdi:shopping';
       return 'mdi:map-marker';
   }
 }
@@ -558,28 +586,10 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Hours & Booking</Typography>
                         </Stack>
                         <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Opening Hours</Typography>
                               <Typography variant="body2">{lieu.opening_hours || lieu.openingHours || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Closing Hours</Typography>
-                              <Typography variant="body2">{lieu.closing_hours || lieu.closingHours || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Seasonal</Typography>
-                              <Typography variant="body2">{lieu.seasonal || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Booking Required</Typography>
-                              <Typography variant="body2">{lieu.booking_required ? 'Yes' : 'No'}</Typography>
                             </Stack>
                           </Grid>
                         </Grid>

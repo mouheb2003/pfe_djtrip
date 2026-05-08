@@ -1496,7 +1496,14 @@ exports.getAllPayments = async (req, res) => {
     const payments = await Payment.find(query)
       .populate('user_id', 'fullname email')
       .populate('inscription_id', 'statut')
-      .populate('activity_id', 'titre')
+      .populate({
+        path: 'activity_id',
+        select: 'titre organisateur_id',
+        populate: {
+          path: 'organisateur_id',
+          select: 'fullname email',
+        },
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -1516,6 +1523,47 @@ exports.getAllPayments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching payments",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * DELETE /api/payments/:paymentId
+ * Delete a payment record (admin only)
+ */
+exports.deletePayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: "paymentId is required",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    await Payment.findByIdAndDelete(paymentId);
+
+    res.status(200).json({
+      success: true,
+      message: "Payment deleted successfully",
+      paymentId,
+    });
+  } catch (error) {
+    console.error("[PAYMENT] Error deleting payment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting payment",
       error: error.message,
     });
   }

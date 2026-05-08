@@ -28,14 +28,16 @@ const TAB_LABELS = {
   archived: 'Archived',
 };
 
-export function NotificationsDrawer({ data = [], sx, ...other }) {
+export function NotificationsDrawer({ data, sx, ...other }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentTab, setCurrentTab] = useState('all');
-  const [notifications, setNotifications] = useState(data);
+  const [notifications, setNotifications] = useState(() => (Array.isArray(data) ? data : []));
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setNotifications(data);
+    if (Array.isArray(data)) {
+      setNotifications(data);
+    }
   }, [data]);
 
   const open = Boolean(anchorEl);

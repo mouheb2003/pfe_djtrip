@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [
     react(),
     checker({
-      
+
       overlay: {
         position: 'tl',
         initialIsOpen: false,
@@ -30,6 +30,15 @@ export default defineConfig({
       },
     ],
   },
-  server: { port: PORT, host: true },
+  server: {
+    port: PORT,
+    host: true,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
   preview: { port: PORT, host: true },
 });

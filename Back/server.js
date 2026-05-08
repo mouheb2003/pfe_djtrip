@@ -50,6 +50,7 @@ const inscriptionRoutes = require("./routes/inscription");
 const avisRoutes = require("./routes/avis");
 const messageRoutes = require("./routes/message");
 const lieuRoutes = require("./routes/lieu");
+const googlePlacesRoutes = require("./routes/googlePlaces");
 const postRoutes = require("./routes/post");
 let commentRoutes;
 try {
@@ -276,6 +277,7 @@ app.use("/api/v1/avis", avisRoutes);
 app.use("/api/v1/posts", postRoutes);
 app.use("/api/v1/comments", commentRoutes);
 app.use("/api/v1/messages", messageRoutes);
+app.use('/api/v1/google', googlePlacesRoutes);
 app.use("/api/v1/lieux", lieuRoutes);
 app.use("/api/v1/system-logs", systemLogRoutes);
 app.use("/api/v1/logs", logRoutes);

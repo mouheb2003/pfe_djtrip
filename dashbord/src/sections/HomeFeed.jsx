@@ -445,7 +445,7 @@ export function HomeFeedView({ sx }) {
                     icon="solar:user-plus-bold"
                     label="Users"
                     color={(theme) => theme.palette.primary.main}
-                    path={paths.dashboard.users}
+                    path={paths.dashboard.users.root}
                   />
                   <QuickActionCard
                     icon="solar:map-point-wave-bold"

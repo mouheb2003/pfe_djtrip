@@ -66,6 +66,10 @@ router.get("/wallet", authMiddleware.verifyToken, paymentController.getWalletBal
 // Get all payments (admin only)
 router.get("/all", authMiddleware.verifyToken, paymentController.getAllPayments);
 
+// DELETE /api/payments/:paymentId
+// Delete payment record (admin only)
+router.delete("/:paymentId", authMiddleware.verifyToken, paymentController.deletePayment);
+
 // POST /api/payments/:paymentId/refund
 // Manual refund for admin (admin only)
 router.post("/:paymentId/refund", authMiddleware.verifyToken, paymentController.manualRefund);

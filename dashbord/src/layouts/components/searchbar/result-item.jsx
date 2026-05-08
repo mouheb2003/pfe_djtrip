@@ -13,7 +13,7 @@ import { Label } from 'src/components/label';
 export function ResultItem({ title, path, labels, href, sx, ...other }) {
   const linkProps = isExternalLink(href)
     ? { target: '_blank', rel: 'noopener noreferrer', href, component: 'a' }
-    : { component: RouterLink, href };
+    : { component: RouterLink, to: href };
 
   return (
     <ListItemButton

@@ -1,15 +1,32 @@
 import { Helmet } from 'react-helmet-async';
 import { useState } from 'react';
+import { useBoolean } from 'minimal-shared/hooks';
 import { useRouter } from 'src/routes/hooks';
 import axios, { endpoints } from 'src/lib/axios';
 import { CONFIG } from 'src/global-config';
 
-import { Container, Typography, Stack, TextField, Button, Alert, Box, Card } from '@mui/material';
+import {
+  Container,
+  Typography,
+  Stack,
+  TextField,
+  Button,
+  Alert,
+  Box,
+  Card,
+  IconButton,
+  InputAdornment,
+} from '@mui/material';
+
+import { Iconify } from 'src/components/iconify';
 
 const metadata = { title: `Change Password | Dashboard - ${CONFIG.appName}` };
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const showCurrentPassword = useBoolean();
+  const showNewPassword = useBoolean();
+  const showConfirmPassword = useBoolean();
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -39,8 +56,8 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    if (formData.newPassword.length > 8) {
-      setError('Password must be at most 8 characters long');
+    if (formData.newPassword.length < 8) {
+      setError('Password must be at least 8 characters long');
       return;
     }
 
@@ -91,30 +108,69 @@ export default function ChangePasswordPage() {
                   fullWidth
                   name="currentPassword"
                   label="Current Password"
-                  type="password"
+                  type={showCurrentPassword.value ? 'text' : 'password'}
                   value={formData.currentPassword}
                   onChange={handleChange}
                   required
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={showCurrentPassword.onToggle} edge="end">
+                            <Iconify
+                              icon={showCurrentPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+                            />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
 
                 <TextField
                   fullWidth
                   name="newPassword"
                   label="New Password"
-                  type="password"
+                  type={showNewPassword.value ? 'text' : 'password'}
                   value={formData.newPassword}
                   onChange={handleChange}
                   required
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={showNewPassword.onToggle} edge="end">
+                            <Iconify
+                              icon={showNewPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+                            />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
 
                 <TextField
                   fullWidth
                   name="confirmPassword"
                   label="Confirm New Password"
-                  type="password"
+                  type={showConfirmPassword.value ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={showConfirmPassword.onToggle} edge="end">
+                            <Iconify
+                              icon={showConfirmPassword.value ? 'solar:eye-bold' : 'solar:eye-closed-bold'}
+                            />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
 
                 <Button

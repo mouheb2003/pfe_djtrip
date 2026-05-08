@@ -153,7 +153,7 @@ class GooglePlacesService {
     required double longitude,
     List<String> includedTypes = const ['restaurant', 'hotel', 'beach'],
     double radiusMeters = 5000,
-    int maxResultCount = 30,
+    int maxResultCount = 20,
     String languageCode = 'fr',
   }) async {
     _ensureApiKey();
