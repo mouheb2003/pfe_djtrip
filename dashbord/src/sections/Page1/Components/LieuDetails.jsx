@@ -99,14 +99,27 @@ function priceLabel(price) {
   return price === 0 ? 'Gratuit' : `${price} TND`;
 }
 
-function normalizeImages(images) {
-  const imageArray = Array.isArray(images) ? images : [];
+function normalizeImages(value) {
+  const imageArray = Array.isArray(value) ? value : value ? [value] : [];
   return imageArray
-    .map((image) => {
-      if (typeof image === 'string') return image;
-      return image?.imageUrl || image?.url || image?.src || '';
+    .flatMap((image) => {
+      if (typeof image === 'string') return [image];
+
+      return [image?.imageUrl, image?.url, image?.src, image?.main_image, image?.photoUrl].filter(Boolean);
     })
     .filter(Boolean);
+}
+
+function getLieuImages(lieu) {
+  return normalizeImages([
+    lieu?.main_image,
+    ...(Array.isArray(lieu?.gallery) ? lieu.gallery : []),
+    ...(Array.isArray(lieu?.galerieImages) ? lieu.galerieImages : []),
+    ...(Array.isArray(lieu?.images) ? lieu.images : []),
+    ...(lieu?.imageUrl ? [lieu.imageUrl] : []),
+    ...(lieu?.image ? [lieu.image] : []),
+    ...(lieu?.photoUrl ? [lieu.photoUrl] : []),
+  ]);
 }
 
 export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
@@ -156,7 +169,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
 
   if (!lieu) return null;
 
-  const images = normalizeImages(lieu.galerieImages || lieu.images || lieu.gallery);
+  const images = getLieuImages(lieu);
   const hasImages = images.length > 0;
   const averageRating = calculateAverageNote(lieu.avis);
   const totalReviews = lieu.avis?.length || 0;
@@ -463,13 +476,13 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           <Grid size={{ xs: 12 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Main Image</Typography>
-                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{lieu.main_image || '-'}</Typography>
+                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{lieu.main_image || images[0] || '-'}</Typography>
                             </Stack>
                           </Grid>
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Gallery</Typography>
-                              <Typography variant="body2">{Array.isArray(lieu.gallery) ? lieu.gallery.length : 0} images</Typography>
+                              <Typography variant="body2">{images.length} images</Typography>
                             </Stack>
                           </Grid>
                           <Grid size={{ xs: 12, sm: 6 }}>

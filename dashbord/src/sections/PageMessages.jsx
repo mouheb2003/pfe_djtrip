@@ -21,6 +21,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useSearchParams } from 'src/routes/hooks';
 import {
   deleteMessageById,
   editMessageById,
@@ -132,6 +133,7 @@ function ConversationAvatar({ conv, size = 32 }) {
 }
 
 export function MessagesView({ sx }) {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [conversations, setConversations] = useState([]);
@@ -195,6 +197,12 @@ export function MessagesView({ sx }) {
   useEffect(() => {
     initConversations();
   }, [initConversations]);
+
+  useEffect(() => {
+    const partnerId = String(searchParams.get('partnerId') || '').trim();
+    if (!partnerId) return;
+    loadMessagesWithUser(partnerId);
+  }, [searchParams, loadMessagesWithUser]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

@@ -2,10 +2,13 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
+
+import { Iconify } from 'src/components/iconify';
 
 import { fToNow } from 'src/utils/format-time';
 
@@ -16,7 +19,7 @@ import { FileThumbnail } from 'src/components/file-thumbnail';
 
 // ----------------------------------------------------------------------
 
-export function NotificationItem({ notification }) {
+export function NotificationItem({ notification, onClick, onDelete }) {
   const iconKey =
     (notification.type === 'order' && 'ic-order') ||
     (notification.type === 'chat' && 'ic-chat') ||
@@ -219,11 +222,14 @@ export function NotificationItem({ notification }) {
   return (
     <ListItemButton
       disableRipple
+      onClick={onClick}
       sx={[
         (theme) => ({
           p: 2.5,
           alignItems: 'flex-start',
           borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
+          cursor: onClick ? 'pointer' : 'default',
+          pr: 1,
         }),
       ]}
     >
@@ -238,6 +244,20 @@ export function NotificationItem({ notification }) {
         {notification.type === 'tags' && renderTagsAction()}
         {notification.type === 'payment' && renderPaymentAction()}
       </Box>
+
+      {onDelete && (
+        <IconButton
+          size="small"
+          color="error"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(notification);
+          }}
+          sx={{ mt: 0.5, ml: 1 }}
+        >
+          <Iconify icon="solar:trash-bin-trash-bold" width={18} />
+        </IconButton>
+      )}
     </ListItemButton>
   );
 }

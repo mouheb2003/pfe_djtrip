@@ -99,7 +99,6 @@ export const navData = [
         title: 'Approvals',
         path: paths.dashboard.approvals,
         icon: ICONS.user,
-        info: <Label color="orange">5</Label>,
       },
     ],
   },

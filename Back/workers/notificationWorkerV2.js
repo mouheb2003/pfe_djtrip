@@ -2,6 +2,7 @@ const notificationEventBus = require('../services/notificationEventBus');
 const notificationService = require('../services/notificationServiceV2');
 const Notification = require('../models/notification');
 const NotificationAnalytics = require('../models/notificationAnalytics');
+const User = require('../models/user');
 
 /**
  * Notification Worker V2
@@ -722,24 +723,74 @@ async function initializeEventListeners() {
   notificationEventBus.on('appeal.created', async (data) => {
     try {
       console.log('📨 Appeal created event:', data);
-      
-      // Send to user
-      await notificationService.sendAppealCreatedNotification({
-        userId: data.userId,
-        appealId: data.appealId,
-      });
+      // Prepare display values
+      const sender = data.userFullName || 'Someone';
+      const subject = data.subject || 'Appeal';
 
-      // Create DB notification
+      // Send confirmation to the user who submitted
+      try {
+        await notificationService.sendAppealCreatedNotification({
+          userId: data.userId,
+          appealId: data.appealId,
+        });
+      } catch (err) {
+        console.error('Error sending appeal.created push to user:', err);
+      }
+
+      // Create DB notification for the submitting user
       await Notification.createNotification({
         user_id: data.userId,
         type: 'appeal',
         title: 'Appeal Submitted 📋',
-        message: 'Your appeal has been submitted and will be processed soon',
+        message: `Your appeal (${subject}) has been submitted and will be processed soon`,
         data: { appealId: data.appealId },
         priority: 'high',
         related_entity_type: 'appeal',
         related_entity_id: data.appealId,
       });
+
+      // Notify admins: create DB notifications and send push with sender + subject
+      // Find admins case-insensitively (userType may be stored as 'Admin' elsewhere)
+      const admins = await User.find({ userType: { $regex: /^admin$/i } }).select('_id email').lean();
+      if (admins.length > 0) {
+        const adminIds = admins.map(a => a._id.toString());
+
+        // Create admin DB notifications in bulk
+        const adminNotifications = admins.map(admin => ({
+          user_id: admin._id,
+          type: 'appeal',
+          title: `New Appeal from ${sender}`,
+          message: `${sender} submitted "${subject}"`,
+          data: { appealId: data.appealId, userId: data.userId },
+          priority: 'high',
+          related_entity_type: 'appeal',
+          related_entity_id: data.appealId,
+        }));
+
+        try {
+          await Notification.insertMany(adminNotifications);
+        } catch (dbErr) {
+          console.error('Error creating admin notifications for appeal.created:', dbErr);
+        }
+
+        // Send push notification to all admins
+        try {
+          await notificationService.sendBulkNotificationQueued({
+            userIds: adminIds,
+            title: `New Appeal from ${sender}`,
+            body: `${sender} submitted "${subject}"`,
+            data: {
+              type: 'appeal_created',
+              appealId: data.appealId,
+              userId: data.userId,
+            },
+            notificationType: 'appeal',
+            priority: 'high',
+          });
+        } catch (pushErr) {
+          console.error('Error sending push to admins for appeal.created:', pushErr);
+        }
+      }
     } catch (error) {
       console.error('Error processing appeal.created event:', error);
     }

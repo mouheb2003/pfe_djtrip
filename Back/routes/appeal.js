@@ -75,4 +75,13 @@ router.patch(
   appealController.updateAppealStatus,
 );
 
+// Delete appeal (admin)
+router.delete(
+  "/admin/:id",
+  verifyToken,
+  verifyAdmin,
+  invalidateCache(["appeals"]),
+  appealController.deleteAppeal,
+);
+
 module.exports = wrapRouter(router);

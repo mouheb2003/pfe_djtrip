@@ -506,9 +506,9 @@ export function BlankView({ title = 'Lieux', sx }) {
       const uploadedUrls = await uploadLieuImages(pendingFiles);
 
       setAddForm((prev) => {
-        const existing = parseImageUrls(prev.photos);
+        const existing = parseImageUrls(prev.gallery);
         const merged = [...new Set([...existing, ...uploadedUrls])];
-        return { ...prev, photos: merged.join('\n') };
+        return { ...prev, gallery: merged.join('\n') };
       });
 
       setPendingFiles([]);
@@ -537,9 +537,9 @@ export function BlankView({ title = 'Lieux', sx }) {
       const uploadedUrls = await uploadLieuImages(editPendingFiles);
 
       setEditForm((prev) => {
-        const existing = parseImageUrls(prev.photos);
+        const existing = parseImageUrls(prev.gallery);
         const merged = [...new Set([...existing, ...uploadedUrls])];
-        return { ...prev, photos: merged.join('\n') };
+        return { ...prev, gallery: merged.join('\n') };
       });
 
       setEditPendingFiles([]);
@@ -554,9 +554,9 @@ export function BlankView({ title = 'Lieux', sx }) {
 
   const handleDeleteEditImage = useCallback((index) => {
     setEditForm((prev) => {
-      const images = parseImageUrls(prev.photos);
+      const images = parseImageUrls(prev.gallery);
       const newImages = images.filter((_, i) => i !== index);
-      return { ...prev, photos: newImages.join('\n') };
+      return { ...prev, gallery: newImages.join('\n') };
     });
   }, []);
 

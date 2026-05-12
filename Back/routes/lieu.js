@@ -43,7 +43,8 @@ router.put("/:id", verifyToken, verifyAdmin, lieuController.updateLieu);
 router.delete("/:id", verifyToken, verifyAdmin, lieuController.deleteLieu);
 
 // Upload images for a lieu (ADMIN only)
-router.post("/:id/upload-images", verifyToken, verifyAdmin, upload.array("files"), lieuController.uploadImages);
+router.post("/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
+router.post("/:id/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
 
 // Update Google Maps API key (ADMIN only)
 router.put("/config/google-maps-key", verifyToken, verifyAdmin, async (req, res) => {

@@ -61,7 +61,6 @@ const TABLE_HEAD = [
   { id: 'email', label: 'Email' },
   { id: 'role', label: 'Role' },
   { id: 'status', label: 'Statut compte' },
-  { id: 'statutOrganisateur', label: 'Statut organisateur' },
   { id: 'dateInscription', label: 'Date inscription' },
   { id: 'actions', label: '', align: 'right' },
 ];
@@ -728,7 +727,6 @@ export function UsersView({ sx }) {
                               {user.status}
                             </Label>
                           </TableCell>
-                          <TableCell>{user.statutOrganisateur}</TableCell>
                           <TableCell>
                             {user.dateInscription
                               ? new Date(user.dateInscription).toLocaleDateString('fr-FR')
@@ -840,120 +838,238 @@ export function UsersView({ sx }) {
           )}
         </Card>
 
-        <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="md">
-          <DialogTitle>
-            <Stack spacing={0.5}>
-              <Typography variant="h6">Détails utilisateur</Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Vue détaillée du profil et de l'état du compte
-              </Typography>
-            </Stack>
+        <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="lg">
+          <DialogTitle sx={{ p: 0 }}>
+            <Box
+              sx={{
+                p: 3,
+                position: 'relative',
+                overflow: 'hidden',
+                color: 'common.white',
+                background:
+                  'linear-gradient(135deg, rgba(15,23,42,1) 0%, rgba(29,78,216,1) 48%, rgba(56,189,248,1) 100%)',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 34%), radial-gradient(circle at bottom left, rgba(255,255,255,0.12), transparent 28%)',
+                  pointerEvents: 'none',
+                },
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ position: 'relative' }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: 'rgba(255,255,255,0.16)',
+                    color: 'common.white',
+                    fontWeight: 800,
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    boxShadow: '0 12px 24px rgba(15,23,42,0.2)',
+                  }}
+                >
+                  {(selectedUser?.fullname?.[0] || selectedUser?.email?.[0] || '?').toUpperCase()}
+                </Avatar>
+
+                <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1.1 }} noWrap>
+                    {selectedUser?.fullname ?? '-'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }} noWrap>
+                    {selectedUser?.email ?? '-'}
+                  </Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
+                    <Label
+                      variant="soft"
+                      sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: 'common.white', px: 1.2 }}
+                    >
+                      {selectedUser?.role ?? '-'}
+                    </Label>
+                    <Label
+                      variant="soft"
+                      sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: 'common.white', px: 1.2 }}
+                    >
+                      {selectedUser?.status ?? '-'}
+                    </Label>
+                    <Label
+                      variant="soft"
+                      sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: 'common.white', px: 1.2 }}
+                    >
+                      {selectedUser?.statutOrganisateur ?? '-'}
+                    </Label>
+                  </Stack>
+                </Box>
+              </Stack>
+            </Box>
           </DialogTitle>
-          <DialogContent dividers>
-            <Stack spacing={2}>
+          <DialogContent dividers sx={{ bgcolor: 'background.paper', p: 3 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2.5,
+                gridTemplateColumns: { xs: '1fr', md: '340px 1fr' },
+                alignItems: 'start',
+              }}
+            >
               <Card
                 variant="outlined"
                 sx={{
-                  p: 2,
-                  borderRadius: 2,
+                  p: 2.5,
+                  borderRadius: 3,
                   bgcolor: 'background.neutral',
+                  position: { md: 'sticky' },
+                  top: { md: 24 },
                 }}
               >
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1.5}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  justifyContent="space-between"
-                >
+                <Stack spacing={2}>
                   <Box>
-                    <Typography variant="h6">{selectedUser?.fullname ?? '-'}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 1.2 }}>
+                      Profil
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
+                      {selectedUser?.fullname ?? '-'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
                       {selectedUser?.email ?? '-'}
                     </Typography>
                   </Box>
 
-                  <Stack direction="row" spacing={1} flexWrap="wrap">
-                    <Label variant="soft" color={roleColor(selectedUser?.role)}>
-                      Role: {selectedUser?.role ?? '-'}
-                    </Label>
-                    <Label variant="soft" color={statusColor(selectedUser?.status)}>
-                      Statut: {selectedUser?.status ?? '-'}
-                    </Label>
-                  </Stack>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.68)',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Compte
+                      </Typography>
+                      <Label variant="soft" color={statusColor(selectedUser?.status)}>
+                        {selectedUser?.status ?? '-'}
+                      </Label>
+                    </Stack>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Rôle
+                      </Typography>
+                      <Label variant="soft" color={roleColor(selectedUser?.role)}>
+                        {selectedUser?.role ?? '-'}
+                      </Label>
+                    </Stack>
+                  </Box>
+
+                  <Box sx={{ display: 'grid', gap: 1.25 }}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2.5, bgcolor: 'background.paper' }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Date d'inscription
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        {selectedUser?.dateInscription
+                          ? new Date(selectedUser.dateInscription).toLocaleString('fr-FR')
+                          : '-'}
+                      </Typography>
+                    </Paper>
+
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2.5, bgcolor: 'background.paper' }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Suspendu jusqu'au
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        {selectedUser?.suspendedUntil
+                          ? new Date(selectedUser.suspendedUntil).toLocaleString('fr-FR')
+                          : '-'}
+                      </Typography>
+                    </Paper>
+                  </Box>
                 </Stack>
               </Card>
 
-              <Box
-                sx={{
-                  display: 'grid',
-                  gap: 1.5,
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                }}
-              >
-                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    Date inscription
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 1.2 }}>
+                    Informations principales
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {selectedUser?.dateInscription
-                      ? new Date(selectedUser.dateInscription).toLocaleString('fr-FR')
-                      : '-'}
-                  </Typography>
-                </Card>
 
-                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    Suspendu jusqu au
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {selectedUser?.suspendedUntil
-                      ? new Date(selectedUser.suspendedUntil).toLocaleString('fr-FR')
-                      : '-'}
-                  </Typography>
-                </Card>
+                  <Box
+                    sx={{
+                      mt: 1,
+                      display: 'grid',
+                      gap: 1.5,
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                    }}
+                  >
+                    <Card variant="outlined" sx={{ p: 1.8, borderRadius: 2.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Téléphone
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        {selectedUser?.numTel ?? '-'}
+                      </Typography>
+                    </Card>
 
-                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    Statut organisateur
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {selectedUser?.statutOrganisateur ?? '-'}
-                  </Typography>
-                </Card>
+                    <Card variant="outlined" sx={{ p: 1.8, borderRadius: 2.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Âge
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        {selectedUser?.age ?? '-'}
+                      </Typography>
+                    </Card>
 
-                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    Téléphone
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {selectedUser?.numTel ?? '-'}
-                  </Typography>
-                </Card>
+                    <Card variant="outlined" sx={{ p: 1.8, borderRadius: 2.5, gridColumn: { sm: '1 / -1' } }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Statut organisateur
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        {selectedUser?.statutOrganisateur ?? '-'}
+                      </Typography>
+                    </Card>
 
-                <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                    Age
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {selectedUser?.age ?? '-'}
-                  </Typography>
-                </Card>
-              </Box>
-
-              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                  Bio
-                </Typography>
-                <Typography variant="body2">{selectedUser?.bio ?? '-'}</Typography>
-              </Card>
-            </Stack>
+                    <Card variant="outlined" sx={{ p: 1.8, borderRadius: 2.5, gridColumn: { sm: '1 / -1' } }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                        Bio
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mt: 0.75, lineHeight: 1.75, overflowWrap: 'anywhere' }}
+                      >
+                        {selectedUser?.bio ?? '-'}
+                      </Typography>
+                    </Card>
+                  </Box>
+                </Box>
+              </Stack>
+            </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDetailsOpen(false)} color="inherit">
-              Fermer
-            </Button>
+          <DialogActions
+            sx={{
+              px: 3,
+              py: 2,
+              gap: 1,
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              bgcolor: 'background.neutral',
+            }}
+          >
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+              <Button onClick={() => setDetailsOpen(false)} color="inherit" variant="outlined">
+                Fermer
+              </Button>
+            </Stack>
             <Button
               color="inherit"
+              variant="outlined"
               onClick={() => handleOpenSuspendDialog(selectedUser)}
               disabled={
                 !selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id
@@ -972,6 +1088,7 @@ export function UsersView({ sx }) {
             </Button>
             <Button
               color="error"
+              variant="contained"
               onClick={() => handleDeleteUser(selectedUser)}
               disabled={
                 !selectedUser || selectedUser.role === 'admin' || busyUserId === selectedUser.id
@@ -1040,56 +1157,40 @@ export function UsersView({ sx }) {
                       </Avatar>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Profile Information</Typography>
                     </Stack>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>ID</Typography>
-                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{userOverview.user?._id ?? userOverview.user?.id ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Full Name</Typography>
-                          <Typography variant="body2">{userOverview.user?.fullname ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Email</Typography>
-                          <Typography variant="body2">{userOverview.user?.email ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Phone</Typography>
-                          <Typography variant="body2">{userOverview.user?.num_tel ?? userOverview.user?.numTel ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Age</Typography>
-                          <Typography variant="body2">{userOverview.user?.age ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Date of Birth</Typography>
-                          <Typography variant="body2">{userOverview.user?.date_naissance ? new Date(userOverview.user.date_naissance).toLocaleDateString('fr-FR') : '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Bio</Typography>
-                          <Typography variant="body2">{userOverview.user?.bio ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Address</Typography>
-                          <Typography variant="body2">{userOverview.user?.address ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                    </Grid>
+                    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' } }}>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>ID</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, wordBreak: 'break-all' }}>{userOverview.user?._id ?? userOverview.user?.id ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Full Name</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.fullname ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Email</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.email ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Phone</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.num_tel ?? userOverview.user?.numTel ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Age</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.age ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Date of Birth</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.date_naissance ? new Date(userOverview.user.date_naissance).toLocaleDateString('fr-FR') : '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2, gridColumn: { sm: '1 / -1' } }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Bio</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.bio ?? '-'}</Typography>
+                      </Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2, gridColumn: { sm: '1 / -1' } }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Address</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{userOverview.user?.address ?? '-'}</Typography>
+                      </Card>
+                    </Box>
                   </Stack>
                 </Card>
 
@@ -1238,44 +1339,14 @@ export function UsersView({ sx }) {
                       </Avatar>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Account Status</Typography>
                     </Stack>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>User Type</Typography>
-                          <Typography variant="body2">{userOverview.user?.userType ?? userOverview.user?.role ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Account Status</Typography>
-                          <Typography variant="body2">{normalizeAccountStatus(userOverview.user?.accountStatus)}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Organizer Status</Typography>
-                          <Typography variant="body2">{userOverview.user?.statut_organisateur ?? '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Registration Date</Typography>
-                          <Typography variant="body2">{userOverview.user?.date_inscription || userOverview.user?.createdAt ? new Date(userOverview.user.date_inscription || userOverview.user.createdAt).toLocaleDateString('fr-FR') : '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Suspended Until</Typography>
-                          <Typography variant="body2">{userOverview.user?.suspendedUntil ? new Date(userOverview.user.suspendedUntil).toLocaleDateString('fr-FR') : '-'}</Typography>
-                        </Stack>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Email Verified</Typography>
-                          <Typography variant="body2">{userOverview.user?.isVerified ? 'Yes' : 'No'}</Typography>
-                        </Stack>
-                      </Grid>
-                    </Grid>
+                    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' } }}>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>User Type</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.userType ?? userOverview.user?.role ?? '-'}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Account Status</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{normalizeAccountStatus(userOverview.user?.accountStatus)}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Organizer Status</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.statut_organisateur ?? '-'}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Registration Date</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.date_inscription || userOverview.user?.createdAt ? new Date(userOverview.user.date_inscription || userOverview.user.createdAt).toLocaleDateString('fr-FR') : '-'}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Suspended Until</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.suspendedUntil ? new Date(userOverview.user.suspendedUntil).toLocaleDateString('fr-FR') : '-'}</Typography></Card>
+                      <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}><Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Email Verified</Typography><Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.isVerified ? 'Yes' : 'No'}</Typography></Card>
+                    </Box>
                   </Stack>
                 </Card>
 
@@ -1289,26 +1360,20 @@ export function UsersView({ sx }) {
                         </Avatar>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Organizer Details</Typography>
                       </Stack>
-                      <Grid container spacing={2}>
-                        <Grid size={{ xs: 12 }}>
-                          <Stack spacing={0.5}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Company Name</Typography>
-                            <Typography variant="body2">{userOverview.user?.company_name ?? '-'}</Typography>
-                          </Stack>
-                        </Grid>
-                        <Grid size={{ xs: 12 }}>
-                          <Stack spacing={0.5}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Business License</Typography>
-                            <Typography variant="body2">{userOverview.user?.business_license ?? '-'}</Typography>
-                          </Stack>
-                        </Grid>
-                        <Grid size={{ xs: 12 }}>
-                          <Stack spacing={0.5}>
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Business Description</Typography>
-                            <Typography variant="body2">{userOverview.user?.business_description ?? '-'}</Typography>
-                          </Stack>
-                        </Grid>
-                      </Grid>
+                      <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' } }}>
+                        <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Company Name</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.company_name ?? '-'}</Typography>
+                        </Card>
+                        <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Business License</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.business_license ?? '-'}</Typography>
+                        </Card>
+                        <Card variant="outlined" sx={{ p: 2, borderRadius: 2, gridColumn: { sm: '1 / -1' } }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>Business Description</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5 }}>{userOverview.user?.business_description ?? '-'}</Typography>
+                        </Card>
+                      </Box>
                     </Stack>
                   </Card>
                 )}
@@ -1408,7 +1473,7 @@ export function UsersView({ sx }) {
                               <Box sx={{ flex: 1 }}>
                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{review.activity_id?.titre ?? 'Activité inconnue'}</Typography>
                                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                  {userOverview.user?.userType === 'Touriste' 
+                                  {userOverview.user?.userType === 'Touriste'
                                     ? `Organisateur: ${review.organisateur_id?.fullname ?? review.organisateur_id?.email ?? '-'}`
                                     : `Touriste: ${review.user_id?.fullname ?? review.user_id?.email ?? '-'}`
                                   }
