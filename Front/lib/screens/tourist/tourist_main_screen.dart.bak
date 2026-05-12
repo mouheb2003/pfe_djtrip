@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
@@ -283,10 +283,21 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         children: [
           IndexedStack(index: _currentIndex, children: _pages),
           Positioned(
-bottom: 18,
+<<<<<<< HEAD
+            bottom: 18,
             left: 16,
             right: 16,
             child: _buildFloatingNavBar(navBg, navActive, navInactive),
+=======
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+            left: 16,
+            right: 16,
+            child: SafeArea(
+              top: false,
+              bottom: true,
+              child: _buildFloatingNavBar(navBg, navActive, navInactive),
+            ),
+>>>>>>> djtrip/DJTripx1
           ),
         ],
       ),
@@ -301,7 +312,11 @@ bottom: 18,
       children: [
         // Main pill-shaped nav bar
         Container(
-height: 70,
+<<<<<<< HEAD
+          height: 70,
+=======
+          height: 60,
+>>>>>>> djtrip/DJTripx1
           decoration: BoxDecoration(
             color: navBg,
             borderRadius: BorderRadius.circular(30),
@@ -416,7 +431,8 @@ class _NavItem extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-AnimatedContainer(
+<<<<<<< HEAD
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   width: isActive ? 50 : 40,
@@ -439,6 +455,34 @@ AnimatedContainer(
                     isActive ? activeIcon : icon,
                     color: isActive ? cs.onPrimary : inactiveColor,
                     size: isActive ? 26 : 18,
+=======
+                Transform.translate(
+                  offset: Offset(0, isActive ? -12 : 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    width: isActive ? 56 : 44,
+                    height: isActive ? 56 : 44,
+                    alignment: Alignment.center,
+                    decoration: isActive
+                        ? BoxDecoration(
+                            color: activeColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: activeColor.withOpacity(0.22),
+                                blurRadius: 14,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          )
+                        : null,
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: isActive ? cs.onPrimary : inactiveColor,
+                      size: isActive ? 28 : 20,
+                    ),
+>>>>>>> djtrip/DJTripx1
                   ),
                 ),
                 if (showDot)
@@ -477,4 +521,3 @@ class _RedDot extends StatelessWidget {
     );
   }
 }
-

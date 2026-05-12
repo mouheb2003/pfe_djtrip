@@ -5183,3 +5183,30 @@
 {"timestamp":"2026-05-11 22:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
 {"timestamp":"2026-05-11 22:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
 >>>>>>> djtrip/DJTripx1
+{"timestamp":"2026-05-12 09:01:16","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:01:16","level":"info","message":"Payment expiration cron job started (schedule: every hour)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:14:11","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-05-12T08:14:11.715Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:15:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:30:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 09:45:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:00:00","level":"info","message":"Starting payment expiration check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:00:00","level":"info","message":"Payment expiration check completed. Cancelled 0 bookings (activities starting within 12 hours).","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:29:14","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:29:14","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:29:14","level":"info","message":"Payment expiration cron job started (schedule: every hour)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:29:14","level":"info","message":"Payment expiration cron job started (schedule: every hour)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:45:17","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-12 10:45:17","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}

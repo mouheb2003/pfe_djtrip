@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_service.dart';
+import 'api_client.dart';
 import 'checkin_offline_service.dart';
 
 /// Service amélioré pour la gestion des inscriptions avec retry et offline support
@@ -10,7 +11,9 @@ class InscriptionServiceImproved {
   static final CheckinOfflineService _offlineService = CheckinOfflineService();
 
   /// Valide un QR code avec retry automatique
-  static Future<Map<String, dynamic>> validateQrBookingWithRetry(String qrData) async {
+  static Future<Map<String, dynamic>> validateQrBookingWithRetry(
+    String qrData,
+  ) async {
     int retryCount = 0;
 
     print('[QR SERVICE] Starting validation for QR: $qrData');
@@ -18,16 +21,17 @@ class InscriptionServiceImproved {
     while (retryCount <= _maxRetries) {
       try {
         print('[QR SERVICE] Attempt ${retryCount + 1} of ${_maxRetries + 1}');
-        
-        final res = await ApiClient.post('/inscriptions/qr/validate', {
-          'qrData': qrData,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            print('[QR SERVICE] Request timed out after 10 seconds');
-            throw Exception('Request timeout');
-          },
-        );
+
+        final res =
+            await ApiClient.post('/inscriptions/qr/validate', {
+              'qrData': qrData,
+            }).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                print('[QR SERVICE] Request timed out after 10 seconds');
+                throw Exception('Request timeout');
+              },
+            );
 
         print('[QR SERVICE] Status code: ${res.statusCode}');
         print('[QR SERVICE] Response body: ${res.body}');
@@ -37,7 +41,7 @@ class InscriptionServiceImproved {
           print('[QR SERVICE] Parsed body: $body');
           print('[QR SERVICE] Success: ${body['success']}');
           print('[QR SERVICE] Data: ${body['data']}');
-          
+
           return {
             'success': true,
             'statusCode': res.statusCode,
@@ -58,7 +62,7 @@ class InscriptionServiceImproved {
         // Client error or max retries exceeded
         final body = _decodeObject(res.body);
         print('[QR SERVICE] Error response: $body');
-        
+
         return {
           'success': false,
           'statusCode': res.statusCode,
@@ -68,16 +72,18 @@ class InscriptionServiceImproved {
       } catch (e) {
         print('[QR SERVICE] Exception: $e');
         print('[QR SERVICE] Exception type: ${e.runtimeType}');
-        
+
         retryCount++;
         if (retryCount <= _maxRetries) {
-          print('[QR SERVICE] Retrying in ${_retryDelay.inSeconds * retryCount} seconds...');
+          print(
+            '[QR SERVICE] Retrying in ${_retryDelay.inSeconds * retryCount} seconds...',
+          );
           await Future.delayed(_retryDelay * retryCount);
           continue;
         }
 
         // Check if offline
-        if (e.toString().contains('SocketException') || 
+        if (e.toString().contains('SocketException') ||
             e.toString().contains('NetworkException') ||
             e.toString().contains('timeout')) {
           print('[QR SERVICE] Network error detected');
@@ -117,16 +123,17 @@ class InscriptionServiceImproved {
 
     while (retryCount <= _maxRetries) {
       try {
-        final res = await ApiClient.put('/inscriptions/$inscriptionId/verifier', {
-          'statut': 'verifie',
-        });
+        final res = await ApiClient.put(
+          '/inscriptions/$inscriptionId/verifier',
+          {'statut': 'verifie'},
+        );
 
         if (res.statusCode == 200) {
           final body = _decodeObject(res.body);
-          
+
           // Success - remove from offline queue if exists
           await _offlineService.removeFromQueue(inscriptionId);
-          
+
           return {
             'success': true,
             'statusCode': res.statusCode,
@@ -134,19 +141,20 @@ class InscriptionServiceImproved {
             'code': body['code'],
             'data': body['data'],
           };
-        } else if (res.statusCode == 400 && 
-                   (body['code'] == 'ALREADY_VERIFIED' || 
-                    body['code'] == 'STATUS_CHANGED')) {
-          // Already verified - remove from queue
-          await _offlineService.removeFromQueue(inscriptionId);
-          
+        } else if (res.statusCode == 400) {
           final body = _decodeObject(res.body);
-          return {
-            'success': false,
-            'statusCode': res.statusCode,
-            'message': body['message'] ?? 'Already verified',
-            'code': body['code'],
-          };
+          if (body['code'] == 'ALREADY_VERIFIED' ||
+              body['code'] == 'STATUS_CHANGED') {
+            // Already verified - remove from queue
+            await _offlineService.removeFromQueue(inscriptionId);
+
+            return {
+              'success': false,
+              'statusCode': res.statusCode,
+              'message': body['message'] ?? 'Already verified',
+              'code': body['code'],
+            };
+          }
         } else if (res.statusCode >= 500) {
           // Server error, retry
           retryCount++;
@@ -166,14 +174,14 @@ class InscriptionServiceImproved {
         };
       } catch (e) {
         retryCount++;
-        
+
         if (retryCount <= _maxRetries) {
           await Future.delayed(_retryDelay * retryCount);
           continue;
         }
 
         // Check if offline - queue for later
-        if (e.toString().contains('SocketException') || 
+        if (e.toString().contains('SocketException') ||
             e.toString().contains('NetworkException')) {
           await _offlineService.addToQueue(
             inscriptionId: inscriptionId,
@@ -181,7 +189,7 @@ class InscriptionServiceImproved {
             touristName: touristName,
             timestamp: DateTime.now(),
           );
-          
+
           return {
             'success': false,
             'statusCode': 0,
@@ -212,7 +220,7 @@ class InscriptionServiceImproved {
   static Future<Map<String, dynamic>> syncOfflineCheckins() async {
     try {
       final pending = await _offlineService.getPendingCheckins();
-      
+
       if (pending.isEmpty) {
         return {
           'success': true,
@@ -238,7 +246,9 @@ class InscriptionServiceImproved {
           synced++; // Already verified, count as success
         } else {
           failed++;
-          await _offlineService.incrementRetryCount(checkin['inscriptionId'] as String);
+          await _offlineService.incrementRetryCount(
+            checkin['inscriptionId'] as String,
+          );
         }
       }
 
