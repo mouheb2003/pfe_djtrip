@@ -404,7 +404,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                         padding: const EdgeInsets.only(bottom: 16),
                         child: PublicationCard(
                           post: postModel,
-                          onLike: () async {
+                          onLikeChanged: (liked, likesCount) async {
                             final postId = (item['_id'] ?? '').toString();
                             if (postId.isEmpty) return;
                             final currentLiked = item['isLiked'] ?? false;
@@ -427,7 +427,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                               _onPostLikeChanged(postId, liked, likesCount);
                             }
                           },
-                          onBookmark: () async {
+                          onBookmarkChanged: (bookmarked, bookmarksCount) async {
                             final postId = (item['_id'] ?? '').toString();
                             if (postId.isEmpty) return;
                             final currentBookmarked =

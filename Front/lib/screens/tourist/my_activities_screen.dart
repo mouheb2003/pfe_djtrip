@@ -218,7 +218,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     if (_tabIndex == 0 && status != null && status.isNotEmpty) {
       return 'Check Booking Status';
     }
-    return _tabIndex == 0 ? 'Book Now' : 'View Details';
+    return _tabIndex == 0 ? 'Participate' : 'View Details';
   }
 
   void _onPrimaryAction(ActivityModel activity) {

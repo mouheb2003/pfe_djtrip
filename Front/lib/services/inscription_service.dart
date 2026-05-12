@@ -554,4 +554,52 @@ class InscriptionService {
   static Future<bool> verifyInscription(String inscriptionId) async {
     return markInscriptionAsUsed(inscriptionId);
   }
+
+  // Organizer: Get all reservations for organizer
+  static Future<List<InscriptionModel>> getOrganizerReservations() async {
+    try {
+      final res = await ApiClient.get('/inscriptions/organisateur/mes-demandes');
+      
+      if (res.statusCode == 200) {
+        final body = _decodeObject(res.body);
+        final inscriptions = _extractInscriptions(body);
+        
+        return inscriptions.map((inscriptionData) {
+          return InscriptionModel.fromJson(inscriptionData);
+        }).toList();
+      } else {
+        throw Exception('Failed to load reservations: ${res.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error loading reservations: $e');
+    }
+  }
+
+  // Organizer: Approve a reservation
+  static Future<bool> approveReservation(String inscriptionId, {String? messageOrganisateur}) async {
+    try {
+      final res = await ApiClient.put('/inscriptions/$inscriptionId/approve', {
+        'message_organisateur': messageOrganisateur ?? '',
+      });
+      
+      return res.statusCode == 200;
+    } catch (e) {
+      print('Error approving reservation: $e');
+      return false;
+    }
+  }
+
+  // Organizer: Reject a reservation
+  static Future<bool> rejectReservation(String inscriptionId, {String? messageOrganisateur}) async {
+    try {
+      final res = await ApiClient.put('/inscriptions/$inscriptionId/reject', {
+        'message_organisateur': messageOrganisateur ?? '',
+      });
+      
+      return res.statusCode == 200;
+    } catch (e) {
+      print('Error rejecting reservation: $e');
+      return false;
+    }
+  }
 }

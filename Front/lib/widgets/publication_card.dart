@@ -10,8 +10,8 @@ import '../screens/shared/public_profile_screen.dart';
 
 class PublicationCard extends StatefulWidget {
   final PostModel post;
-  final VoidCallback? onLike;
-  final VoidCallback? onBookmark;
+  final Function(bool liked, int likesCount)? onLikeChanged;
+  final Function(bool bookmarked, int bookmarksCount)? onBookmarkChanged;
   final VoidCallback? onShare;
   final VoidCallback? onReport;
   final VoidCallback? onMute;
@@ -20,8 +20,8 @@ class PublicationCard extends StatefulWidget {
   const PublicationCard({
     super.key,
     required this.post,
-    this.onLike,
-    this.onBookmark,
+    this.onLikeChanged,
+    this.onBookmarkChanged,
     this.onShare,
     this.onReport,
     this.onMute,
@@ -468,7 +468,7 @@ class _PublicationCardState extends State<PublicationCard> {
             icon: widget.post.isLiked ? Icons.favorite : Icons.favorite_border,
             count: widget.post.likesCount,
             color: widget.post.isLiked ? const Color(0xFFFF4757) : const Color(0xFF6B7280),
-            onTap: widget.onLike,
+            onTap: () => widget.onLikeChanged?.call(!widget.post.isLiked, widget.post.isLiked ? widget.post.likesCount - 1 : widget.post.likesCount + 1),
           ),
           const SizedBox(width: 20),
           
@@ -521,7 +521,7 @@ class _PublicationCardState extends State<PublicationCard> {
                 color: widget.post.isBookmarked ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
                 size: 22,
               ),
-              onPressed: widget.onBookmark,
+              onPressed: () => widget.onBookmarkChanged?.call(!widget.post.isBookmarked, 0),
             ),
           ),
         ],

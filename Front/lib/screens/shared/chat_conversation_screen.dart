@@ -27,6 +27,7 @@ class ChatConversationScreen extends StatefulWidget {
   final String? partnerType;
   final bool partnerOnline;
   final bool isSupportChat;
+  final String? initialMessage;
 
   const ChatConversationScreen({
     super.key,
@@ -36,6 +37,7 @@ class ChatConversationScreen extends StatefulWidget {
     this.partnerType,
     this.partnerOnline = false,
     this.isSupportChat = false,
+    this.initialMessage,
   });
 
   @override
@@ -210,6 +212,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _initVoicePlayer();
     _checkBlockMuteStatus();
     _loadPartnerPrivacySettings();
+    
+    // 🚀 Auto-message from activity details
+    if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _msgCtrl.text = widget.initialMessage!;
+          _send();
+        }
+      });
+    }
+    
     _loadMessages();
     _initSocket();
     _startAutoRefresh();

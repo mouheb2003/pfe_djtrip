@@ -356,6 +356,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
+    
+    // Debug logs
+    print('CreatePostScreen - User: ${user?.fullname}');
+    print('CreatePostScreen - Avatar: ${user?.avatar}');
+    print('CreatePostScreen - UserType: ${user?.userType}');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),

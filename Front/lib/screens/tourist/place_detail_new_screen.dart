@@ -639,7 +639,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
               ),
               child: const Center(
                 child: Text(
-                  'Book Now',
+                  'Participate',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1045,7 +1045,7 @@ class _PlaceDetailNewScreenState extends State<PlaceDetailNewScreen>
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'Book Now',
+                    'Participate',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

@@ -11,6 +11,7 @@ import '../../notifications_screen.dart';
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
 import '../verify_booking_screen.dart';
+import '../my_reservations_screen.dart';
 import '../../shared/ai_chat_screen.dart';
 
 class MyActivitiesTab extends StatefulWidget {
@@ -35,7 +36,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_handleTabChange);
     _loadActivities();
     _loadUnreadCount();
@@ -116,6 +117,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   }
 
   List<ActivityModel> get _completedActivities {
+    return _activities.where((a) => a.isPast).toList();
+  }
+
+  List<ActivityModel> get _archivedActivities {
     return _activities.where((a) => a.isPast).toList();
   }
 
@@ -509,11 +514,48 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // Reservations Management Icon
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MyReservationsScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                Icons.list_alt_outlined,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                     ],
                   ),
                 ),
               ),
-              
               // Search Bar
               SliverToBoxAdapter(
                 child: Padding(
@@ -611,9 +653,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                       ),
                       padding: const EdgeInsets.all(4),
                       tabs: [
-                        _buildTab('Active', _activeActivities.length),
+                        _buildTab('Upcoming', _activeActivities.length),
                         _buildTab('Ongoing', _ongoingActivities.length),
-                        _buildTab('Completed', _completedActivities.length),
+                        _buildTab('Archive', _completedActivities.length),
+                        _buildTab('All', _activities.length),
                       ],
                     ),
                   ),
@@ -626,7 +669,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
             children: [
               _buildActivityList(_getFilteredActivities(_activeActivities), 'active'),
               _buildActivityList(_getFilteredActivities(_ongoingActivities), 'ongoing'),
-              _buildActivityList(_getFilteredActivities(_completedActivities), 'completed'),
+              _buildActivityList(_getFilteredActivities(_archivedActivities), 'archive'),
+              _buildActivityList(_getFilteredActivities(_activities), 'all'),
             ],
           ),
         ),

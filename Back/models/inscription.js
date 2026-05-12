@@ -24,13 +24,8 @@ const inscriptionSchema = new mongoose.Schema(
     // Registration status
     statut: {
       type: String,
-      enum: ["approuvee", "annulee", "verifie", "PAID_PENDING_CONFIRMATION"],
-      default: "PAID_PENDING_CONFIRMATION",
-    },
-    // Reference to payment (for paid bookings)
-    payment_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Payment",
+      enum: ["pending", "approved", "cancelled", "verified"],
+      default: "pending",
     },
     // Number of participants (if the tourist registers multiple people)
     nombre_participants: {
@@ -122,8 +117,8 @@ inscriptionSchema.index({ organisateur_id: 1, statut: 1 });
 inscriptionSchema.index({ qr_token: 1 }, { sparse: true });
 
 // Method to approve a registration
-inscriptionSchema.methods.approuver = function (messageOrganisateur) {
-  this.statut = "approuvee";
+inscriptionSchema.methods.approve = function (messageOrganisateur) {
+  this.statut = "approved";
   this.date_reponse = new Date();
   if (messageOrganisateur) {
     this.message_organisateur = messageOrganisateur;
@@ -132,8 +127,8 @@ inscriptionSchema.methods.approuver = function (messageOrganisateur) {
 };
 
 // Method to reject a registration
-inscriptionSchema.methods.refuser = function (messageOrganisateur) {
-  this.statut = "refusee";
+inscriptionSchema.methods.reject = function (messageOrganisateur) {
+  this.statut = "cancelled";
   this.date_reponse = new Date();
   if (messageOrganisateur) {
     this.message_organisateur = messageOrganisateur;
@@ -142,8 +137,8 @@ inscriptionSchema.methods.refuser = function (messageOrganisateur) {
 };
 
 // Method to cancel a registration
-inscriptionSchema.methods.annuler = function () {
-  this.statut = "annulee";
+inscriptionSchema.methods.cancel = function () {
+  this.statut = "cancelled";
   return this.save();
 };
 
@@ -174,7 +169,7 @@ inscriptionSchema.methods.setReviewReminder = function (remindAt) {
 // Method to check if review reminder should be shown
 inscriptionSchema.methods.shouldShowReviewReminder = async function () {
   if (this.hasReviewed) return false;
-  if (this.statut !== "approuvee") return false;
+  if (this.statut !== "approved") return false;
   if (!this.qr_used_at) return false; // Not checked in
 
   const now = new Date();
@@ -215,7 +210,7 @@ inscriptionSchema.statics.checkBookingOverlap = async function (touristeId, newA
     // Find all approved bookings for the tourist
     const filter = {
       touriste_id: touristeId,
-      statut: { $in: ["approuvee", "verifie", "PAID_PENDING_CONFIRMATION"] }
+      statut: { $in: ["approved", "verified", "pending"] }
     };
     
     // Exclude current inscription if updating

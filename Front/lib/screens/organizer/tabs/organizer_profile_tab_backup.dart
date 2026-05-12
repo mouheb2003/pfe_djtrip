@@ -256,22 +256,29 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
 
       final mine = byId.values.toList();
 
-      // Toujours calculer la moyenne des notes de toutes les activités de l'organisateur
-      final computedAverage = mine.isNotEmpty
-          ? mine.fold<double>(
-                  0,
-                  (sum, activity) => sum + activity.noteMoyenne,
-                ) /
-                mine.length
-          : 0.0;
-      
-      // Toujours calculer le nombre total de reviews à partir des activités
-      final computedReviews = mine.isNotEmpty
-          ? mine.fold<int>(
-              0,
-              (sum, activity) => sum + activity.nombreAvis,
-            )
-          : 0;
+      final organizerAvgFromProfile = (user?.noteMoyenne ?? 0.0).clamp(
+        0.0,
+        5.0,
+      );
+      final organizerReviewsFromProfile = user?.nombreAvis ?? 0;
+
+      final computedAverage = organizerAvgFromProfile > 0
+          ? organizerAvgFromProfile
+          : (mine.isNotEmpty
+                ? mine.fold<double>(
+                        0,
+                        (sum, activity) => sum + activity.noteMoyenne,
+                      ) /
+                      mine.length
+                : 0.0);
+      final computedReviews = organizerReviewsFromProfile > 0
+          ? organizerReviewsFromProfile
+          : (reviews.isNotEmpty
+                ? reviews.length
+                : mine.fold<int>(
+                    0,
+                    (sum, activity) => sum + activity.nombreAvis,
+                  ));
 
       setState(() {
         _user = user;
@@ -657,6 +664,25 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: SizedBox(
+          width: 60,
+          height: 60,
+          child: FloatingActionButton(
+          backgroundColor: AppColors.primary,
+          elevation: 6,
+          onPressed: () async {
+            final created = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateActivityScreen()),
+            );
+            if (created == true) _loadAll();
+          },
+          child: const Icon(Icons.add, size: 28, color: Colors.white),
+        ),
+        ),
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
@@ -1020,8 +1046,35 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                  ],
+                    // ── Create Activity ────────────
+                    InkWell(
+                      onTap: () async {
+                        final created = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const CreateActivityScreen()));
+                        if (created == true) _loadAll();
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundImage: _user?.avatar != null ? NetworkImage(_user!.avatar!) : null,
+                              child: _user?.avatar == null ? const Icon(Icons.person, size: 16) : null,
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text('Tap to create a new activity', style: TextStyle(color: Color(0xFF8C90B3), fontWeight: FontWeight.w600, fontSize: 13)),
+                            ),
+                            Icon(Icons.add_circle_outline, color: AppColors.primary.withOpacity(0.7)),
+                          ],
+                        ),
+                      ),
+                    ),
                 ),
+              ],
+                ],
               ),
             ],
           ),

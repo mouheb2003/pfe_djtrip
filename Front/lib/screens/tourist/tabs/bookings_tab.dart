@@ -19,7 +19,7 @@ class _BookingsTabState extends State<BookingsTab> {
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, List<InscriptionModel>> _buckets = {
-    'pending_for_payment': [],
+    'pending': [],
     'confirmed': [],
     'cancelled': [],
     'used': [],
@@ -60,7 +60,7 @@ class _BookingsTabState extends State<BookingsTab> {
   List<InscriptionModel> get _currentItems {
     switch (_tabIndex) {
       case 0:
-        return _buckets['pending_for_payment'] ?? [];
+        return _buckets['pending'] ?? [];
       case 1:
         return _buckets['confirmed'] ?? [];
       case 2:
@@ -68,7 +68,7 @@ class _BookingsTabState extends State<BookingsTab> {
       case 3:
         return _buckets['used'] ?? [];
       default:
-        return _buckets['pending_for_payment'] ?? [];
+        return _buckets['pending'] ?? [];
     }
   }
 

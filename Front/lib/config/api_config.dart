@@ -21,7 +21,7 @@ class ApiConfig {
     if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
     }
-    return 'http://$value';
+    return 'http://192.168.148.99:3000';
   }
 
   static String get serverBaseUrl {
@@ -34,7 +34,7 @@ class ApiConfig {
     }
 
     // Default local API target for Android emulator.
-    return _ensureScheme('http://10.0.2.2:3000');
+    return _ensureScheme('http://192.168.148.99:3000');
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

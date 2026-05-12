@@ -127,6 +127,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         role == 'organizer';
   }
 
+  String _generateActivityMessage() {
+    if (_activity == null) return '';
+    
+    final title = _activity!.title;
+    final date = _activity!.dateDebut != null ? _activity!.dateDebut.toString().split(' ')[0] : 'Date TBD';
+    final location = _activity!.lieu;
+    final price = _activity!.prixFormatted;
+    
+    return 'Hi! I\'m interested in your activity "$title" on $date at $location. Could you provide more information about this activity?';
+  }
+
   bool get _isActivityOrganizer {
     if (_activity == null || _currentUserId.isEmpty) return false;
     final organizer = _activity?.organisateur;
@@ -925,6 +936,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   partnerAvatar: orgAvatar,
                                   partnerType: 'Organisator',
                                   partnerOnline: orgOnline,
+                                  initialMessage: _generateActivityMessage(),
                                 ),
                               ),
                             );

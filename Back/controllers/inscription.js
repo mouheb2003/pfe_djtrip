@@ -189,7 +189,7 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
       };
     }
 
-    if (inscription.statut === "verifie" || inscription.qr_used_at) {
+    if (inscription.statut === "verified" || inscription.qr_used_at) {
       return {
         ok: false,
         statusCode: 400,
@@ -199,7 +199,7 @@ async function inspectBookingForQr({ qrData, organiserId, markUsed = false }) {
       };
     }
 
-    if (inscription.statut !== "approuvee") {
+    if (inscription.statut !== "approved") {
       console.log('[QR VALIDATION] Status check failed - not approved');
       return {
         ok: false,
@@ -272,66 +272,25 @@ async function expirePendingInscriptionsForEndedActivities() {
     return 0;
   }
 }
-
-// Auto-cancel PAID_PENDING_CONFIRMATION inscriptions 12 hours before activity start date.
-// Business rule: if payment is not completed within 12 hours before activity start,
-// the booking is automatically cancelled.
-async function expirePaidPendingInscriptions() {
-  try {
-    const now = new Date();
-    const twelveHoursBeforeStart = new Date(now.getTime() + (12 * 60 * 60 * 1000)); // 12 hours in the future
-
-    // Find activities that start within the next 12 hours
-    const expiringActivityIds = await Activite.find({
-      date_debut: { $lt: twelveHoursBeforeStart },
-    }).distinct("_id");
-
-    if (!expiringActivityIds.length) return 0;
-
-    const result = await Inscription.updateMany(
-      {
-        activite_id: { $in: expiringActivityIds },
-        statut: "PAID_PENDING_CONFIRMATION",
-      },
-      {
-        $set: {
-          statut: "annulee",
-          date_reponse: now,
-          message_organisateur:
-            "Automatically cancelled because payment was not completed within 12 hours before activity start.",
-        },
-      },
-    );
-
-    return result.modifiedCount || 0;
-  } catch (error) {
-    console.error('[EXPIRE PAID_PENDING] Error:', error);
-    return 0;
-  }
-}
-
-// Export expiration functions for use in cron jobs
 exports.expirePendingInscriptionsForEndedActivities = expirePendingInscriptionsForEndedActivities;
-exports.expirePaidPendingInscriptions = expirePaidPendingInscriptions;
+exports.expirePaidPendingInscriptions = expirePendingInscriptionsForEndedActivities;
 
 // Create a new registration (Tourist registers for an activity)
-// If skip_payment is true: auto-approve immediately
-// If skip_payment is false (default): create with PAID_PENDING_CONFIRMATION status (payment required)
+// Creates a pending request that organizer can approve or reject
 exports.createInscription = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const touristeId = req.user.userId; // Logged-in tourist ID
-    const { activite_id, nombre_participants, message_touriste, skip_payment = false } = req.body;
+    const { activite_id, nombre_participants, message_touriste } = req.body;
     const nombreParticipants = Number.parseInt(nombre_participants, 10);
 
     console.log('[INSCRIPTION] Creating inscription:', {
       touristeId,
       activite_id,
       nombre_participants,
-      nombreParticipants,
-      skip_payment
+      nombreParticipants
     });
 
     if (!Number.isInteger(nombreParticipants) || nombreParticipants < 1) {
@@ -381,7 +340,7 @@ exports.createInscription = async (req, res) => {
     const inscriptionExistante = await Inscription.findOne({
       touriste_id: touristeId,
       activite_id: activite_id,
-      statut: { $in: ["approuvee", "verifie", "PAID_PENDING_CONFIRMATION"] },
+      statut: { $in: ["approved", "verified", "pending"] },
     }).session(session);
 
     if (inscriptionExistante) {
@@ -416,13 +375,10 @@ exports.createInscription = async (req, res) => {
       });
     }
 
-    // Calculate total price
+    // Calculate total price (for reference)
     const prixTotal = activite.prix * nombreParticipants;
 
-    // Determine status based on skip_payment flag
-    const statut = skip_payment ? "approuvee" : "PAID_PENDING_CONFIRMATION";
-
-    // Create the registration
+    // Create the registration with pending status
     const inscription = new Inscription({
       touriste_id: touristeId,
       activite_id: activite_id,
@@ -430,54 +386,10 @@ exports.createInscription = async (req, res) => {
       nombre_participants: nombreParticipants,
       message_touriste,
       prix_total: prixTotal,
-      statut: statut,
+      statut: "pending",
     });
 
     await inscription.save({ session });
-
-    // If auto-approved (skip_payment), handle capacity, QR, and notifications
-    if (skip_payment) {
-      // Atomic capacity check and increment to prevent overbooking
-      const updatedActivite = await Activite.findOneAndUpdate(
-        {
-          _id: activite_id,
-          $expr: {
-            $gte: [
-              "$capacite_max",
-              { $add: ["$nombre_reservations", nombreParticipants] }
-            ]
-          }
-        },
-        {
-          $inc: { nombre_reservations: nombreParticipants }
-        },
-        { session, new: true }
-      );
-
-      if (!updatedActivite) {
-        await session.abortTransaction();
-        const currentActivite = await Activite.findById(activite_id);
-        const available = currentActivite.capacite_max - currentActivite.nombre_reservations;
-        return res.status(400).json({
-          message: `Cannot book: only ${Math.max(available, 0)} place${available > 1 ? "s" : ""} left (overbooking protection)`,
-          available: Math.max(available, 0),
-          requested: nombreParticipants
-        });
-      }
-
-      // Set price and response date
-      inscription.prix_unitaire = activite.prix;
-      inscription.date_reponse = new Date();
-
-      // Generate QR token
-      const qrToken = createBookingQrToken(inscription, updatedActivite);
-      const activityDeadline = getActivityDeadline(updatedActivite);
-      inscription.qr_token = qrToken;
-      inscription.qr_token_generated_at = new Date();
-      inscription.qr_token_expires_at = activityDeadline;
-
-      await inscription.save({ session });
-    }
 
     await session.commitTransaction();
 
@@ -515,101 +427,15 @@ exports.createInscription = async (req, res) => {
       );
     }
 
-    // If auto-approved, generate QR, send email, and emit approved event
-    if (skip_payment) {
-      const inscriptionPopulated = await Inscription.findById(inscription._id)
-        .populate("activite_id", "titre date_debut date_fin lieu prix")
-        .populate("touriste_id", "fullname email avatar");
+    // Return pending registration
+    const inscriptionPopulated = await Inscription.findById(inscription._id)
+      .populate("activite_id", "titre date_debut date_fin lieu prix")
+      .populate("touriste_id", "fullname email avatar");
 
-      const touristEmail = inscriptionPopulated?.touriste_id?.email;
-      const touristName = inscriptionPopulated?.touriste_id?.fullname || "Traveler";
-      const activityTitle = inscriptionPopulated?.activite_id?.titre || "Activity";
-      const bookingCode = inscription.qr_token || `DJTRIP_BOOKING:${inscription._id}`;
-
-      if (touristEmail) {
-        const bookingDate = inscriptionPopulated?.activite_id?.date_debut
-          ? new Date(inscriptionPopulated.activite_id.date_debut).toLocaleDateString("en-GB")
-          : new Date().toLocaleDateString("en-GB");
-        const bookingTime = inscriptionPopulated?.activite_id?.date_debut
-          ? new Date(inscriptionPopulated.activite_id.date_debut).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "--:--";
-
-        let qrPublicUrl = null;
-        try {
-          const cloudinary = require("../config/cloudinary");
-          const qrBuffer = await QRCode.toBuffer(bookingCode, {
-            errorCorrectionLevel: "M",
-            margin: 1,
-            width: 280,
-          });
-          
-          const uploadResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload_stream(
-              {
-                folder: "djtrip/booking-qr",
-                public_id: `booking-qr-${inscription._id}`,
-                resource_type: "image",
-                format: "png",
-              },
-              (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-              }
-            ).end(qrBuffer);
-          });
-          
-          qrPublicUrl = uploadResult.secure_url;
-          console.log('QR code uploaded to Cloudinary:', qrPublicUrl);
-        } catch (qrError) {
-          console.error("Error generating or uploading booking QR code:", qrError);
-        }
-
-        try {
-          await emailService.sendBookingConfirmationEmail({
-            email: touristEmail,
-            fullname: touristName,
-            bookingCode,
-            activityTitle,
-            bookingDate,
-            bookingTime,
-            participants: inscription.nombre_participants,
-            totalPrice: `${inscription.prix_total.toFixed(2)} TND`,
-            qrPublicUrl,
-          });
-        } catch (emailError) {
-          console.error("Error sending booking confirmation email:", emailError);
-        }
-      }
-
-      // Emit booking approved event
-      try {
-        notificationEventBus.emitBookingApproved({
-          touristId: inscription.touriste_id,
-          activityTitle,
-          bookingId: inscription._id.toString(),
-        });
-      } catch (notifError) {
-        console.warn('Failed to emit booking approved event:', notifError.message);
-      }
-
-      res.status(201).json({
-        message: "Registration created and approved successfully",
-        inscription: inscriptionPopulated,
-      });
-    } else {
-      // Payment required - return inscription with PAID_PENDING_CONFIRMATION status
-      const inscriptionPopulated = await Inscription.findById(inscription._id)
-        .populate("activite_id", "titre date_debut date_fin lieu prix")
-        .populate("touriste_id", "fullname email avatar");
-
-      res.status(201).json({
-        message: "Registration created. Payment required to complete booking.",
-        inscription: inscriptionPopulated,
-      });
-    }
+    res.status(201).json({
+      message: "Registration request sent successfully. Waiting for organizer approval.",
+      inscription: inscriptionPopulated,
+    });
   } catch (error) {
     await session.abortTransaction();
     res.status(500).json({
@@ -659,7 +485,7 @@ exports.getMyBookings = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean(); // Use lean() for better performance and cleaner data
 
-    const pending_for_payment = [];
+    const pending = [];
     const confirmed = [];
     const cancelled = [];
     const used = [];
@@ -668,22 +494,22 @@ exports.getMyBookings = async (req, res) => {
       // Validate and clean the inscription object
       if (ins && typeof ins === "object" && ins.statut) {
         // Use the lean object directly - no need for JSON stringify/parse
-        if (ins.statut === "PAID_PENDING_CONFIRMATION" || ins.statut === "PAYMENT_FAILED") pending_for_payment.push(ins);
-        else if (ins.statut === "approuvee") confirmed.push(ins);
-        else if (ins.statut === "verifie") used.push(ins);
-        else cancelled.push(ins); // annulee, refusee, en_attente
+        if (ins.statut === "pending") pending.push(ins);
+        else if (ins.statut === "approved") confirmed.push(ins);
+        else if (ins.statut === "verified") used.push(ins);
+        else cancelled.push(ins); // cancelled
       } else {
         console.warn("Invalid inscription object:", ins);
       }
     });
 
     console.log(
-      `Bookings for user ${touristeId}: ${pending_for_payment.length} pending for payment, ${confirmed.length} confirmed, ${cancelled.length} cancelled, ${used.length} used`,
+      `Bookings for user ${touristeId}: ${pending.length} pending, ${confirmed.length} confirmed, ${cancelled.length} cancelled, ${used.length} used`,
     );
 
     res.status(200).json({
       success: true,
-      data: { pending_for_payment, confirmed, cancelled, used },
+      data: { pending, confirmed, cancelled, used },
     });
   } catch (error) {
     console.error("Error in getMyBookings:", error);
@@ -746,14 +572,14 @@ exports.getInscriptionsByOrganisateur = async (req, res) => {
   }
 };
 
-// Get pending registrations for an organizer (deprecated - no longer used with auto-approval)
+// Get pending registrations for an organizer
 exports.getInscriptionsEnAttente = async (req, res) => {
   try {
     const organisateurId = req.user.userId;
 
     const inscriptions = await Inscription.find({
       organisateur_id: organisateurId,
-      statut: "en_attente",
+      statut: "pending",
     })
       .populate("touriste_id", "fullname email avatar num_tel")
       .populate("activite_id", "titre date_debut lieu")
@@ -856,7 +682,7 @@ exports.getOrganizerStats = async (req, res) => {
         Inscription.countDocuments({ organisateur_id: organisateurId }),
         Inscription.find({
           organisateur_id: organisateurId,
-          statut: "approuvee",
+          statut: "approved",
         }).select("prix_total"),
         Activite.countDocuments({
           organisateur_id: organisateurId,
@@ -1109,7 +935,7 @@ exports.verifyInscription = async (req, res) => {
     }
 
     // Vérifier le statut du booking
-    if (booking.statut !== "approuvee") {
+    if (booking.statut !== "approved") {
       await CheckinLog.createLog({
         bookingId: inscriptionId,
         organiserId: organisateurId,
@@ -1177,16 +1003,16 @@ exports.verifyInscription = async (req, res) => {
     }
 
     // MISE À JOUR ATOMIQUE pour éviter les race conditions
-    // findOneAndUpdate avec condition statut != verifie
+    // findOneAndUpdate avec condition statut != verified
     const updatedBooking = await Inscription.findOneAndUpdate(
       {
         _id: inscriptionId,
-        statut: 'approuvee',
+        statut: 'approved',
         qr_used_at: { $exists: false },
       },
       {
         $set: {
-          statut: 'verifie',
+          statut: 'verified',
           qr_used_at: new Date(),
         },
       },
@@ -1202,7 +1028,7 @@ exports.verifyInscription = async (req, res) => {
       // Vérifier si déjà vérifié
       const alreadyVerified = await Inscription.findById(inscriptionId);
       
-      if (alreadyVerified?.statut === 'verifie' || alreadyVerified?.qr_used_at) {
+      if (alreadyVerified?.statut === 'verified' || alreadyVerified?.qr_used_at) {
         await CheckinLog.createLog({
           bookingId: inscriptionId,
           organiserId: organisateurId,
@@ -1443,7 +1269,7 @@ exports.getPendingReviewReminders = async (req, res) => {
     // Find all approved bookings for this tourist that are checked in but not reviewed
     const bookings = await Inscription.find({
       touriste_id: touristeId,
-      statut: "approuvee",
+      statut: "approved",
       qr_used_at: { $exists: true },
       hasReviewed: false,
     })
@@ -1502,7 +1328,7 @@ exports.getActivityParticipants = async (req, res) => {
     console.log(`🔍 [PARTICIPANTS] Checking approved and verified inscriptions...`);
     const inscriptions = await Inscription.find({
       activite_id: activiteId,
-      statut: { $in: ['approuvee', 'verifie'] }
+      statut: { $in: ['approved', 'verified'] }
     })
     .populate({
       path: 'touriste_id',
@@ -1588,6 +1414,244 @@ exports.getActivityParticipants = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error loading participants",
+      error: error.message
+    });
+  }
+};
+
+// Approve a reservation request (Organizer only)
+exports.approveReservation = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { inscriptionId } = req.params;
+    const { message_organisateur } = req.body;
+    const organizerId = req.user.userId;
+
+    console.log('[APPROVE RESERVATION] Approving reservation:', { inscriptionId, organizerId });
+
+    // Find the inscription
+    const inscription = await Inscription.findById(inscriptionId)
+      .populate('activite_id')
+      .populate('touriste_id')
+      .session(session);
+
+    if (!inscription) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Verify organizer owns this activity
+    if (inscription.organisateur_id.toString() !== organizerId) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: "You can only approve reservations for your activities" });
+    }
+
+    // Check if reservation is pending
+    if (inscription.statut !== "pending") {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        message: `Cannot approve reservation with status: ${inscription.statut}` 
+      });
+    }
+
+    // Check activity capacity
+    const activite = inscription.activite_id;
+    const available = activite.capacite_max - activite.nombre_reservations;
+    
+    if (available < inscription.nombre_participants) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        message: `Cannot approve: only ${Math.max(available, 0)} place${available > 1 ? "s" : ""} left`,
+        available: Math.max(available, 0),
+        requested: inscription.nombre_participants
+      });
+    }
+
+    // Update activity capacity
+    await Activite.findByIdAndUpdate(
+      activite._id,
+      { $inc: { nombre_reservations: inscription.nombre_participants } },
+      { session }
+    );
+
+    // Approve the reservation
+    await inscription.approve(message_organisateur);
+
+    // Generate QR token
+    const qrToken = createBookingQrToken(inscription, activite);
+    const activityDeadline = getActivityDeadline(activite);
+    
+    inscription.qr_token = qrToken;
+    inscription.qr_token_generated_at = new Date();
+    inscription.qr_token_expires_at = activityDeadline;
+    
+    await inscription.save({ session });
+
+    await session.commitTransaction();
+
+    // Send email with QR code
+    try {
+      const touristEmail = inscription.touriste_id?.email;
+      const touristName = inscription.touriste_id?.fullname || "Traveler";
+      const activityTitle = activite.titre;
+      const bookingDate = activite.date_debut
+        ? new Date(activite.date_debut).toLocaleDateString("en-GB")
+        : new Date().toLocaleDateString("en-GB");
+      const bookingTime = activite.date_debut
+        ? new Date(activite.date_debut).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "--:--";
+
+      let qrPublicUrl = null;
+      try {
+        const cloudinary = require("../config/cloudinary");
+        const qrBuffer = await QRCode.toBuffer(qrToken, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 280,
+        });
+        
+        const uploadResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream(
+            {
+              folder: "djtrip/booking-qr",
+              public_id: `booking-qr-${inscription._id}`,
+              resource_type: "image",
+              format: "png",
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          ).end(qrBuffer);
+        });
+        
+        qrPublicUrl = uploadResult.secure_url;
+        console.log('QR code uploaded to Cloudinary:', qrPublicUrl);
+      } catch (qrError) {
+        console.error("Error generating or uploading booking QR code:", qrError);
+      }
+
+      await emailService.sendBookingConfirmationEmail({
+        email: touristEmail,
+        fullname: touristName,
+        bookingCode: qrToken,
+        activityTitle,
+        bookingDate,
+        bookingTime,
+        participants: inscription.nombre_participants,
+        totalPrice: `${inscription.prix_total.toFixed(2)} TND`,
+        qrPublicUrl,
+      });
+    } catch (emailError) {
+      console.error("Error sending booking confirmation email:", emailError);
+    }
+
+    // Emit notification
+    try {
+      notificationEventBus.emitBookingApproved({
+        touristId: inscription.touriste_id._id,
+        activityTitle: activite.titre,
+        bookingId: inscription._id.toString(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit booking approved event:', notifError.message);
+    }
+
+    res.json({
+      message: "Reservation approved successfully",
+      inscription: await Inscription.findById(inscriptionId)
+        .populate('activite_id', 'titre date_debut date_fin lieu prix')
+        .populate('touriste_id', 'fullname email avatar')
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('[APPROVE RESERVATION] Error:', error);
+    res.status(500).json({
+      message: "Error approving reservation",
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// Reject a reservation request (Organizer only)
+exports.rejectReservation = async (req, res) => {
+  try {
+    const { inscriptionId } = req.params;
+    const { message_organisateur } = req.body;
+    const organizerId = req.user.userId;
+
+    console.log('[REJECT RESERVATION] Rejecting reservation:', { inscriptionId, organizerId });
+
+    // Find the inscription
+    const inscription = await Inscription.findById(inscriptionId)
+      .populate('activite_id')
+      .populate('touriste_id');
+
+    if (!inscription) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Verify organizer owns this activity
+    if (inscription.organisateur_id.toString() !== organizerId) {
+      return res.status(403).json({ message: "You can only reject reservations for your activities" });
+    }
+
+    // Check if reservation is pending
+    if (inscription.statut !== "pending") {
+      return res.status(400).json({ 
+        message: `Cannot reject reservation with status: ${inscription.statut}` 
+      });
+    }
+
+    // Reject the reservation
+    await inscription.reject(message_organisateur);
+
+    // Send rejection email
+    try {
+      const touristEmail = inscription.touriste_id?.email;
+      const touristName = inscription.touriste_id?.fullname || "Traveler";
+      const activityTitle = inscription.activite_id.titre;
+
+      await emailService.sendBookingRejectionEmail({
+        email: touristEmail,
+        fullname: touristName,
+        activityTitle,
+        rejectionReason: message_organisateur || "No reason provided",
+      });
+    } catch (emailError) {
+      console.error("Error sending rejection email:", emailError);
+    }
+
+    // Emit notification
+    try {
+      notificationEventBus.emitBookingRejected({
+        touristId: inscription.touriste_id._id,
+        activityTitle: inscription.activite_id.titre,
+        bookingId: inscription._id.toString(),
+      });
+    } catch (notifError) {
+      console.warn('Failed to emit booking rejected event:', notifError.message);
+    }
+
+    res.json({
+      message: "Reservation rejected successfully",
+      inscription: await Inscription.findById(inscriptionId)
+        .populate('activite_id', 'titre date_debut date_fin lieu prix')
+        .populate('touriste_id', 'fullname email avatar')
+    });
+
+  } catch (error) {
+    console.error('[REJECT RESERVATION] Error:', error);
+    res.status(500).json({
+      message: "Error rejecting reservation",
       error: error.message
     });
   }

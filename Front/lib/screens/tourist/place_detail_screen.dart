@@ -715,7 +715,7 @@ class PlaceDetailScreen extends StatelessWidget {
                   const Icon(Icons.calendar_today, color: Colors.white, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    'Book Now',
+                    'Participate',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

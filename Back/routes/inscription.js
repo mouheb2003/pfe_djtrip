@@ -88,20 +88,20 @@ router.get(
 
 // Approve a registration (Organizer only)
 router.put(
-  "/:inscriptionId/approuver",
+  "/:inscriptionId/approve",
   verifyToken,
   verifyOrganisator,
   invalidateCache(["inscriptions", "activites"]),
-  inscriptionController.approuverInscription,
+  inscriptionController.approveReservation,
 );
 
 // Reject a registration (Organizer only)
 router.put(
-  "/:inscriptionId/refuser",
+  "/:inscriptionId/reject",
   verifyToken,
   verifyOrganisator,
   invalidateCache(["inscriptions", "activites"]),
-  inscriptionController.refuserInscription,
+  inscriptionController.rejectReservation,
 );
 
 // ========================================

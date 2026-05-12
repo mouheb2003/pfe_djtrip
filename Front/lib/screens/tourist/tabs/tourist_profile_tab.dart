@@ -1158,25 +1158,6 @@ List<Map<String, dynamic>> _featuredPlaces = [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 100),
-        child: SizedBox(
-          width: 60,
-          height: 60,
-          child: FloatingActionButton(
-            backgroundColor: AppColors.primary,
-            elevation: 6,
-            onPressed: () async {
-              final created = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (_) => const CreatePostScreen()),
-              );
-              if (created == true) _loadAll();
-            },
-            child: const Icon(Icons.add, size: 28, color: Colors.white),
-          ),
-        ),
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
@@ -1618,82 +1599,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                 ),
               ),
               const SizedBox(height: 2),
-              Row(
-                children: [
-                  const Text(
-                    'My Posts',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B2458),
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ScreenNetwork(
-                            showBackButton: true,
-                            title: 'My Posts',
-                            showOnlyMyPosts: true,
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text(
-                      'VIEW ALL',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (_myPosts.isEmpty)
-                Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'No posts yet',
-                      style: TextStyle(
-                        color: AppColors.textGrey,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: _myPosts.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 6,
-                    mainAxisSpacing: 6,
-                    childAspectRatio: 1,
-                  ),
-                  itemBuilder: (context, index) {
-                    final post = _myPosts[index];
-                    return _PostCard(
-                      post: post,
-                      onMore: () => _showPostActions(post),
-                      onOpenDetails: () => _openPostDetailsSheet(post),
-                    );
-                  },
-                ),
-            const SizedBox(height: 20),
-            // Favorites Places Section
+              // Favorites Places Section
             const Text(
               'FAVORITES PLACES',
               style: TextStyle(
