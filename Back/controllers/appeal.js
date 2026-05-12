@@ -2,6 +2,7 @@ const Appeal = require("../models/appeal");
 const User = require("../models/user");
 const emailService = require("../services/appealEmailService");
 const notificationEventBus = require("../services/notificationEventBus");
+const Notification = require("../models/notification");
 
 // ─── POST /appeals ───────────────────────────────────────────────────────────────
 // Submit a new appeal
@@ -71,14 +72,44 @@ exports.submitAppeal = async (req, res) => {
       // Don't fail the request if email fails
     }
 
-    // Emit appeal created event for notification
+    // Emit event for other listeners
     try {
       notificationEventBus.emitAppealCreated({
         userId: userId,
         appealId: appeal._id,
+        userFullName: user.fullname || user.email || `${user.firstName || ''} ${user.lastName || ''}`,
+        subject: appeal.subject,
       });
-    } catch (notifError) {
-      console.warn("Failed to send appeal notification:", notifError.message);
+    } catch (emitErr) {
+      console.error('[APPEAL] Failed to emit appeal.created:', emitErr);
+    }
+
+    // Create admin notifications using Notification.createNotification to ensure DB write + push attempt
+    try {
+      const admins = await User.find({ userType: { $regex: /^admin$/i } }).select('_id email').lean();
+      if (admins && admins.length > 0) {
+        const senderName = user.fullname || user.email || 'Someone';
+        const subjectText = appeal.subject || 'Appeal';
+        await Promise.all(admins.map(async (admin) => {
+          try {
+            await Notification.createNotification({
+              user_id: admin._id,
+              type: 'appeal',
+              title: `New Appeal from ${senderName}`,
+              message: `${senderName} submitted "${subjectText}"`,
+              data: { appealId: appeal._id, userId },
+              priority: 'high',
+              related_entity_type: 'appeal',
+              related_entity_id: appeal._id,
+            });
+          } catch (err) {
+            console.error('Error creating admin notification for', admin._id, err);
+          }
+        }));
+        console.log('[APPEAL] Admin notifications created in DB for appeal:', appeal._id);
+      }
+    } catch (adminNotifErr) {
+      console.error('[APPEAL] Failed to create admin DB notifications:', adminNotifErr);
     }
 
     res.status(201).json({
@@ -301,8 +332,9 @@ exports.updateAppealStatus = async (req, res) => {
         appealId: appeal._id,
         status: status,
       });
+      console.log('[APPEAL] appeal.resolved event emitted for appealId:', appeal._id, 'status:', status);
     } catch (notifError) {
-      console.warn("Failed to send appeal resolved notification:", notifError.message);
+      console.warn('Failed to send appeal resolved notification:', notifError.message);
     }
 
     res.status(200).json({
@@ -313,6 +345,33 @@ exports.updateAppealStatus = async (req, res) => {
     console.error("Error updating appeal status:", error);
     res.status(500).json({
       message: "Error updating appeal status",
+      error: error.message,
+    });
+  }
+};
+
+// ─── DELETE /admin/appeals/:id ────────────────────────────────────────────────────
+// Delete an appeal (admin)
+exports.deleteAppeal = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const appeal = await Appeal.findById(id);
+    if (!appeal) {
+      return res.status(404).json({ message: "Appeal not found" });
+    }
+
+    // Delete the appeal
+    await Appeal.findByIdAndDelete(id);
+
+    res.status(200).json({
+      message: "Appeal deleted successfully",
+      appeal_id: id,
+    });
+  } catch (error) {
+    console.error("Error deleting appeal:", error);
+    res.status(500).json({
+      message: "Error deleting appeal",
       error: error.message,
     });
   }
@@ -387,6 +446,7 @@ exports.submitAnonymousAppeal = async (req, res) => {
         submission_type: "anonymous",
       },
     });
+    console.log('[APPEAL-ANON] Appeal created:', appeal._id);
 
     // Send email notifications
     try {
@@ -405,6 +465,60 @@ exports.submitAnonymousAppeal = async (req, res) => {
     } catch (emailError) {
       console.error("Failed to send appeal emails:", emailError);
       // Don't fail the request if email fails
+    }
+
+    // Emit event for other listeners
+    try {
+      notificationEventBus.emitAppealCreated({
+        userId: user._id,
+        appealId: appeal._id,
+        userFullName: user.fullname || user.email || `${user.firstName || ''} ${user.lastName || ''}`,
+        subject: appeal.subject,
+      });
+      console.log('[APPEAL-ANON] Event emitted successfully for appeal:', appeal._id);
+    } catch (emitErr) {
+      console.error('[APPEAL-ANON] Failed to emit appeal.created:', emitErr);
+    }
+
+    // Create admin notifications using Notification.createNotification to ensure DB write + push attempt
+    console.log('[APPEAL-ANON] Starting admin notification creation for appeal:', appeal._id, 'user:', user._id);
+    try {
+      console.log('[APPEAL-ANON] Querying admins with regex...');
+      const admins = await User.find({ userType: { $regex: /^admin$/i } }).select('_id email').lean();
+      console.log('[APPEAL-ANON] Found', admins.length, 'admins');
+      
+      if (admins && admins.length > 0) {
+        const senderName = user.fullname || user.email || 'Someone';
+        const subjectText = appeal.subject || 'Appeal';
+        console.log('[APPEAL-ANON] Creating notifications for', admins.length, 'admins');
+        console.log('[APPEAL-ANON] Sender:', senderName, 'Subject:', subjectText);
+        
+        const results = await Promise.all(admins.map(async (admin) => {
+          try {
+            console.log('[APPEAL-ANON] Creating notification for admin:', admin._id);
+            const notif = await Notification.createNotification({
+              user_id: admin._id,
+              type: 'appeal',
+              title: `New Appeal from ${senderName}`,
+              message: `${senderName} submitted "${subjectText}"`,
+              data: { appealId: appeal._id, userId: user._id },
+              priority: 'high',
+              related_entity_type: 'appeal',
+              related_entity_id: appeal._id,
+            });
+            console.log('[APPEAL-ANON] Notification created successfully:', notif._id);
+            return notif;
+          } catch (err) {
+            console.error('[APPEAL-ANON] Error creating admin notification for', admin._id, ':', err.message);
+            throw err;
+          }
+        }));
+        console.log('[APPEAL-ANON] All admin notifications created:', results.length);
+      } else {
+        console.warn('[APPEAL-ANON] No admins found to notify for appeal:', appeal._id);
+      }
+    } catch (adminNotifErr) {
+      console.error('[APPEAL-ANON] Failed to create admin DB notifications:', adminNotifErr.message);
     }
 
     res.status(201).json({

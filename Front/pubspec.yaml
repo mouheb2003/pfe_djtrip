@@ -54,14 +54,11 @@ dependencies:
   # Image picker for avatar upload
   image_picker: ^1.0.7
 
-  # Cached network image for image loading
-  cached_network_image: ^3.3.1
-
   # HTTP multipart for file upload
   http_parser: ^4.0.2
 
-  # Google Maps for location selection
-  google_maps_flutter: ^2.5.3
+  # Google Maps for location selection (with POI click support)
+  google_maps_flutter: ^2.13.1
   geocoding: ^3.0.0
   geolocator: ^12.0.0
 
@@ -73,9 +70,6 @@ dependencies:
 
   # Real-time messaging
   socket_io_client: ^2.0.3+1
-
-  # WebView for payment integration
-  webview_flutter: ^4.4.4
 
   # Connectivity and caching
   connectivity_plus: ^6.0.5
@@ -105,6 +99,8 @@ dependencies:
 
   # Device Info for unique deviceId generation
   device_info_plus: ^10.1.0
+  cached_network_image: ^3.4.1
+  webview_flutter: ^4.8.0
 
 dev_dependencies:
   flutter_test:

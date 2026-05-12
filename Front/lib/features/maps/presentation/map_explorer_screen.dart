@@ -11,9 +11,12 @@ import '../models/map_place.dart';
 import '../models/map_place_suggestion.dart';
 import '../services/google_directions_service.dart';
 import '../services/google_places_service.dart';
+<<<<<<< HEAD
 import '../../../models/lieu_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../theme/app_theme.dart';
+=======
+>>>>>>> djtrip/DJTripx1
 
 // A small widget that attempts to fetch the image bytes via http
 // and displays them with Image.memory. This helps when Image.network
@@ -46,6 +49,7 @@ class NetworkImageWithFallback extends StatelessWidget {
     return FutureBuilder<Uint8List?>(
       future: _fetchBytes(url),
       builder: (context, snapshot) {
+<<<<<<< HEAD
         if (snapshot.hasData && snapshot.data != null) {
           return Image.memory(
             snapshot.data!,
@@ -72,6 +76,24 @@ class NetworkImageWithFallback extends StatelessWidget {
         return Container(
           color: Colors.grey[300],
           child: const Icon(Icons.broken_image, color: Colors.grey),
+=======
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final bytes = snapshot.data;
+        if (bytes != null && bytes.isNotEmpty) {
+          return Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+          );
+        }
+        return Container(
+          color: Colors.grey.shade200,
+          child: const Center(child: Icon(Icons.broken_image)),
+>>>>>>> djtrip/DJTripx1
         );
       },
     );
@@ -184,7 +206,10 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
 
   final GooglePlacesService _placesService = GooglePlacesService();
   final GoogleDirectionsService _directionsService = GoogleDirectionsService();
+<<<<<<< HEAD
   final LieuService _lieuService = LieuService();
+=======
+>>>>>>> djtrip/DJTripx1
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _originController = TextEditingController();
@@ -210,7 +235,10 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   List<LatLng> _routePoints = const [];
   String? _routeDistanceText;
   String? _routeDurationText;
+<<<<<<< HEAD
   List<LieuModel> _lieuxFromBD = [];
+=======
+>>>>>>> djtrip/DJTripx1
 
   bool _isLoadingSuggestions = false;
   bool _isLoadingOriginSuggestions = false;
@@ -239,7 +267,10 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     'mosque',
   ];
   late List<String> _selectedPlaceTypes;
+<<<<<<< HEAD
   String _selectedFilter = 'all';
+=======
+>>>>>>> djtrip/DJTripx1
 
   @override
   void initState() {
@@ -247,6 +278,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     _selectedPlaceTypes = [];
     _autocompleteSessionToken = _createSessionToken();
     unawaited(_loadNearby(center: _djerbaCenter));
+<<<<<<< HEAD
     unawaited(_loadLieuxFromBD());
   }
 
@@ -259,6 +291,8 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     } catch (e) {
       // Silently handle error
     }
+=======
+>>>>>>> djtrip/DJTripx1
   }
 
   @override
@@ -454,11 +488,16 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     try {
       // ignore: avoid_print
       print(
+<<<<<<< HEAD
         '[MapExplorer] _loadNearby -> center: ${center.latitude}, ${center.longitude}, selectedFilter: $_selectedFilter, includedTypes: $_selectedPlaceTypes',
+=======
+        '[MapExplorer] _loadNearby -> center: ${center.latitude}, ${center.longitude}, includedTypes: $_selectedPlaceTypes',
+>>>>>>> djtrip/DJTripx1
       );
     } catch (_) {}
 
     try {
+<<<<<<< HEAD
       // Use selectedFilter to determine includedTypes
       final includedTypes = _selectedFilter == 'all' ? <String>[] : <String>[_selectedFilter];
       
@@ -470,6 +509,12 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
         latitude: center.latitude,
         longitude: center.longitude,
         includedTypes: includedTypes,
+=======
+      final nearby = await _placesService.fetchNearbyPlaces(
+        latitude: center.latitude,
+        longitude: center.longitude,
+        includedTypes: _selectedPlaceTypes,
+>>>>>>> djtrip/DJTripx1
         radiusMeters: 7000,
         maxResultCount: 20,
       );
@@ -1320,6 +1365,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   Set<Marker> _buildMarkers() {
     final markers = <Marker>{};
 
+<<<<<<< HEAD
     // Debug print
     // ignore: avoid_print
     print('[MapExplorer] Building markers - lieuxFromBD count: ${_lieuxFromBD.length}');
@@ -1400,6 +1446,8 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     // ignore: avoid_print
     print('[MapExplorer] Building nearby markers - _nearbyPlaces count: ${_nearbyPlaces.length}');
     
+=======
+>>>>>>> djtrip/DJTripx1
     // Nearby markers are color-coded by place type.
     for (final place in _nearbyPlaces) {
       markers.add(
@@ -1465,6 +1513,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       );
     }
 
+<<<<<<< HEAD
     // Add current location marker
     if (_currentLocation != null) {
       markers.add(
@@ -1479,6 +1528,8 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       );
     }
 
+=======
+>>>>>>> djtrip/DJTripx1
     return markers;
   }
 
@@ -1512,10 +1563,13 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   double _markerHueForType(String? primaryType) {
     final type = (primaryType ?? '').toLowerCase();
 
+<<<<<<< HEAD
     // Debug print
     // ignore: avoid_print
     print('[MapExplorer] _markerHueForType: "$primaryType" -> "$type"');
 
+=======
+>>>>>>> djtrip/DJTripx1
     if (type.contains('restaurant')) {
       return BitmapDescriptor.hueRed;
     }
@@ -1525,6 +1579,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     if (type.contains('beach')) {
       return BitmapDescriptor.hueCyan;
     }
+<<<<<<< HEAD
     if (type.contains('museum')) {
       return BitmapDescriptor.hueOrange;
     }
@@ -1543,6 +1598,8 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
     if (type.contains('tourist_attraction')) {
       return BitmapDescriptor.hueMagenta;
     }
+=======
+>>>>>>> djtrip/DJTripx1
     return BitmapDescriptor.hueOrange;
   }
 
@@ -1755,6 +1812,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   }
 
   Widget _buildSearchBar() {
+<<<<<<< HEAD
     final cs = Theme.of(context).colorScheme;
     return Container(
       height: 48,
@@ -1768,13 +1826,30 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             color: Colors.black.withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
+=======
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+>>>>>>> djtrip/DJTripx1
           ),
         ],
       ),
       child: Row(
         children: [
+<<<<<<< HEAD
           Icon(Icons.search, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
+=======
+          const Icon(Icons.search, color: Color(0xFF1768AC)),
+          const SizedBox(width: 10),
+>>>>>>> djtrip/DJTripx1
           Expanded(
             child: TextField(
               controller: _searchController,
@@ -1783,19 +1858,32 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                 unawaited(_onSearchChanged(value));
               },
               textInputAction: TextInputAction.search,
+<<<<<<< HEAD
               decoration: InputDecoration(
                 hintText: 'Rechercher des lieux à Djerba',
                 hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
+=======
+              decoration: const InputDecoration(
+                hintText: 'Search places in Djerba',
+                border: InputBorder.none,
+>>>>>>> djtrip/DJTripx1
               ),
             ),
           ),
           if (_isLoadingSuggestions)
+<<<<<<< HEAD
             SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+=======
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+>>>>>>> djtrip/DJTripx1
             )
           else if (_searchController.text.isNotEmpty)
             GestureDetector(
@@ -1805,7 +1893,11 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                   _suggestions = const [];
                 });
               },
+<<<<<<< HEAD
               child: Icon(Icons.close, size: 18, color: AppColors.onSurfaceVariant),
+=======
+              child: const Icon(Icons.close, size: 18),
+>>>>>>> djtrip/DJTripx1
             ),
         ],
       ),
@@ -1965,6 +2057,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   }
 
   Widget _buildTypeFilters() {
+<<<<<<< HEAD
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1992,10 +2085,48 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                   });
                   unawaited(_loadNearbyForVisibleRegion());
                 },
+=======
+    return SizedBox(
+      height: 50,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: _broadPlaceTypes.length + 1,
+        itemBuilder: (context, index) {
+          if (index == _broadPlaceTypes.length) {
+            // Reset button at the end
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Align(
+                alignment: Alignment.center,
+                child: GestureDetector(
+                  onTap: _resetTypeFilters,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      '✕ Réinit',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+>>>>>>> djtrip/DJTripx1
               ),
             );
           }
 
+<<<<<<< HEAD
           final type = _broadPlaceTypes[index - 1];
           final isSelected = _selectedFilter == type;
           final displayName = type.replaceAll('_', ' ').split(' ').map((word) {
@@ -2021,6 +2152,31 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                 });
                 unawaited(_loadNearbyForVisibleRegion());
               },
+=======
+          final type = _broadPlaceTypes[index];
+          final isSelected = _selectedPlaceTypes.contains(type);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FilterChip(
+              label: Text(
+                _formatPlaceType(type),
+                style: const TextStyle(fontSize: 11),
+              ),
+              selected: isSelected,
+              selectedColor: Colors.white,
+              checkmarkColor: const Color(0xFF1768AC),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+              side: BorderSide(
+                color: isSelected ? const Color(0xFF1768AC) : Colors.black,
+                width: isSelected ? 2 : 1,
+              ),
+              onSelected: (_) => unawaited(_updateSelectedTypes(type)),
+>>>>>>> djtrip/DJTripx1
             ),
           );
         },

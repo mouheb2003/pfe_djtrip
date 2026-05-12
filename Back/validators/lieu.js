@@ -5,7 +5,7 @@ const createLieuSchema = Joi.object({
   name: Joi.string().required(),
   slug: Joi.string(),
   type: Joi.string()
-    .valid("beach", "hotel", "restaurant", "activity", "landmark")
+    .valid("beach", "accommodation", "food", "activity", "museum", "shopping", "other")
     .required(),
 
   // ================= LOCALISATION =================
@@ -74,7 +74,7 @@ const updateLieuSchema = Joi.object({
   // ================= IDENTITÉ =================
   name: Joi.string(),
   slug: Joi.string(),
-  type: Joi.string().valid("beach", "hotel", "restaurant", "activity", "landmark"),
+  type: Joi.string().valid("beach", "accommodation", "food", "activity", "museum", "shopping", "other"),
 
   // ================= LOCALISATION =================
   address: Joi.string(),

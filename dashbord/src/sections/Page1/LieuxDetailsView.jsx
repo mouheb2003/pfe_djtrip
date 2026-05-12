@@ -25,35 +25,63 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { Carousel, useCarousel, CarouselArrowBasicButtons } from 'src/components/carousel';
 
 function categorieColor(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'info';
+    case 'museum':
     case 'musee':
       return 'secondary';
+    case 'shopping':
+      return 'primary';
+    case 'accommodation':
     case 'hotel':
       return 'success';
+    case 'food':
     case 'restaurant':
       return 'warning';
     case 'monument':
-      return 'error';
+    case 'landmark':
+      return 'default';
+    case 'other':
+      return 'default';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'success';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'warning';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'secondary';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'primary';
       return 'default';
   }
 }
 
 function categorieIcon(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'fluent:beach-20-filled';
+    case 'museum':
     case 'musee':
       return 'mdi:bank';
+    case 'shopping':
+      return 'mdi:shopping';
+    case 'accommodation':
     case 'hotel':
       return 'fa-solid:hotel';
+    case 'food':
     case 'restaurant':
       return 'mdi:silverware-fork-knife';
     case 'monument':
-      return 'mdi:castle';
+    case 'landmark':
+      return 'mdi:map-marker';
+    case 'other':
+      return 'mdi:map-marker';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'fa-solid:hotel';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'mdi:silverware-fork-knife';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'mdi:bank';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'mdi:shopping';
       return 'mdi:map-marker';
   }
 }

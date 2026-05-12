@@ -21,38 +21,35 @@ import '../shared/review_prompt_modal.dart';
 
 class TouristMainScreen extends StatefulWidget {
   final int initialIndex;
-  const TouristMainScreen({super.key, this.initialIndex = 0});
+  const TouristMainScreen({Key? key, this.initialIndex = 0}) : super(key: key);
 
   @override
-  State<TouristMainScreen> createState() => _TouristMainScreenState();
+  _TouristMainScreenState createState() => _TouristMainScreenState();
 }
 
 class _TouristMainScreenState extends State<TouristMainScreen> {
-  static const Duration _noveltyRefreshInterval = Duration(seconds: 12);
-
-  static const String _sectionHome = 'tourist_home';
-  static const String _sectionActivities = 'tourist_bookings';
-  static const String _sectionNetwork = 'tourist_network';
-  static const String _sectionMessages = 'tourist_messages';
-
-  late int _currentIndex;
-  late final List<Widget> _pages;
+  int _currentIndex = 0;
+  late List<Widget> _pages;
   Timer? _noveltyTimer;
-
-  bool _showHomeDot = false;
-  bool _showActivitiesDot = false;
-  bool _showNetworkDot = false;
-  bool _showMessagesDot = false;
-
+  final Duration _noveltyRefreshInterval = const Duration(seconds: 30);
   String _homeSignature = '';
   String _activitiesSignature = '';
   String _networkSignature = '';
   String _messagesSignature = '';
+  bool _showHomeDot = false;
+  bool _showActivitiesDot = false;
+  bool _showNetworkDot = false;
+  bool _showMessagesDot = false;
+  final String _sectionHome = 'home';
+  final String _sectionActivities = 'activities';
+  final String _sectionNetwork = 'network';
+  final String _sectionMessages = 'messages';
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+
     _pages = [
       HomeTab(
         onExploreTap: () => _goToTab(1),
@@ -73,7 +70,6 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       _refreshNoveltyBadges();
     });
 
-    // Check for pending review popups after a short delay
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
         _checkAndShowReviewPopup();
@@ -91,7 +87,8 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     if (!mounted) return;
 
     try {
-      final pendingReview = await review_service.ReviewReminderService.getNextPendingReview();
+      final pendingReview =
+          await review_service.ReviewReminderService.getNextPendingReview();
       if (pendingReview == null) return;
 
       final booking = pendingReview['booking'] as InscriptionModel;
@@ -119,16 +116,14 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => ReviewPromptModal(
-          booking: bookingModel,
-          activity: activity,
-        ),
+        builder: (context) =>
+            ReviewPromptModal(booking: bookingModel, activity: activity),
       );
 
       // Mark as shown after popup is closed
       await review_service.ReviewReminderService.markAsShown(booking.id);
     } catch (e) {
-      print('[TouristMainScreen] Error showing review popup: $e');
+      debugPrint('[TouristMainScreen] Error showing review popup: $e');
     }
   }
 
@@ -271,9 +266,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
   void _openNotifications() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const NotificationHistoryScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
     );
   }
 
@@ -290,10 +283,21 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         children: [
           IndexedStack(index: _currentIndex, children: _pages),
           Positioned(
+<<<<<<< HEAD
             bottom: 18,
             left: 16,
             right: 16,
             child: _buildFloatingNavBar(navBg, navActive, navInactive),
+=======
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+            left: 16,
+            right: 16,
+            child: SafeArea(
+              top: false,
+              bottom: true,
+              child: _buildFloatingNavBar(navBg, navActive, navInactive),
+            ),
+>>>>>>> djtrip/DJTripx1
           ),
         ],
       ),
@@ -308,7 +312,11 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       children: [
         // Main pill-shaped nav bar
         Container(
+<<<<<<< HEAD
           height: 70,
+=======
+          height: 60,
+>>>>>>> djtrip/DJTripx1
           decoration: BoxDecoration(
             color: navBg,
             borderRadius: BorderRadius.circular(30),
@@ -423,6 +431,7 @@ class _NavItem extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
+<<<<<<< HEAD
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
@@ -446,6 +455,34 @@ class _NavItem extends StatelessWidget {
                     isActive ? activeIcon : icon,
                     color: isActive ? cs.onPrimary : inactiveColor,
                     size: isActive ? 26 : 18,
+=======
+                Transform.translate(
+                  offset: Offset(0, isActive ? -12 : 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    width: isActive ? 56 : 44,
+                    height: isActive ? 56 : 44,
+                    alignment: Alignment.center,
+                    decoration: isActive
+                        ? BoxDecoration(
+                            color: activeColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: activeColor.withOpacity(0.22),
+                                blurRadius: 14,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          )
+                        : null,
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: isActive ? cs.onPrimary : inactiveColor,
+                      size: isActive ? 28 : 20,
+                    ),
+>>>>>>> djtrip/DJTripx1
                   ),
                 ),
                 if (showDot)

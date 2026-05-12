@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/maps/presentation/map_explorer_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/onboarding/user_type_selection_screen.dart';
@@ -22,6 +23,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String touristMain = '/tourist/main';
   static const String organizerMain = '/organizer/main';
+  static const String mapExplorer = '/maps/explorer';
   static const String profilePrefix = '/profile/';
 
   /// Returns the appropriate home screen widget based on user type
@@ -106,6 +108,11 @@ class AppRoutes {
             : 0;
         return MaterialPageRoute(
           builder: (_) => OrganizerMainScreen(initialIndex: initialIndex),
+          settings: settings,
+        );
+      case mapExplorer:
+        return MaterialPageRoute(
+          builder: (_) => const MapExplorerScreen(),
           settings: settings,
         );
       default:

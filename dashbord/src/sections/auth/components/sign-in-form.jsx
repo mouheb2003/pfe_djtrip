@@ -2,13 +2,9 @@ import { useFormContext } from 'react-hook-form';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
-import Link from '@mui/material/Link';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
-
-import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
 import { Field } from 'src/components/hook-form';
@@ -56,15 +52,6 @@ export function SignInForm({ sx, ...other }) {
           },
         }}
       />
-      <Link
-        component={RouterLink}
-        href={paths.resetPassword}
-        variant="body2"
-        color="inherit"
-        sx={{ alignSelf: 'flex-end' }}
-      >
-        Forgot password?
-      </Link>
       <Button
         fullWidth
         color="inherit"

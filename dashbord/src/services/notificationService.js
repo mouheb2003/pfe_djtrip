@@ -12,6 +12,17 @@ const API = {
 };
 
 export const notificationService = {
+  // Get notifications for current user
+  getUserNotifications: async (params = {}) => {
+    try {
+      const response = await axios.get(API.userNotifications, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting user notifications:', error);
+      throw error;
+    }
+  },
+
   // Get all notifications (admin)
   getAllNotifications: async (params = {}) => {
     try {

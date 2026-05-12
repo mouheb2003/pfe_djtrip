@@ -52,7 +52,7 @@ exports.createNotification = async (req, res) => {
 };
 
 // ─── GET /notifications ───────────────────────────────────────────────────────
-// Get user notifications
+// Get user notifications (filtered to display-worthy types only)
 exports.getUserNotifications = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -63,15 +63,20 @@ exports.getUserNotifications = async (req, res) => {
       skip = 0,
     } = req.query;
 
+    // Only allow fetching these notification types for display
+    const allowedTypes = ['message', 'approval', 'appeal', 'booking'];
+    const queryType = type && allowedTypes.includes(type) ? type : null;
+
     const notifications = await Notification.getUserNotifications(userId, {
-      type,
+      type: queryType,
       unread_only: unread_only === "true",
       limit: parseInt(limit),
       skip: parseInt(skip),
+      allowedTypes, // Pass allowed types to filter in DB query
     });
 
     // Get total count for pagination
-    const totalCount = await Notification.countDocuments({ user_id: userId });
+    const totalCount = await Notification.countDocuments({ user_id: userId, type: { $in: allowedTypes } });
 
     res.status(200).json({
       success: true,
@@ -197,8 +202,12 @@ exports.deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
+    const userType = req.user.userType || null;
 
-    const result = await Notification.deleteOne({ _id: id, user_id: userId });
+    // Allow admins to delete any notification; regular users only their own
+    const query = userType === 'Admin' ? { _id: id } : { _id: id, user_id: userId };
+
+    const result = await Notification.deleteOne(query);
 
     if (result.deletedCount === 0) {
       return res.status(404).json({

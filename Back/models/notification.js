@@ -159,6 +159,11 @@ notificationSchema.statics.createNotification = async function (notificationData
 notificationSchema.statics.getUserNotifications = function (userId, options = {}) {
   const query = { user_id: userId };
 
+  // Filter by allowed types if provided
+  if (options.allowedTypes && Array.isArray(options.allowedTypes)) {
+    query.type = { $in: options.allowedTypes };
+  }
+
   // Filter by unread if requested
   if (options.unread_only) {
     query.is_read = false;

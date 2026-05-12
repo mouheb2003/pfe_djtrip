@@ -6,14 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
-import Link from '@mui/material/Link';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { useRouter } from 'src/routes/hooks';
-import { RouterLink } from 'src/routes/components';
 
+import { Logo } from 'src/components/logo';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
@@ -78,16 +77,6 @@ export function JwtSignInView() {
         slotProps={{ inputLabel: { shrink: true } }}
       />
       <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
-        <Link
-          component={RouterLink}
-          href="#"
-          variant="body2"
-          color="inherit"
-          sx={{ alignSelf: 'flex-end' }}
-        >
-          Forgot password?
-        </Link>
-
         <Field.Text
           name="password"
           label="Password"
@@ -126,11 +115,13 @@ export function JwtSignInView() {
 
   return (
     <>
+      <Box sx={{ mb: 1, display: 'flex', justifyContent: { xs: 'center', md: 'flex-start' } }}>
+        <Logo href="/" sx={{ width: 300, height: 180 }} />
+      </Box>
+
       <FormHead title="Admin sign in" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Accès administrateur requis. Identifiant: admin, mot de passe: admin.
-      </Alert>
+
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }}>

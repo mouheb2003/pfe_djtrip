@@ -118,6 +118,12 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
         _showWebView = true;
       });
 
+      if ((_checkoutUrl ?? '').startsWith('mock://')) {
+        print('[STRIPE PAYMENT] Mock checkout detected, auto-completing payment');
+        await _completePaymentManually();
+        return;
+      }
+
       // Load the checkout URL in the webview
       _webViewController.loadRequest(Uri.parse(_checkoutUrl!));
     } catch (e) {
@@ -221,6 +227,12 @@ class _StripePaymentScreenState extends State<StripePaymentScreen> {
 
   String _getUserFriendlyErrorMessage(String error) {
     final errorLower = error.toLowerCase();
+
+    if (errorLower.contains('stripe is not configured') ||
+        errorLower.contains('invalid api key') ||
+        errorLower.contains('stripe')) {
+      return 'Payment service is not configured yet. Please contact support.';
+    }
 
     // Check for server errors
     if (errorLower.contains('server') || errorLower.contains('500') || errorLower.contains('502') || errorLower.contains('503')) {

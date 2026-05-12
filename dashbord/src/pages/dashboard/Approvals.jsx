@@ -1,565 +1,298 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Badge,
-  Button,
-  Card,
-  ConfigProvider,
-  Descriptions,
-  Empty,
-  Form,
-  Input,
-  message,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-  Avatar,
-  theme,
-} from 'antd';
-import {
-  CheckOutlined,
-  CloseOutlined,
-  EyeOutlined,
-  GoogleOutlined,
-  MailOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  UserOutlined,
-  PhoneOutlined,
-  EnvironmentOutlined,
-  GlobalOutlined,
-  ClockCircleOutlined,
-  FileTextOutlined,
-  IdcardOutlined,
-} from '@ant-design/icons';
+﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
+import TableRow from '@mui/material/TableRow';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import TableContainer from '@mui/material/TableContainer';
+
+import { DashboardContent } from 'src/layouts/dashboard';
 import { onboardingService } from 'src/services/onboardingService';
-import { useSettingsContext } from 'src/components/settings';
 
-const { Title, Text } = Typography;
-const { Option } = Select;
-const { TextArea } = Input;
+import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
+import { Scrollbar } from 'src/components/scrollbar';
+import {
+  useTable,
+  emptyRows,
+  rowInPage,
+  getComparator,
+  TableEmptyRows,
+  TableHeadCustom,
+  TablePaginationCustom,
+} from 'src/components/table';
 
-const Approvals = () => {
-  const settings = useSettingsContext();
-  const isDarkMode = settings.state.colorScheme === 'dark';
-  const { defaultAlgorithm, darkAlgorithm } = theme;
+const TABLE_HEAD = [
+  { id: 'fullname', label: 'Nom complet' },
+  { id: 'email', label: 'Email' },
+  { id: 'signup_method', label: "Méthode d'inscription" },
+  { id: 'country', label: 'Pays' },
+  { id: 'submitted_for_approval', label: 'Soumis le' },
+  { id: 'wait_days', label: "Jours d'attente" },
+  { id: 'actions', label: 'Actions', align: 'right' },
+];
 
+function normalizeApproval(org) {
+  return {
+    id: org?._id || org?.id,
+    fullname: org?.fullname || '-',
+    email: org?.email || '-',
+    signup_method: org?.signup_method || 'email',
+    country: org?.country || '-',
+    submitted_for_approval: org?.onboarding_status?.submitted_at || org?.createdAt || null,
+    wait_days: org?.onboarding_status?.wait_days || 0,
+    details: org?.details || {},
+  };
+}
+
+function statusColor(waitDays) {
+  if (waitDays > 7) return 'error';
+  if (waitDays > 3) return 'warning';
+  return 'info';
+}
+
+export default function ApprovalsPage() {
+  const table = useTable();
   const [organizers, setOrganizers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [stats, setStats] = useState({
-    pending_approvals: 0,
-    onboarded_users: 0,
-    onboarding_completion_rate: 0,
-    total_users: 0,
-  });
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [signupMethodFilter, setSignupMethodFilter] = useState('all');
 
-  const [filters, setFilters] = useState({ search: '', signup_method: undefined });
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [total, setTotal] = useState(0);
+  const [selectedOrg, setSelectedOrg] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [confirmApproveOpen, setConfirmApproveOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
-  const [selectedOrganizer, setSelectedOrganizer] = useState(null);
-  const [detailsVisible, setDetailsVisible] = useState(false);
-  const [approveVisible, setApproveVisible] = useState(false);
-  const [rejectVisible, setRejectVisible] = useState(false);
-  const [rejectForm] = Form.useForm();
-
-  const loadApprovals = async (nextPage = page, nextFilters = filters) => {
-    setLoading(true);
+  const loadApprovals = useCallback(async () => {
     try {
-      const apiFilters = {};
-      if (nextFilters.search) apiFilters.search = nextFilters.search;
-      if (nextFilters.signup_method) apiFilters.signup_method = nextFilters.signup_method;
-
-      const res = await onboardingService.getPendingApprovals(nextPage, pageSize, apiFilters);
-      const list = res?.organizers ?? [];
-      const totalItems = res?.pagination?.total_items ?? list.length;
-
-      setOrganizers(Array.isArray(list) ? list : []);
-      setTotal(Number.isFinite(totalItems) ? totalItems : 0);
-      setPage(nextPage);
-    } catch (e) {
-      console.error('Failed to load pending approvals:', e);
-      setOrganizers([]);
-      setTotal(0);
-      message.error('Failed to load pending approvals');
+      setLoading(true);
+      const data = await onboardingService.getPendingApprovals();
+      const rows = Array.isArray(data) ? data : (data.organizers || []);
+      setOrganizers(rows.map(normalizeApproval));
+    } catch (err) {
+      toast.error('Erreur lors du chargement des approbations');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadStats = async () => {
-    setStatsLoading(true);
-    try {
-      const res = await onboardingService.getOnboardingStats();
-      setStats({
-        pending_approvals: res?.pending_approvals ?? 0,
-        onboarded_users: res?.onboarded_users ?? 0,
-        onboarding_completion_rate: Number(res?.onboarding_completion_rate ?? 0),
-        total_users: res?.total_users ?? 0,
-      });
-    } catch (e) {
-      console.error('Failed to load onboarding stats:', e);
-      setStats({
-        pending_approvals: 0,
-        onboarded_users: 0,
-        onboarding_completion_rate: 0,
-        total_users: 0,
-      });
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadApprovals(1, filters);
-    loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearch = (value) => {
-    const next = { ...filters, search: value };
-    setFilters(next);
-    loadApprovals(1, next);
-  };
+  useEffect(() => {
+    loadApprovals();
+  }, [loadApprovals]);
 
-  const handleSignupMethod = (value) => {
-    const next = { ...filters, signup_method: value };
-    setFilters(next);
-    loadApprovals(1, next);
-  };
-
-  const approve = async () => {
-    if (!selectedOrganizer?._id) return;
+  const handleApprove = useCallback(async () => {
     try {
-      await onboardingService.approveOrganizer(selectedOrganizer._id);
-      message.success('Organizer approved');
-      setApproveVisible(false);
-      setSelectedOrganizer(null);
-      await Promise.all([loadApprovals(1, filters), loadStats()]);
-    } catch (e) {
-      console.error('Approve failed:', e);
-      message.error('Failed to approve organizer');
+      if (!selectedOrg) return;
+      await onboardingService.approveOrganizer(selectedOrg.id);
+      toast.success('Organisateur approuvé');
+      setConfirmApproveOpen(false);
+      loadApprovals();
+    } catch (err) {
+      toast.error("Erreur lors de l'approbation");
     }
-  };
+  }, [selectedOrg, loadApprovals]);
 
-  const reject = async (values) => {
-    if (!selectedOrganizer?._id) return;
+  const handleReject = useCallback(async () => {
     try {
-      await onboardingService.rejectOrganizer(selectedOrganizer._id, values.reason);
-      message.success('Organizer rejected');
-      setRejectVisible(false);
-      rejectForm.resetFields();
-      setSelectedOrganizer(null);
-      await Promise.all([loadApprovals(1, filters), loadStats()]);
-    } catch (e) {
-      console.error('Reject failed:', e);
-      message.error('Failed to reject organizer');
+      if (!selectedOrg) return;
+      if (!rejectionReason.trim()) {
+        toast.warning('Veuillez saisir une raison de rejet');
+        return;
+      }
+      await onboardingService.rejectOrganizer(selectedOrg.id, rejectionReason);
+      toast.success('Organisateur rejeté');
+      setRejectOpen(false);
+      setRejectionReason('');
+      loadApprovals();
+    } catch (err) {
+      toast.error('Erreur lors du rejet');
     }
+  }, [selectedOrg, rejectionReason, loadApprovals]);
+
+  const handleFilterSearch = (event) => {
+    setSearchQuery(event.target.value);
   };
 
-  const columns = useMemo(
-    () => [
-      {
-        title: 'Organizer',
-        key: 'organizer',
-        width: 240,
-        render: (_, record) => (
-          <Space>
-            <UserOutlined />
-            <div>
-              <div style={{ fontWeight: 700 }}>{record.fullname || 'Unknown'}</div>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {record.email}
-              </Text>
-            </div>
-          </Space>
-        ),
-      },
-      {
-        title: 'Method',
-        dataIndex: 'signup_method',
-        key: 'method',
-        width: 140,
-        render: (m) => (
-          <Tag color="blue" style={{ fontWeight: 700 }}>
-            {m === 'google' ? <GoogleOutlined /> : <MailOutlined />} {String(m || 'email')}
-          </Tag>
-        ),
-      },
-      {
-        title: 'Country',
-        key: 'country',
-        width: 160,
-        render: (_, r) => r.onboarding_data?.pays_origine || r.onboarding_data?.country || 'N/A',
-      },
-      {
-        title: 'Submitted',
-        dataIndex: 'submitted_for_approval',
-        key: 'submitted',
-        width: 200,
-        render: (v) => (v ? new Date(v).toLocaleString() : '—'),
-      },
-      {
-        title: 'Wait',
-        key: 'wait',
-        width: 100,
-        render: (_, r) => {
-          const ts = r.submitted_for_approval ? new Date(r.submitted_for_approval).getTime() : 0;
-          const d = ts ? Math.floor((Date.now() - ts) / 86400000) : 0;
-          return <Badge color={d > 2 ? '#ef4444' : '#10b981'} text={`${d}d`} />;
-        },
-      },
-      {
-        title: 'Actions',
-        key: 'actions',
-        width: 160,
-        fixed: 'right',
-        render: (_, r) => (
-          <Space>
-            <Tooltip title="View details">
-              <Button
-                type="text"
-                icon={<EyeOutlined />}
-                onClick={() => {
-                  setSelectedOrganizer(r);
-                  setDetailsVisible(true);
-                }}
-              />
-            </Tooltip>
-            <Tooltip title="Approve">
-              <Button
-                type="text"
-                icon={<CheckOutlined />}
-                onClick={() => {
-                  setSelectedOrganizer(r);
-                  setApproveVisible(true);
-                }}
-              />
-            </Tooltip>
-            <Tooltip title="Reject">
-              <Button
-                danger
-                type="text"
-                icon={<CloseOutlined />}
-                onClick={() => {
-                  setSelectedOrganizer(r);
-                  setRejectVisible(true);
-                }}
-              />
-            </Tooltip>
-          </Space>
-        ),
-      },
-    ],
-    [rejectForm]
-  );
+  const handleFilterMethod = (event) => {
+    setSignupMethodFilter(event.target.value);
+  };
+
+  const dataFiltered = useMemo(() => {
+    const comparator = getComparator(table.order, table.orderBy);
+    const stabilized = organizers.map((el, idx) => [el, idx]);
+    stabilized.sort((a, b) => {
+      const order = comparator(a[0], b[0]);
+      if (order !== 0) return order;
+      return a[1] - b[1];
+    });
+    let data = stabilized.map((el) => el[0]);
+
+    if (searchQuery) {
+      data = data.filter((row) =>
+        row.fullname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        row.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (signupMethodFilter !== 'all') {
+      data = data.filter((row) => row.signup_method === signupMethodFilter);
+    }
+    return data;
+  }, [organizers, searchQuery, signupMethodFilter, table.order, table.orderBy]);
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: isDarkMode ? darkAlgorithm : defaultAlgorithm,
-        token: {
-          fontFamily: "'Public Sans', sans-serif",
-          borderRadius: 12,
-          colorPrimary: '#f97316',
-          colorSuccess: '#10b981',
-          colorWarning: '#f59e0b',
-          colorError: '#ef4444',
-          colorInfo: '#3b82f6',
-        },
-        components: {
-          Typography: {
-            fontWeightStrong: 800,
-          },
-          Card: {
-            borderRadiusLG: 16,
-          },
-          Input: {
-            controlHeightLG: 48,
-            borderRadiusLG: 12,
-          },
-          Select: {
-            controlHeightLG: 48,
-            borderRadiusLG: 12,
-          },
-          Modal: {
-            borderRadiusLG: 12,
-          },
-          Table: {
-            borderRadiusLG: 12,
-          },
-        },
-      }}
-    >
-      <div className="mx-auto max-w-7xl p-6 space-y-8" style={{ color: isDarkMode ? '#fff' : 'inherit' }}>
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <div>
-            <Title level={2} className="mb-2 flex items-center" style={{ fontWeight: 800 }}>
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg flex items-center justify-center mr-3">
-                <CheckOutlined className="text-white text-lg" />
-              </div>
-              Organizer Approvals
-            </Title>
-            <Text type="secondary" className="text-sm">
-              Review onboarding submissions and approve organizer accounts
-            </Text>
-          </div>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              loadApprovals(1, filters);
-              loadStats();
-            }}
-            className="border-gray-300 hover:border-orange-500 hover:text-orange-500"
-            style={{ borderRadius: '10px', height: '40px' }}
-          >
-            Refresh
-          </Button>
-        </div>
+    <DashboardContent maxWidth="xl">
+      <Typography variant="h4" sx={{ mb: { xs: 3, md: 5 } }}>
+        Approbations en attente
+      </Typography>
 
-        {/* Statistics Cards - Enhanced */}
-        <Space size={20} style={{ display: 'flex', overflowX: 'auto', paddingBottom: 12, marginBottom: 32 }}>
-          <Card
-            style={{
-              width: 280,
-              flex: '0 0 auto',
-              background: isDarkMode ? '#1e1e1e' : '#fff',
-              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
-              borderRadius: 20,
-              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
-            }}
-            className="hover:scale-105 transition-all duration-300 cursor-pointer"
-            bodyStyle={{ padding: '28px' }}
-            loading={statsLoading}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Pending</Text>
-                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#f97316', fontSize: '36px', lineHeight: 1 }}>{stats.pending_approvals}</Title>
-                <div className="mt-2 flex items-center gap-1">
-                  <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 600, background: isDarkMode ? 'rgba(249, 115, 22, 0.15)' : '#fff7ed', padding: '4px 8px', borderRadius: '6px' }}>
-                    +{Math.round(stats.pending_approvals * 0.1)} this week
-                  </span>
-                </div>
-              </div>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                boxShadow: '0 8px 16px rgba(249, 115, 22, 0.3)'
-              }}>
-                <ClockCircleOutlined style={{ fontSize: 28, color: '#fff' }} />
-              </div>
-            </div>
-            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
-              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
-                Awaiting review
-              </Text>
-            </div>
-          </Card>
-
-          <Card
-            style={{
-              width: 280,
-              flex: '0 0 auto',
-              background: isDarkMode ? '#1e1e1e' : '#fff',
-              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
-              borderRadius: 20,
-              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
-            }}
-            className="hover:scale-105 transition-all duration-300 cursor-pointer"
-            bodyStyle={{ padding: '28px' }}
-            loading={statsLoading}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Onboarded</Text>
-                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#3b82f6', fontSize: '36px', lineHeight: 1 }}>{stats.onboarded_users}</Title>
-                <div className="mt-2 flex items-center gap-1">
-                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5', padding: '4px 8px', borderRadius: '6px' }}>
-                    ↑ 12% from last month
-                  </span>
-                </div>
-              </div>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
-              }}>
-                <CheckOutlined style={{ fontSize: 28, color: '#fff' }} />
-              </div>
-            </div>
-            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
-              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
-                Approved organizers
-              </Text>
-            </div>
-          </Card>
-
-          <Card
-            style={{
-              width: 280,
-              flex: '0 0 auto',
-              background: isDarkMode ? '#1e1e1e' : '#fff',
-              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
-              borderRadius: 20,
-              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
-            }}
-            className="hover:scale-105 transition-all duration-300 cursor-pointer"
-            bodyStyle={{ padding: '28px' }}
-            loading={statsLoading}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Completion Rate</Text>
-                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#10b981', fontSize: '36px', lineHeight: 1 }}>{stats.onboarding_completion_rate}%</Title>
-                <div className="mt-2 flex items-center gap-1">
-                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5', padding: '4px 8px', borderRadius: '6px' }}>
-                    ↑ 5% improvement
-                  </span>
-                </div>
-              </div>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: '0 8px 16px rgba(16, 185, 129, 0.3)'
-              }}>
-                <FileTextOutlined style={{ fontSize: 28, color: '#fff' }} />
-              </div>
-            </div>
-            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
-              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
-                Profile completion
-              </Text>
-            </div>
-          </Card>
-
-          <Card
-            style={{
-              width: 280,
-              flex: '0 0 auto',
-              background: isDarkMode ? '#1e1e1e' : '#fff',
-              border: isDarkMode ? '1px solid #2c2c2c' : '1px solid #e5e7eb',
-              borderRadius: 20,
-              boxShadow: isDarkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)',
-            }}
-            className="hover:scale-105 transition-all duration-300 cursor-pointer"
-            bodyStyle={{ padding: '28px' }}
-            loading={statsLoading}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <Text type="secondary" className="text-xs font-bold uppercase tracking-wider" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : '#6b7280', letterSpacing: '0.05em' }}>Total Users</Text>
-                <Title level={2} className="mb-0 mt-2" style={{ fontWeight: 900, color: '#8b5cf6', fontSize: '36px', lineHeight: 1 }}>{stats.total_users}</Title>
-                <div className="mt-2 flex items-center gap-1">
-                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5', padding: '4px 8px', borderRadius: '6px' }}>
-                    ↑ 8% growth
-                  </span>
-                </div>
-              </div>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                boxShadow: '0 8px 16px rgba(139, 92, 246, 0.3)'
-              }}>
-                <UserOutlined style={{ fontSize: 28, color: '#fff' }} />
-              </div>
-            </div>
-            <div className="mt-5 pt-4" style={{ borderTop: isDarkMode ? '1px solid #2c2c2c' : '1px solid #f3f4f6' }}>
-              <Text style={{ fontSize: '13px', color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : '#6b7280', fontWeight: 500 }}>
-                Registered users
-              </Text>
-            </div>
-          </Card>
-        </Space>
-
-        {/* Filters */}
-        <Card
-          style={{ background: isDarkMode ? '#1e1e1e' : '#fff' }}
-          className="border-0 rounded-2xl shadow-md mb-8"
-        >
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by name or email..."
-                prefix={<SearchOutlined className="text-gray-400" />}
-                className="h-12 border-gray-300 focus:border-orange-500"
-                style={{ borderRadius: '12px', background: isDarkMode ? '#2c2c2c' : '#fff', border: isDarkMode ? 'none' : '1px solid #d9d9d9', color: isDarkMode ? '#fff' : 'inherit' }}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              <Select
-                placeholder="Signup method"
-                className="min-w-[150px]"
-                style={{ height: '48px' }}
-                allowClear
-                onChange={handleSignupMethod}
-              >
-                <Option value="email">
-                  <div className="flex items-center">
-                    <MailOutlined className="mr-2 text-blue-500" />
-                    Email
-                  </div>
-                </Option>
-                <Option value="google">
-                  <div className="flex items-center">
-                    <GoogleOutlined className="mr-2 text-red-500" />
-                    Google
-                  </div>
-                </Option>
-                <Option value="facebook">
-                  <div className="flex items-center">
-                    <UserOutlined className="mr-2 text-blue-600" />
-                    Facebook
-                  </div>
-                </Option>
-              </Select>
-            </div>
-          </div>
+      <Stack spacing={3}>
+        <Card sx={{ p: 2.5 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <TextField
+              fullWidth
+              value={searchQuery}
+              onChange={handleFilterSearch}
+              placeholder="Rechercher par nom ou email..."
+              InputProps={{
+                startAdornment: <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled', mr: 1 }} />,
+              }}
+            />
+            <TextField
+              select
+              label="Méthode d'inscription"
+              value={signupMethodFilter}
+              onChange={handleFilterMethod}
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="all">Toutes</MenuItem>
+              <MenuItem value="email">Email</MenuItem>
+              <MenuItem value="google">Google</MenuItem>
+              <MenuItem value="facebook">Facebook</MenuItem>
+            </TextField>
+          </Stack>
         </Card>
 
-        {/* Table */}
-        <Card
-          style={{ background: isDarkMode ? '#1e1e1e' : '#fff' }}
-          className="border-0 rounded-2xl shadow-md"
-          bodyStyle={{ paddingTop: 16 }}
-        >
-          <div className="mb-6">
-            <Title level={4} className="mb-0" style={{ color: isDarkMode ? '#fff' : 'inherit', fontWeight: 700 }}>Pending Approvals</Title>
-            <Text type="secondary" className="text-sm" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>
-              Review and approve organizer onboarding requests
-            </Text>
-          </div>
-          <Table
-            columns={columns}
-            dataSource={organizers}
-            rowKey="_id"
-            loading={loading}
-            bordered
-            size="middle"
-            sticky={{ offsetHeader: 64 }}
-            locale={{ emptyText: <Empty description="No pending approvals" /> }}
-            pagination={{
-              current: page,
-              pageSize,
-              total,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (t, range) => (
-                <span className="text-gray-600" style={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.45)' : 'inherit' }}>Showing {range[0]} to {range[1]} of {t} approvals</span>
-              ),
-            }}
-            onChange={(pagination) => {
-              const nextPage = pagination.current || 1;
-              const nextSize = pagination.pageSize || pageSize;
-              setPageSize(nextSize);
-              loadApprovals(nextPage, filters);
-            }}
-            scroll={{ x: 1000 }}
+        <Card>
+          <Scrollbar>
+            <TableContainer component={Paper}>
+              <Table size={table.dense ? 'small' : 'medium'}>
+                <TableHeadCustom
+                  order={table.order}
+                  orderBy={table.orderBy}
+                  onSort={table.onSort}
+                  headCells={TABLE_HEAD}
+                  rowCount={dataFiltered.length}
+                />
+
+                <TableBody>
+                  {rowInPage(dataFiltered, table.page, table.rowsPerPage).map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.fullname}</TableCell>
+                      <TableCell>{row.email}</TableCell>
+                      <TableCell>
+                        <Label color="default">{row.signup_method}</Label>
+                      </TableCell>
+                      <TableCell>{row.country}</TableCell>
+                      <TableCell>{row.submitted_for_approval ? new Date(row.submitted_for_approval).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell>
+                        <Label color={statusColor(row.wait_days)}>
+                          {row.wait_days} jours
+                        </Label>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Voir détails">
+                          <IconButton onClick={() => { setSelectedOrg(row); setDetailsOpen(true); }}>
+                            <Iconify icon="eva:eye-fill" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Approuver">
+                          <IconButton color="success" onClick={() => { setSelectedOrg(row); setConfirmApproveOpen(true); }}>
+                            <Iconify icon="eva:checkmark-circle-2-fill" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Rejeter">
+                          <IconButton color="error" onClick={() => { setSelectedOrg(row); setRejectOpen(true); }}>
+                            <Iconify icon="eva:close-circle-fill" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  <TableEmptyRows height={table.dense ? 56 : 76} emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)} />
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+
+          <Box sx={{ p: 2 }}>
+            <TablePaginationCustom
+              page={table.page}
+              dense={table.dense}
+              count={dataFiltered.length}
+              rowsPerPage={table.rowsPerPage}
+              onPageChange={table.onChangePage}
+              onChangeDense={table.onChangeDense}
+              onRowsPerPageChange={table.onChangeRowsPerPage}
+            />
+          </Box>
+        </Card>
+      </Stack>
+
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Détails de l'organisateur</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Typography variant="subtitle2">Nom: <Typography variant="body2" component="span">{selectedOrg?.fullname}</Typography></Typography>
+            <Typography variant="subtitle2">Email: <Typography variant="body2" component="span">{selectedOrg?.email}</Typography></Typography>
+            <Typography variant="subtitle2">Pays: <Typography variant="body2" component="span">{selectedOrg?.country}</Typography></Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailsOpen(false)}>Fermer</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmApproveOpen} onClose={() => setConfirmApproveOpen(false)}>
+        <DialogTitle>Confirmer l'approbation</DialogTitle>
+        <DialogContent>
+          Êtes-vous sûr de vouloir approuver <b>{selectedOrg?.fullname}</b> ?
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmApproveOpen(false)}>Annuler</Button>
+          <Button variant="contained" color="success" onClick={handleApprove}>Approuver</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Rejeter l'organisateur</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>Veuillez indiquer la raison du rejet pour <b>{selectedOrg?.fullname}</b> :</Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="Ex: Documents incomplets, informations invalides..."
           />
+<<<<<<< HEAD
         </Card>
 
         {/* Details Modal - Enhanced with all user info */}
@@ -895,7 +628,14 @@ const Approvals = () => {
         </Modal>
       </div>
     </ConfigProvider>
+=======
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectOpen(false)}>Annuler</Button>
+          <Button variant="contained" color="error" onClick={handleReject}>Rejeter</Button>
+        </DialogActions>
+      </Dialog>
+    </DashboardContent>
+>>>>>>> djtrip/DJTripx1
   );
-};
-
-export default Approvals;
+}

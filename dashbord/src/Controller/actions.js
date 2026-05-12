@@ -53,6 +53,12 @@ export async function updateLieu(id, payload) {
   return data?.lieu ?? data;
 }
 
+export async function deleteLieu(id) {
+  if (!id) return null;
+
+  return Delete(END_POINT.lieuById(id));
+}
+
 export async function getUsers() {
   const data = await Get(`${END_POINT.users}?_t=${Date.now()}`);
 
@@ -150,6 +156,28 @@ export async function getActivitesAdmin() {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.activites)) return data.activites;
   if (Array.isArray(data?.activities)) return data.activities;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.results)) return data.results;
+
+  return [];
+}
+
+export async function getActiviteById(id) {
+  if (!id) return null;
+
+  const data = await Get(END_POINT.activiteById(id));
+  return data?.activite ?? data;
+}
+
+export async function getPaymentsAdmin({ page = 1, limit = 1000, status } = {}) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  if (status && status !== 'all') params.set('status', status);
+
+  const data = await Get(`${END_POINT.paymentsAdmin}?${params.toString()}`);
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.payments)) return data.payments;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.results)) return data.results;
 

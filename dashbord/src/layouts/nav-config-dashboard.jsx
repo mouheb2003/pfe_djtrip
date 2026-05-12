@@ -87,7 +87,7 @@ export const navData = [
     items: [
       {
         title: 'Users',
-        path: paths.dashboard.three,
+        path: paths.dashboard.users.root,
         icon: ICONS.user,
       },
       {
@@ -128,6 +128,11 @@ export const navData = [
         title: 'Payments',
         path: paths.dashboard.payments,
         icon: ICONS.invoice,
+      },
+      {
+        title: 'Facteurs',
+        path: paths.dashboard.facteurs.root,
+        icon: ICONS.banking,
       },
     ],
   },

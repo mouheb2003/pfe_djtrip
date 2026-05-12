@@ -34,7 +34,11 @@ class ApiConfig {
     }
 
     // Default local API target for Android emulator.
+<<<<<<< HEAD
     return _ensureScheme('http://192.168.55.99:3000');
+=======
+    return _ensureScheme(devUrls.first);
+>>>>>>> djtrip/DJTripx1
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';

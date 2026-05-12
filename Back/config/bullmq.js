@@ -11,31 +11,41 @@ const { redisClient } = require('./redis');
 let redisAvailable = false;
 let notificationQueue = null;
 let notificationWorker = null;
+let fallbackModeLogged = false;
+
+function enableFallback(reason) {
+  if (!fallbackModeLogged) {
+    console.warn(`⚠️ ${reason} - Queue system disabled, using fallback mode`);
+    fallbackModeLogged = true;
+  }
+  redisAvailable = false;
+}
 
 try {
   redisClient.on('connect', () => {
-    console.log('✅ Redis connected - Queue system enabled');
+    if (!redisAvailable) {
+      console.log('✅ Redis connected - Queue system enabled');
+    }
+    fallbackModeLogged = false;
     redisAvailable = true;
   });
 
-  redisClient.on('error', (err) => {
-    console.warn('⚠️ Redis connection error - Queue system disabled, using fallback mode');
-    redisAvailable = false;
+  redisClient.on('error', () => {
+    enableFallback('Redis connection error');
   });
 
   // Test connection
   redisClient.ping((err) => {
     if (err) {
-      console.warn('⚠️ Redis not available - Queue system disabled, using fallback mode');
-      redisAvailable = false;
+      enableFallback('Redis not available');
     } else {
       console.log('✅ Redis available - Queue system enabled');
+      fallbackModeLogged = false;
       redisAvailable = true;
     }
   });
 } catch (error) {
-  console.warn('⚠️ Redis initialization failed - Queue system disabled, using fallback mode');
-  redisAvailable = false;
+  enableFallback('Redis initialization failed');
 }
 
 // Queue options

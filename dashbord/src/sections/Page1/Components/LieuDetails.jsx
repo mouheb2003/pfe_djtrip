@@ -24,35 +24,63 @@ import { END_POINT } from 'src/Controller/endPoint';
 import { getUserById, getUserReviews } from 'src/Controller/actions';
 
 function categorieColor(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'info';
+    case 'museum':
     case 'musee':
       return 'secondary';
+    case 'shopping':
+      return 'primary';
+    case 'accommodation':
     case 'hotel':
       return 'success';
+    case 'food':
     case 'restaurant':
       return 'warning';
+    case 'landmark':
     case 'monument':
-      return 'error';
+      return 'default';
+    case 'other':
+      return 'default';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'success';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'warning';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'secondary';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'primary';
       return 'default';
   }
 }
 
 function categorieIcon(categorie) {
+  const normalized = String(categorie ?? '').toLowerCase();
   switch (categorie) {
     case 'plage':
+    case 'beach':
       return 'fluent:beach-20-filled';
+    case 'museum':
     case 'musee':
       return 'mdi:bank';
+    case 'shopping':
+      return 'mdi:shopping';
+    case 'accommodation':
     case 'hotel':
       return 'fa-solid:hotel';
+    case 'food':
     case 'restaurant':
       return 'mdi:silverware-fork-knife';
+    case 'landmark':
     case 'monument':
-      return 'mdi:castle';
+      return 'mdi:map-marker';
+    case 'other':
+      return 'mdi:map-marker';
     default:
+      if (normalized.includes('hotel') || normalized.includes('heberg')) return 'fa-solid:hotel';
+      if (normalized.includes('restaurant') || normalized.includes('food')) return 'mdi:silverware-fork-knife';
+      if (normalized.includes('museum') || normalized.includes('musee')) return 'mdi:bank';
+      if (normalized.includes('shopping') || normalized.includes('shop') || normalized.includes('store') || normalized.includes('mall') || normalized.includes('market')) return 'mdi:shopping';
       return 'mdi:map-marker';
   }
 }
@@ -71,14 +99,27 @@ function priceLabel(price) {
   return price === 0 ? 'Gratuit' : `${price} TND`;
 }
 
-function normalizeImages(images) {
-  const imageArray = Array.isArray(images) ? images : [];
+function normalizeImages(value) {
+  const imageArray = Array.isArray(value) ? value : value ? [value] : [];
   return imageArray
-    .map((image) => {
-      if (typeof image === 'string') return image;
-      return image?.imageUrl || image?.url || image?.src || '';
+    .flatMap((image) => {
+      if (typeof image === 'string') return [image];
+
+      return [image?.imageUrl, image?.url, image?.src, image?.main_image, image?.photoUrl].filter(Boolean);
     })
     .filter(Boolean);
+}
+
+function getLieuImages(lieu) {
+  return normalizeImages([
+    lieu?.main_image,
+    ...(Array.isArray(lieu?.gallery) ? lieu.gallery : []),
+    ...(Array.isArray(lieu?.galerieImages) ? lieu.galerieImages : []),
+    ...(Array.isArray(lieu?.images) ? lieu.images : []),
+    ...(lieu?.imageUrl ? [lieu.imageUrl] : []),
+    ...(lieu?.image ? [lieu.image] : []),
+    ...(lieu?.photoUrl ? [lieu.photoUrl] : []),
+  ]);
 }
 
 export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
@@ -96,10 +137,10 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
     try {
       const userData = await getUserById(userId);
       setSelectedUser(userData);
-      
+
       const reviews = await getUserReviews(userId);
       setUserReviews(reviews);
-      
+
       setUserProfileOpen(true);
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -128,7 +169,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
 
   if (!lieu) return null;
 
-  const images = normalizeImages(lieu.galerieImages || lieu.images || lieu.gallery);
+  const images = getLieuImages(lieu);
   const hasImages = images.length > 0;
   const averageRating = calculateAverageNote(lieu.avis);
   const totalReviews = lieu.avis?.length || 0;
@@ -412,7 +453,7 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Coordinates</Typography>
                               <Typography variant="body2">
-                                {lieu.latitude && lieu.longitude 
+                                {lieu.latitude && lieu.longitude
                                   ? `${lieu.latitude.toFixed(4)}, ${lieu.longitude.toFixed(4)}`
                                   : '-'}
                               </Typography>
@@ -435,13 +476,13 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           <Grid size={{ xs: 12 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Main Image</Typography>
-                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{lieu.main_image || '-'}</Typography>
+                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{lieu.main_image || images[0] || '-'}</Typography>
                             </Stack>
                           </Grid>
                           <Grid size={{ xs: 12, sm: 6 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Gallery</Typography>
-                              <Typography variant="body2">{Array.isArray(lieu.gallery) ? lieu.gallery.length : 0} images</Typography>
+                              <Typography variant="body2">{images.length} images</Typography>
                             </Stack>
                           </Grid>
                           <Grid size={{ xs: 12, sm: 6 }}>
@@ -558,28 +599,10 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Hours & Booking</Typography>
                         </Stack>
                         <Grid container spacing={2}>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                             <Stack spacing={0.5}>
                               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Opening Hours</Typography>
                               <Typography variant="body2">{lieu.opening_hours || lieu.openingHours || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Closing Hours</Typography>
-                              <Typography variant="body2">{lieu.closing_hours || lieu.closingHours || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Seasonal</Typography>
-                              <Typography variant="body2">{lieu.seasonal || '-'}</Typography>
-                            </Stack>
-                          </Grid>
-                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <Stack spacing={0.5}>
-                              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>Booking Required</Typography>
-                              <Typography variant="body2">{lieu.booking_required ? 'Yes' : 'No'}</Typography>
                             </Stack>
                           </Grid>
                         </Grid>
@@ -775,28 +798,8 @@ export function LieuDetailsDialog({ open, onClose, lieu, onRefresh }) {
                                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                     {avis.user?.nom || avis.user?.name || avis.user?.prenom || avis.user?.fullname || 'User'}
                                   </Typography>
-                                  <Rating value={Number(avis.note) || 0} readOnly size="small" />
-                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                    {Number(avis.note || 0).toFixed(1)}/5
-                                  </Typography>
-                                </Stack>
-                                <Stack direction="row" alignItems="center" spacing={1}>
-                                  {isAdmin && avis._id && (
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleDeleteReview(avis._id)}
-                                      sx={{ color: 'error.main' }}
-                                      title="Delete review"
-                                    >
-                                      <Iconify icon="solar:trash-bin-trash-bold" width={16} />
-                                    </IconButton>
-                                  )}
                                 </Stack>
                               </Stack>
-
-                              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
-                                {avis.avis || avis.comment || 'No comment provided.'}
-                              </Typography>
                             </Box>
                           </Stack>
                         </Card>

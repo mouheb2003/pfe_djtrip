@@ -41,7 +41,8 @@ export function Searchbar({ data: navItems = [], sx, ...other }) {
 
   const handleKeyDown = useCallback(
     (event) => {
-      if (event.metaKey && event.key.toLowerCase() === 'k') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
         onToggle();
         setSearchQuery('');
       }

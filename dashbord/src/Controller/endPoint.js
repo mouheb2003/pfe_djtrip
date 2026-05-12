@@ -16,6 +16,8 @@ export const END_POINT = {
   postById: (id) => buildApiPath(`/posts/admin/${id}`),
   activites: buildApiPath('/activites/admin'),
   activiteById: (id) => buildApiPath(`/activites/admin/${id}`),
+  paymentsAdmin: buildApiPath('/payments/all'),
+  paymentById: (id) => buildApiPath(`/payments/${id}`),
   messageConversations: buildApiPath('/messages/conversations'),
   messageWith: (partnerId) => buildApiPath(`/messages/with/${partnerId}`),
   messageById: (messageId) => buildApiPath(`/messages/${messageId}`),

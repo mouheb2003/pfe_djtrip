@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _logoFadeAnimation;
   late Animation<double> _subtitleFadeAnimation;
   late Animation<int> _characterCountAnimation;
-  final String _logoText = 'DTrip';
+  final String _logoText = 'DJTrip';
 
   @override
   void initState() {
@@ -86,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen>
 
         // 🚀 NEW: Handle email verification flow
         if (!emailVerified) {
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
               builder: (_) => EmailVerificationScreen(
@@ -94,17 +94,19 @@ class _SplashScreenState extends State<SplashScreen>
                 userType: userType,
               ),
             ),
+            (route) => false,
           );
           return;
         }
 
         // 🚀 NEW: Handle onboarding flow
         if (!isOnboarded) {
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
               builder: (_) => const UserTypeSelectionScreen(),
             ),
+            (route) => false,
           );
           return;
         }
@@ -115,17 +117,21 @@ class _SplashScreenState extends State<SplashScreen>
             final status = await OnboardingService.getOnboardingStatus();
             final isApproved = status['is_approved'] ?? true;
             if (status['success'] == true && isApproved == false) {
-              Navigator.pushReplacement(
+              Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const WaitingApprovalScreen(),
+                ),
+                (route) => false,
               );
               return;
             }
           } catch (_) {
             // If status check fails, be safe: keep organizer blocked.
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const WaitingApprovalScreen()),
+              (route) => false,
             );
             return;
           }
@@ -134,12 +140,20 @@ class _SplashScreenState extends State<SplashScreen>
         final route = (userType == 'Organisator' || userType == 'Organizer')
             ? AppRoutes.organizerMain
             : AppRoutes.touristMain;
-        Navigator.pushReplacementNamed(context, route);
+        Navigator.pushNamedAndRemoveUntil(context, route, (route) => false);
       } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.welcome,
+          (route) => false,
+        );
       }
     } else {
-      Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.welcome,
+        (route) => false,
+      );
     }
   }
 

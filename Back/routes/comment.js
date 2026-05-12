@@ -18,10 +18,22 @@ router.get("/test", (req, res) => {
   res.json({ message: "Test endpoint works" });
 });
 
+// ==================== PUBLIC ENDPOINTS ====================
+
+// Search users for mention autocomplete
+router.get(
+  "/users/search",
+  verifyToken,
+  commentController.searchUsersForMention
+);
+
+// ==================== ADMIN ENDPOINTS ====================
+
 // Get all comments with filters (ADMIN)
 router.get(
   "/admin",
   verifyToken,
+  verifyAdmin,
   commentController.getAdminComments
 );
 
@@ -29,11 +41,10 @@ router.get(
 router.delete(
   "/admin/:commentId",
   verifyToken,
+  verifyAdmin,
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.adminDeleteComment
 );
-
-// ==================== PUBLIC ENDPOINTS ====================
 
 // Get comments for a post with pagination
 router.get(
@@ -99,13 +110,6 @@ router.delete(
   verifyToken,
   invalidateCache(["comments:post", "comments:single", "posts:feed", "posts:me"]),
   commentController.deleteComment
-);
-
-// Search users for mention autocomplete
-router.get(
-  "/users/search",
-  verifyToken,
-  commentController.searchUsersForMention
 );
 
 console.log('[COMMENT ROUTES] All routes defined, wrapping router...');

@@ -47,6 +47,15 @@ exports.createCheckoutSession = async (req, res) => {
       description
     } = req.body;
 
+    const stripeSecret = process.env.STRIPE_SECRET_KEY || '';
+    const stripeNotConfigured =
+      !stripeSecret ||
+      stripeSecret.includes('your_stripe_secret_key_here') ||
+      stripeSecret.includes('sk_test_your_') ||
+      stripeSecret.length < 20;
+
+    const isDevelopment = (process.env.NODE_ENV || 'development') !== 'production';
+
     console.log('[STRIPE PAYMENT] Request body:', {
       inscription_id,
       activity_id,
@@ -133,6 +142,55 @@ exports.createCheckoutSession = async (req, res) => {
 
     console.log('[STRIPE PAYMENT] Success URL:', success_url);
     console.log('[STRIPE PAYMENT] Cancel URL:', cancel_url);
+
+    // Development fallback: allow payment flow without real Stripe keys.
+    if (stripeNotConfigured && isDevelopment) {
+      const mockSessionId = `mock_session_${Date.now()}`;
+
+      const payment = new Payment({
+        user_id: userId,
+        inscription_id: inscription_id || null,
+        order_id,
+        amount,
+        currency: currency.toUpperCase(),
+        description,
+        status: 'pending',
+        stripe_session_id: mockSessionId,
+        payment_url: 'mock://auto-success',
+        success_url,
+        cancel_url,
+        activity_id: activity_id || null,
+        activity_title: activity_title || null,
+        nombre_participants: nombre_participants || null,
+        adults: adults || null,
+        children: children || null,
+      });
+
+      await payment.save({ session });
+      await session.commitTransaction();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Mock checkout session created (development mode)',
+        payment: {
+          order_id,
+          session_id: mockSessionId,
+          checkout_url: 'mock://auto-success',
+          amount,
+          currency: currency.toUpperCase(),
+          description,
+          mock_mode: true,
+        },
+      });
+    }
+
+    if (stripeNotConfigured) {
+      await session.abortTransaction();
+      return res.status(503).json({
+        success: false,
+        message: "Stripe is not configured on server. Set STRIPE_SECRET_KEY in Back/.env",
+      });
+    }
 
     // Convert amount to cents (Stripe uses smallest currency unit)
     const amountInCents = Math.round(amount * 100);
@@ -421,6 +479,60 @@ exports.completePayment = async (req, res) => {
           "[STRIPE PAYMENT] Inscription status updated to APPROVED"
         );
       }
+    } else if (payment.activity_id) {
+      // New booking flow: create inscription after successful payment.
+      const activity = await Activite.findById(payment.activity_id).session(session);
+      if (!activity) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: "Activity not found for this payment",
+        });
+      }
+
+      const nombreParticipants = payment.nombre_participants || 1;
+      const updatedActivity = await Activite.findOneAndUpdate(
+        {
+          _id: payment.activity_id,
+          $expr: {
+            $gte: [
+              "$capacite_max",
+              { $add: ["$nombre_reservations", nombreParticipants] },
+            ],
+          },
+        },
+        {
+          $inc: { nombre_reservations: nombreParticipants },
+        },
+        { session, new: true }
+      );
+
+      if (!updatedActivity) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: "No available capacity for this activity",
+        });
+      }
+
+      const inscription = new Inscription({
+        touriste_id: payment.user_id,
+        activite_id: payment.activity_id,
+        organisateur_id: activity.organisateur_id,
+        nombre_participants: nombreParticipants,
+        message_touriste: `Adults: ${payment.adults || 0}, Children: ${payment.children || 0}`,
+        prix_total: payment.amount,
+        prix_unitaire: activity.prix,
+        statut: "approuvee",
+        date_reponse: new Date(),
+      });
+
+      await inscription.save({ session });
+
+      payment.inscription_id = inscription._id;
+      await payment.save({ session });
+
+      console.log("[STRIPE PAYMENT] Inscription created and approved after manual completion:", inscription._id);
     }
 
     await session.commitTransaction();
@@ -1384,7 +1496,14 @@ exports.getAllPayments = async (req, res) => {
     const payments = await Payment.find(query)
       .populate('user_id', 'fullname email')
       .populate('inscription_id', 'statut')
-      .populate('activity_id', 'titre')
+      .populate({
+        path: 'activity_id',
+        select: 'titre organisateur_id',
+        populate: {
+          path: 'organisateur_id',
+          select: 'fullname email',
+        },
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -1404,6 +1523,47 @@ exports.getAllPayments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching payments",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * DELETE /api/payments/:paymentId
+ * Delete a payment record (admin only)
+ */
+exports.deletePayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: "paymentId is required",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    await Payment.findByIdAndDelete(paymentId);
+
+    res.status(200).json({
+      success: true,
+      message: "Payment deleted successfully",
+      paymentId,
+    });
+  } catch (error) {
+    console.error("[PAYMENT] Error deleting payment:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting payment",
       error: error.message,
     });
   }

@@ -452,6 +452,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
     return 'post';
   }
 
+<<<<<<< HEAD
   // Helper method to get timeline status
   String _getTimelineStatus(Map<String, dynamic> activityData) {
     final now = DateTime.now();
@@ -520,11 +521,14 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
     return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
   }
 
+=======
+>>>>>>> djtrip/DJTripx1
   Widget _buildActivityCard(Map<String, dynamic> activityData) {
     final activityId = (activityData['_id'] ?? '').toString();
     final isBookmarked = activityData['isBookmarked'] ?? true;
     final bookmarksCount = (activityData['bookmarks_count'] as num?)?.toInt() ?? 0;
     
+<<<<<<< HEAD
     // Get timeline status
     final timelineStatus = _getTimelineStatus(activityData);
     final statusColor = _getStatusColor(timelineStatus);
@@ -539,23 +543,35 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                         activityData['organisateur_id']?['name']?.toString() ?? 
                         'Organizer';
     
+=======
+>>>>>>> djtrip/DJTripx1
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
+<<<<<<< HEAD
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, 4),
+=======
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+>>>>>>> djtrip/DJTripx1
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+<<<<<<< HEAD
             // Image section with status badge
             Stack(
               children: [
@@ -674,11 +690,29 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
             ),
             
             // Content section
+=======
+            if (activityData['photos'] != null && (activityData['photos'] as List).isNotEmpty)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(
+                  (activityData['photos'] as List).first.toString(),
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 150,
+                    color: const Color(0xFFF0F4FF),
+                    child: const Icon(Icons.image_not_supported, size: 40, color: Color(0xFF4B63FF)),
+                  ),
+                ),
+              ),
+>>>>>>> djtrip/DJTripx1
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+<<<<<<< HEAD
                   // Title
                   Text(
                     activityData['titre']?.toString() ?? 'Activity',
@@ -723,10 +757,43 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                             color: Color(0xFF6B7280),
                           ),
                           overflow: TextOverflow.ellipsis,
+=======
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          activityData['titre']?.toString() ?? 'Activity',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B2458),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          final currentBookmarked = activityData['isBookmarked'] ?? true;
+                          final currentCount = (activityData['bookmarks_count'] as num?)?.toInt() ?? 0;
+                          setState(() {
+                            activityData['isBookmarked'] = !currentBookmarked;
+                            activityData['bookmarks_count'] = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+                          });
+                          final result = await ActivityService.toggleActivityBookmark(activityId);
+                          if (result['success'] == true) {
+                            final bookmarked = result['bookmarked'] == true;
+                            final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
+                            _onActivityBookmarkChanged(activityId, bookmarked, bookmarksCount);
+                          }
+                        },
+                        icon: Icon(
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                          color: isBookmarked ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
+>>>>>>> djtrip/DJTripx1
                         ),
                       ),
                     ],
                   ),
+<<<<<<< HEAD
                   
                   if (startDate.isNotEmpty) ...[
                     const SizedBox(height: 6),
@@ -785,13 +852,41 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                         size: 16,
                         color: const Color(0xFF6B7280),
                       ),
+=======
+                  const SizedBox(height: 8),
+                  Text(
+                    activityData['lieu']?.toString() ?? 'Location',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '${activityData['prix'] ?? 0} TND',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4B63FF),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(Icons.bookmark_rounded, size: 16, color: const Color(0xFF6B7280)),
+>>>>>>> djtrip/DJTripx1
                       const SizedBox(width: 4),
                       Text(
                         '$bookmarksCount',
                         style: const TextStyle(
+<<<<<<< HEAD
                           fontSize: 13,
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w500,
+=======
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+>>>>>>> djtrip/DJTripx1
                         ),
                       ),
                     ],

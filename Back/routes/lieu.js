@@ -6,6 +6,7 @@ const lieuController = require("../controllers/lieu");
 console.log('[LIEU ROUTES] Lieu controller loaded');
 const wrapRouter = require("../middleware/wrapRouter");
 const { verifyToken, verifyAdmin } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 const Config = require("../models/lieu").Config;
 
 // ==================== PUBLIC ENDPOINTS ====================
@@ -42,7 +43,8 @@ router.put("/:id", verifyToken, verifyAdmin, lieuController.updateLieu);
 router.delete("/:id", verifyToken, verifyAdmin, lieuController.deleteLieu);
 
 // Upload images for a lieu (ADMIN only)
-router.post("/:id/upload-images", verifyToken, verifyAdmin, lieuController.uploadImages);
+router.post("/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
+router.post("/:id/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
 
 // Update Google Maps API key (ADMIN only)
 router.put("/config/google-maps-key", verifyToken, verifyAdmin, async (req, res) => {

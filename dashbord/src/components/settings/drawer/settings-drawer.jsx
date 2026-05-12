@@ -74,11 +74,11 @@ export function SettingsDrawer({ sx, defaultSettings }) {
     try {
       await logout();
       settings.onCloseDrawer();
-      window.location.href = '/auth/jwt/sign-in';
+      router.push('/auth/jwt/sign-in');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  }, [logout, settings]);
+  }, [logout, settings, router]);
 
   const renderHead = () => (
     <Box
