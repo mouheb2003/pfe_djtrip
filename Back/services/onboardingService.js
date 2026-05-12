@@ -32,11 +32,28 @@ class OnboardingService {
       throw new Error('User not found');
     }
 
-    // Update onboarding data
+    // Update onboarding data (keep for backup)
     user.onboarding_data = {
       ...user.onboarding_data,
       ...stepData
     };
+
+    // Save directly to User fields
+    if (stepData.num_tel) user.num_tel = stepData.num_tel;
+    if (stepData.pays_telephone) user.pays_telephone = stepData.pays_telephone;
+    if (stepData.avatar) user.avatar = stepData.avatar;
+    if (stepData.cover_photo) user.cover_photo = stepData.cover_photo;
+    if (stepData.pays_origine) user.pays_origine = stepData.pays_origine;
+    if (stepData.langue_preferee) user.langue_preferee = stepData.langue_preferee;
+    // centres_interet only for tourists
+    if (stepData.centres_interet && user.userType === 'Touriste') {
+      user.centres_interet = stepData.centres_interet;
+    }
+    if (stepData.specialites_activites) user.specialites_activites = stepData.specialites_activites;
+    if (stepData.langues_proposees) user.langues_proposees = stepData.langues_proposees;
+    if (stepData.bio) user.bio = stepData.bio;
+    if (stepData.reasonToJoin) user.reasonToJoin = stepData.reasonToJoin; // For organizers
+
     user.onboarding_step = (user.onboarding_step || 0) + 1;
 
     await user.save();
@@ -189,7 +206,7 @@ class OnboardingService {
     
     const [organizers, total] = await Promise.all([
       User.find(query)
-        .select('fullname email userType signup_method submitted_for_approval onboarding_data')
+        .select('fullname email userType signup_method submitted_for_approval onboarding_data reasonToJoin')
         .sort({ submitted_for_approval: -1 })
         .skip(skip)
         .limit(limit)
@@ -380,6 +397,13 @@ const TOURIST_ONBOARDING_STEPS = [
     fields: ['avatar']
   },
   {
+    id: 'cover_photo',
+    title: 'Cover Photo',
+    description: 'Add a cover photo to make your profile stand out',
+    required: false,
+    fields: ['cover_photo']
+  },
+  {
     id: 'country',
     title: 'Country',
     description: 'Tell us where you\'re from',
@@ -392,6 +416,13 @@ const TOURIST_ONBOARDING_STEPS = [
     description: 'Choose your preferred language',
     required: true,
     fields: ['langue_preferee']
+  },
+  {
+    id: 'interests',
+    title: 'Your Interests',
+    description: 'Pick a few interests to personalize your recommendations',
+    required: true,
+    fields: ['centres_interet']
   }
 ];
 
@@ -409,6 +440,13 @@ const ORGANIZER_ONBOARDING_STEPS = [
     description: 'Add a profile picture to personalize your account',
     required: true,
     fields: ['avatar']
+  },
+  {
+    id: 'cover_photo',
+    title: 'Cover Photo',
+    description: 'Add a cover photo to make your profile stand out',
+    required: false,
+    fields: ['cover_photo']
   },
   {
     id: 'country',
@@ -437,6 +475,20 @@ const ORGANIZER_ONBOARDING_STEPS = [
     description: 'What languages do you offer tours in?',
     required: true,
     fields: ['langues_proposees']
+  },
+  {
+    id: 'organizer_bio',
+    title: 'Your Bio',
+    description: 'Tell us about yourself and your experience',
+    required: true,
+    fields: ['bio']
+  },
+  {
+    id: 'reason_to_join',
+    title: 'Why Join DJTrip?',
+    description: 'Tell us why you want to become an organizer on DJTrip',
+    required: true,
+    fields: ['reasonToJoin']
   }
 ];
 

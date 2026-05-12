@@ -461,10 +461,33 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      
+      // Handle booking overlap errors
+      String errorMessage = 'Error: $e';
+      Color backgroundColor = Colors.red;
+      
+      if (e.toString().contains('status code 409') || e.toString().contains('already have a booking during this time period')) {
+        // Extract conflict details if available
+        String conflictDetails = '';
+        try {
+          // Try to parse the error response for conflict details
+          if (e.toString().contains('conflict:')) {
+            final conflictMatch = RegExp(r'conflict:\s*({.*?})').firstMatch(e.toString());
+            if (conflictMatch != null) {
+              conflictDetails = '\n\nConflicting activity: ${conflictMatch.group(1)}';
+            }
+          }
+        } catch (_) {}
+        
+        errorMessage = 'You already have a booking during this time period.$conflictDetails';
+        backgroundColor = Colors.orange;
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          content: Text(errorMessage),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 5),
         ),
       );
     }

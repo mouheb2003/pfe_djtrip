@@ -11,8 +11,10 @@ const UserService = require("../services/user");
 const { createActivityLog } = require("../services/activityLogService");
 const logger = require("../utils/logger");
 const systemLogStore = require("../services/systemLogStore");
+const { generateUsernameSuggestions, createUsernameForUser, isValidUsername } = require("../utils/usernameGenerator");
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Utiliser ta clé Google Client ID depuis l'environnement
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID_MED);
 
 async function restoreExpiredSuspensions({ userId } = {}) {
   try {
@@ -22,8 +24,9 @@ async function restoreExpiredSuspensions({ userId } = {}) {
       suspendedUntil: { $ne: null, $lte: now },
     };
 
+    // Handle userId as username string, not ObjectId
     if (userId) {
-      query._id = userId;
+      query.username = userId;
     }
 
     const users = await User.find(query).select(
@@ -401,6 +404,30 @@ exports.signIn = async (req, res) => {
   }
 };
 
+// Get user by username
+exports.getUserByUsername = async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    if (!username) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    const user = await UserService.getUserByUsername(username);
+
+    return res.json({
+      user: {
+        ...user,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('[UserController] Error getting user by username:', error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Google Sign-In - Authenticate with Google ID token
 exports.googleAuth = async (req, res) => {
   try {
@@ -409,7 +436,7 @@ exports.googleAuth = async (req, res) => {
     if (!idToken) {
       return res.status(400).json({ message: "Google ID token is required" });
     }
-    if (!process.env.GOOGLE_CLIENT_ID) {
+    if (!process.env.GOOGLE_CLIENT_ID_MED) {
       return res.status(500).json({
         message: "Google auth is not configured on server",
       });
@@ -419,7 +446,7 @@ exports.googleAuth = async (req, res) => {
     try {
       ticket = await googleClient.verifyIdToken({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: process.env.GOOGLE_CLIENT_ID_MED,
       });
     } catch (error) {
       // Provide more specific error messages for common OAuth issues
@@ -550,10 +577,24 @@ exports.googleAuth = async (req, res) => {
       user.accountStatus = "active";
       await user.save();
     } else {
+      // Generate username for new Google users if not already set
+      let username = user?.username;
+      if (!username) {
+        console.log(`🔧 Generating username for Google user: ${fullname} (${email})`);
+        username = await createUsernameForUser(fullname, async (testUsername) => {
+          const existingUser = await User.findOne({ username: testUsername });
+          return !!existingUser;
+        });
+        console.log(`✅ Generated username: ${username}`);
+      } else {
+        console.log(`📝 Using existing username: ${username}`);
+      }
+
       user = new User({
         fullname,
         email,
         googleId,
+        username, // Add generated or existing username
         avatar,
         emailVerified: isEmailVerified,
         userType: null, // No default type for Google signup - user selects via UserTypeSelectionScreen
@@ -2123,6 +2164,61 @@ exports.removeFcmToken = async (req, res) => {
     console.error("❌ Error removing FCM token:", err);
     res.status(500).json({
       message: "Error removing FCM token",
+      error: err.message,
+    });
+  }
+};
+
+// POST /heartbeat - Update user's last active timestamp
+exports.heartbeat = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Update user's lastActiveAt with current timestamp
+    await User.findByIdAndUpdate(userId, {
+      lastActiveAt: new Date()
+    });
+    
+    console.log(`💓 [HEARTBEAT] Updated lastActiveAt for user ${userId}`);
+    
+    // Return success with minimal response for performance
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('❌ [HEARTBEAT] Error updating lastActiveAt:', err);
+    res.status(500).json({
+      message: "Error updating heartbeat",
+      error: err.message,
+    });
+  }
+};
+
+// POST /heartbeat/:userId - Update specific user's last active timestamp (for admin/testing)
+exports.heartbeatForUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.userId;
+    
+    // Only allow admins or the user themselves to update heartbeat
+    if (requestingUserId !== userId) {
+      return res.status(403).json({
+        message: "Forbidden: Cannot update heartbeat for another user",
+        error: "Unauthorized heartbeat update"
+      });
+    }
+    
+    // Update specific user's lastActiveAt with current timestamp
+    await User.findByIdAndUpdate(userId, {
+      lastActiveAt: new Date()
+    });
+    
+    console.log(`💓 [HEARTBEAT] Updated lastActiveAt for user ${userId} by ${requestingUserId}`);
+    
+    // Return success with minimal response for performance
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('❌ [HEARTBEAT] Error updating lastActiveAt:', err);
+    res.status(500).json({
+      message: "Error updating heartbeat",
       error: err.message,
     });
   }

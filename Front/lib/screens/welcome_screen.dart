@@ -4,6 +4,7 @@ import '../config/app_routes.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import 'onboarding/user_type_selection_screen.dart';
+import 'onboarding/dynamic_onboarding_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -40,7 +41,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _handleGoogleLogin() async {
-    // ... logic ...
     setState(() => _isLoading = true);
     try {
       final result = await AuthService.signInWithGoogle();
@@ -49,12 +49,27 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       if (result['success'] == true) {
         final user = result['user'] as Map<String, dynamic>?;
         final userType = (user?['userType'] as String?)?.trim();
+        final bool isNewUser = result['is_new_user'] as bool? ?? false;
+        final bool requiresOnboarding = result['requires_onboarding'] as bool? ?? false;
 
-        // If Google auth created a user without a type, ask once.
-        if (userType == null || userType.isEmpty) {
+        // 🚀 CORRECTED: Only show user type selection for NEW Google users without type
+        // Existing users should have their userType already set
+        if (isNewUser && (userType == null || userType.isEmpty)) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const UserTypeSelectionScreen()),
+          );
+          return;
+        }
+
+        // 🚀 NEW: Handle onboarding for users who need it
+        if (requiresOnboarding) {
+          // User exists but needs onboarding, go directly to dynamic onboarding
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DynamicOnboardingScreen(),
+            ),
           );
           return;
         }

@@ -16,7 +16,9 @@ class PostModel {
   final bool isLiked;
   final bool isBookmarked;
   final bool isVerified;
+  final bool isArchived;
   final List<String> hashtags;
+  final List<String> mentions;
   final String? audience;
 
   const PostModel({
@@ -37,7 +39,9 @@ class PostModel {
     this.isLiked = false,
     this.isBookmarked = false,
     this.isVerified = false,
+    this.isArchived = false,
     this.hashtags = const [],
+    this.mentions = const [],
     this.audience,
   });
 
@@ -75,6 +79,11 @@ class PostModel {
       hashtagsList = (json['hashtags'] as List).map((e) => e.toString()).toList();
     }
 
+    List<String> mentionsList = [];
+    if (json['mentions'] is List) {
+      mentionsList = (json['mentions'] as List).map((e) => e.toString()).toList();
+    }
+
     return PostModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       authorId: author['_id']?.toString() ?? author['id']?.toString() ?? '',
@@ -93,7 +102,9 @@ class PostModel {
       isLiked: json['isLiked'] == true || json['is_liked'] == true,
       isBookmarked: json['isBookmarked'] == true || json['is_bookmarked'] == true,
       isVerified: author['isVerified'] == true || author['is_verified'] == true,
+      isArchived: json['isArchived'] == true || json['is_archived'] == true,
       hashtags: hashtagsList,
+      mentions: mentionsList,
       audience: json['audience']?.toString(),
     );
   }

@@ -45,6 +45,21 @@ const createActiviteSchema = Joi.object({
   lieu: Joi.string().required().messages({
     "any.required": "Location is required",
   }),
+  location_type: Joi.string()
+    .valid(...["fixed", "custom", "itinerary"])
+    .optional(),
+  locationType: Joi.string()
+    .valid(...["fixed", "custom", "itinerary"])
+    .optional(),
+  itineraire: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
+  itineraire_coords: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
+  itineraireCoords: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
   duree: Joi.number().min(0.1).required().messages({
     "any.required": "Duration is required",
     "number.min": "Minimum duration is 0.1 hours",
@@ -111,6 +126,21 @@ const updateActiviteSchema = Joi.object({
     .valid(...ACTIVITY_TYPES)
     .optional(),
   lieu: Joi.string().optional(),
+  location_type: Joi.string()
+    .valid(...["fixed", "custom", "itinerary"])
+    .optional(),
+  locationType: Joi.string()
+    .valid(...["fixed", "custom", "itinerary"])
+    .optional(),
+  itineraire: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
+  itineraire_coords: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
+  itineraireCoords: Joi.alternatives()
+    .try(Joi.string(), Joi.array().items(Joi.object().unknown(true)))
+    .optional(),
   duree: Joi.number().min(0.1).optional(),
   prix: Joi.number().min(0).optional(),
   capacite_max: Joi.number().integer().min(1).optional(),

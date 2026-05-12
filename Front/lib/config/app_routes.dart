@@ -10,6 +10,7 @@ import '../screens/shared/public_profile_screen.dart';
 import '../screens/tourist/tourist_main_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../splash_screen.dart';
+import '../services/auth_service.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -23,6 +24,20 @@ class AppRoutes {
   static const String organizerMain = '/organizer/main';
   static const String profilePrefix = '/profile/';
 
+  /// Returns the appropriate home screen widget based on user type
+  static Widget getHomeScreenForUserType(String? userType) {
+    switch (userType) {
+      case 'Touriste':
+        return const TouristMainScreen();
+      case 'Organisator':
+      case 'Organizer':
+        return const OrganizerMainScreen();
+      default:
+        // Fallback to splash screen if user type is not recognized
+        return const SplashScreen();
+    }
+  }
+
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case splash:
@@ -31,9 +46,25 @@ class AppRoutes {
           settings: settings,
         );
       case home:
-        // Use splash as a router-like entry point.
+        // Dynamic routing based on user type
         return MaterialPageRoute(
-          builder: (_) => const SplashScreen(),
+          builder: (_) => FutureBuilder<Map<String, dynamic>?>(
+            future: AuthService.getUser(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              
+              final user = snapshot.data;
+              final userType = user?['userType'] as String?;
+              
+              return getHomeScreenForUserType(userType);
+            },
+          ),
           settings: settings,
         );
       case welcome:

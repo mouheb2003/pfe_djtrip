@@ -22,6 +22,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   
   final List<String> _typeOptions = [
     'All',
+    'Push',
+    'Normal',
     'Booking',
     'Message',
     'Review',
@@ -62,8 +64,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() => _isLoading = true);
 
     try {
+      String? filterType;
+      
+      // Gérer les filtres spéciaux pour Push/Normal
+      if (_selectedType == 'Push') {
+        filterType = 'push'; // Filtrer par isPush: true
+      } else if (_selectedType == 'Normal') {
+        filterType = 'normal'; // Filtrer par isPush: false
+      } else if (_selectedType == 'All') {
+        filterType = null; // Afficher tout
+      } else {
+        filterType = _selectedType.toLowerCase(); // Types standards
+      }
+
       final result = await NotificationService.getUserNotifications(
-        type: _selectedType == 'All' ? null : _selectedType.toLowerCase(),
+        type: filterType,
         limit: 20,
         skip: refresh ? 0 : _notifications.length,
         cacheFirst: false,

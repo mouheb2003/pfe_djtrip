@@ -6,10 +6,9 @@ import 'package:flutter/services.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/post_service.dart';
-import '../../../widgets/auto_image_carousel.dart';
 import '../../../widgets/publication_card.dart';
 import '../../../models/post_model.dart';
-import '../../../screens/shared/share_post_to_conversation_screen.dart';
+import '../../../widgets/tiktok_share_widget.dart';
 import '../../../screens/shared/bookmarked_items_screen.dart';
 
 class ScreenNetwork extends StatefulWidget {
@@ -881,20 +880,21 @@ class _ScreenNetworkState extends State<ScreenNetwork> {
                             final content = (postData['content'] ?? '').toString();
                             final imageUrl = (postData['image_url'] ?? postData['imageUrl'] ?? '').toString();
                             if (postId.isEmpty) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SharePostToConversationScreen(
-                                  postId: postId,
-                                  postContent: content,
-                                  postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
-                                ),
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => TikTokShareWidget(
+                                postId: postId,
+                                postContent: content,
+                                postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
                               ),
                             );
                           },
                           onReport: () {
                             final postId = (postData['_id'] ?? '').toString();
                             if (postId.isEmpty) return;
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Report submitted successfully'),

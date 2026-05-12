@@ -8,6 +8,7 @@ class ApiConfig {
 
   static const List<String> devUrls = [
     'http://10.0.2.2:3000',
+    'http://192.168.55.99:3000',
     'http://192.168.51.99:3000',
     'http://192.168.100.9:3000',
     'http://192.168.1.189:3000',
@@ -32,7 +33,7 @@ class ApiConfig {
       return 'https://backdjtrip.onrender.com';
     }
 
-    // Default local API target for development on physical devices.
+    // Default local API target for Android emulator.
     return _ensureScheme('http://192.168.55.99:3000');
   }
 

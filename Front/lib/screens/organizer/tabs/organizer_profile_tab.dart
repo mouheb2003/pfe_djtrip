@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../models/activity_model.dart';
@@ -127,6 +128,18 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     _loadAll();
   }
 
+
+  void _copyUsername(String username) {
+    Clipboard.setData(ClipboardData(text: '@$username'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Username @$username copied to clipboard!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   void _showAvatarFullScreen(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return;
@@ -651,10 +664,12 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),
-      floatingActionButton: SizedBox(
-        width: 60,
-        height: 60,
-        child: FloatingActionButton(
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: SizedBox(
+          width: 60,
+          height: 60,
+          child: FloatingActionButton(
           backgroundColor: AppColors.primary,
           elevation: 6,
           onPressed: () async {
@@ -665,6 +680,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
             if (created == true) _loadAll();
           },
           child: const Icon(Icons.add, size: 28, color: Colors.white),
+        ),
         ),
       ),
       body: SafeArea(
@@ -841,7 +857,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
-                          letterSpacing: 0.5,
+                          letterSpacing: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -850,28 +866,97 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                 ),
               ),
               const SizedBox(height: 8),
-
-              // ── Name ────────────────────────────────────────────────
-               Text(
-                user?.fullname ?? 'Organizer',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1B2458),
+              // ── Full Name ─────────────────────────────────────
+              if (_user?.fullname != null && _user!.fullname!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    _user!.fullname!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1D245D),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-
-              // ── Location ───────────────────────────────────────────────
-              Text(
-                _displayLocation(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+              if (_user?.fullname != null && _user!.fullname!.isNotEmpty)
+                const SizedBox(height: 4),
+              // ── Username ───────────────────────────────────
+              if (_user?.username != null && _user!.username!.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EDFF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.alternate_email,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '@${_user!.username}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1B2458),
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          _copyUsername(_user!.username!);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.copy,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_user?.username != null && _user!.username!.isNotEmpty)
+                const SizedBox(height: 8),
+              // ── Location ─────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _displayLocation(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1D245D),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),

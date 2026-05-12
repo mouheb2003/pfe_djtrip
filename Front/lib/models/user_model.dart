@@ -3,6 +3,7 @@ enum UserStatus { active, suspended, banned, inactive }
 class UserModel {
   final String id;
   final String fullname;
+  final String? username;
   final String email;
   final String userType; // 'Touriste' | 'Organisator'
   final String? avatar;
@@ -15,10 +16,13 @@ class UserModel {
   final String languePreferee;
   final double noteMoyenne;
   final int nombreAvis;
+  final bool pushNotifEnabled;
+  final bool notificationsEmail;
 
   const UserModel({
     required this.id,
     required this.fullname,
+    this.username,
     required this.email,
     required this.userType,
     this.avatar,
@@ -31,6 +35,8 @@ class UserModel {
     this.languePreferee = 'English',
     this.noteMoyenne = 0,
     this.nombreAvis = 0,
+    this.pushNotifEnabled = true,
+    this.notificationsEmail = true,
   });
 
   static List<String> _safeStringList(dynamic raw) {
@@ -44,6 +50,7 @@ class UserModel {
     return UserModel(
       id: json['_id'] ?? '',
       fullname: json['fullname'] ?? '',
+      username: json['username'] as String?,
       email: json['email'] ?? '',
       userType: json['userType'] ?? '',
       avatar: json['avatar'] as String?,
@@ -51,13 +58,13 @@ class UserModel {
       bio: json['bio'] as String?,
       numTel: json['num_tel'] as String?,
       paysOrigine: json['pays_origine'] as String?,
-      isOnline: json['isOnline'] == true,
-      centresInteret: _safeStringList(json['centres_interet']),
-      languePreferee: json['langue_preferee'] as String? ?? 'English',
-      noteMoyenne: (json['note_moyenne'] as num? ?? 0).toDouble(),
-      nombreAvis:
-          (json['nombre_avis'] as num? ?? json['nombreAvis'] as num? ?? 0)
-              .toInt(),
+      isOnline: json['isOnline'] ?? false,
+      centresInteret: json['centres_interet'] != null ? List<String>.from(json['centres_interet']) : const [],
+      languePreferee: json['langue_preferee'] ?? 'English',
+      noteMoyenne: (json['note_moyenne'] ?? 0).toDouble(),
+      nombreAvis: json['nombre_avis'] ?? 0,
+      pushNotifEnabled: json['push_notif_enabled'] ?? true,
+      notificationsEmail: json['notifications_email'] ?? true,
     );
   }
 
@@ -65,6 +72,7 @@ class UserModel {
     return {
       '_id': id,
       'fullname': fullname,
+      'username': username,
       'email': email,
       'userType': userType,
       'avatar': avatar,
@@ -77,6 +85,8 @@ class UserModel {
       'langue_preferee': languePreferee,
       'note_moyenne': noteMoyenne,
       'nombre_avis': nombreAvis,
+      'push_notif_enabled': pushNotifEnabled,
+      'notifications_email': notificationsEmail,
     };
   }
 

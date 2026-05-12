@@ -4,7 +4,7 @@ import 'config/app_routes.dart';
 import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'screens/auth/email_verification_screen.dart';
-import 'screens/auth/onboarding_screen.dart';
+import 'screens/onboarding/user_type_selection_screen.dart';
 import 'services/onboarding_service.dart';
 import 'screens/organizer/waiting_approval_screen.dart';
 
@@ -103,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => OnboardingScreen(userType: userType),
+              builder: (_) => const UserTypeSelectionScreen(),
             ),
           );
           return;

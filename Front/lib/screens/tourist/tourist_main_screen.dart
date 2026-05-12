@@ -3,7 +3,7 @@ import 'dart:async';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
 import 'tabs/home_tab.dart';
-import 'tabs/explore_tab.dart';
+import '../../features/maps/presentation/map_explorer_screen.dart';
 import 'tabs/screen_network.dart';
 import 'tabs/tourist_profile_tab.dart';
 import '../shared/messages_screen.dart';
@@ -61,7 +61,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       ),
-      const ExploreTab(),
+      const MapExplorerScreen(),
       const MyActivitiesScreen(),
       const ScreenNetwork(),
       TouristProfileTab(onNavigateToTab: _goToTab),
@@ -285,149 +285,102 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     const navInactive = Color(0xFF7B82A8);
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 88,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.topCenter,
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(index: _currentIndex, children: _pages),
+          Positioned(
+            bottom: 18,
+            left: 16,
+            right: 16,
+            child: _buildFloatingNavBar(navBg, navActive, navInactive),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingNavBar(Color navBg, Color navActive, Color navInactive) {
+    final cs = Theme.of(context).colorScheme;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Main pill-shaped nav bar
+        Container(
+          height: 70,
+          decoration: BoxDecoration(
+            color: navBg,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 8,
-                child: Container(
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: navBg,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.14),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.home_outlined,
-                          activeIcon: Icons.home,
-                          label: 'Home',
-                          index: 0,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                          showDot: _showHomeDot,
-                        ),
-                      ),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.explore_outlined,
-                          activeIcon: Icons.explore,
-                          label: 'Explore',
-                          index: 1,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                        ),
-                      ),
-                      const SizedBox(width: 56),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.event_note_outlined,
-                          activeIcon: Icons.event_note,
-                          label: 'Activities',
-                          index: 2,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                          showDot: _showActivitiesDot,
-                        ),
-                      ),
-                      Expanded(
-                        child: _NavItem(
-                          icon: Icons.person_outline,
-                          activeIcon: Icons.person,
-                          label: 'Profile',
-                          index: 4,
-                          currentIndex: _currentIndex,
-                          onTap: _goToTab,
-                          activeColor: navActive,
-                          inactiveColor: navInactive,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              _NavItem(
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home,
+                label: 'Home',
+                index: 0,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showHomeDot,
               ),
-              Positioned(
-                top: -8,
-                child: GestureDetector(
-                  onTap: () => _goToTab(3),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-                          color: navBg,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: _currentIndex == 3
-                                  ? AppColors.primaryDark
-                                  : AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.public,
-                              color: cs.onPrimary,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_showNetworkDot)
-                        const Positioned(top: 7, right: 7, child: _RedDot()),
-                    ],
-                  ),
-                ),
+              _NavItem(
+                icon: Icons.explore_outlined,
+                activeIcon: Icons.explore,
+                label: 'Explore',
+                index: 1,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
               ),
-              Positioned(
-                top: 57,
-                child: Text(
-                  'Network',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: _currentIndex == 3 ? AppColors.primary : navInactive,
-                  ),
-                ),
+              _NavItem(
+                icon: Icons.public,
+                activeIcon: Icons.public,
+                label: 'Network',
+                index: 3,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showNetworkDot,
+              ),
+              _NavItem(
+                icon: Icons.event_note_outlined,
+                activeIcon: Icons.event_note,
+                label: 'Activities',
+                index: 2,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showActivitiesDot,
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                activeIcon: Icons.person,
+                label: 'Profile',
+                index: 4,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
               ),
             ],
           ),
         ),
-      ),
+        // center handled as a normal _NavItem in the Row above
+      ],
     );
   }
 }
@@ -458,27 +411,48 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  color: isActive ? activeColor : inactiveColor,
-                  size: 20,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: isActive ? 50 : 40,
+                  height: isActive ? 50 : 40,
+                  alignment: Alignment.center,
+                  decoration: isActive
+                      ? BoxDecoration(
+                          color: activeColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: activeColor.withOpacity(0.22),
+                              blurRadius: 14,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        )
+                      : null,
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    color: isActive ? cs.onPrimary : inactiveColor,
+                    size: isActive ? 26 : 18,
+                  ),
                 ),
                 if (showDot)
                   const Positioned(top: -2, right: -5, child: _RedDot()),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 0.5),
             Text(
               label,
               style: TextStyle(

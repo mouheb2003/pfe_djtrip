@@ -47,6 +47,14 @@ router.get(
   inscriptionController.getTouristeParticipatedCount,
 );
 
+// Get public endpoint to get activity participants (any user can see)
+router.get(
+  "/activite/:activiteId/participants",
+  verifyToken,
+  cacheGet("inscriptions:activite:participants", 60),
+  inscriptionController.getActivityParticipants,
+);
+
 // Cancel a registration (Tourist only)
 router.put(
   "/:inscriptionId/annuler",

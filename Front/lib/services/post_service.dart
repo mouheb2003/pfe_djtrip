@@ -82,6 +82,7 @@ class PostService {
     String locationLabel = '',
     String tripLink = '',
     List<String> hashtags = const [],
+    List<String> mentions = const [],
   }) async {
     try {
       final res = await ApiClient.post('/posts', {
@@ -93,6 +94,7 @@ class PostService {
         'locationLabel': locationLabel,
         'tripLink': tripLink,
         'hashtags': hashtags,
+        'mentions': mentions,
       });
 
       Map<String, dynamic> body = {};
@@ -415,4 +417,5 @@ class PostService {
       };
     }
   }
-}
+
+  }

@@ -9,6 +9,7 @@ import '../../../services/activity_service.dart';
 import '../place_detail_screen.dart';
 import '../place_detail_new_screen.dart';
 import '../../shared/activity_detail_screen.dart';
+import '../../shared/ai_chat_screen.dart';
 import '../view_all_activities_screen.dart';
 import '../view_all_places_screen.dart';
 import '../../shared/activity_card.dart';
@@ -57,6 +58,9 @@ class _HomeTabState extends State<HomeTab> {
 
   static const String _heroImage =
       'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
+  
+  static const String _djerbaHeroImage =
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1500&q=80';
 
   @override
   void initState() {
@@ -168,10 +172,59 @@ class _HomeTabState extends State<HomeTab> {
     return result;
   }
 
+  // Grouper les lieux par catégorie
+  Map<String, List<LieuModel>> get _lieuxByCategory {
+    final Map<String, List<LieuModel>> grouped = {};
+    
+    for (final lieu in _filteredVisibleLieux) {
+      final category = lieu.categorie?.toLowerCase().trim() ?? 'autres';
+      if (!grouped.containsKey(category)) {
+        grouped[category] = [];
+      }
+      grouped[category]!.add(lieu);
+    }
+    
+    // Trier chaque catégorie par rating (meilleur en premier)
+    for (final category in grouped.keys) {
+      grouped[category]!.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
+    }
+    
+    return grouped;
+  }
+
+  // Obtenir les 5 meilleurs lieux notés
   List<LieuModel> get _topRatedPlaces {
     final items = [..._visibleLieux];
     items.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
     return items.take(5).toList();
+  }
+
+  // Formater le nom de la catégorie
+  String _formatCategoryName(String category) {
+    switch (category.toLowerCase()) {
+      case 'plages':
+        return 'Beaches';
+      case 'restaurants':
+        return 'Restaurants';
+      case 'hotels':
+        return 'Hotels';
+      case 'monuments':
+        return 'Monuments';
+      case 'activites':
+        return 'Activities';
+      case 'shopping':
+        return 'Shopping';
+      case 'parcs':
+        return 'Parks';
+      case 'musees':
+        return 'Museums';
+      case 'autres':
+        return 'Others';
+      default:
+        return category.split(' ').map((word) => 
+          word.isNotEmpty ? word[0].toUpperCase() + word.substring(1).toLowerCase() : ''
+        ).join(' ');
+    }
   }
 
   void _updateSearchSuggestions(String query) {
@@ -475,11 +528,67 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    
+                    // Djerba Hero Section
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        image: DecorationImage(
+                          image: NetworkImage(_djerbaHeroImage),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.6),
+                            ],
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'Djerba',
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -1,
+                                ),
+                              ),
+                              const Text(
+                                'The Pearl of the Mediterranean',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Top Rated Places Section
                     Row(
                       children: [
                         const Expanded(
                           child: Text(
-                            'Top Destinations',
+                            'Top Rated Places',
                             style: TextStyle(
                               fontSize: 44 / 2,
                               fontWeight: FontWeight.w900,
@@ -517,17 +626,17 @@ class _HomeTabState extends State<HomeTab> {
                             height: 240,
                             child: Center(child: CircularProgressIndicator()),
                           )
-                        : _topDestinationsList.isEmpty
+                        : _topRatedPlaces.isEmpty
                         ? _EmptyDestinations(onRetry: _loadLieux)
                         : SizedBox(
                             height: 280,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _topDestinationsList.length,
+                              itemCount: _topRatedPlaces.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 16),
                               itemBuilder: (context, index) {
-                                final lieu = _topDestinationsList[index];
+                                final lieu = _topRatedPlaces[index];
                                 return _TopDestinationCard(
                                   lieu: lieu,
                                   onTap: () => Navigator.push(
@@ -542,6 +651,82 @@ class _HomeTabState extends State<HomeTab> {
                               },
                             ),
                           ),
+                    const SizedBox(height: 32),
+                    
+                    // Destinations by Category Sections
+                    ...(_lieuxByCategory.entries.map((entry) {
+                      final category = entry.key;
+                      final places = entry.value.take(5).toList(); // Top 5 par catégorie
+                      
+                      if (places.isEmpty) return const SizedBox.shrink();
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _formatCategoryName(category),
+                                  style: const TextStyle(
+                                    fontSize: 44 / 2,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ViewAllPlacesScreen(),
+                                    ),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF167BFF),
+                                ),
+                                iconAlignment: IconAlignment.end,
+                                icon: const Icon(Icons.arrow_forward, size: 18),
+                                label: const Text(
+                                  'View All',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 280,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: places.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 16),
+                              itemBuilder: (context, index) {
+                                final lieu = places[index];
+                                return _TopDestinationCard(
+                                  lieu: lieu,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PlaceDetailScreen(
+                                        place: _toPlaceMap(lieu),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList()),
+                    
                     const SizedBox(height: 32),
                     // Top Activities Section
                     Row(
@@ -731,20 +916,27 @@ class _HomeTabState extends State<HomeTab> {
         ),
       ),
       floatingActionButton: SizedBox(
-        width: 48,
-        height: 48,
+        width: 56,
+        height: 56,
         child: Hero(
-          tag: 'home_fab',
+          tag: 'ai_chat_fab',
           child: Material(
             color: const Color(0xFFFF6B1A),
             elevation: 8,
             shape: const CircleBorder(),
             child: InkWell(
-              borderRadius: BorderRadius.circular(24),
-              onTap: () {},
+              borderRadius: BorderRadius.circular(28),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AiChatScreen(),
+                  ),
+                );
+              },
               child: const Padding(
-                padding: EdgeInsets.all(12),
-                child: Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+                padding: EdgeInsets.all(16),
+                child: Icon(Icons.smart_toy, color: Colors.white, size: 24),
               ),
             ),
           ),

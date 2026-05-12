@@ -73,6 +73,8 @@ const checkinLogRoutes = require("./routes/checkinLog");
 const paymentRoutes = require("./routes/payment");
 const invoiceRoutes = require("./routes/invoice");
 const followRoutes = require("./routes/follow");
+const aiTextRoutes = require("./routes/aiText");
+const mentionRoutes = require("./routes/mentionRoutes");
 const Message = require("./models/message");
 const User = require("./models/user");
 const UserService = require("./services/user");
@@ -270,6 +272,12 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/touristes", touristeRoutes);
 app.use("/api/v1/organisators", organisatorRoutes);
+app.use((req, res, next) => {
+  if (req.path.includes('/activites')) {
+    console.log('[SERVER] Activites request:', req.method, req.path, req.originalUrl);
+  }
+  next();
+});
 app.use("/api/v1/activites", activiteRoutes);
 app.use("/api/v1/inscriptions", inscriptionRoutes);
 app.use("/api/v1/avis", avisRoutes);
@@ -288,6 +296,8 @@ app.use("/api/v1/checkin-logs", checkinLogRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/follow", followRoutes);
+app.use("/api/v1/ai-text", aiTextRoutes);
+app.use("/api/v1/mentions", mentionRoutes);
 
 // ─── Refresh Token Route ──────────────────────────────────────────────────────
 app.post("/api/v1/auth/refresh", authMiddleware.refreshToken);

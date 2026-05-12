@@ -4,6 +4,7 @@ const { createActivityLog } = require("../services/activityLogService");
 const { triggerPublicationNotification } = require("../controllers/notification");
 const notificationEventBus = require("../services/notificationEventBus");
 const User = require("../models/user");
+const { extractMentions } = require("../controllers/mentionController");
 
 const basePopulate = {
   path: "author_id",
@@ -124,6 +125,10 @@ exports.getUserPosts = async (req, res) => {
 exports.createPost = async (req, res) => {
   try {
     const authorId = req.user.userId;
+    
+    // Debug log complet du body
+    console.log('POST /posts req.body:', JSON.stringify(req.body, null, 2));
+    
     const {
       content = "",
       imageUrl = "",
@@ -133,6 +138,7 @@ exports.createPost = async (req, res) => {
       locationLabel = "",
       tripLink = "",
       hashtags = [],
+      mentions = [],
     } = req.body || {};
 
     const trimmedContent = String(content || "").trim();
@@ -161,6 +167,16 @@ exports.createPost = async (req, res) => {
           .slice(0, 10)
       : [];
 
+    // Combiner les mentions du frontend et celles extraites du contenu
+    const frontendMentions = Array.isArray(mentions) ? mentions : [];
+    const contentMentions = extractMentions(trimmedContent);
+    const allMentions = [...new Set([...frontendMentions, ...contentMentions])];
+    
+    // Debug log
+    console.log('Creating post with frontend mentions:', frontendMentions);
+    console.log('Creating post with content mentions:', contentMentions);
+    console.log('Creating post with all mentions:', allMentions);
+    
     const post = await Post.create({
       author_id: authorId,
       content: trimmedContent,
@@ -171,6 +187,7 @@ exports.createPost = async (req, res) => {
       location_label: String(locationLabel || "").trim(),
       trip_link: String(tripLink || "").trim(),
       hashtags: safeHashtags,
+      mentions: allMentions, // Ajouter toutes les mentions
     });
 
     const populated = await Post.findById(post._id)
@@ -1003,6 +1020,64 @@ exports.deletePostByAdmin = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error deleting post as admin",
+      error: error.message,
+    });
+  }
+};
+
+// Archive/Unarchive a post
+exports.archivePost = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { postId } = req.params;
+    const { isArchived } = req.body; // true to archive, false to unarchive
+
+    const post = await Post.findOne({ _id: postId, author_id: userId });
+
+    if (!post) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Post not found or you don't have permission to archive this post" 
+      });
+    }
+
+    post.is_archived = isArchived;
+    post.updated_at = new Date();
+    await post.save();
+
+    // Log the activity
+    try {
+      await createActivityLog({
+        actorId: userId,
+        action: isArchived ? "archive_post" : "unarchive_post",
+        targetType: "post",
+        targetId: post._id,
+        templateKey: isArchived ? "archive_post" : "unarchive_post",
+        metadata: {
+          title: post.content?.slice(0, 80) || "Publication",
+        },
+      });
+    } catch (logError) {
+      console.warn(
+        "Activity log failed for archivePost:",
+        logError.message,
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: isArchived ? "Post archived successfully" : "Post unarchived successfully",
+      post: {
+        _id: post._id,
+        is_archived: post.is_archived,
+        updated_at: post.updated_at,
+      },
+    });
+  } catch (error) {
+    console.error("Error archiving post:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error archiving post",
       error: error.message,
     });
   }

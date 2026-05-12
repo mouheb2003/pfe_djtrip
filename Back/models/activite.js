@@ -63,17 +63,105 @@ const activiteSchema = new mongoose.Schema(
       required: [true, "Location is required"],
       trim: true,
     },
-    // GPS coordinates (optional)
+    // GPS coordinates (conditional based on location_type)
     coordonnees: {
       latitude: {
         type: Number,
         min: -90,
         max: 90,
+        validate: {
+          validator: function (value) {
+            // Required for fixed location
+            if (
+              this.location_type === "fixed" &&
+              (value === undefined || value === null)
+            ) {
+              return false;
+            }
+            return true;
+          },
+          message: "Coordinates are required for fixed location",
+        },
       },
       longitude: {
         type: Number,
         min: -180,
         max: 180,
+        validate: {
+          validator: function (value) {
+            // Required for fixed location
+            if (
+              this.location_type === "fixed" &&
+              (value === undefined || value === null)
+            ) {
+              return false;
+            }
+            return true;
+          },
+          message: "Coordinates are required for fixed location",
+        },
+      },
+    },
+    // Location type - fixed, custom, or itinerary
+    location_type: {
+      type: String,
+      enum: ["fixed", "custom", "itinerary"],
+      default: "fixed",
+    },
+    // NEW: Itinerary items (array of structured objects)
+    itineraire: {
+      type: [
+        {
+          title: {
+            type: String,
+            trim: true,
+            maxlength: [100, "Title cannot exceed 100 characters"],
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: [500, "Description cannot exceed 500 characters"],
+          },
+          address: {
+            type: String,
+            trim: true,
+          },
+          lat: {
+            type: Number,
+            min: -90,
+            max: 90,
+          },
+          lng: {
+            type: Number,
+            min: -180,
+            max: 180,
+          },
+          // Optional: order of the item in the itinerary
+          order: {
+            type: Number,
+            default: 0,
+          },
+        },
+      ],
+      default: [],
+      validate: {
+        validator: function (value) {
+          // For itinerary type, allow empty array during transitions but warn
+          // Validation of non-empty itinerary should be done at API level (frontend validation)
+          if (
+            this.location_type === "itinerary" &&
+            (!value || value.length === 0)
+          ) {
+            console.warn(
+              "⚠️ Itinerary type with empty items - this may be a type transition state",
+            );
+            // Allow it - frontend should validate
+            return true;
+          }
+          return true;
+        },
+        message:
+          "Itinerary type should have at least one item (frontend validation will catch this)",
       },
     },
     // Activity duration (in hours)
@@ -179,13 +267,113 @@ const activiteSchema = new mongoose.Schema(
   },
 );
 
+// PRE-SAVE VALIDATION AND DATA CLEANING
+activiteSchema.pre("save", async function () {
+  const locationType = this.location_type;
+
+  // Clean data based on location type
+  switch (locationType) {
+    case "fixed":
+      // Fixed location: require coordinates, remove itinerary
+      if (
+        !this.coordonnees ||
+        this.coordonnees.latitude === undefined ||
+        this.coordonnees.longitude === undefined
+      ) {
+        throw new Error("Coordinates are required for fixed location");
+      }
+      // Remove itinerary data for fixed locations
+      this.itineraire = [];
+      break;
+
+    case "custom":
+      // Custom location: only lieu required, remove itinerary and coordinates
+      // Remove coordinates for custom locations (optional)
+      if (this.coordonnees) {
+        this.coordonnees = undefined;
+      }
+      // Remove itinerary data for custom locations
+      this.itineraire = [];
+      break;
+
+    case "itinerary":
+      // Itinerary: require at least one item, remove single coordinates
+      if (!this.itineraire || this.itineraire.length === 0) {
+        throw new Error(
+          "At least one itinerary item is required for itinerary type",
+        );
+      }
+      // Remove single coordinates for itinerary locations
+      if (this.coordonnees) {
+        this.coordonnees = undefined;
+      }
+      // Generate composite lieu from itinerary items
+      if (this.itineraire && this.itineraire.length > 0) {
+        const addresses = this.itineraire
+          .map((item) => item.address)
+          .filter((addr) => addr);
+        if (addresses.length > 0) {
+          this.lieu = `Multi-location tour: ${addresses.join(" to ")}`;
+        }
+      }
+      break;
+
+    default:
+      throw new Error("Invalid location type");
+  }
+});
+
+// PRE-UPDATE VALIDATION AND DATA CLEANING
+activiteSchema.pre(
+  ["updateOne", "updateMany", "findOneAndUpdate"],
+  function () {
+    const update = this.getUpdate();
+    const locationType = update.$set?.location_type || update.location_type;
+
+    if (locationType) {
+      switch (locationType) {
+        case "fixed":
+          // Remove itinerary data for fixed locations
+          if (update.$set) {
+            update.$set.itineraire = [];
+          } else {
+            update.itineraire = [];
+          }
+          break;
+
+        case "custom":
+          // Remove itinerary and coordinates for custom locations
+          if (update.$set) {
+            update.$set.itineraire = [];
+            update.$set.coordonnees = undefined;
+          } else {
+            update.itineraire = [];
+            update.coordonnees = undefined;
+          }
+          break;
+
+        case "itinerary":
+          // Remove single coordinates for itinerary locations
+          if (update.$set) {
+            update.$set.coordonnees = undefined;
+          } else {
+            update.coordonnees = undefined;
+          }
+          break;
+      }
+    }
+  },
+);
+
 // Indexes to improve search performance
-activiteSchema.index({ type_activite: 1, statut: 1 });
-activiteSchema.index({ categorie: 1, statut: 1 });
 activiteSchema.index({ organisateur_id: 1 });
 activiteSchema.index({ lieu: "text", titre: "text", description: "text" });
-// Geospatial index for proximity queries (e.g. activities near a location)
+
+// Geospatial index for proximity queries (only for fixed locations)
 activiteSchema.index({ "coordonnees.latitude": 1, "coordonnees.longitude": 1 });
+
+// Index for itinerary locations
+activiteSchema.index({ "itineraire.lat": 1, "itineraire.lng": 1 });
 
 const Activite = mongoose.model("Activite", activiteSchema);
 

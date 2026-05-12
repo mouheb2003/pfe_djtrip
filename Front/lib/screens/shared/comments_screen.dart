@@ -116,6 +116,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     if (currentUser != null) {
       setState(() {
         _currentUserId = currentUser['_id']?.toString();
+        _currentUserRole = currentUser['role']?.toString();
       });
     }
     
@@ -898,17 +899,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                   child: Row(
                     children: [
                       // User avatar
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: const Color(0xFFE8E5FF),
-                        child: Text(
-                          _currentUserId?.substring(0, 1).toUpperCase() ?? 'U',
-                          style: const TextStyle(
-                            color: Color(0xFF4B63FF),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      _buildUserAvatar(),
                       const SizedBox(width: 12),
                       
                       Expanded(
@@ -1126,41 +1117,74 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     );
   }
 
+  Widget _buildUserAvatar() {
+    final currentUser = AuthService.currentUser;
+    final String? photoUrl = currentUser?['photo'];
+    final String userName = currentUser?['username'] ?? currentUser?['name'] ?? 'User';
+    final String firstLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+    
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundColor: const Color(0xFFE8E5FF),
+        backgroundImage: NetworkImage(photoUrl),
+        onBackgroundImageError: (exception, stackTrace) {
+          // Fallback to initial if image fails to load
+        },
+        child: photoUrl.isEmpty ? null : null, // Show initial if no photo
+      );
+    }
+    
+    // Default avatar with icon
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: const Color(0xFFE8E5FF),
+      child: Icon(
+        Icons.person,
+        size: 18,
+        color: const Color(0xFF4B63FF),
+      ),
+    );
+  }
+
   Widget _buildReactionEmojis() {
     return Container(
       height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: _reactionEmojis.map((emoji) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _commentController.text += emoji;
-                });
-                // Move cursor to end of text
-                _commentController.selection = TextSelection.fromPosition(
-                  TextPosition(offset: _commentController.text.length),
-                );
-                // Request focus to ensure keyboard is active
-                _commentFocusNode.requestFocus();
-                HapticFeedback.lightImpact();
-              },
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 20),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: _reactionEmojis.map((emoji) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _commentController.text += emoji;
+                  });
+                  // Move cursor to end of text
+                  _commentController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _commentController.text.length),
+                  );
+                  // Request focus to ensure keyboard is active
+                  _commentFocusNode.requestFocus();
+                  HapticFeedback.lightImpact();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 18),
+                  ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

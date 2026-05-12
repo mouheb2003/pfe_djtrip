@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -15,6 +16,7 @@ import 'services/api_service.dart';
 import 'services/navigation_service.dart';
 import 'services/fcm_notification_service.dart';
 import 'services/auth_service.dart';
+import 'services/heartbeat_service.dart';
 import 'providers/user_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -36,10 +38,10 @@ void _showGlobalError(String message) {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔒 Hide status bar and navigation bar (immersive mode)
-  // Status bar will only appear when swiping down from top
+  // 🔒 Show status bar and navigation bar (edge to edge mode)
+  // Status bar and navigation bar will always be visible
   SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.immersiveSticky,
+    SystemUiMode.edgeToEdge,
   );
 
   try {
@@ -58,6 +60,9 @@ Future<void> main() async {
 
     // 🔔 FCM (APRÈS Firebase)
     await FcmNotificationService().initialize();
+    
+    // 💓 Initialize heartbeat service (will start when user is authenticated)
+    developer.log('💓 [HEARTBEAT] Service initialized', name: 'Main');
   } catch (e) {
     debugPrint("❌ Init error: $e");
   }

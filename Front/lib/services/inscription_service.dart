@@ -57,9 +57,17 @@ class InscriptionService {
     final direct = _decodeObjectList(body['inscriptions']);
     if (direct.isNotEmpty) return direct;
 
+    // Check for participants key (used by getActivityParticipants endpoint)
+    final participants = _decodeObjectList(body['participants']);
+    if (participants.isNotEmpty) return participants;
+
     final dataObj = _decodeObject(body['data']);
     final fromData = _decodeObjectList(dataObj['inscriptions']);
     if (fromData.isNotEmpty) return fromData;
+
+    // Check for participants in data
+    final participantsFromData = _decodeObjectList(dataObj['participants']);
+    if (participantsFromData.isNotEmpty) return participantsFromData;
 
     final resultObj = _decodeObject(body['result']);
     return _decodeObjectList(resultObj['inscriptions']);
@@ -307,6 +315,62 @@ class InscriptionService {
       );
     } catch (_) {
       throw Exception('Unable to load organizer requests');
+    }
+  }
+
+  /// Public: Get participants for any activity (any authenticated user can see)
+  static Future<List<InscriptionModel>> getActivityParticipants({
+    required String activiteId,
+  }) async {
+    final query = <String, String>{
+      'activite_id': activiteId,
+    };
+
+    final res = await ApiClient.get(
+      '/inscriptions/activite/$activiteId/participants',
+      query: query,
+      cacheFirst: false,
+      cacheTtl: const Duration(seconds: 1),
+    );
+    if (res.statusCode == 200) {
+      final body = _decodeObject(res.body);
+      final list = _extractInscriptions(body);
+      
+      // Map the backend response to frontend model structure
+      final mappedList = list.map((participant) {
+        print('🔍 [SERVICE DEBUG] Original participant: $participant');
+        
+        // If participant has the new structure with nested touriste object
+        if (participant['touriste'] != null) {
+          // Create a new structure that matches InscriptionModel.fromJson expectations
+          final mapped = {
+            '_id': participant['_id'],
+            'statut': participant['statut'],
+            'nombre_participants': participant['nombreParticipants'] ?? participant['nombre_participants'],
+            'prix_total': participant['prixTotal'] ?? participant['prix_total'],
+            'date_demande': participant['dateDemande'] ?? participant['date_demande'],
+            'touriste_id': participant['touriste']['_id'],
+            'activite_id': participant['activite']['_id'],
+            'touriste': participant['touriste'], // Keep the nested object for UI display
+            'activite': participant['activite'], // Keep the nested object for UI display
+          };
+          print('🔍 [SERVICE DEBUG] Mapped participant: $mapped');
+          return mapped;
+        }
+        // Return original structure if no nested touriste object
+        print('🔍 [SERVICE DEBUG] Using original participant structure');
+        return participant;
+      }).toList();
+      
+      return mappedList.map(InscriptionModel.fromJson).toList();
+    }
+    try {
+      final body = _decodeObject(res.body);
+      throw Exception(
+        (body['message'] as String?) ?? 'Unable to load activity participants',
+      );
+    } catch (_) {
+      throw Exception('Unable to load activity participants');
     }
   }
 

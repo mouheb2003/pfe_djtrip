@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../models/user_model.dart';
@@ -19,6 +20,7 @@ import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
 import '../place_detail_screen.dart';
 import '../all_places_simple.dart';
+import '../../../widgets/mention_text_widget.dart';
 import 'screen_network.dart';
 
 class TouristProfileTab extends StatefulWidget {
@@ -79,7 +81,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
       }
 
       final results = await Future.wait([
-        UserService.getProfile(),
+        UserService.getProfile(forceRefresh: true),
         InscriptionService.getTouristStats(),
         PostService.getMyPosts(),
         AuthService.getUser(),
@@ -107,8 +109,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                       final authorId = author is Map<String, dynamic>
                           ? (author['_id'] ?? author['id'] ?? '').toString()
                           : author?.toString() ?? '';
-                      return currentUserId.isNotEmpty &&
-                          authorId == currentUserId;
+                      return currentUserId.isNotEmpty && authorId == currentUserId;
                     }).toList())
               .take(12)
               .toList();
@@ -154,6 +155,18 @@ List<Map<String, dynamic>> _featuredPlaces = [];
     if (diff.inHours > 0) return '${diff.inHours}h ago';
     if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
     return 'Just now';
+  }
+
+  void _copyUsername(String username) {
+    Clipboard.setData(ClipboardData(text: '@$username'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Username @$username copied to clipboard!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showAvatarFullScreen(String? avatarUrl) {
@@ -228,104 +241,124 @@ List<Map<String, dynamic>> _featuredPlaces = [];
     await _loadAll();
   }
 
+  
   Future<void> _deletePost(String postId) async {
     final confirmed = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Delete post',
-      barrierColor: Colors.black.withOpacity(0.25),
+      barrierColor: Colors.black.withOpacity(0.5),
       pageBuilder: (context, _, __) {
         return SafeArea(
           child: Center(
             child: Container(
-              width: MediaQuery.of(context).size.width * 0.84,
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              width: 320,
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F8FC),
-                borderRadius: BorderRadius.circular(28),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Header with icon
                   Container(
-                    width: 92,
-                    height: 92,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF5D5E0),
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF2F0),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.delete_forever,
-                      color: Color(0xFFC00445),
-                      size: 44,
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
+                  
+                  // Title
                   const Text(
-                    'Delete Post?',
+                    'Delete Post',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1F245A),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
+                  
+                  // Description
                   const Text(
-                    'Are you sure you want to permanently delete this post?\nThis action cannot be undone.',
+                    'This post will be permanently deleted.\nYou won\'t be able to recover it later.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: Color(0xFF555C8F),
+                      fontSize: 15,
+                      color: Color(0xFF6B7280),
+                      height: 1.5,
+                      letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC00445),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(40),
+                  const SizedBox(height: 24),
+                  
+                  // Buttons
+                  Row(
+                    children: [
+                      // Cancel button
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6B7280),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                      const SizedBox(width: 12),
+                      
+                      // Delete button
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF1853E5),
-                        side: const BorderSide(
-                          color: Color(0xFFD1D4E7),
-                          width: 1.6,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(40),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -342,9 +375,12 @@ List<Map<String, dynamic>> _featuredPlaces = [];
 
     if (result['success'] == true) {
       await _loadAll();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Post deleted.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post deleted successfully'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
       return;
     }
 
@@ -353,6 +389,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
         content: Text(
           result['message']?.toString() ?? 'Unable to delete post.',
         ),
+        backgroundColor: const Color(0xFFDC2626),
       ),
     );
   }
@@ -425,18 +462,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                         await Share.share(content);
                       },
                     ),
-                    _ActionRow(
-                      icon: Icons.inventory_2_rounded,
-                      label: 'Archive Post',
-                      iconColor: const Color(0xFF2051F2),
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Archive coming soon.')),
-                        );
-                      },
-                    ),
-                    const Divider(height: 26, color: Color(0xFFE0E1EF)),
+                                        const Divider(height: 26, color: Color(0xFFE0E1EF)),
                     _ActionRow(
                       icon: Icons.delete_rounded,
                       label: 'Delete Post',
@@ -783,12 +809,6 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                                   ],
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                icon: const Icon(Icons.more_horiz_rounded),
-                                iconSize: 20,
-                                color: const Color(0xFF8B8FAE),
-                              ),
                             ],
                           ),
                           if (locationLabel.isNotEmpty) ...[
@@ -876,40 +896,10 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                                 icon: Icons.chat_bubble,
                                 label: '$commentsCount',
                               ),
-                              const SizedBox(width: 18),
-                              const _DetailAction(icon: Icons.share_rounded),
                               const Spacer(),
-                              const _DetailAction(
-                                icon: Icons.bookmark_border_rounded,
-                              ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: () {
-                                Navigator.pop(dialogContext);
-                                _openCommentsSheet(post);
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFE7E3F4),
-                                foregroundColor: const Color(0xFF4B4F73),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              child: const Text(
-                                'Voir les commentaires',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                                                  ],
                       ),
                     ),
                   ),
@@ -923,325 +913,217 @@ List<Map<String, dynamic>> _featuredPlaces = [];
   }
 
   String _displayLocation() {
-    final raw = _user?.paysOrigine?.trim() ?? '';
-    if (raw.isEmpty) return '🇹🇳 DJERBA, TN';
-    final flag = _getCountryFlag(raw);
-    return '$flag ${raw.toUpperCase()}';
+    final parts = <String>[];
+    
+    if (_user?.paysOrigine?.isNotEmpty == true) {
+      final countryName = _user!.paysOrigine!;
+      final flag = _getCountryFlag(countryName);
+      parts.add('$flag $countryName');
+    }
+    
+    return parts.join(' • ');
   }
 
   String _getCountryFlag(String country) {
-    if (country.isEmpty) return '🌍';
-    
-    // Clean the country name - remove extra spaces and lowercase
-    final cleanCountry = country.trim().toLowerCase();
-    
-    // Common country codes to flag emojis
-    final countryFlags = {
-      // Tunisia variations
-      'tn': '🇹🇳',
-      'tunisia': '🇹🇳',
-      'tunisie': '🇹🇳',
-      'tunisian': '🇹🇳',
-      // France variations
-      'fr': '🇫🇷',
-      'france': '🇫🇷',
-      // USA variations
-      'us': '🇺🇸',
-      'usa': '🇺🇸',
-      'united states': '🇺🇸',
-      'united states of america': '🇺🇸',
-      'america': '🇺🇸',
-      // UK variations
-      'gb': '🇬🇧',
-      'uk': '🇬🇧',
-      'united kingdom': '🇬🇧',
-      'britain': '🇬🇧',
-      'great britain': '🇬🇧',
-      'england': '🇬🇧',
-      // Germany
-      'de': '🇩🇪',
-      'germany': '🇩🇪',
-      'allemagne': '🇩🇪',
-      // Italy
-      'it': '🇮🇹',
-      'italy': '🇮🇹',
-      'italie': '🇮🇹',
-      // Spain
-      'es': '🇪🇸',
-      'spain': '🇪🇸',
-      'espagne': '🇪🇸',
-      // Morocco
-      'ma': '🇲🇦',
-      'morocco': '🇲🇦',
-      'maroc': '🇲🇦',
-      // Algeria
-      'dz': '🇩🇿',
-      'algeria': '🇩🇿',
-      'algerie': '🇩🇿',
-      // Egypt
-      'eg': '🇪🇬',
-      'egypt': '🇪🇬',
-      'egypte': '🇪🇬',
-      // Libya
-      'ly': '🇱🇾',
-      'libya': '🇱🇾',
-      'libye': '🇱🇾',
-      // Saudi Arabia
-      'sa': '🇸🇦',
-      'saudi arabia': '🇸🇦',
-      'arabie saoudite': '🇸🇦',
-      // UAE
-      'ae': '🇦🇪',
-      'uae': '🇦🇪',
-      'emirates': '🇦🇪',
-      'united arab emirates': '🇦🇪',
-      // Qatar
-      'qa': '🇶🇦',
-      'qatar': '🇶🇦',
-      // Canada
-      'ca': '🇨🇦',
-      'canada': '🇨🇦',
-      // Australia
-      'au': '🇦🇺',
-      'australia': '🇦🇺',
-      'australie': '🇦🇺',
-      // Japan
-      'jp': '🇯🇵',
-      'japan': '🇯🇵',
-      'japon': '🇯🇵',
-      // China
-      'cn': '🇨🇳',
-      'china': '🇨🇳',
-      'chine': '�🇳',
-      // India
-      'in': '�🇮🇳',
-      'india': '🇮🇳',
-      'inde': '🇮🇳',
-      // Brazil
-      'br': '🇧🇷',
-      'brazil': '🇧🇷',
-      'bresil': '🇧🇷',
-      // Mexico
-      'mx': '🇲🇽',
-      'mexico': '🇲🇽',
-      'mexique': '🇲🇽',
-      // Argentina
-      'ar': '🇦🇷',
-      'argentina': '🇦🇷',
-      'argentine': '🇦🇷',
-      // South Africa
-      'za': '🇿🇦',
-      'south africa': '🇿🇦',
-      'afrique du sud': '🇿🇦',
-      // Nigeria
-      'ng': '🇳🇬',
-      'nigeria': '🇳🇬',
-      // Kenya
-      'ke': '🇰🇪',
-      'kenya': '🇰🇪',
-      // Turkey
-      'tr': '🇹🇷',
-      'turkey': '🇹🇷',
-      'turquie': '🇹🇷',
-      // Greece
-      'gr': '🇬🇷',
-      'greece': '🇬🇷',
-      'grece': '🇬🇷',
-      // Netherlands
-      'nl': '🇳🇱',
-      'netherlands': '🇳🇱',
-      'pays-bas': '🇳🇱',
-      'pays bas': '🇳🇱',
-      // Belgium
-      'be': '🇧🇪',
-      'belgium': '🇧🇪',
-      'belgique': '🇧🇪',
-      // Switzerland
-      'ch': '🇨🇭',
-      'switzerland': '🇨🇭',
-      'suisse': '🇨�',
-      // Sweden
-      'se': '�🇸🇪',
-      'sweden': '🇸🇪',
-      'suede': '🇸🇪',
-      // Norway
-      'no': '🇳🇴',
-      'norway': '🇳🇴',
-      'norvege': '🇳🇴',
-      // Denmark
-      'dk': '🇩🇰',
-      'denmark': '🇩🇰',
-      'danemark': '🇩🇰',
-      // Finland
-      'fi': '🇫🇮',
-      'finland': '🇫🇮',
-      'finlande': '🇫🇮',
-      // Poland
-      'pl': '🇵🇱',
-      'poland': '🇵🇱',
-      'pologne': '🇵🇱',
-      // Czech Republic
-      'cz': '🇨🇿',
-      'czech': '🇨🇿',
-      'czech republic': '🇨🇿',
-      'republique tcheque': '🇨🇿',
-      // Austria
-      'at': '🇦🇹',
-      'austria': '🇦🇹',
-      'autriche': '🇦🇹',
-      // Hungary
-      'hu': '🇭🇺',
-      'hungary': '🇭🇺',
-      'hongrie': '🇭🇺',
-      // Portugal
-      'pt': '🇵🇹',
-      'portugal': '🇵🇹',
-      // Russia
-      'ru': '🇷🇺',
-      'russia': '🇷🇺',
-      'russie': '🇷🇺',
-      // Ukraine
-      'ua': '🇺🇦',
-      'ukraine': '🇺🇦',
-      // Romania
-      'ro': '🇷🇴',
-      'romania': '🇷🇴',
-      'roumanie': '🇷🇴',
-      // Bulgaria
-      'bg': '🇧🇬',
-      'bulgaria': '🇧🇬',
-      'bulgarie': '🇧🇬',
-      // Croatia
-      'hr': '🇭🇷',
-      'croatia': '🇭🇷',
-      'croatie': '🇭🇷',
-      // Slovenia
-      'si': '🇸🇮',
-      'slovenia': '🇸🇮',
-      'slovenie': '🇸🇮',
-      // Slovakia
-      'sk': '🇸🇰',
-      'slovakia': '🇸🇰',
-      'slovaquie': '🇸🇰',
-      // Estonia
-      'ee': '🇪🇪',
-      'estonia': '🇪🇪',
-      'estonie': '🇪🇪',
-      // Latvia
-      'lv': '🇱🇻',
-      'latvia': '🇱🇻',
-      'letonie': '🇱🇻',
-      // Lithuania
-      'lt': '🇱🇹',
-      'lithuania': '🇱🇹',
-      'lituanie': '🇱🇹',
-      // Iceland
-      'is': '🇮🇸',
-      'iceland': '🇮🇸',
-      'islande': '🇮�',
-      // Ireland
-      'ie': '🇮�🇪',
-      'ireland': '🇮🇪',
-      'irlande': '🇮�',
-      // Israel
-      'il': '🇮�🇱',
-      'israel': '🇮🇱',
-      // Jordan
-      'jo': '🇯🇴',
-      'jordan': '🇯🇴',
-      'jordanie': '🇯🇴',
-      // Lebanon
-      'lb': '🇱🇧',
-      'lebanon': '🇱🇧',
-      'liban': '🇱🇧',
-      // Syria
-      'sy': '🇸🇾',
-      'syria': '🇸🇾',
-      'syrie': '🇸🇾',
-      // Iraq
-      'iq': '🇮🇶',
-      'iraq': '🇮🇶',
-      'irak': '🇮🇶',
-      // Kuwait
-      'kw': '🇰🇼',
-      'kuwait': '🇰🇼',
-      'koweit': '🇰🇼',
-      // Bahrain
-      'bh': '🇧🇭',
-      'bahrain': '🇧🇭',
-      'bahrein': '🇧🇭',
-      // Oman
-      'om': '🇴🇲',
-      'oman': '🇴🇲',
-      // Pakistan
-      'pk': '🇵🇰',
-      'pakistan': '🇵🇰',
-      // Bangladesh
-      'bd': '🇧🇩',
-      'bangladesh': '🇧🇩',
-      // Sri Lanka
-      'lk': '🇱🇰',
-      'sri lanka': '🇱🇰',
-      // Myanmar
-      'mm': '🇲🇲',
-      'myanmar': '🇲🇲',
-      // Thailand
-      'th': '🇹🇭',
-      'thailand': '🇹🇭',
-      'thailande': '🇹🇭',
-      // Vietnam
-      'vn': '🇻🇳',
-      'vietnam': '🇻🇳',
-      'viet nam': '🇻🇳',
-      // Cambodia
-      'kh': '🇰🇭',
-      'cambodia': '🇰🇭',
-      'cambodge': '🇰🇭',
-      // Laos
-      'la': '🇱🇦',
-      'laos': '🇱🇦',
-      // Malaysia
-      'my': '🇲🇾',
-      'malaysia': '🇲🇾',
-      'malaisie': '🇲🇾',
-      // Singapore
-      'sg': '🇸🇬',
-      'singapore': '🇸🇬',
-      'singapour': '🇸🇬',
-      // Indonesia
-      'id': '🇮🇩',
-      'indonesia': '🇮🇩',
-      'indonesie': '🇮🇩',
-      // Philippines
-      'ph': '🇵🇭',
-      'philippines': '🇵🇭',
-      'philippins': '🇵🇭',
-      // New Zealand
-      'nz': '🇳🇿',
-      'new zealand': '🇳🇿',
-      'nouvelle-zelande': '🇳🇿',
-      // South Korea
-      'kr': '🇰🇷',
-      'south korea': '🇰🇷',
-      'coree du sud': '🇰🇷',
-      // North Korea
-      'kp': '🇰🇵',
-      'north korea': '🇰🇵',
-      'coree du nord': '🇰🇵',
-    };
-    
-    final flag = countryFlags[cleanCountry];
-    if (flag != null) return flag;
-    
-    // Try to find partial match (e.g., "Tunisian" contains "tunisia")
-    for (final entry in countryFlags.entries) {
-      if (cleanCountry.contains(entry.key) || entry.key.contains(cleanCountry)) {
-        return entry.value;
-      }
-    }
-    
-    debugPrint('No flag found for country: $country');
-    return '🌍';
+  if (country.isEmpty) return '�';
+  
+  // Clean the country name - remove extra spaces and lowercase
+  final cleanCountry = country.trim().toLowerCase();
+  
+  // Common country codes to flag emojis
+  final countryFlags = {
+    // Tunisia variations
+    'tn': '🇹🇳',
+    'tunisia': '🇹🇳',
+    'tunisie': '🇹🇳',
+    'tunisian': '🇹🇳',
+    // France variations
+    'fr': '🇫🇷',
+    'france': '🇫🇷',
+    // USA variations
+    'us': '🇺🇸',
+    'usa': '🇺🇸',
+    'united states': '🇺🇸',
+    'united states of america': '🇺🇸',
+    'america': '🇺🇸',
+    // UK variations
+    'gb': '🇬🇧',
+    'uk': '🇬🇧',
+    'united kingdom': '🇬🇧',
+    'britain': '🇬🇧',
+    'great britain': '🇬🇧',
+    'england': '🇬🇧',
+    // Germany
+    'de': '🇩🇪',
+    'germany': '🇩🇪',
+    'allemagne': '🇩🇪',
+    // Italy
+    'it': '🇮🇹',
+    'italy': '🇮🇹',
+    'italie': '🇮🇹',
+    // Spain
+    'es': '🇪🇸',
+    'spain': '🇪🇸',
+    'espagne': '🇪🇸',
+    // Morocco
+    'ma': '🇲🇦',
+    'morocco': '🇲🇦',
+    'maroc': '🇲🇦',
+    // Algeria
+    'dz': '🇩🇿',
+    'algeria': '🇩🇿',
+    'algerie': '🇩🇿',
+    // Egypt
+    'eg': '🇪🇬',
+    'egypt': '🇪🇬',
+    'egypte': '🇪🇬',
+    // Libya
+    'ly': '🇱🇾',
+    'libya': '🇱🇾',
+    'libye': '🇱🇾',
+    // Saudi Arabia
+    'sa': '🇸🇦',
+    'saudi arabia': '🇸🇦',
+    'arabie saoudite': '🇸🇦',
+    // UAE
+    'ae': '🇦🇪',
+    'uae': '🇦🇪',
+    'emirates': '🇦🇪',
+    'united arab emirates': '🇦🇪',
+    // Qatar
+    'qa': '🇶🇦',
+    'qatar': '🇶🇦',
+    // Canada
+    'ca': '🇨🇦',
+    'canada': '🇨🇦',
+    // Australia
+    'au': '🇦🇺',
+    'australia': '🇦🇺',
+    'australie': '🇦🇺',
+    // Japan
+    'jp': '🇯🇵',
+    'japan': '🇯🇵',
+    'japon': '🇯🇵',
+    // China
+    'cn': '🇨🇳',
+    'china': '🇨🇳',
+    'chine': '🇨🇳',
+    // India
+    'in': '🇮🇳',
+    'india': '🇮🇳',
+    'inde': '🇮🇳',
+    // Brazil
+    'br': '🇧🇷',
+    'brazil': '🇧🇷',
+    'bresil': '🇧🇷',
+    // Mexico
+    'mx': '🇲🇽',
+    'mexico': '🇲🇽',
+    'mexique': '🇲🇽',
+    // Argentina
+    'ar': '🇦🇷',
+    'argentina': '🇦🇷',
+    'argentine': '🇦🇷',
+    // South Africa
+    'za': '🇿🇦',
+    'south africa': '🇿🇦',
+    'afrique du sud': '🇿🇦',
+    // Nigeria
+    'ng': '🇳🇬',
+    'nigeria': '🇳🇬',
+    // Kenya
+    'ke': '🇰🇪',
+    'kenya': '🇰🇪',
+    // Turkey
+    'tr': '🇹🇷',
+    'turkey': '🇹🇷',
+    'turquie': '🇹🇷',
+    // Greece
+    'gr': '🇬🇷',
+    'greece': '🇬🇷',
+    'grece': '🇬🇷',
+    // Netherlands
+    'nl': '🇳🇱',
+    'netherlands': '🇳🇱',
+    'pays-bas': '🇳🇱',
+    'pays bas': '🇳🇱',
+    // Belgium
+    'be': '🇧🇪',
+    'belgium': '🇧🇪',
+    'belgique': '🇧🇪',
+    // Switzerland
+    'ch': '🇨🇭',
+    'switzerland': '🇨🇭',
+    'suisse': '🇨🇭',
+    // Sweden
+    'se': '🇸🇪',
+    'sweden': '🇸🇪',
+    'suede': '🇸🇪',
+    // Norway
+    'no': '🇳🇴',
+    'norway': '🇳🇴',
+    'norvege': '🇳🇴',
+    // Denmark
+    'dk': '🇩🇰',
+    'denmark': '🇩🇰',
+    'danemark': '🇩🇰',
+    // Finland
+    'fi': '🇫🇮',
+    'finland': '🇫🇮',
+    'finlande': '🇫🇮',
+    // Poland
+    'pl': '🇵🇱',
+    'poland': '🇵🇱',
+    'pologne': '🇵🇱',
+    // Czech Republic
+    'cz': '🇨🇿',
+    'czech': '🇨🇿',
+    'czech republic': '🇨🇿',
+    'republique tcheque': '🇨🇿',
+    // Austria
+    'at': '🇦🇹',
+    'austria': '🇦🇹',
+    'autriche': '🇦🇹',
+    // Hungary
+    'hu': '🇭🇺',
+    'hungary': '🇭🇺',
+    'hongrie': '🇭🇺',
+    // Portugal
+    'pt': '🇵🇹',
+    'portugal': '🇵🇹',
+    // Russia
+    'ru': '🇷🇺',
+    'russia': '🇷🇺',
+    'russie': '🇷🇺',
+    // Ukraine
+    'ua': '🇺🇦',
+    'ukraine': '🇺🇦',
+    // Romania
+    'ro': '🇷🇴',
+    'romania': '🇷🇴',
+    'roumanie': '🇷🇴',
+    // Bulgaria
+    'bg': '🇧🇬',
+    'bulgaria': '🇧🇬',
+    'bulgarie': '🇧🇬',
+    // Croatia
+    'hr': '🇭🇷',
+    'croatia': '🇭🇷',
+    'croatie': '🇭🇷',
+    // Slovenia
+    'si': '🇸🇮',
+    'slovenia': '🇸🇮',
+    'slovenie': '🇸🇮',
+    // Slovakia
+    'sk': '🇸🇰',
+    'slovakia': '🇸🇰',
+    'slovaquie': '🇸🇰',
+    // Estonia
+    'ee': '🇪🇪',
+    'estonia': '🇪🇪',
+  };
+  
+  return countryFlags[cleanCountry] ?? '🌍';
   }
 
   String _safeBio() {
@@ -1276,6 +1158,25 @@ List<Map<String, dynamic>> _featuredPlaces = [];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1FA),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: SizedBox(
+          width: 60,
+          height: 60,
+          child: FloatingActionButton(
+            backgroundColor: AppColors.primary,
+            elevation: 6,
+            onPressed: () async {
+              final created = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const CreatePostScreen()),
+              );
+              if (created == true) _loadAll();
+            },
+            child: const Icon(Icons.add, size: 28, color: Colors.white),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
@@ -1457,6 +1358,71 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                 ),
               ),
               const SizedBox(height: 2),
+
+              // ── Username ───────────────────────────────────
+              if (user?.username != null && user!.username!.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE9ECEF), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.alternate_email,
+                        size: 16,
+                        color: const Color(0xFF6C757D),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '@${user!.username}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF495057),
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          _copyUsername(user!.username!);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D6EFD),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.copy,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'Copy',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (user?.username != null && user!.username!.isNotEmpty)
+                const SizedBox(height: 8),
               Text(
                 _displayLocation(),
                 textAlign: TextAlign.center,

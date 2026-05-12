@@ -9,6 +9,7 @@ import 'api_client.dart';
 import 'api_service.dart';
 import 'navigation_service.dart';
 import 'fcm_notification_service.dart';
+import 'heartbeat_service.dart';
 import '../config/app_routes.dart';
 import '../config/oauth_config.dart';
 
@@ -255,6 +256,14 @@ class AuthService {
   static Future<void> saveUser(Map<String, dynamic> user) async {
     _cachedUser = user;
     await _storage.write(key: _keyUser, value: jsonEncode(user));
+    
+    // 💓 Start heartbeat service after successful authentication
+    try {
+      HeartbeatService.instance.startHeartbeat();
+      print('💓 [AUTH] Heartbeat service started after user authentication');
+    } catch (e) {
+      print('❌ [AUTH] Error starting heartbeat service: $e');
+    }
   }
 
   static Future<Map<String, dynamic>?> getUser() async {
@@ -447,6 +456,7 @@ class AuthService {
     required String email,
     required String password,
     required String userType, // 'Touriste' | 'Organisator'
+    String? username, // Optional: if not provided, backend will auto-generate
   }) async {
     try {
       final res = await ApiClient.post('/users/signup', {
@@ -454,6 +464,7 @@ class AuthService {
         'email': email,
         'mot_de_passe': password,
         'userType': userType,
+        if (username != null) 'username': username, // Only send if provided
       }, auth: false);
 
       Map<String, dynamic> body = {};
@@ -637,6 +648,15 @@ class AuthService {
   static Future<void> clearLocalSession() async {
     _stopAccountGuardSocket();
     _cachedUser = null;
+    
+    // 💓 Stop heartbeat service on logout
+    try {
+      HeartbeatService.instance.stopHeartbeat();
+      print('💓 [AUTH] Heartbeat service stopped on logout');
+    } catch (e) {
+      print('❌ [AUTH] Error stopping heartbeat service: $e');
+    }
+    
     await _storage.deleteAll();
   }
 

@@ -711,12 +711,155 @@ const Approvals = () => {
                     </a>
                   </Descriptions.Item>
                 )}
-                {/* Debug: Show available data */}
+                {/* Reason for Joining */}
+                {selectedOrganizer.onboarding_data?.reasonToJoin && (
+                  <Descriptions.Item label="Reason to Join" span={2}>
+                    <div className="p-4 rounded-xl" style={{ 
+                      background: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', 
+                      border: isDarkMode ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #d1fae5',
+                      borderRadius: '12px'
+                    }}>
+                      <div style={{ marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: isDarkMode ? '#10b981' : '#059669' }}>
+                        Why they want to join DJTrip:
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        lineHeight: '1.5',
+                        color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : '#374151',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+                        {selectedOrganizer.onboarding_data.reasonToJoin || 'No reason provided'}
+                      </div>
+                    </div>
+                  </Descriptions.Item>
+                )}
+
+                {/* Enhanced Available Data */}
                 <Descriptions.Item label="Available Data" span={2}>
-                  <div className="p-4 rounded-xl" style={{ background: isDarkMode ? '#2c2c2c' : '#f8fafc', border: isDarkMode ? '1px solid #3c3c3c' : '1px solid #e2e8f0', maxHeight: '300px', overflow: 'auto' }}>
-                    <pre style={{ fontSize: '11px', margin: 0 }}>
-                      {JSON.stringify(selectedOrganizer, null, 2)}
-                    </pre>
+                  <div style={{ 
+                    background: '#ffffff', 
+                    border: '1px solid #e5e7eb', 
+                    borderRadius: '12px',
+                    padding: '16px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    {/* Header */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      marginBottom: '16px',
+                      padding: '12px 16px',
+                      background: '#f8fafc',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: '#3b82f6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <FileTextOutlined style={{ fontSize: '20px', color: '#ffffff' }} />
+                        </div>
+                        <div>
+                          <div style={{ 
+                            fontSize: '16px', 
+                            fontWeight: '700', 
+                            color: '#1f2937',
+                            marginBottom: '2px'
+                          }}>
+                            Complete Data Structure
+                          </div>
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: '#6b7280',
+                            opacity: 0.8
+                          }}>
+                            Full organizer data object
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: '4px 8px',
+                        background: '#eff6ff',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: '#1d4ed8'
+                      }}>
+                        JSON
+                      </div>
+                    </div>
+
+                    {/* Code Container */}
+                    <div style={{ 
+                      background: '#f9fafb',
+                      borderRadius: '10px',
+                      padding: '20px',
+                      border: '1px solid #e5e7eb',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      {/* Copy indicator */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        padding: '4px 8px',
+                        background: '#f3f4f6',
+                        borderRadius: '6px',
+                        fontSize: '10px',
+                        color: '#6b7280',
+                        fontFamily: 'monospace'
+                      }}>
+                        {Object.keys(selectedOrganizer || {}).length} keys
+                      </div>
+                      
+                      <pre style={{ 
+                        fontSize: '13px', 
+                        margin: 0, 
+                        fontFamily: "'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace",
+                        color: '#111827',
+                        lineHeight: '1.6',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        tabSize: 2
+                      }}>
+                        {JSON.stringify(selectedOrganizer, null, 2)}
+                      </pre>
+                    </div>
+
+                    {/* Footer info */}
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '8px 12px',
+                      background: '#f0f9ff',
+                      borderRadius: '8px',
+                      border: '1px solid #bae6fd'
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#1890ff',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <div style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: '#1890ff'
+                        }} />
+                        All available organizer data including onboarding information
+                      </div>
+                    </div>
                   </div>
                 </Descriptions.Item>
               </Descriptions>

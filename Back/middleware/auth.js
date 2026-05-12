@@ -68,14 +68,18 @@ exports.verifyToken = async (req, res, next) => {
     );
 
     if (!user) {
+      console.log('[AUTH verifyToken] User not found');
       return res.status(401).json({
         success: false,
         message: "User not found",
       });
     }
 
+    console.log('[AUTH verifyToken] User found, accountStatus:', user.accountStatus, 'userType:', user.userType);
+
     // Revoke old access tokens after admin actions (ban/suspend/logout)
     if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      console.log('[AUTH verifyToken] Token version mismatch');
       return res.status(401).json({
         success: false,
         forceLogout: true,
@@ -90,6 +94,8 @@ exports.verifyToken = async (req, res, next) => {
       userType: user.userType,
       tokenVersion: user.tokenVersion,
     };
+
+    console.log('[AUTH verifyToken] req.user set, calling next()');
 
     // Auto-reactivate when suspension is expired
     if (user.accountStatus === "suspended" && user.suspendedUntil) {
@@ -152,6 +158,7 @@ exports.verifyToken = async (req, res, next) => {
     }
 
     if (user.accountStatus === "banned") {
+      console.log('[AUTH verifyToken] User is banned');
       return res.status(403).json({
         success: false,
         forceLogout: true,
@@ -164,6 +171,7 @@ exports.verifyToken = async (req, res, next) => {
     }
 
     if (user.accountStatus === "inactive") {
+      console.log('[AUTH verifyToken] User is inactive');
       return res.status(403).json({
         success: false,
         forceLogout: true,
@@ -171,8 +179,10 @@ exports.verifyToken = async (req, res, next) => {
       });
     }
 
+    console.log('[AUTH verifyToken] Verification passed');
     next();
   } catch (err) {
+    console.log('[AUTH verifyToken] Error:', err.name, err.message);
     if (err.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
@@ -186,9 +196,51 @@ exports.verifyToken = async (req, res, next) => {
   }
 };
 
+// Optional authentication middleware - tries to verify token but continues even if missing/invalid
+exports.optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      // No token provided, continue without user
+      return next();
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const user = await User.findById(decoded.userId).select(
+      "email fullname accountStatus suspendedUntil suspendReason banReason tokenVersion userType",
+    );
+
+    if (!user) {
+      // User not found, continue without user
+      return next();
+    }
+
+    // Check token version
+    if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+      // Token version mismatch, continue without user
+      return next();
+    }
+
+    // Set user in request if valid
+    req.user = {
+      userId: user._id,
+      email: user.email,
+      userType: user.userType,
+      tokenVersion: user.tokenVersion,
+    };
+
+    next();
+  } catch (err) {
+    // Token invalid or expired, continue without user
+    next();
+  }
+};
+
 // Middleware to verify Organisator userType
 exports.verifyOrganisator = async (req, res, next) => {
   try {
+    console.log('[AUTH verifyOrganisator] Starting verification for:', req.method, req.path);
     // Fetch fresh user data from database to ensure we have the latest userType
     const User = require("../models/user");
     const user = await User.findById(req.user.userId).select(
@@ -196,11 +248,14 @@ exports.verifyOrganisator = async (req, res, next) => {
     );
 
     if (!user) {
+      console.log('[AUTH verifyOrganisator] User not found');
       return res.status(401).json({
         success: false,
         message: "User not found",
       });
     }
+
+    console.log('[AUTH verifyOrganisator] User found, userType:', user.userType, 'is_onboarded:', user.is_onboarded, 'is_approved:', user.is_approved);
 
     // Update req.user with fresh data
     req.user.userType = user.userType;
@@ -211,6 +266,7 @@ exports.verifyOrganisator = async (req, res, next) => {
     if (user.userType !== "Organisator") {
       // Only return requires_onboarding if user has no userType at all
       const needsOnboarding = !user.userType || user.userType === null;
+      console.log('[AUTH verifyOrganisator] User is not an organizer, needsOnboarding:', needsOnboarding);
       return res.status(403).json({
         success: false,
         message: "Access denied. Organisator access required.",
@@ -220,6 +276,7 @@ exports.verifyOrganisator = async (req, res, next) => {
 
     // For organizers, check if they are onboarded and approved
     if (!user.is_onboarded) {
+      console.log('[AUTH verifyOrganisator] Organizer not onboarded');
       return res.status(403).json({
         success: false,
         message: "Please complete onboarding to access organizer features",
@@ -228,6 +285,7 @@ exports.verifyOrganisator = async (req, res, next) => {
     }
 
     if (!user.is_approved) {
+      console.log('[AUTH verifyOrganisator] Organizer not approved');
       return res.status(403).json({
         success: false,
         message: "Your organizer account is waiting for approval",
@@ -235,9 +293,10 @@ exports.verifyOrganisator = async (req, res, next) => {
       });
     }
 
+    console.log('[AUTH verifyOrganisator] Verification passed');
     next();
   } catch (error) {
-    console.error("Error in verifyOrganisator middleware:", error);
+    console.error("[AUTH verifyOrganisator] Error:", error);
     return res.status(500).json({
       success: false,
       message: "Error verifying organizer access",

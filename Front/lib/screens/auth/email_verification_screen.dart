@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
-import 'onboarding_screen.dart';
 import '../onboarding/user_type_selection_screen.dart';
+import '../onboarding/dynamic_onboarding_screen.dart';
 import '../../config/app_routes.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -88,7 +88,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => OnboardingScreen(userType: widget.userType),
+                builder: (_) => DynamicOnboardingScreen(),
               ),
             );
           } else {

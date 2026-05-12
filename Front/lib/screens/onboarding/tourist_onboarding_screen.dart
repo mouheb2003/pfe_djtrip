@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../theme/app_theme.dart';
+import '../../services/onboarding_service.dart';
 
 class TouristOnboardingScreen extends StatefulWidget {
   const TouristOnboardingScreen({super.key});
@@ -16,38 +18,47 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
   late Animation<double> _progressAnimation;
   
   int _currentPage = 0;
+  bool _isLoading = false;
+  
+  // Form data
+  final _phoneController = TextEditingController();
+  final _countryController = TextEditingController();
+  String? _selectedPhoneCountry;
+  String? _selectedLanguage;
+  String? _avatarUrl;
+  
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      title: 'Discover Amazing Activities',
-      subtitle: 'Find unique experiences tailored to your interests',
-      description: 'From adventure sports to cultural tours, explore thousands of activities worldwide',
-      icon: Icons.explore,
+      title: 'Phone Number',
+      subtitle: 'Add your phone number for better communication',
+      description: 'We\'ll use this to send you important updates about your bookings',
+      icon: Icons.phone,
       color: const Color(0xFF4B63FF),
-      image: 'assets/images/onboarding/tourist/discover.png',
+      stepId: 'phone',
     ),
     OnboardingPage(
-      title: 'Book with Confidence',
-      subtitle: 'Secure payments and verified organizers',
-      description: 'All organizers are verified and we offer secure payment processing for your peace of mind',
-      icon: Icons.security,
+      title: 'Profile Picture',
+      subtitle: 'Add a profile picture to personalize your account',
+      description: 'A photo helps organizers and other tourists recognize you',
+      icon: Icons.camera_alt,
       color: const Color(0xFF00B894),
-      image: 'assets/images/onboarding/tourist/booking.png',
+      stepId: 'profile_picture',
     ),
     OnboardingPage(
-      title: 'Connect with Locals',
-      subtitle: 'Meet authentic local guides and experts',
-      description: 'Learn from experienced locals who know the area better than anyone else',
-      icon: Icons.people,
+      title: 'Country',
+      subtitle: 'Tell us where you\'re from',
+      description: 'This helps us show you activities relevant to your location',
+      icon: Icons.public,
       color: const Color(0xFF9B59B6),
-      image: 'assets/images/onboarding/tourist/connect.png',
+      stepId: 'country',
     ),
     OnboardingPage(
-      title: 'Share Your Experience',
-      subtitle: 'Rate and review activities you\'ve enjoyed',
-      description: 'Help others make informed decisions by sharing your honest feedback',
-      icon: Icons.star_rate,
+      title: 'Preferred Language',
+      subtitle: 'Choose your preferred language',
+      description: 'We\'ll use this to communicate with you in your language',
+      icon: Icons.language,
       color: const Color(0xFFFFA502),
-      image: 'assets/images/onboarding/tourist/review.png',
+      stepId: 'language',
     ),
   ];
 
@@ -76,6 +87,8 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
   void dispose() {
     _pageController.dispose();
     _progressController.dispose();
+    _phoneController.dispose();
+    _countryController.dispose();
     super.dispose();
   }
 
@@ -89,8 +102,15 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
     _progressController.forward();
   }
 
-  void _onNext() {
+  Future<void> _onNext() async {
     HapticFeedback.lightImpact();
+    
+    // Validate and save current step
+    if (!_validateCurrentStep()) {
+      return;
+    }
+    
+    await _saveCurrentStep();
     
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
@@ -98,7 +118,7 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
         curve: Curves.easeInOut,
       );
     } else {
-      _completeOnboarding();
+      await _completeOnboarding();
     }
   }
 
@@ -116,13 +136,106 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
     }
   }
 
-  void _completeOnboarding() {
-    // Navigate to home screen
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/tourist_home',
-      (route) => false,
-    );
+  bool _validateCurrentStep() {
+    final stepId = _pages[_currentPage].stepId;
+    
+    switch (stepId) {
+      case 'phone':
+        if (_phoneController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter your phone number')),
+          );
+          return false;
+        }
+        break;
+      case 'country':
+        if (_countryController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter your country')),
+          );
+          return false;
+        }
+        break;
+      case 'language':
+        if (_selectedLanguage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select your preferred language')),
+          );
+          return false;
+        }
+        break;
+    }
+    return true;
+  }
+
+  Future<void> _saveCurrentStep() async {
+    final stepId = _pages[_currentPage].stepId;
+    Map<String, dynamic> stepData = {};
+    
+    switch (stepId) {
+      case 'phone':
+        stepData = {
+          'num_tel': _phoneController.text,
+          'pays_telephone': _selectedPhoneCountry ?? 'France',
+        };
+        break;
+      case 'profile_picture':
+        stepData = {
+          'avatar': _avatarUrl,
+        };
+        break;
+      case 'country':
+        stepData = {
+          'pays_origine': _countryController.text,
+        };
+        break;
+      case 'language':
+        stepData = {
+          'langue_preferee': _selectedLanguage ?? 'English',
+        };
+        break;
+    }
+    
+    try {
+      await OnboardingService.updateOnboardingStep(stepData);
+    } catch (e) {
+      print('Error saving step: $e');
+    }
+  }
+
+  Future<void> _completeOnboarding() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      await OnboardingService.completeOnboarding();
+      
+      if (!mounted) return;
+      
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/tourist_home',
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error completing onboarding: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+  
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (pickedFile != null) {
+      // TODO: Upload image to server and get URL
+      setState(() {
+        _avatarUrl = pickedFile.path;
+      });
+    }
   }
 
   @override
@@ -222,18 +335,28 @@ class _TouristOnboardingScreenState extends State<TouristOnboardingScreen>
             
             // Page Content
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                itemCount: _pages.length,
-                itemBuilder: (context, index) {
-                  return _OnboardingPageWidget(
-                    page: _pages[index],
-                    isLastPage: index == _pages.length - 1,
-                    onNext: _onNext,
-                  );
-                },
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : PageView.builder(
+                      controller: _pageController,
+                      onPageChanged: _onPageChanged,
+                      itemCount: _pages.length,
+                      itemBuilder: (context, index) {
+                        return _OnboardingPageWidget(
+                          page: _pages[index],
+                          isLastPage: index == _pages.length - 1,
+                          onNext: _onNext,
+                          phoneController: _phoneController,
+                          countryController: _countryController,
+                          selectedPhoneCountry: _selectedPhoneCountry,
+                          onPhoneCountryChanged: (value) => setState(() => _selectedPhoneCountry = value),
+                          selectedLanguage: _selectedLanguage,
+                          onLanguageChanged: (value) => setState(() => _selectedLanguage = value),
+                          avatarUrl: _avatarUrl,
+                          onPickImage: _pickImage,
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -246,11 +369,27 @@ class _OnboardingPageWidget extends StatefulWidget {
   final OnboardingPage page;
   final bool isLastPage;
   final VoidCallback onNext;
+  final TextEditingController phoneController;
+  final TextEditingController countryController;
+  final String? selectedPhoneCountry;
+  final Function(String?) onPhoneCountryChanged;
+  final String? selectedLanguage;
+  final Function(String?) onLanguageChanged;
+  final String? avatarUrl;
+  final VoidCallback onPickImage;
 
   const _OnboardingPageWidget({
     required this.page,
     required this.isLastPage,
     required this.onNext,
+    required this.phoneController,
+    required this.countryController,
+    required this.selectedPhoneCountry,
+    required this.onPhoneCountryChanged,
+    required this.selectedLanguage,
+    required this.onLanguageChanged,
+    required this.avatarUrl,
+    required this.onPickImage,
   });
 
   @override
@@ -303,86 +442,74 @@ class _OnboardingPageWidgetState extends State<_OnboardingPageWidget>
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
               
-              // Illustration Placeholder
-              Expanded(
-                flex: 2,
+              // Icon
+              Center(
                 child: Container(
-                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: widget.page.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: widget.page.color.withOpacity(0.2),
-                      width: 2,
-                    ),
+                    shape: BoxShape.circle,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        widget.page.icon,
-                        size: 80,
-                        color: widget.page.color,
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Illustration',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: widget.page.color.withOpacity(0.6),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    widget.page.icon,
+                    size: 64,
+                    color: widget.page.color,
                   ),
                 ),
               ),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               
-              // Content
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.page.title,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E225E),
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.page.subtitle,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: widget.page.color,
-                        height: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.page.description,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: const Color(0xFF6C757D),
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+              // Title
+              Text(
+                widget.page.title,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1E225E),
+                  height: 1.2,
                 ),
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 8),
+              
+              // Subtitle
+              Text(
+                widget.page.subtitle,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: widget.page.color,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              
+              // Description
+              Text(
+                widget.page.description,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: const Color(0xFF6C757D),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Form fields based on step
+              _buildFormFields(),
+              
+              const SizedBox(height: 32),
               
               // Next Button
               SizedBox(
@@ -402,13 +529,16 @@ class _OnboardingPageWidgetState extends State<_OnboardingPageWidget>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        widget.isLastPage ? 'Get Started' : 'Next',
+                        widget.isLastPage ? 'Complete' : 'Next',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       if (widget.isLastPage) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.check, size: 20),
+                      ] else ...[
                         const SizedBox(width: 8),
                         const Icon(Icons.arrow_forward, size: 20),
                       ],
@@ -424,6 +554,157 @@ class _OnboardingPageWidgetState extends State<_OnboardingPageWidget>
       ),
     );
   }
+
+  Widget _buildFormFields() {
+    switch (widget.page.stepId) {
+      case 'phone':
+        return Column(
+          children: [
+            // Phone Country Dropdown
+            DropdownButtonFormField<String>(
+              value: widget.selectedPhoneCountry,
+              decoration: InputDecoration(
+                labelText: 'Phone Country',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              items: const [
+                DropdownMenuItem(value: 'France', child: Text('France (+33)')),
+                DropdownMenuItem(value: 'Tunisia', child: Text('Tunisia (+216)')),
+                DropdownMenuItem(value: 'USA', child: Text('USA (+1)')),
+                DropdownMenuItem(value: 'UK', child: Text('UK (+44)')),
+                DropdownMenuItem(value: 'Germany', child: Text('Germany (+49)')),
+                DropdownMenuItem(value: 'Italy', child: Text('Italy (+39)')),
+                DropdownMenuItem(value: 'Spain', child: Text('Spain (+34)')),
+              ],
+              onChanged: widget.onPhoneCountryChanged,
+            ),
+            const SizedBox(height: 16),
+            // Phone Number Input
+            TextField(
+              controller: widget.phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Phone Number',
+                hintText: 'Enter your phone number',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.phone),
+              ),
+            ),
+          ],
+        );
+      
+      case 'profile_picture':
+        return Column(
+          children: [
+            GestureDetector(
+              onTap: widget.onPickImage,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: widget.page.color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: widget.page.color.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: widget.avatarUrl != null
+                    ? ClipOval(
+                        child: Image.network(
+                          widget.avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.person,
+                              size: 48,
+                              color: widget.page.color.withOpacity(0.5),
+                            );
+                          },
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt,
+                            size: 32,
+                            color: widget.page.color.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to upload',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: widget.page.color.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Optional - You can add this later',
+              style: TextStyle(
+                fontSize: 12,
+                color: const Color(0xFF6C757D),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
+      
+      case 'country':
+        return TextField(
+          controller: widget.countryController,
+          decoration: InputDecoration(
+            labelText: 'Country',
+            hintText: 'Enter your country',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            prefixIcon: const Icon(Icons.public),
+          ),
+        );
+      
+      case 'language':
+        return DropdownButtonFormField<String>(
+          value: widget.selectedLanguage,
+          decoration: InputDecoration(
+            labelText: 'Preferred Language',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            prefixIcon: const Icon(Icons.language),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'English', child: Text('English')),
+            DropdownMenuItem(value: 'French', child: Text('Français')),
+            DropdownMenuItem(value: 'Arabic', child: Text('العربية')),
+            DropdownMenuItem(value: 'Spanish', child: Text('Español')),
+            DropdownMenuItem(value: 'German', child: Text('Deutsch')),
+            DropdownMenuItem(value: 'Italian', child: Text('Italiano')),
+          ],
+          onChanged: widget.onLanguageChanged,
+        );
+      
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 }
 
 class OnboardingPage {
@@ -432,7 +713,7 @@ class OnboardingPage {
   final String description;
   final IconData icon;
   final Color color;
-  final String image;
+  final String stepId;
 
   OnboardingPage({
     required this.title,
@@ -440,6 +721,6 @@ class OnboardingPage {
     required this.description,
     required this.icon,
     required this.color,
-    required this.image,
+    required this.stepId,
   });
 }

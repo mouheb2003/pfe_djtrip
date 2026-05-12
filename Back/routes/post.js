@@ -118,5 +118,11 @@ router.delete(
   invalidateCache(["posts:feed", "posts:admin", "posts:me", "posts:comments"]),
   postController.deletePostByAdmin,
 );
+router.patch(
+  "/:postId/archive",
+  verifyToken,
+  invalidateCache(["posts:feed", "posts:me"]),
+  postController.archivePost,
+);
 
 module.exports = wrapRouter(router);

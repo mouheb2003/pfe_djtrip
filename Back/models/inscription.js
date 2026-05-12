@@ -207,6 +207,63 @@ inscriptionSchema.methods.shouldShowReviewReminder = async function () {
   return true;
 };
 
+// Static method to check for booking overlaps
+inscriptionSchema.statics.checkBookingOverlap = async function (touristeId, newActivityStartDate, newActivityEndDate, excludeInscriptionId = null) {
+  try {
+    const Activite = require("./activite");
+    
+    // Find all approved bookings for the tourist
+    const filter = {
+      touriste_id: touristeId,
+      statut: { $in: ["approuvee", "verifie", "PAID_PENDING_CONFIRMATION"] }
+    };
+    
+    // Exclude current inscription if updating
+    if (excludeInscriptionId) {
+      filter._id = { $ne: excludeInscriptionId };
+    }
+    
+    const existingBookings = await this.find(filter)
+      .populate("activite_id", "date_debut date_fin duree titre");
+    
+    console.log(`[OVERLAP CHECK] Checking ${existingBookings.length} existing bookings for tourist ${touristeId}`);
+    
+    for (const booking of existingBookings) {
+      if (!booking.activite_id) continue;
+      
+      const existingStart = new Date(booking.activite_id.date_debut);
+      const existingEnd = new Date(booking.activite_id.date_fin);
+      
+      // Check if dates overlap
+      // Two periods overlap if: (start1 < end2) AND (start2 < end1)
+      const overlaps = 
+        (newActivityStartDate < existingEnd) && 
+        (newActivityEndDate > existingStart);
+      
+      if (overlaps) {
+        console.log(`[OVERLAP DETECTED] New activity ${newActivityStartDate} - ${newActivityEndDate} overlaps with existing booking ${booking.activite_id.titre} (${existingStart} - ${existingEnd})`);
+        return {
+          hasOverlap: true,
+          conflictingBooking: {
+            inscriptionId: booking._id,
+            activityTitle: booking.activite_id.titre,
+            startDate: existingStart,
+            endDate: existingEnd,
+            status: booking.statut
+          }
+        };
+      }
+    }
+    
+    console.log(`[OVERLAP CHECK] No overlaps found for tourist ${touristeId}`);
+    return { hasOverlap: false };
+    
+  } catch (error) {
+    console.error("[OVERLAP CHECK] Error checking booking overlap:", error);
+    throw error;
+  }
+};
+
 const Inscription = mongoose.model("Inscription", inscriptionSchema);
 
 module.exports = Inscription;

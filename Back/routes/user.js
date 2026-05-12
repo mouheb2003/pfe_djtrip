@@ -50,6 +50,89 @@ router.post(
   userController.logout,
 );
 
+// POST /disconnect-all - Disconnect all users (temporarily for testing)
+router.post('/disconnect-all', verifyToken, async (req, res) => {
+  try {
+    // Temporarily remove admin check for testing
+    console.log(`🔌 [DISCONNECT_ALL] User ${req.user.userId} requested to disconnect all users`);
+
+    console.log('🔌 [DISCONNECT_ALL] Admin requested to disconnect all users');
+    
+    // Update all users to offline status
+    const User = require('../models/user');
+    const result = await User.updateMany(
+      {}, // All users
+      { 
+        $set: { 
+          lastActiveAt: new Date(Date.now() - 60000), // Set to 60 seconds ago to ensure offline status
+          isOnline: false 
+        }
+      }
+    );
+
+    console.log(`🔌 [DISCONNECT_ALL] Updated ${result.modifiedCount} users to offline status`);
+    
+    res.json({
+      success: true,
+      message: `Successfully disconnected ${result.modifiedCount} users`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('❌ [DISCONNECT_ALL] Error disconnecting users:', err);
+    res.status(500).json({
+      message: "Error disconnecting users",
+      error: err.message
+    });
+  }
+});
+
+// POST /disconnect-all-test - Test endpoint without authentication
+router.post('/disconnect-all-test', async (req, res) => {
+  try {
+    console.log('🔌 [DISCONNECT_ALL_TEST] Test endpoint - disconnecting all users');
+    
+    // Update all users to offline status
+    const User = require('../models/user');
+    const result = await User.updateMany(
+      {}, // All users
+      { 
+        $set: { 
+          lastActiveAt: new Date(Date.now() - 60000), // Set to 60 seconds ago to ensure offline status
+          isOnline: false 
+        }
+      }
+    );
+
+    console.log(`🔌 [DISCONNECT_ALL_TEST] Updated ${result.modifiedCount} users to offline status`);
+    
+    res.json({
+      success: true,
+      message: `Successfully disconnected ${result.modifiedCount} users (TEST)`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('❌ [DISCONNECT_ALL_TEST] Error disconnecting users:', err);
+    res.status(500).json({
+      message: "Error disconnecting users",
+      error: err.message
+    });
+  }
+});
+
+// POST /heartbeat - Update user's last active timestamp (protected route)
+router.post(
+  "/heartbeat",
+  verifyToken,
+  userController.heartbeat,
+);
+
+// POST /heartbeat/:userId - Update specific user's last active timestamp (for admin/testing)
+router.post(
+  "/heartbeat/:userId",
+  verifyToken,
+  userController.heartbeatForUser,
+);
+
 // POST /refresh-token - Refresh access token
 router.post("/refresh-token", refreshToken);
 
@@ -222,6 +305,9 @@ router.put(
   verifyToken,
   userController.updateAdvancedSettings,
 );
+
+// GET /username/:username - Get user by username
+router.get("/username/:username", cacheGet("users:by-username", 60), userController.getUserByUsername);
 
 // GET /:id - Get user by ID
 router.get("/:id", cacheGet("users:by-id", 60), userController.getUserById);

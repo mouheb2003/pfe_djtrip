@@ -6,6 +6,28 @@ const bcrypt = require("bcryptjs");
 const emailService = require("./email");
 
 /**
+ * Calculate real-time online status based on lastActiveAt
+ * @param {Date} lastActiveAt - Last active timestamp
+ * @returns {Boolean} isReallyOnline
+ */
+function calculateOnlineStatus(lastActiveAt) {
+  if (!lastActiveAt) return false;
+  
+  const diff = Date.now() - new Date(lastActiveAt).getTime();
+  
+  // More conservative approach: user must be active within last 30 seconds to be "online"
+  // This prevents false positives from stale data
+  if (diff > 30000) return false;
+  
+  // Additional check: if activity is very recent (within 10 seconds), definitely online
+  if (diff < 10000) return true;
+  
+  // For 10-30 seconds range, check if it's reasonable to be online
+  // This accounts for network delays and slight timing variations
+  return diff < 30000;
+}
+
+/**
  * Service for managing user operations
  */
 class UserService {
@@ -28,7 +50,60 @@ class UserService {
       throw new Error("User not found");
     }
 
-    return user;
+    // Convert user to plain object and add presence information
+    const userObj = user.toObject();
+    
+    // Add real-time presence information
+    // Initialize lastActiveAt for existing users who don't have this field
+    if (!user.lastActiveAt) {
+      // Use derniere_connexion as fallback, or current time if not available
+      userObj.lastActiveAt = user.derniere_connexion || new Date();
+      
+      // Update the user document to include lastActiveAt for future requests
+      await User.findByIdAndUpdate(user._id, { 
+        $set: { lastActiveAt: userObj.lastActiveAt } 
+      });
+    } else {
+      userObj.lastActiveAt = user.lastActiveAt;
+    }
+    
+    userObj.isReallyOnline = calculateOnlineStatus(userObj.lastActiveAt);
+
+    return userObj;
+  }
+
+  /**
+   * Retrieves a user by their username
+   * @param {String} username - Username
+   * @returns {Promise<Object>} User
+   */
+  static async getUserByUsername(username) {
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Convert user to plain object and add presence information
+    const userObj = user.toObject();
+    
+    // Add real-time presence information
+    // Initialize lastActiveAt for existing users who don't have this field
+    if (!user.lastActiveAt) {
+      // Use derniere_connexion as fallback, or current time if not available
+      userObj.lastActiveAt = user.derniere_connexion || new Date();
+      
+      // Update the user document to include lastActiveAt for future requests
+      await User.findByIdAndUpdate(user._id, { 
+        $set: { lastActiveAt: userObj.lastActiveAt } 
+      });
+    } else {
+      userObj.lastActiveAt = user.lastActiveAt;
+    }
+    
+    userObj.isReallyOnline = calculateOnlineStatus(userObj.lastActiveAt);
+
+    return userObj;
   }
 
   /**
@@ -884,10 +959,24 @@ class UserService {
     const verificationCode = emailService.generateVerificationCode();
     const verificationCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
+    // Generate username if not provided
+    let username = userData.username;
+    if (!username) {
+      console.log(`🔧 Generating username for user: ${fullname} (${email})`);
+      username = await createUsernameForUser(fullname, async (testUsername) => {
+        const existingUser = await User.findOne({ username: testUsername });
+        return !!existingUser;
+      });
+      console.log(`✅ Generated username: ${username}`);
+    } else {
+      console.log(`📝 Using provided username: ${username}`);
+    }
+
     // Prepare base data
     const baseData = {
       fullname,
       email,
+      username,
       mot_de_passe: hashedPassword,
       date_inscription: new Date(),
       accountStatus: "active",

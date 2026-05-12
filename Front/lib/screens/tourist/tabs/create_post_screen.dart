@@ -7,7 +7,12 @@ import '../../../models/lieu_model.dart';
 import '../../../models/user_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../services/post_service.dart';
+import '../../../services/ai_text_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/mention_input_widget.dart';
+import '../../../widgets/mention_zone_widget.dart';
+import '../../../widgets/ai_text_widgets.dart';
+import '../../../screens/organizer/interactive_djerba_map_screen.dart';
 import '../lieux_map_screen.dart';
 
 class CreatePostScreen extends StatefulWidget {
@@ -24,8 +29,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _locationCtrl = TextEditingController();
   final List<XFile> _images = [];
   final List<String> _hashtags = [];
+  final List<String> _mentions = [];
 
   bool _publishing = false;
+  bool _isProcessingAi = false;
 
   Future<void> _pickImages() async {
     final picked = await ImagePicker().pickMultiImage(
@@ -63,18 +70,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickPlaceFromMap() async {
-    final lieux = await LieuService.getLieux();
-    if (!mounted) return;
-
-    final selected = await Navigator.push<LieuModel>(
+    final result = await Navigator.push<MapPickerResult>(
       context,
       MaterialPageRoute(
-        builder: (_) => LieuxMapScreen(lieux: lieux, selectionMode: true),
+        builder: (_) => const InteractiveDjerbaMapScreen(),
       ),
     );
 
-    if (selected == null) return;
-    setState(() => _locationCtrl.text = selected.titre);
+    if (result == null) return;
+    setState(() => _locationCtrl.text = result.address);
   }
 
   Future<void> _mentionPlace() async {
@@ -174,6 +178,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() => _hashtags.add(normalized));
   }
 
+  void _onMentionAdded(String username) {
+    if (!_mentions.contains(username)) {
+      setState(() => _mentions.add(username));
+      // Debug print
+      print('[CreatePost] Mention added: @$username, total mentions: $_mentions');
+    } else {
+      print('[CreatePost] Mention already exists: @$username');
+    }
+  }
+
   Future<void> _publish() async {
     if (_publishing) return;
     final content = _contentCtrl.text.trim();
@@ -192,12 +206,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       if (url != null && url.isNotEmpty) imageUrls.add(url);
     }
 
+    // Debug print before sending
+    print('[CreatePost] Publishing with mentions: $_mentions');
+    print('[CreatePost] Publishing with hashtags: $_hashtags');
+    print('[CreatePost] Content: $content');
+    
     final result = await PostService.createPost(
       content: content,
-      imageUrl: imageUrls.isNotEmpty ? imageUrls.first : '',
       imageUrls: imageUrls,
       locationLabel: _locationCtrl.text.trim(),
       hashtags: _hashtags,
+      mentions: _mentions,
     );
 
     if (!mounted) return;
@@ -215,6 +234,123 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildAiActionButtons(TextEditingController controller, String fieldType) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Rewrite button
+        AiActionButton(
+          icon: Icons.auto_fix_high,
+          tooltip: 'Rewrite',
+          onPressed: _isProcessingAi ? null : () => _rewriteFieldText(controller, fieldType),
+        ),
+        const SizedBox(width: 4),
+        // Improve button  
+        AiActionButton(
+          icon: Icons.spellcheck,
+          tooltip: 'Improve',
+          onPressed: _isProcessingAi ? null : () => _improveFieldText(controller, fieldType),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _rewriteFieldText(TextEditingController controller, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.rewriteText(
+        text,
+        type: 'post',
+        title: fieldType == 'post' ? _locationCtrl.text.trim() : null,
+        description: fieldType == 'post' ? _contentCtrl.text.trim() : null,
+      );
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        controller.text = result['result'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post rewritten successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to rewrite post'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to rewrite post. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _improveFieldText(TextEditingController controller, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.improveText(
+        text,
+        type: 'post',
+        title: fieldType == 'post' ? _locationCtrl.text.trim() : null,
+        description: fieldType == 'post' ? _contentCtrl.text.trim() : null,
+      );
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        controller.text = result['result'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post improved successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to improve post'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to improve post. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
   }
 
   @override
@@ -296,19 +432,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            TextField(
+            MentionInputWidget(
               controller: _contentCtrl,
-              minLines: 4,
-              maxLines: 8,
-              style: const TextStyle(
-                fontSize: 20,
-                height: 1.25,
-                color: Color(0xFF3B4371),
-              ),
-              decoration: const InputDecoration(
-                hintText: "What's happening in Djerba?",
-                border: InputBorder.none,
-              ),
+              onMentionAdded: _onMentionAdded,
+              focusNode: FocusNode(skipTraversal: true),
+            ),
+            const SizedBox(height: 20),
+            MentionZoneWidget(
+              selectedMentions: _mentions,
+              onMentionsChanged: (newMentions) {
+                setState(() {
+                  _mentions.clear();
+                  _mentions.addAll(newMentions);
+                  
+                  // Ajouter les mentions au contenu du texte
+                  final currentContent = _contentCtrl.text;
+                  final mentionsText = newMentions.map((m) => '@$m').join(' ');
+                  final newContent = '$currentContent $mentionsText'.trim();
+                  _contentCtrl.text = newContent;
+                });
+              },
             ),
             const SizedBox(height: 8),
             _UploadButton(onTap: _pickImages, count: _images.length),

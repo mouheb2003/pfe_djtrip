@@ -5,6 +5,10 @@ class ActivityModel {
   final String typeActivite;
   final String categorie;
   final String lieu;
+  final String? locationType;
+  final String? itineraire;
+  final List<Map<String, dynamic>>? itineraireSteps;
+  final List<Map<String, dynamic>>? itineraireCoords;
   final double duree;
   final double prix;
   final int capaciteMax;
@@ -33,6 +37,10 @@ class ActivityModel {
     required this.typeActivite,
     this.categorie = '',
     required this.lieu,
+    this.locationType,
+    this.itineraire,
+    this.itineraireSteps,
+    this.itineraireCoords,
     required this.duree,
     required this.prix,
     required this.capaciteMax,
@@ -104,6 +112,35 @@ class ActivityModel {
       return [];
     }
 
+    List<Map<String, dynamic>> parseSteps(dynamic value) {
+      if (value is! List) return [];
+      return value
+          .whereType<Map>()
+          .map(
+            (step) => step.map((key, value) => MapEntry(key.toString(), value)),
+          )
+          .toList();
+    }
+
+    final itineraireValue = json['itineraire'];
+    final itinerarySteps = parseSteps(itineraireValue);
+    final itineraryText = itineraireValue is String
+        ? itineraireValue
+        : itinerarySteps.isNotEmpty
+        ? itinerarySteps
+              .map((step) {
+                final title = step['title']?.toString() ?? '';
+                final description = step['description']?.toString() ?? '';
+                final address = step['address']?.toString() ?? '';
+                final parts = <String>[];
+                if (title.isNotEmpty) parts.add(title);
+                if (description.isNotEmpty) parts.add(description);
+                if (address.isNotEmpty) parts.add(address);
+                return parts.join(' - ');
+              })
+              .join('\n')
+        : null;
+
     return ActivityModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       titre: json['titre']?.toString() ?? '',
@@ -111,6 +148,14 @@ class ActivityModel {
       typeActivite: json['type_activite']?.toString() ?? '',
       categorie: json['categorie']?.toString() ?? 'Other',
       lieu: json['lieu']?.toString() ?? '',
+      locationType: json['location_type']?.toString(),
+      itineraire: itineraryText,
+      itineraireSteps: itinerarySteps.isNotEmpty ? itinerarySteps : null,
+      itineraireCoords: json['itineraire_coords'] is List
+          ? (json['itineraire_coords'] as List)
+                .map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
+                .toList()
+          : [],
       duree: toDouble(json['duree']),
       prix: toDouble(json['prix']),
       capaciteMax: nToInt(json['capacite_max']),
@@ -205,23 +250,24 @@ class ActivityModel {
   // Format lieu to show place name instead of coordinates
   String get formattedLieu {
     if (lieu.isEmpty) return 'Location not specified';
-    
+
     final trimmed = lieu.trim();
-    
+
     // Strict GPS coordinate pattern: two decimal numbers separated by comma or space
     // Valid coordinates: lat between -90 and 90, lng between -180 and 180
     final coordPattern = RegExp(
-      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s*,\s*-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$'
+      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s*,\s*-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$',
     );
-    
+
     // Alternative pattern with space separator
     final coordPatternSpace = RegExp(
-      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s+-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$'
+      r'^-?(?:90(?:\.0+)?|[1-8]?\d(?:\.\d+)?)\s+-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[1-9]?\d(?:\.\d+)?)$',
     );
-    
+
     // Check if it's clearly GPS coordinates (two numbers with decimals)
-    final isCoordinates = coordPattern.hasMatch(trimmed) || coordPatternSpace.hasMatch(trimmed);
-    
+    final isCoordinates =
+        coordPattern.hasMatch(trimmed) || coordPatternSpace.hasMatch(trimmed);
+
     if (isCoordinates) {
       // It's GPS coordinates - try to use coordinates map if available
       if (coordonnees != null && coordonnees!.containsKey('name')) {
@@ -231,7 +277,7 @@ class ActivityModel {
       // If no name available, show the actual coordinates
       return lieu;
     }
-    
+
     // Not coordinates - return the original value
     return lieu;
   }
@@ -310,6 +356,7 @@ class ActivityModel {
     List<DateTime>? datesDisponibles,
     Map<String, dynamic>? organisateur,
     Map<String, dynamic>? coordonnees,
+    List<Map<String, dynamic>>? itineraireSteps,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isBookmarked,
@@ -338,6 +385,7 @@ class ActivityModel {
       datesDisponibles: datesDisponibles ?? this.datesDisponibles,
       organisateur: organisateur ?? this.organisateur,
       coordonnees: coordonnees ?? this.coordonnees,
+      itineraireSteps: itineraireSteps ?? this.itineraireSteps,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isBookmarked: isBookmarked ?? this.isBookmarked,

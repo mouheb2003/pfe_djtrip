@@ -718,11 +718,11 @@ async function sendAppealCreatedNotification({ userId, appealId }) {
 }
 
 async function sendAppealResolvedNotification({ userId, appealId, status }) {
-  const title = status === 'approved' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌';
+  const title = status === 'accepted' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌';
   return sendPushNotificationQueued({
     userId,
     title,
-    body: `Your appeal has been ${status === 'approved' ? 'accepted' : 'rejected'}`,
+    body: `Your appeal has been ${status === 'accepted' ? 'accepted' : 'rejected'}`,
     data: {
       type: 'appeal_resolved',
       appealId,

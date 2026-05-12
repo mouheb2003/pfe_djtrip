@@ -9,8 +9,8 @@ import '../../services/onboarding_service.dart';
 import '../../services/navigation_service.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_screen.dart';
-import 'onboarding_screen.dart';
 import '../onboarding/user_type_selection_screen.dart';
+import '../onboarding/dynamic_onboarding_screen.dart';
 import '../organizer/waiting_approval_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -38,63 +38,104 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordCtrl.addListener(_updateCredentialsIfRemembered);
   }
 
-  void _updateCredentialsIfRemembered() {
-    if (_rememberMe) {
+  void _updateCredentialsIfRemembered() async {
+    if (_rememberMe && mounted) {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
       if (email.isNotEmpty && password.isNotEmpty) {
-        final storage = FlutterSecureStorage();
-        storage.write(key: 'remembered_email', value: email);
-        storage.write(key: 'remembered_password', value: password);
+        try {
+          final storage = FlutterSecureStorage();
+          await storage.write(key: 'remembered_email', value: email);
+          await storage.write(key: 'remembered_password', value: password);
+          debugPrint('✅ Remember Me: Saved credentials for $email');
+        } catch (e) {
+          debugPrint('❌ Remember Me: Error saving credentials: $e');
+        }
       }
     }
   }
 
   Future<void> _loadRememberedEmail() async {
-    final storage = FlutterSecureStorage();
-    final savedEmail = await storage.read(key: 'remembered_email');
-    if (savedEmail != null && savedEmail.isNotEmpty) {
+    try {
+      final storage = FlutterSecureStorage();
+      final savedEmail = await storage.read(key: 'remembered_email');
       final savedPassword = await storage.read(key: 'remembered_password');
-      setState(() {
-        _emailCtrl.text = savedEmail;
-        if (savedPassword != null && savedPassword.isNotEmpty) {
-          _passwordCtrl.text = savedPassword;
+      
+      debugPrint('🔍 Remember Me: Loading saved credentials...');
+      debugPrint('🔍 Saved email: ${savedEmail ?? 'null'}');
+      debugPrint('🔍 Saved password: ${savedPassword != null ? '***' : 'null'}');
+      
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _emailCtrl.text = savedEmail;
+            if (savedPassword != null && savedPassword.isNotEmpty) {
+              _passwordCtrl.text = savedPassword;
+            }
+            _rememberMe = true;
+          });
+          debugPrint('✅ Remember Me: Loaded credentials for $savedEmail');
         }
-        _rememberMe = true;
-      });
-    } else {
-      setState(() {
-        _rememberMe = false;
-      });
+      } else {
+        if (mounted) {
+          setState(() {
+            _rememberMe = false;
+          });
+          debugPrint('ℹ️ Remember Me: No saved credentials found');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Remember Me: Error loading credentials: $e');
+      if (mounted) {
+        setState(() {
+          _rememberMe = false;
+        });
+      }
     }
   }
 
   Future<void> _saveRememberedEmail(String email, String password) async {
-    final storage = FlutterSecureStorage();
-    if (_rememberMe) {
-      await storage.write(key: 'remembered_email', value: email);
-      await storage.write(key: 'remembered_password', value: password);
-    } else {
-      await storage.delete(key: 'remembered_email');
-      await storage.delete(key: 'remembered_password');
+    try {
+      final storage = FlutterSecureStorage();
+      if (_rememberMe) {
+        await storage.write(key: 'remembered_email', value: email);
+        await storage.write(key: 'remembered_password', value: password);
+        debugPrint('✅ Remember Me: Saved credentials on successful login for $email');
+      } else {
+        await storage.delete(key: 'remembered_email');
+        await storage.delete(key: 'remembered_password');
+        debugPrint('🗑️ Remember Me: Deleted credentials');
+      }
+    } catch (e) {
+      debugPrint('❌ Remember Me: Error saving credentials on login: $e');
     }
   }
 
   Future<void> _toggleRememberMe(bool value) async {
+    debugPrint('🔄 Remember Me: Toggled to $value');
     setState(() => _rememberMe = value);
-    final storage = FlutterSecureStorage();
-    if (value) {
-      // Save immediately when checked
-      final email = _emailCtrl.text.trim();
-      final password = _passwordCtrl.text;
-      if (email.isNotEmpty && password.isNotEmpty) {
-        await storage.write(key: 'remembered_email', value: email);
-        await storage.write(key: 'remembered_password', value: password);
+    
+    try {
+      final storage = FlutterSecureStorage();
+      if (value) {
+        // Save immediately when checked
+        final email = _emailCtrl.text.trim();
+        final password = _passwordCtrl.text;
+        if (email.isNotEmpty && password.isNotEmpty) {
+          await storage.write(key: 'remembered_email', value: email);
+          await storage.write(key: 'remembered_password', value: password);
+          debugPrint('✅ Remember Me: Checked - saved credentials for $email');
+        } else {
+          debugPrint('⚠️ Remember Me: Checked but fields are empty');
+        }
+      } else {
+        // Delete immediately when unchecked
+        await storage.delete(key: 'remembered_email');
+        await storage.delete(key: 'remembered_password');
+        debugPrint('🗑️ Remember Me: Unchecked - deleted saved credentials');
       }
-    } else {
-      // Delete immediately when unchecked
-      await storage.delete(key: 'remembered_email');
-      await storage.delete(key: 'remembered_password');
+    } catch (e) {
+      debugPrint('❌ Remember Me: Error toggling: $e');
     }
   }
 
@@ -144,7 +185,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (result['success'] == true) {
-        // Credentials are already saved in real-time via _toggleRememberMe and _updateCredentialsIfRemembered
+        // Save credentials on successful login if Remember Me is checked
+        // Use the current state of _rememberMe at the time of successful login
+        if (_rememberMe) {
+          await _saveRememberedEmail(email, password);
+        }
         final user = result['user'] as Map<String, dynamic>?;
         final userType = user?['userType'] as String? ?? 'Touriste';
 
@@ -180,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => OnboardingScreen(userType: userType),
+                builder: (_) => DynamicOnboardingScreen(),
               ),
             );
           } else {

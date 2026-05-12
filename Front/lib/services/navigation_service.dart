@@ -5,8 +5,8 @@ import 'dart:convert';
 
 import '../config/app_routes.dart';
 import '../screens/shared/appeal_form_screen.dart';
+import '../screens/onboarding/dynamic_onboarding_screen.dart';
 import '../models/user_model.dart';
-import '../screens/auth/onboarding_screen.dart';
 import 'auth_service.dart';
 
 class NavigationService {
@@ -31,10 +31,11 @@ class NavigationService {
         raw: restriction,
       );
 
-      // Only show restriction dialog if there's a valid restriction type
-      // This prevents false positives from generic error messages
-      if (payload.type.isNotEmpty && 
-          (payload.isBanned || payload.isSuspended)) {
+      // Show restriction dialog ONLY if user is actually banned/suspended
+      // Verify current user status before showing popup to avoid false positives
+      final shouldShowPopup = await _verifyUserRestrictionStatus(payload);
+      
+      if (shouldShowPopup) {
         final dialogContext = navigator.overlay?.context;
         if (dialogContext != null) {
           await showDialog<void>(
@@ -51,6 +52,51 @@ class NavigationService {
     _isRedirecting = false;
   }
 
+  /// Verify if user is actually banned/suspended before showing popup
+  /// This prevents false positives from generic error messages
+  static Future<bool> _verifyUserRestrictionStatus(_RestrictionPayload payload) async {
+    try {
+      debugPrint('🔍 Verifying user restriction status...');
+      debugPrint('🔍 Payload type: "${payload.type}"');
+      debugPrint('🔍 Payload reason: "${payload.reason}"');
+      debugPrint('🔍 Payload message: "${payload.message}"');
+      
+      // If no clear indication of restriction, don't show popup
+      if (payload.type.isEmpty && 
+          !payload.message.toLowerCase().contains('banned') && 
+          !payload.message.toLowerCase().contains('suspended') &&
+          !payload.reason.toLowerCase().contains('banned') &&
+          !payload.reason.toLowerCase().contains('suspended')) {
+        debugPrint('❌ No clear restriction indication found, skipping popup');
+        return false;
+      }
+
+      // Check if it's a clear ban/suspension message
+      final messageLower = payload.message.toLowerCase();
+      final reasonLower = payload.reason.toLowerCase();
+      
+      final isBannedMessage = messageLower.contains('banned') || 
+                           reasonLower.contains('banned') ||
+                           payload.type.toLowerCase() == 'banned';
+      
+      final isSuspendedMessage = messageLower.contains('suspended') || 
+                             reasonLower.contains('suspended') ||
+                             payload.type.toLowerCase() == 'suspended';
+
+      if (isBannedMessage || isSuspendedMessage) {
+        debugPrint('✅ Confirmed restriction detected: ${isBannedMessage ? "BANNED" : "SUSPENDED"}');
+        return true;
+      }
+
+      debugPrint('❌ No valid restriction pattern found, skipping popup');
+      return false;
+    } catch (e) {
+      debugPrint('❌ Error verifying restriction status: $e');
+      // On error, don't show popup to avoid false positives
+      return false;
+    }
+  }
+
   static Future<void> navigateToOnboarding({String? userType}) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
@@ -58,11 +104,38 @@ class NavigationService {
     // If no userType provided, navigate to user type selection screen first
     if (userType == null) {
       navigator.pushReplacementNamed(AppRoutes.userTypeSelection);
-    } else {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => OnboardingScreen(userType: userType)),
-      );
+      return;
     }
+
+    // Check user's onboarding and approval status
+    final user = await AuthService.getUser();
+    if (user == null) {
+      navigator.pushReplacementNamed(AppRoutes.login);
+      return;
+    }
+
+    final isOnboarded = user['is_onboarded'] ?? false;
+    final isApproved = user['is_approved'] ?? true;
+    final requiresApproval = (userType == 'Organisator' || userType == 'Organizer');
+
+    // If not onboarded, go to onboarding screen
+    if (!isOnboarded) {
+      navigator.pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => DynamicOnboardingScreen(),
+        ),
+      );
+      return;
+    }
+
+    // If organizer and not approved, go to waiting approval
+    if (requiresApproval && !isApproved) {
+      navigateToWaitingApproval();
+      return;
+    }
+
+    // Otherwise, go to home
+    navigateToHome(userType: userType);
   }
 
   static void navigateToWaitingApproval() {
@@ -98,8 +171,12 @@ class _RestrictionPayload {
     required this.remainingSeconds,
   });
 
-  bool get isBanned => type == 'banned';
-  bool get isSuspended => type == 'suspended';
+  bool get isBanned => type.toLowerCase() == 'banned' || 
+                     message.toLowerCase().contains('banned') || 
+                     reason.toLowerCase().contains('banned');
+  bool get isSuspended => type.toLowerCase() == 'suspended' || 
+                        message.toLowerCase().contains('suspend') || 
+                        reason.toLowerCase().contains('suspend');
 
   UserStatus get toUserStatus {
     if (isBanned) return UserStatus.banned;
@@ -324,7 +401,56 @@ class _AccountRestrictedDialogState extends State<_AccountRestrictedDialog> {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Reason Display
+            if (widget.payload.reason.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: themeColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: themeColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: themeColor,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Raison:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: themeColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.payload.reason,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // Suspension Timer Card
             if (isSuspended) ...[

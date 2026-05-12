@@ -12,6 +12,7 @@ import 'change_password_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'help_center_screen.dart';
 import '../settings/privacy_settings_screen.dart';
+import '../settings/simple_notification_settings_screen.dart';
 import '../../services/user_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -339,11 +340,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               onTap: () => _showInfo('Language selector coming soon.'),
             ),
-            _SettingsTileSwitch(
+            _SettingsTile(
               icon: Icons.notifications,
               label: 'Notifications',
-              value: _notificationsEnabled,
-              onChanged: _updateNotificationSetting,
+              trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SimpleNotificationSettingsScreen(),
+                ),
+              ),
             ),
             _SettingsTileSwitch(
               icon: Icons.dark_mode,

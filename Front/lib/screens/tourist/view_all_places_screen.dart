@@ -595,7 +595,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
             mainAxisSize: MainAxisSize.min,
             children: [
               // Image section
-              Flexible(
+              Expanded(
                 flex: 3,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -645,9 +645,8 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                 ),
               ),
               // Content section
-              Flexible(
+              Expanded(
                 flex: 2,
-                fit: FlexFit.tight,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(

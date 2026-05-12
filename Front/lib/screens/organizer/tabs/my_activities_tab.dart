@@ -11,6 +11,7 @@ import '../../notifications_screen.dart';
 import '../create_activity_screen.dart';
 import '../edit_activity_screen.dart';
 import '../verify_booking_screen.dart';
+import '../../shared/ai_chat_screen.dart';
 
 class MyActivitiesTab extends StatefulWidget {
   const MyActivitiesTab({super.key});
@@ -302,9 +303,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SafeArea(
           child: Padding(
@@ -323,10 +324,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                 const SizedBox(height: 20),
                 Text(
                   activity.titre,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1B2458),
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
@@ -414,7 +415,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -519,13 +520,13 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
@@ -828,104 +829,131 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
 
   Widget _buildFloatingButtons() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2, right: 2),
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width - 32,
-        child: Row(
-          children: [
-            const Spacer(),
-            // Verify Booking Button
-            Material(
-              color: Colors.transparent,
-              elevation: 8,
-              borderRadius: BorderRadius.circular(24),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VerifyBookingScreen(),
-                    ),
-                  );
-                },
-                child: Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 17),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2E9D45).withOpacity(0.38),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Verify Booking',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Create Activity FAB
-            Hero(
-              tag: 'organizer_fab',
+      padding: const EdgeInsets.only(bottom: 100, left: 190),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Chatbot FAB
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: Hero(
+              tag: 'ai_chat_fab_organizer',
               child: Material(
-                color: AppColors.primary,
+                color: const Color(0xFFFF6B1A),
+                elevation: 8,
                 shape: const CircleBorder(),
-                elevation: 6,
                 child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () async {
-                    final created = await Navigator.push<bool>(
+                  borderRadius: BorderRadius.circular(28),
+                  onTap: () {
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const CreateActivityScreen(),
+                        builder: (context) => const AiChatScreen(),
                       ),
                     );
-                    if (created == true) _loadActivities(refresh: true);
                   },
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.primary, AppColors.primaryDark],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 30,
-                    ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Icon(Icons.smart_toy, color: Colors.white, size: 22),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          // Verify Booking Button
+          Material(
+            color: Colors.transparent,
+            elevation: 8,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const VerifyBookingScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E9D45).withOpacity(0.38),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white, size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      'Verify Booking',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Create Activity FAB
+          Hero(
+            tag: 'organizer_fab',
+            child: Material(
+              color: AppColors.primary,
+              shape: const CircleBorder(),
+              elevation: 6,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () async {
+                  final created = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CreateActivityScreen(),
+                    ),
+                  );
+                  if (created == true) _loadActivities(refresh: true);
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.primary, AppColors.primaryDark],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1192,10 +1220,10 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                       Expanded(
                         child: Text(
                           widget.activity.formattedLieu,
-                          style: const TextStyle(
-                            fontSize: 13,
+                          style: TextStyle(
+                            fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF6B7280),
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

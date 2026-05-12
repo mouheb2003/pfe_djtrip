@@ -71,11 +71,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       // Backend expects 'Touriste' / 'Organisator' — keep these values as-is
+      // Note: username is optional - backend will auto-generate if not provided
       final result = await AuthService.signUp(
         fullname: name,
         email: email,
         password: password,
         userType: _isTourist ? 'Touriste' : 'Organisator',
+        // username: null, // Let backend auto-generate unique username
       );
 
       if (!mounted) return;

@@ -18,6 +18,7 @@ import '../payment/stripe_payment_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
+import 'add_review_modal.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final String activityId;
@@ -33,7 +34,8 @@ class ActivityDetailScreen extends StatefulWidget {
   State<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
 }
 
-class _ActivityDetailScreenState extends State<ActivityDetailScreen> with WidgetsBindingObserver {
+class _ActivityDetailScreenState extends State<ActivityDetailScreen>
+    with WidgetsBindingObserver {
   bool _showFullDesc = false;
   late PageController _pageController;
   Timer? _carouselTimer;
@@ -48,17 +50,24 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
   bool _loadingParticipants = false;
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingReviews = false;
+  String? _errorMsg;
+  
+  // Ongoing review state
+  int _activityRating = 0;
+  int _organizerRating = 0;
+  bool _isSubmittingReview = false;
+  final _reviewController = TextEditingController();
 
   final _images = const [
-    // Djerba beach images
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1519046904884-53103b34b206?q=80&w=1600&auto=format&fit=crop',
+    // Djerba beach images - using reliable URLs
+    'https://picsum.photos/seed/djerba-beach-1/1600/900.jpg',
+    'https://picsum.photos/seed/djerba-beach-2/1600/900.jpg',
     // Djerba palm trees and landscape
-    'https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1473187983305-f6153f717574?q=80&w=1600&auto=format&fit=crop',
+    'https://picsum.photos/seed/djerba-palms/1600/900.jpg',
+    'https://picsum.photos/seed/djerba-landscape/1600/900.jpg',
     // Djerba culture and architecture
-    'https://images.unsplash.com/photo-1549140600-78e9c8b3e8c9?q=80&w=1600&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1600&auto=format&fit=crop',
+    'https://picsum.photos/seed/djerba-culture/1600/900.jpg',
+    'https://picsum.photos/seed/djerba-architecture/1600/900.jpg',
   ];
 
   List<String> get _displayImages {
@@ -113,13 +122,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
 
   bool get _isOrganizerUser {
     final role = _currentUserType.trim().toLowerCase();
-    return role == 'organisator' || role == 'organisateur' || role == 'organizer';
+    return role == 'organisator' ||
+        role == 'organisateur' ||
+        role == 'organizer';
   }
 
   bool get _isActivityOrganizer {
     if (_activity == null || _currentUserId.isEmpty) return false;
     final organizer = _activity?.organisateur;
-    final organizerId = (organizer?['_id'] ?? organizer?['id'] ?? '').toString().trim();
+    final organizerId = (organizer?['_id'] ?? organizer?['id'] ?? '')
+        .toString()
+        .trim();
     return organizerId == _currentUserId;
   }
 
@@ -128,6 +141,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     if (booking == null) return false;
     // If latest booking is cancelled, treat as no booking (allow rebooking)
     return !booking.isCancelled;
+  }
+
+  bool get _hasAlreadyReviewedActivity {
+    if (_reviews.isEmpty) return false;
+    return _reviews.any((review) {
+      final touristeId = review['touriste_id']?['_id']?.toString() ??
+          review['touriste_id']?['id']?.toString() ??
+          '';
+      return touristeId == _currentUserId;
+    });
   }
 
   bool get _hasPendingPaymentBooking {
@@ -146,6 +169,41 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     final booking = _bookingForActivity;
     if (booking == null) return false;
     return booking.isApproved;
+  }
+
+  /// Check if a participant can be displayed based on privacy settings
+  bool _canDisplayParticipant(Map<String, dynamic> participant) {
+    if (participant.isEmpty) return false;
+    
+    // Extract ID from both possible structures (same logic as in logging)
+    String participantUserId = '';
+    if (participant['touriste']?['_id'] != null) {
+      participantUserId = participant['touriste']['_id'].toString();
+    } else if (participant['touriste_id']?['_id'] != null) {
+      participantUserId = participant['touriste_id']['_id'].toString();
+    } else {
+      participantUserId = (participant['touriste']?['_id'] ?? participant['touriste']?['id'] ?? '').toString();
+    }
+    
+    if (participantUserId.isEmpty) return false;
+    
+    print('🔍 [PARTICIPANT DEBUG FRONTEND] participantUserId: "$participantUserId"');
+    print('🔍 [PARTICIPANT DEBUG FRONTEND] _currentUserId: "$_currentUserId"');
+    print('🔍 [PARTICIPANT DEBUG FRONTEND] comparison result: ${participantUserId == _currentUserId}');
+    print('🔍 [PARTICIPANT DEBUG FRONTEND] _isActivityOrganizer: $_isActivityOrganizer');
+    
+    // Always show if viewer is the participant themselves (even if profileVisibility is false)
+    // This is because a user can always see their own profile
+    if (participantUserId == _currentUserId) return true;
+    
+    // Always show if viewer is activity organizer
+    if (_isActivityOrganizer) return true;
+    
+    // Check participant's privacy settings
+    final profileVisibility = participant['touriste']?['profileVisibility'] ?? true;
+    print('🔍 [PARTICIPANT DEBUG FRONTEND] profileVisibility: $profileVisibility');
+    
+    return profileVisibility == true;
   }
 
   bool get _isPastActivity {
@@ -292,12 +350,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     WidgetsBinding.instance.removeObserver(this);
     _carouselTimer?.cancel();
     _pageController.dispose();
+    _reviewController.dispose();
     super.dispose();
   }
 
   Future<void> _loadActivity({bool isRefresh = false}) async {
     try {
-      print('🔍 Loading activity with ID: ${widget.activityId} (isRefresh: $isRefresh)');
+      print(
+        '🔍 Loading activity with ID: ${widget.activityId} (isRefresh: $isRefresh)',
+      );
       if (widget.activityId.isEmpty) throw Exception('Activity ID is empty');
       final results = await Future.wait([
         ActivityService.getActivityById(widget.activityId),
@@ -318,7 +379,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
       setState(() {
         // Preserve existing activity data on refresh if API returns null
         final newActivity = results[0] as ActivityModel?;
-        print('🔍 New activity data: ${newActivity?.titre ?? 'null'}, Existing activity: ${_activity?.titre ?? 'null'}');
+        print(
+          '🔍 New activity data: ${newActivity?.titre ?? 'null'}, Existing activity: ${_activity?.titre ?? 'null'}',
+        );
         if (!isRefresh || newActivity != null) {
           _activity = newActivity;
           print('✅ Updated activity to: ${_activity?.titre ?? 'null'}');
@@ -393,10 +456,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -411,7 +471,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Retry Payment'),
-        content: const Text('This will delete the failed booking and create a new payment. Continue?'),
+        content: const Text(
+          'This will delete the failed booking and create a new payment. Continue?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -419,7 +481,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue', style: TextStyle(color: Colors.green)),
+            child: const Text(
+              'Continue',
+              style: TextStyle(color: Colors.green),
+            ),
           ),
         ],
       ),
@@ -431,12 +496,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     try {
       // Delete the failed booking
       await InscriptionService.deleteInscription(booking.id);
-      
+
       // Refresh activity to clear the booking
       await _loadActivity(isRefresh: true);
-      
+
       if (!mounted) return;
-      
+
       // Navigate to booking selection to create new booking
       await Navigator.push(
         context,
@@ -444,16 +509,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
           builder: (_) => BookingSelectionScreen(activity: _activity!),
         ),
       );
-      
+
       // Refresh again after booking
       await _loadActivity(isRefresh: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -469,7 +531,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Booking'),
-        content: const Text('Are you sure you want to delete this pending booking?'),
+        content: const Text(
+          'Are you sure you want to delete this pending booking?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -507,10 +571,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -519,27 +580,77 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
   }
 
   Future<void> _loadParticipants() async {
-    if (_activity == null || !_isActivityOrganizer) return;
-    if (!(_activity!.isOngoing || _activity!.isPast)) return;
-    
+    if (_activity == null) return;
+    // Allow all users to see participants, but apply privacy filtering
+    if (!(_activity!.isOngoing || _activity!.isPast)) {
+      print('🔍 [PARTICIPANTS] Activity not ongoing/past, skipping participants load');
+      return;
+    }
+
     setState(() => _loadingParticipants = true);
     try {
-      print('🔍 Loading participants for activity: ${widget.activityId}');
-      final participants = await InscriptionService.getOrganizerInscriptions(
+      print('🔍 [PARTICIPANTS] Loading participants for activity: ${widget.activityId}');
+      print('🔍 [PARTICIPANTS] Current user ID: $_currentUserId');
+      print('🔍 [PARTICIPANTS] Current user type: $_currentUserType');
+      print('🔍 [PARTICIPANTS] Is activity organizer: $_isActivityOrganizer');
+      print('🔍 [PARTICIPANTS] Activity organizer ID: ${_activity?.organisateur?['_id']}');
+      
+      // Use public endpoint - any authenticated user can see participants
+      print('🔍 [PARTICIPANTS] Using public endpoint for participants...');
+      final participants = await InscriptionService.getActivityParticipants(
         activiteId: widget.activityId,
-        statut: 'approuvee',
       );
-      print('🔍 Participants loaded: ${participants.length} participants');
+      print('🔍 [PARTICIPANTS] Total participants loaded from API: ${participants.length}');
+      
+      // Log each participant's privacy details
+      for (int i = 0; i < participants.length; i++) {
+        final participant = participants[i];
+        final participantData = participant.toJson();
+        print('🔍 [PARTICIPANT $i] RAW DATA: ${participantData}');
+        
+        // Extract ID from both possible structures
+        String participantUserId = '';
+        if (participantData['touriste']?['_id'] != null) {
+          participantUserId = participantData['touriste']['_id'].toString();
+        } else if (participantData['touriste_id']?['_id'] != null) {
+          participantUserId = participantData['touriste_id']['_id'].toString();
+        } else {
+          participantUserId = (participantData['touriste']?['_id'] ?? participantData['touriste']?['id'] ?? '').toString();
+        }
+        
+        final profileVisibility = participantData['touriste']?['profileVisibility'] ?? true;
+        final canDisplay = _canDisplayParticipant(participantData);
+        
+        print('🔍 [PARTICIPANT $i] ID: $participantUserId');
+        print('🔍 [PARTICIPANT $i] ProfileVisibility: $profileVisibility');
+        print('🔍 [PARTICIPANT $i] Is current user: ${participantUserId == _currentUserId}');
+        print('🔍 [PARTICIPANT $i] Can display: $canDisplay');
+        print('🔍 [PARTICIPANT $i] ---');
+      }
+      
       if (mounted) {
         setState(() {
           _participants = participants;
           _loadingParticipants = false;
         });
       }
+      
+      // Log filtering results
+      final visibleParticipants = participants.where((p) => _canDisplayParticipant(p.toJson())).toList();
+      final hiddenParticipants = participants.where((p) => !_canDisplayParticipant(p.toJson())).toList();
+      print('🔍 [PARTICIPANTS] Visible participants: ${visibleParticipants.length}');
+      print('🔍 [PARTICIPANTS] Hidden participants: ${hiddenParticipants.length}');
+      
     } catch (e) {
-      print('❌ Error loading participants: $e');
+      print('❌ [PARTICIPANTS] Error loading participants: $e');
+      print('❌ [PARTICIPANTS] Error type: ${e.runtimeType}');
+      print('❌ [PARTICIPANTS] Error details: ${e.toString()}');
+      
       if (mounted) {
-        setState(() => _loadingParticipants = false);
+        setState(() {
+          _participants = [];
+          _loadingParticipants = false;
+        });
       }
     }
   }
@@ -567,6 +678,101 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
     await _loadReviews();
   }
 
+  Future<void> _submitOngoingReview() async {
+    if (_activityRating == 0 && _organizerRating == 0) {
+      setState(() => _errorMsg = 'Please provide at least one rating.');
+      return;
+    }
+
+    setState(() {
+      _isSubmittingReview = true;
+      _errorMsg = null;
+    });
+
+    try {
+      // Submit activity review if rated
+      if (_activityRating > 0) {
+        await ReviewService.createReview(
+          activiteId: widget.activityId,
+          note: _activityRating,
+          commentaire: _reviewController.text.trim(),
+        );
+      }
+
+      // Submit organizer review if rated
+      if (_organizerRating > 0 && _activity?.organisateur != null) {
+        final organizerId = (_activity?.organisateur?['_id'] ??
+                _activity?.organisateur?['id'])
+            .toString();
+        if (organizerId.isNotEmpty) {
+          await ReviewService.createOrganizerReview(
+            organisateurId: organizerId,
+            note: _organizerRating,
+            commentaire: _reviewController.text.trim(),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activityRating = 0;
+          _organizerRating = 0;
+          _reviewController.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Review submitted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadReviews(); // Reload reviews to show the new one
+      }
+    } catch (e) {
+      print('❌ Error submitting review: $e');
+      if (mounted) {
+        setState(() => _errorMsg = 'Failed to submit review. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmittingReview = false);
+    }
+  }
+
+  /// Scroll to review section when user clicks "Review" button
+  void _scrollToReviewSection() {
+    final ScrollController scrollController = PrimaryScrollController.of(context);
+    if (scrollController != null) {
+      // Find the review section in the scroll view
+      // Scroll to the review section (approximately at 0.7 of the total scroll extent)
+      scrollController.animateTo(
+        scrollController.position.maxScrollExtent * 0.7,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  /// Show add review modal for ongoing activities
+  void _showAddReviewModal(BuildContext context) {
+    if (_activity?.organisateur == null) return;
+    
+    final organizerId = (_activity?.organisateur?['_id'] ?? 
+                      _activity?.organisateur?['id'])
+                    .toString();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AddReviewModal(
+        activityId: widget.activityId,
+        organizerId: organizerId,
+        onReviewAdded: () {
+          Navigator.of(context).pop();
+          _loadReviews(); // Reload reviews to show the new one
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingActivity) {
@@ -577,172 +783,397 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
       return const Scaffold(body: Center(child: Text('Activity not found.')));
     }
 
+    final locationType = activity.locationType?.trim().toLowerCase();
+    final hasItinerary =
+        locationType == 'itinerary' ||
+        (activity.itineraireSteps != null &&
+            activity.itineraireSteps!.isNotEmpty) ||
+        (activity.itineraire != null &&
+            activity.itineraire!.trim().isNotEmpty) ||
+        (activity.itineraireCoords != null &&
+            activity.itineraireCoords!.isNotEmpty);
+    final showItinerary = hasItinerary;
+    final showLocation = !showItinerary;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F2FA),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Stack(
         children: [
           RefreshIndicator(
             onRefresh: _refreshData,
             child: CustomScrollView(
               slivers: [
-              SliverToBoxAdapter(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    SizedBox(
-                      height: 400,
-                      width: double.infinity,
-                      child: PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (i) => setState(() => _currentImage = i),
-                        itemCount: _displayImages.length,
-                        itemBuilder: (ctx, i) =>
-                            Image.network(_displayImages[i], fit: BoxFit.cover),
-                      ),
-                    ),
-                    Positioned(
-                      top: 40,
-                      left: 16,
-                      child: _TopIconButton(
-                        icon: Icons.arrow_back,
-                        onTap: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                SliverToBoxAdapter(
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      const SizedBox(height: 20),
-                      _HeroSummaryCard(activity: activity),
-                      const SizedBox(height: 20),
-                      _SectionTitle('Description'),
-                      Text(
-                        _description,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: Color(0xFF4B5563),
+                      SizedBox(
+                        height: 400,
+                        width: double.infinity,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (i) =>
+                              setState(() => _currentImage = i),
+                          itemCount: _displayImages.length,
+                          itemBuilder: (ctx, i) => Image.network(
+                            _displayImages[i],
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
-                      _SectionTitle('Included Equipment'),
-                      _TagListSection(
-                        items: activity.equipementsInclus,
-                        emptyLabel: 'No equipment specified',
-                        icon: Icons.check_circle,
-                        chipColor: const Color(0xFFE9E8F7),
-                        iconColor: const Color(0xFF3049D9),
+                      Positioned(
+                        top: 40,
+                        left: 16,
+                        child: _TopIconButton(
+                          icon: Icons.arrow_back,
+                          onTap: () => Navigator.pop(context),
+                        ),
                       ),
-                      _SectionTitle('What to Bring'),
-                      _TagListSection(
-                        items: activity.aApporter,
-                        emptyLabel: 'Nothing special is required',
-                        icon: Icons.shopping_basket_outlined,
-                        chipColor: const Color(0xFFE9E8F7),
-                        iconColor: const Color(0xFF3049D9),
-                      ),
-                      _SectionTitle('Location'),
-                      _LocationCard(
-                        placeLabel: activity.lieu,
-                        meetingPoint: _meetingPoint,
-                      ),
-                      _SectionTitle('Organizer'),
-                      _OrganizerCard(
-                        organizer: activity.organisateur,
-                        canContact: _isTouristUser && _canContactOrganizer,
-                        onContact: () {
-                          final organizer = activity.organisateur;
-                          final orgId =
-                              (organizer?['_id'] ?? organizer?['id'] ?? '')
-                                  .toString()
-                                  .trim();
-                          if (orgId.isEmpty) return;
+                    ],
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        _HeroSummaryCard(activity: activity),
+                        const SizedBox(height: 20),
+                        _SectionTitle('Description'),
+                        Text(
+                          _description,
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.6,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        _SectionTitle('Included Equipment'),
+                        _TagListSection(
+                          items: activity.equipementsInclus,
+                          emptyLabel: 'No equipment specified',
+                          icon: Icons.check_circle,
+                          chipColor: Theme.of(context).colorScheme.surfaceVariant,
+                          iconColor: Theme.of(context).colorScheme.primary,
+                        ),
+                        _SectionTitle('What to Bring'),
+                        _TagListSection(
+                          items: activity.aApporter,
+                          emptyLabel: 'Nothing special is required',
+                          icon: Icons.shopping_basket_outlined,
+                          chipColor: Theme.of(context).colorScheme.surfaceVariant,
+                          iconColor: Theme.of(context).colorScheme.primary,
+                        ),
+                        if (showLocation) ...[
+                          _SectionTitle('Location'),
+                          _LocationCard(
+                            placeLabel: activity.lieu,
+                            meetingPoint: _meetingPoint,
+                          ),
+                        ],
+                        if (showItinerary) ...[
+                          _SectionTitle('Itinerary'),
+                          _ItineraryCard(
+                            itinerary: activity.itineraire ?? '',
+                            itinerarySteps: activity.itineraireSteps,
+                            itineraryCoords: activity.itineraireCoords,
+                          ),
+                        ],
+                        _SectionTitle('Organizer'),
+                        _OrganizerCard(
+                          organizer: activity.organisateur,
+                          canContact: _isTouristUser && _canContactOrganizer,
+                          onTap: () {
+                            final orgId =
+                                (activity.organisateur?['_id'] ??
+                                        activity.organisateur?['id'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
+                            if (orgId.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PublicProfileScreen(userId: orgId),
+                                ),
+                              );
+                            }
+                          },
+                          onContact: () {
+                            final organizer = activity.organisateur;
+                            final orgId =
+                                (organizer?['_id'] ?? organizer?['id'] ?? '')
+                                    .toString()
+                                    .trim();
+                            if (orgId.isEmpty) return;
 
-                          final orgName =
-                              (organizer?['fullname'] ?? 'Organizer')
-                                  .toString();
-                          final orgAvatar = organizer?['avatar']?.toString();
-                          final orgOnline = organizer?['isOnline'] == true;
+                            final orgName =
+                                (organizer?['fullname'] ?? 'Organizer')
+                                    .toString();
+                            final orgAvatar = organizer?['avatar']?.toString();
+                            final orgOnline = organizer?['isOnline'] == true;
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatConversationScreen(
-                                partnerId: orgId,
-                                partnerName: orgName,
-                                partnerAvatar: orgAvatar,
-                                partnerType: 'Organisator',
-                                partnerOnline: orgOnline,
-                              ),
-                            ),
-                          );
-                        },
-                        onTap: () {
-                          final orgId =
-                              (activity.organisateur?['_id'] ??
-                                      activity.organisateur?['id'] ??
-                                      '')
-                                  .toString();
-                          if (orgId.isNotEmpty) {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => PublicProfileScreen(
-                                  userId: orgId,
+                                builder: (_) => ChatConversationScreen(
+                                  partnerId: orgId,
+                                  partnerName: orgName,
+                                  partnerAvatar: orgAvatar,
+                                  partnerType: 'Organisator',
+                                  partnerOnline: orgOnline,
                                 ),
                               ),
                             );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      // Participants section (only for organizer's ongoing/past activities)
-                      if (_isActivityOrganizer && (_activity?.isOngoing == true || _activity?.isPast == true)) ...[
-                        _SectionTitle('Participants'),
-                        if (_loadingParticipants)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(24),
-                              child: CircularProgressIndicator(),
+                          },
+                        ),
+                        // Participants section (visible to all users for ongoing/past activities)
+                        if ((_activity?.isOngoing == true ||
+                            _activity?.isPast == true)) ...[
+                          _SectionTitle('Participants'),
+                          if (_loadingParticipants)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else if (_participants.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                              ),
+                              child: Text(
+                                'No participants yet for this Activity.',
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          else
+                            ..._participants
+                                .where((participant) => _canDisplayParticipant(participant.toJson()))
+                                .map(
+                                  (participant) => _ParticipantCard(
+                                    participant: participant,
+                                    currentUserId: _currentUserId,
+                                  ),
+                                )
+                                .toList(),
+                          // Show privacy notice if some participants are hidden
+                          if (_participants.any((p) => !_canDisplayParticipant(p.toJson())))
+                            Container(
+                              margin: const EdgeInsets.only(top: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.privacy_tip_outlined,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Some participants have chosen to keep their profiles private.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          )
-                        else if (_participants.isEmpty)
+                        ],
+                        // Activity Review Section (for participants only - ongoing ONLY)
+                        if (_activity?.isOngoing == true &&
+                            _hasBookingForActivity &&
+                            !_isActivityOrganizer &&
+                            !_hasAlreadyReviewedActivity) ...[
+                          _SectionTitle('Rate Your Experience'),
                           Container(
-                            padding: const EdgeInsets.all(24),
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
                             ),
-                            child: const Text(
-                              'No participants yet for this activity.',
-                              style: TextStyle(color: Color(0xFF6B7280)),
-                              textAlign: TextAlign.center,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Share your experience while the activity is ongoing!',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Activity Rating
+                                Text(
+                                  'Rate this activity',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: List.generate(5, (index) {
+                                    return IconButton(
+                                      icon: Icon(
+                                        index < _activityRating
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        color: const Color(0xFFF59E0B),
+                                        size: 28,
+                                      ),
+                                      onPressed: () {
+                                        setState(() => _activityRating = index + 1);
+                                      },
+                                    );
+                                  }),
+                                ),
+                                const SizedBox(height: 16),
+                                // Organizer Rating
+                                Text(
+                                  'Rate the organizer',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: List.generate(5, (index) {
+                                    return IconButton(
+                                      icon: Icon(
+                                        index < _organizerRating
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        color: const Color(0xFFF59E0B),
+                                        size: 28,
+                                      ),
+                                      onPressed: () {
+                                        setState(() => _organizerRating = index + 1);
+                                      },
+                                    );
+                                  }),
+                                ),
+                                const SizedBox(height: 16),
+                                // Comment
+                                TextField(
+                                  controller: _reviewController,
+                                  maxLines: 4,
+                                  decoration: InputDecoration(
+                                    hintText: 'Share your experience...',
+                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF9FAFB),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Submit Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton(
+                                    onPressed: _isSubmittingReview
+                                        ? null
+                                        : _submitOngoingReview,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF3B82F6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: _isSubmittingReview
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Submit Review',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          )
-                        else
-                          ..._participants.map((participant) => _ParticipantCard(
-                            participant: participant,
-                          )).toList(),
-                        const SizedBox(height: 24),
-                      ],
-                      _SectionTitle('Reviews'),
-                      if (_activity?.isPast == true)
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        if (!_loadingReviews) 
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _SectionTitle('Reviews'),
+                              // Add Review Button for participants who haven't reviewed yet (ongoing activities ONLY)
+                              if (_hasBookingForActivity && 
+                                  !_isActivityOrganizer && 
+                                  !_hasAlreadyReviewedActivity &&
+                                  _activity?.isOngoing == true)
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    // Show add review modal instead of scrolling
+                                    _showAddReviewModal(context);
+                                  },
+                                  icon: const Icon(Icons.rate_review, size: 16),
+                                  label: const Text('Review'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF3B82F6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         if (_loadingReviews)
-                          const Center(
-                            child: CircularProgressIndicator(),
-                          )
+                          const Center(child: CircularProgressIndicator())
                         else if (_reviews.isEmpty)
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
                             ),
                             child: const Text(
                               'No reviews yet. Be the first to review!',
@@ -751,31 +1182,23 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                             ),
                           )
                         else
-                          ..._reviews.map((review) => _ReviewCard(
-                            review: review,
-                            currentUserId: _currentUserId,
-                            onReviewUpdated: _loadReviews,
-                          )).toList()
-                      else
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                          ),
-                          child: const Text(
-                            'Reviews will be available after the activity is completed.',
-                            style: TextStyle(color: Color(0xFF6B7280)),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                    ],
+                          ..._reviews
+                              .map(
+                                (review) => _ReviewCard(
+                                  review: review,
+                                  currentUserId: _currentUserId,
+                                  onReviewUpdated: _loadReviews,
+                                ),
+                              )
+                              .toList(),
+                        // Reviews are now available for both ongoing and completed activities
+                        // No need to show "reviews will be available" message anymore
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
           if (!widget.viewOnly && !_isActivityOrganizer && !_isPaidBooking)
             Positioned(
@@ -788,21 +1211,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> with Widget
                 buttonLabel: _isPaymentFailed
                     ? 'Pay'
                     : (_hasPendingPaymentBooking
-                        ? 'Pay'
-                        : (_hasBookingForActivity
-                            ? 'Check Booking Status'
-                            : (_isPastActivity && _hasBookingForActivity
+                          ? 'Pay'
+                          : (_hasBookingForActivity
                                 ? 'Check Booking Status'
-                                : 'Book Now'))),
+                                : (_isPastActivity && _hasBookingForActivity
+                                      ? 'Check Booking Status'
+                                      : 'Book Now'))),
                 onBook: _isBooking
                     ? null
                     : (_isPaymentFailed
-                        ? _retryPayment
-                        : (_hasPendingPaymentBooking
-                            ? _navigateToPayment
-                            : (_hasBookingForActivity
-                                ? _openBookingStatus
-                                : _bookActivity))),
+                          ? _retryPayment
+                          : (_hasPendingPaymentBooking
+                                ? _navigateToPayment
+                                : (_hasBookingForActivity
+                                      ? _openBookingStatus
+                                      : _bookActivity))),
                 isLoading: _isBooking,
                 showDeleteButton: _isPaymentFailed,
                 onDelete: _isPaymentFailed ? _deletePendingBooking : null,
@@ -1092,21 +1515,29 @@ class _HeroSummaryCard extends StatelessWidget {
 
 class _ParticipantCard extends StatelessWidget {
   final InscriptionModel participant;
+  final String currentUserId;
 
-  const _ParticipantCard({required this.participant});
+  const _ParticipantCard({required this.participant, required this.currentUserId});
 
   String _participantName() {
     final touriste = participant.touriste;
-    if (touriste is Map<String, dynamic>) {
+    print('🔍 [CARD DEBUG] participant.touriste: $touriste');
+    
+    if (touriste != null && touriste is Map<String, dynamic>) {
       final name = (touriste['fullname'] ?? '').toString().trim();
+      print('🔍 [CARD DEBUG] extracted name: "$name"');
       if (name.isNotEmpty) return name;
     }
-    return 'Participant';
+    
+    // Show "X places" for group bookings instead of "Participant"
+    final places = participant.nombreParticipants ?? 1;
+    print('🔍 [CARD DEBUG] using places: $places');
+    return '$places place${places > 1 ? 's' : ''}';
   }
 
   String _participantAvatar() {
     final touriste = participant.touriste;
-    if (touriste is Map<String, dynamic>) {
+    if (touriste != null && touriste is Map<String, dynamic>) {
       return (touriste['avatar'] ?? '').toString();
     }
     return '';
@@ -1114,7 +1545,7 @@ class _ParticipantCard extends StatelessWidget {
 
   String _participantId() {
     final touriste = participant.touriste;
-    if (touriste is Map<String, dynamic>) {
+    if (touriste != null && touriste is Map<String, dynamic>) {
       return (touriste['_id'] ?? touriste['id'] ?? '').toString().trim();
     }
     return '';
@@ -1127,6 +1558,45 @@ class _ParticipantCard extends StatelessWidget {
     final participantId = _participantId();
     final nbParticipants = participant.nombreParticipants ?? 1;
     final bookingDate = participant.dateDemande;
+    
+    // Check if this is the current user
+    final isCurrentUser = participantId == currentUserId;
+    
+    // Check privacy settings
+    final touriste = participant.touriste;
+    bool profileVisibility = true;
+    if (touriste != null && touriste is Map<String, dynamic>) {
+      profileVisibility = touriste['profileVisibility'] ?? true;
+    }
+    
+    // If not current user and profileVisibility is false, show only alert
+    if (!isCurrentUser && !profileVisibility) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_off, size: 20, color: AppColors.textGrey),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'This participant has chosen to keep their profile private',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textGrey,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return InkWell(
       onTap: () {
@@ -1134,9 +1604,7 @@ class _ParticipantCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => PublicProfileScreen(
-                userId: participantId,
-              ),
+              builder: (_) => PublicProfileScreen(userId: participantId),
             ),
           );
         }
@@ -1154,9 +1622,7 @@ class _ParticipantCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundImage: avatar.isNotEmpty
-                  ? NetworkImage(avatar)
-                  : null,
+              backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
               child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
             ),
             const SizedBox(width: 16),
@@ -1178,7 +1644,7 @@ class _ParticipantCard extends StatelessWidget {
                       Icon(Icons.people, size: 14, color: AppColors.textGrey),
                       const SizedBox(width: 4),
                       Text(
-                        '$nbParticipants participant${nbParticipants > 1 ? 's' : ''}',
+                        '$nbParticipants place${nbParticipants > 1 ? 's' : ''}',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF6B7280),
@@ -1192,7 +1658,10 @@ class _ParticipantCard extends StatelessWidget {
             if (bookingDate != null) ...[
               const SizedBox(width: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(8),
@@ -1309,6 +1778,22 @@ class _LocationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final markerId = const MarkerId('meeting_point');
 
+    // Build markers and polyline from itinerary coordinates
+    Set<Marker> markers = {};
+    Set<Polyline> polylines = {};
+    LatLng? cameraTarget;
+    if (meetingPoint != null) {
+      // Use single meeting point
+      markers.add(
+        Marker(
+          markerId: markerId,
+          position: meetingPoint!,
+          infoWindow: InfoWindow(title: placeLabel),
+        ),
+      );
+      cameraTarget = meetingPoint;
+    }
+
     return Container(
       height: 150,
       width: double.infinity,
@@ -1318,7 +1803,7 @@ class _LocationCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: meetingPoint == null
+        child: cameraTarget == null
             ? Center(
                 child: Text(
                   'Meeting point: $placeLabel',
@@ -1329,16 +1814,11 @@ class _LocationCard extends StatelessWidget {
                 children: [
                   GoogleMap(
                     initialCameraPosition: CameraPosition(
-                      target: meetingPoint!,
-                      zoom: 14.5,
+                      target: cameraTarget,
+                      zoom: 12.0,
                     ),
-                    markers: {
-                      Marker(
-                        markerId: markerId,
-                        position: meetingPoint!,
-                        infoWindow: InfoWindow(title: placeLabel),
-                      ),
-                    },
+                    markers: markers,
+                    polylines: polylines,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,
                     mapToolbarEnabled: false,
@@ -1374,6 +1854,322 @@ class _LocationCard extends StatelessWidget {
               ),
       ),
     );
+  }
+}
+
+class _ItineraryCard extends StatelessWidget {
+  final String itinerary;
+  final List<Map<String, dynamic>>? itinerarySteps;
+  final List<Map<String, dynamic>>? itineraryCoords;
+  const _ItineraryCard({
+    required this.itinerary,
+    this.itinerarySteps,
+    this.itineraryCoords,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Prefer structured itinerary steps when available, otherwise fall back to text parsing.
+    final steps = itinerarySteps != null && itinerarySteps!.isNotEmpty
+        ? itinerarySteps!.map((step) => _formatStructuredStep(step)).toList()
+        : _parseItinerarySteps(itinerary);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E9FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.route, color: const Color(0xFF4A65E6), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Journey Itinerary',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF131E32),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Visual timeline with steps
+          ...steps.asMap().entries.map((entry) {
+            final index = entry.key;
+            final step = entry.value;
+            final isLast = index == steps.length - 1;
+
+            final location = _locationForStep(index);
+
+            return _buildItineraryStep(index + 1, step, isLast, location);
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  String _formatStructuredStep(Map<String, dynamic> step) {
+    final title = step['title']?.toString().trim() ?? '';
+    final description = step['description']?.toString().trim() ?? '';
+    final address = step['address']?.toString().trim() ?? '';
+    final parts = <String>[];
+    if (title.isNotEmpty) parts.add(title);
+    if (description.isNotEmpty) parts.add(description);
+    if (address.isNotEmpty) parts.add(address);
+    return parts.isEmpty ? 'Step' : parts.join(' - ');
+  }
+
+  String _locationForStep(int index) {
+    if (itinerarySteps != null && index < itinerarySteps!.length) {
+      final step = itinerarySteps![index];
+      final address = step['address']?.toString() ?? '';
+      if (address.isNotEmpty) return address;
+    }
+    if (itineraryCoords != null &&
+        itineraryCoords!.isNotEmpty &&
+        index < itineraryCoords!.length) {
+      final coord = itineraryCoords![index];
+      return coord['address'] as String? ?? '';
+    }
+    return '';
+  }
+
+  List<String> _parseItinerarySteps(String itinerary) {
+    // Split by newlines and filter out empty lines
+    final lines = itinerary
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .map((line) => line.trim())
+        .toList();
+
+    // Check if this is the new structured format (Step X: description - address)
+    final stepPattern = RegExp(r'^Step\s+(\d+):\s*(.+)$', caseSensitive: false);
+    final structuredSteps = <String>[];
+
+    for (final line in lines) {
+      final match = stepPattern.firstMatch(line);
+      if (match != null) {
+        // Extract description from structured format
+        final description = match.group(2) ?? line;
+
+        // Remove address part if present (everything after " - ")
+        final addressSeparatorIndex = description.indexOf(' - ');
+        if (addressSeparatorIndex > 0) {
+          final cleanDescription = description
+              .substring(0, addressSeparatorIndex)
+              .trim();
+          structuredSteps.add(cleanDescription);
+        } else {
+          structuredSteps.add(description);
+        }
+      } else {
+        // For non-structured format, keep the original line
+        structuredSteps.add(line);
+      }
+    }
+
+    // If we found structured steps, return them
+    if (structuredSteps.isNotEmpty && structuredSteps.length == lines.length) {
+      return structuredSteps;
+    }
+
+    // Fallback to original logic for old format
+    if (lines.length == 1) {
+      // Try to split by common time patterns
+      final timePattern = RegExp(r'(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)');
+      final matches = timePattern.allMatches(itinerary);
+
+      if (matches.length > 1) {
+        final steps = <String>[];
+        int lastIndex = 0;
+
+        for (int i = 0; i < matches.length; i++) {
+          final match = matches.elementAt(i);
+          if (i > 0) {
+            steps.add(itinerary.substring(lastIndex, match.start).trim());
+          }
+          lastIndex = match.start;
+        }
+
+        // Add the last part
+        if (lastIndex < itinerary.length) {
+          steps.add(itinerary.substring(lastIndex).trim());
+        }
+
+        return steps.where((step) => step.isNotEmpty).toList();
+      }
+    }
+
+    return lines;
+  }
+
+  Widget _buildItineraryStep(
+    int stepNumber,
+    String stepText,
+    bool isLast,
+    String location,
+  ) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Step number with circle
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4B63FF),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4B63FF).withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  '$stepNumber',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Step content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Extract time if present
+                  if (_extractTime(stepText) != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4B63FF).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _extractTime(stepText)!,
+                        style: const TextStyle(
+                          color: Color(0xFF4B63FF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Step description
+                  Text(
+                    _removeTimeFromText(stepText),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF131E32),
+                      height: 1.4,
+                    ),
+                  ),
+
+                  // Location if available
+                  if (location.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E9FF)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: const Color(0xFF4A65E6),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              location,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF4A65E6),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // Connection line (except for last step)
+        if (!isLast) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const SizedBox(width: 16),
+              Container(
+                width: 2,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF4B63FF).withOpacity(0.3),
+                      const Color(0xFF4B63FF).withOpacity(0.1),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  String? _extractTime(String text) {
+    final timePattern = RegExp(r'(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)');
+    final match = timePattern.firstMatch(text);
+    return match?.group(1);
+  }
+
+  String _removeTimeFromText(String text) {
+    final timePattern = RegExp(r'\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?\s*[-–—]\s*');
+    return text.replaceFirst(timePattern, '').trim();
   }
 }
 
@@ -1549,7 +2345,9 @@ class _StickyBottomBar extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onBook,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: showDeleteButton ? const Color(0xFFF59E0B) : const Color(0xFF3B82F6),
+                  backgroundColor: showDeleteButton
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF3B82F6),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -1662,7 +2460,9 @@ class _ReviewCard extends StatelessWidget {
         type: 'activite',
         initialRating: (review['note'] ?? 0).toDouble(),
         initialComment: review['commentaire']?.toString(),
-        initialTags: review['tags'] is List ? List<String>.from(review['tags'] as List) : null,
+        initialTags: review['tags'] is List
+            ? List<String>.from(review['tags'] as List)
+            : null,
         onReviewUpdated: onReviewUpdated,
         onReviewDeleted: onReviewUpdated,
       ),
@@ -1712,7 +2512,9 @@ class _ReviewCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isMyReview ? const Color(0xFF4B63FF) : const Color(0xFFE5E7EB),
+            color: isMyReview
+                ? const Color(0xFF4B63FF)
+                : const Color(0xFFE5E7EB),
             width: isMyReview ? 2 : 1,
           ),
         ),
@@ -1726,7 +2528,9 @@ class _ReviewCard extends StatelessWidget {
                   backgroundImage: avatar.isNotEmpty
                       ? NetworkImage(avatar)
                       : null,
-                  child: avatar.isEmpty ? const Icon(Icons.person, size: 20) : null,
+                  child: avatar.isEmpty
+                      ? const Icon(Icons.person, size: 20)
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1746,7 +2550,10 @@ class _ReviewCard extends StatelessWidget {
                           if (isMyReview) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF4B63FF),
                                 borderRadius: BorderRadius.circular(4),
@@ -1771,11 +2578,14 @@ class _ReviewCard extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          ...List.generate(5, (i) => Icon(
-                            i < rating ? Icons.star : Icons.star_border,
-                            color: const Color(0xFFF59E0B),
-                            size: 14,
-                          )),
+                          ...List.generate(
+                            5,
+                            (i) => Icon(
+                              i < rating ? Icons.star : Icons.star_border,
+                              color: const Color(0xFFF59E0B),
+                              size: 14,
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             _reviewDate(),
@@ -1800,28 +2610,35 @@ class _ReviewCard extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            if (review['tags'] != null && review['tags'] is List && (review['tags'] as List).isNotEmpty)
+            if (review['tags'] != null &&
+                review['tags'] is List &&
+                (review['tags'] as List).isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: (review['tags'] as List)
-                      .map<Widget>((tag) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE9E8F7),
-                              borderRadius: BorderRadius.circular(12),
+                      .map<Widget>(
+                        (tag) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE9E8F7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            tag.toString(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF3049D9),
+                              fontWeight: FontWeight.w500,
                             ),
-                            child: Text(
-                              tag.toString(),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF3049D9),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ))
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
               ),

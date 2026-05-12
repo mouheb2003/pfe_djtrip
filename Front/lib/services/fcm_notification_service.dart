@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
+import 'navigation_service.dart';
 
 /// Service de gestion des notifications Firebase Cloud Messaging
 /// Production-ready avec gestion foreground/background
@@ -253,17 +254,99 @@ class FcmNotificationService {
   /// Gère les messages reçus en foreground
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('📱 Received foreground message: ${message.notification?.title}');
+    debugPrint('📱 Message data: ${message.data}');
     debugPrint('📱 Message ID: ${DateTime.now().millisecondsSinceEpoch}');
 
-    // Afficher une notification locale
+    // Vérifier si c'est une notification de restriction (bannissement/suspension)
+    final data = message.data;
+    if (data != null) {
+      final dataString = data.toString();
+      if (dataString.contains('banned') || 
+          dataString.contains('suspended') || 
+          dataString.contains('restriction')) {
+        debugPrint('🚨 Detected restriction notification, forcing display');
+        
+        // Forcer l'affichage immédiat pour les restrictions
+        await _showLocalNotification(
+          title: message.notification?.title ?? 'Account Restriction',
+          body: message.notification?.body ?? 'Your account status has changed',
+          payload: dataString,
+        );
+        
+        // Traiter immédiatement les restrictions
+        await _handleRestrictionNotification(data);
+        return;
+      }
+      
+      // Vérifier si c'est une notification d'appel
+      final type = data['type']?.toString();
+      final status = data['status']?.toString();
+      final appealId = data['appealId']?.toString();
+      
+      if (type == 'appeal_resolved' || appealId != null) {
+        debugPrint('📋 Detected appeal notification');
+        debugPrint('📋 Appeal status: $status');
+        
+        // Utiliser le titre et le corps de la notification du backend
+        await _showLocalNotification(
+          title: message.notification?.title ?? 'Appeal Update',
+          body: message.notification?.body ?? 'Your appeal status has been updated',
+          payload: dataString,
+        );
+        
+        // Traiter les mises à jour d'appel
+        await _handleAppealNotification(data);
+        return;
+      }
+    }
+
+    // Afficher une notification locale normale
     await _showLocalNotification(
       title: message.notification?.title ?? 'Notification',
       body: message.notification?.body ?? '',
       payload: message.data.toString(),
     );
 
+    // Sauvegarder la push notification dans la base de données avec flag isPush
+    await _savePushNotificationToDatabase(message);
+
     // Callback personnalisable
     _onForegroundMessage?.call(message);
+  }
+
+  /// Gère les notifications de restriction (bannissement/suspension)
+  Future<void> _handleRestrictionNotification(dynamic data) async {
+    try {
+      // Forcer le rafraîchissement des données utilisateur
+      await AuthService.clearLocalSession();
+      
+      // Naviguer vers login avec message de restriction
+      final navigator = NavigationService.navigatorKey.currentState;
+      if (navigator != null) {
+        navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling restriction notification: $e');
+    }
+  }
+
+  /// Gère les notifications d'appel
+  Future<void> _handleAppealNotification(dynamic data) async {
+    try {
+      debugPrint('📋 Processing appeal notification: $data');
+      
+      // Forcer le rafraîchissement des données d'appel
+      // Cela pourrait déclencher un rechargement automatique dans l'écran des appels
+      final navigator = NavigationService.navigatorKey.currentState;
+      if (navigator != null) {
+        // Si l'utilisateur est sur l'écran des appels, forcer le rafraîchissement
+        if (navigator.canPop()) {
+          navigator.pushNamedAndRemoveUntil('/appeals', (route) => false);
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling appeal notification: $e');
+    }
   }
 
   /// Gère les messages reçus en background
@@ -334,6 +417,43 @@ class FcmNotificationService {
   /// Définit le callback pour le tap sur notification
   void setOnNotificationTapped(Function(String?) callback) {
     _onNotificationTappedCallback = callback;
+  }
+
+  /// Sauvegarde une push notification dans la base de données avec flag isPush
+  Future<void> _savePushNotificationToDatabase(RemoteMessage message) async {
+    try {
+      final accessToken = await AuthService.getAccessToken();
+      if (accessToken == null || accessToken.isEmpty) {
+        debugPrint('⚠️ User not authenticated, skipping push notification save');
+        return;
+      }
+
+      final data = message.data ?? {};
+      final response = await ApiClient.post(
+        '/notifications',
+        {
+          'title': message.notification?.title ?? 'Push Notification',
+          'message': message.notification?.body ?? '',
+          'type': data['type'] ?? 'push',
+          'data': data,
+          'priority': data['priority'] ?? 'medium',
+          'isPush': true, // Flag pour identifier les push notifications
+          'actionUrl': data['actionUrl'],
+          'actionText': data['actionText'],
+          'relatedEntityType': data['relatedEntityType'],
+          'relatedEntityId': data['relatedEntityId'],
+          'targetRole': data['targetRole'],
+        },
+      );
+
+      if (response.statusCode == 201) {
+        debugPrint('✅ Push notification saved to database');
+      } else {
+        debugPrint('⚠️ Failed to save push notification: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error saving push notification to database: $e');
+    }
   }
 
   /// Nettoie les ressources

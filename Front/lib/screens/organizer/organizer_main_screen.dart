@@ -185,130 +185,108 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     const navBg = Color(0xFFF2F1FA);
     const navActive = AppColors.primary;
     const navInactive = Color(0xFF7B82A8);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
-      body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: Container(
-        color: const Color(0xFFF2F1FA),
-        padding: const EdgeInsets.only(bottom: 20),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(index: _currentIndex, children: _pages),
+          Positioned(
+            bottom: 18,
+            left: 16,
+            right: 16,
+            child: _buildFloatingNavBar(navBg, navActive, navInactive),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingNavBar(Color navBg, Color navActive, Color navInactive) {
+    final cs = Theme.of(context).colorScheme;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Main pill-shaped nav bar
+        Container(
+          height: 70,
+          decoration: BoxDecoration(
+            color: navBg,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  // Activities (Index 0)
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.calendar_today_outlined,
-                      activeIcon: Icons.calendar_today,
-                      label: 'Activities',
-                      index: 0,
-                      currentIndex: _currentIndex,
-                      onTap: _goToTab,
-                      activeColor: navActive,
-                      inactiveColor: navInactive,
-                      showDot: _showActivitiesDot,
-                    ),
-                  ),
-                  // Explore (Index 1)
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.explore_outlined,
-                      activeIcon: Icons.explore,
-                      label: 'Explore',
-                      index: 1,
-                      currentIndex: _currentIndex,
-                      onTap: _goToTab,
-                      activeColor: navActive,
-                      inactiveColor: navInactive,
-                    ),
-                  ),
-                  // Network (Index 2)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _goToTab(2),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: _currentIndex == 2
-                                      ? AppColors.primaryDark
-                                      : AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.public,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                              if (_showNetworkDot)
-                                const Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: _RedDot(),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Network',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: _currentIndex == 2 ? AppColors.primary : navInactive,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Messages (Index 3)
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.chat_bubble_outline,
-                      activeIcon: Icons.chat_bubble,
-                      label: 'Messages',
-                      index: 3,
-                      currentIndex: _currentIndex,
-                      onTap: _goToTab,
-                      activeColor: navActive,
-                      inactiveColor: navInactive,
-                      showDot: _showMessagesDot,
-                    ),
-                  ),
-                  // Profile (Index 4)
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.person_outline,
-                      activeIcon: Icons.person,
-                      label: 'Profile',
-                      index: 4,
-                      currentIndex: _currentIndex,
-                      onTap: (i) => setState(() => _currentIndex = i),
-                      activeColor: navActive,
-                      inactiveColor: navInactive,
-                    ),
-                  ),
-                ],
+              _NavItem(
+                icon: Icons.calendar_today_outlined,
+                activeIcon: Icons.calendar_today,
+                label: 'Activities',
+                index: 0,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showActivitiesDot,
+              ),
+              _NavItem(
+                icon: Icons.explore_outlined,
+                activeIcon: Icons.explore,
+                label: 'Explore',
+                index: 1,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+              ),
+              _NavItem(
+                icon: Icons.public,
+                activeIcon: Icons.public,
+                label: 'Network',
+                index: 2,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showNetworkDot,
+              ),
+              _NavItem(
+                icon: Icons.chat_bubble_outline,
+                activeIcon: Icons.chat_bubble,
+                label: 'Messages',
+                index: 3,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
+                showDot: _showMessagesDot,
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                activeIcon: Icons.person,
+                label: 'Profile',
+                index: 4,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
               ),
             ],
           ),
         ),
-      ),
+        // center handled as a normal _NavItem in the Row above
+      ],
     );
   }
 }
@@ -339,27 +317,48 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = index == currentIndex;
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  color: isActive ? activeColor : inactiveColor,
-                  size: 20,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: isActive ? 50 : 40,
+                  height: isActive ? 50 : 40,
+                  alignment: Alignment.center,
+                  decoration: isActive
+                      ? BoxDecoration(
+                          color: activeColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: activeColor.withOpacity(0.22),
+                                blurRadius: 14,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          )
+                        : null,
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    color: isActive ? cs.onPrimary : inactiveColor,
+                    size: isActive ? 26 : 18,
+                  ),
                 ),
                 if (showDot)
                   const Positioned(top: -2, right: -5, child: _RedDot()),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 0.5),
             Text(
               label,
               style: TextStyle(

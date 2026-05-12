@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../models/post_model.dart';
 import '../utils/time_ago.dart';
 import '../screens/shared/comments_screen.dart';
+import '../widgets/facebook_mentions_inline_widget.dart';
+import '../screens/shared/public_profile_screen.dart';
 
 class PublicationCard extends StatefulWidget {
   final PostModel post;
@@ -34,6 +36,13 @@ class _PublicationCardState extends State<PublicationCard> {
   final PageController _pageController = PageController();
   Timer? _autoScrollTimer;
   int _currentPage = 0;
+
+  // Clean content by removing @mentions to avoid duplication with header mentions
+  String _cleanContent(String content) {
+    // Remove @mentions from content to avoid duplication with header mentions
+    final mentionRegex = RegExp(r'@[a-zA-Z0-9_]{3,30}');
+    return content.replaceAll(mentionRegex, '');
+  }
 
   @override
   void initState() {
@@ -109,32 +118,44 @@ class _PublicationCardState extends State<PublicationCard> {
       child: Row(
         children: [
           // Avatar
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFE8E5FF),
-                width: 2,
+          GestureDetector(
+            onTap: () {
+              if (widget.post.authorId.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PublicProfileScreen(userId: widget.post.authorId),
+                  ),
+                );
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFE8E5FF),
+                  width: 2,
+                ),
               ),
-            ),
-            child: CircleAvatar(
-              radius: 22,
-              backgroundColor: const Color(0xFFE8E5FF),
-              backgroundImage: widget.post.authorAvatar?.isNotEmpty == true
-                  ? NetworkImage(widget.post.authorAvatar!)
-                  : null,
-              child: widget.post.authorAvatar?.isEmpty != false
-                  ? const Icon(
-                      Icons.person,
-                      color: Color(0xFF4B63FF),
-                      size: 22,
-                    )
-                  : null,
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: const Color(0xFFE8E5FF),
+                backgroundImage: widget.post.authorAvatar?.isNotEmpty == true
+                    ? NetworkImage(widget.post.authorAvatar!)
+                    : null,
+                child: widget.post.authorAvatar?.isEmpty != false
+                    ? const Icon(
+                        Icons.person,
+                        color: Color(0xFF4B63FF),
+                        size: 22,
+                      )
+                    : null,
+              ),
             ),
           ),
           const SizedBox(width: 14),
           
-          // User info
+          // User info with mentions
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +186,9 @@ class _PublicationCardState extends State<PublicationCard> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Text(
                       TimeAgo.format(widget.post.createdAt).toUpperCase(),
@@ -173,44 +196,41 @@ class _PublicationCardState extends State<PublicationCard> {
                         fontSize: 12,
                         color: Colors.grey[600],
                         fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
                       ),
                     ),
-                    if (widget.post.locationLabel != null && widget.post.locationLabel!.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F4FF),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: 11,
-                                color: const Color(0xFF4B63FF),
-                              ),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  widget.post.locationLabel!,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF4B63FF),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
+                    if (widget.post.mentions.isNotEmpty)
+                      FacebookMentionsInlineWidget(mentions: widget.post.mentions),
+                    if (widget.post.locationLabel != null && widget.post.locationLabel!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F4FF),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 11,
+                              color: const Color(0xFF4B63FF),
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                widget.post.locationLabel!,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF4B63FF),
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
                   ],
                 ),
               ],
@@ -234,24 +254,25 @@ class _PublicationCardState extends State<PublicationCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.post.content,
+            _cleanContent(widget.post.content),
             style: const TextStyle(
               fontSize: 15,
-              color: Color(0xFF1F2937),
-              height: 1.6,
+              height: 1.4,
+              color: Color(0xFF2D2D2D),
               fontWeight: FontWeight.w500,
             ),
-            maxLines: null,
           ),
+          // Hashtags section
           if (widget.post.hashtags.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.post.hashtags.map((tag) {
-                final hashtag = tag.startsWith('#') ? tag : '#$tag';
-                return Flexible(
-                  child: Container(
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.post.hashtags.map((tag) {
+                  final hashtag = tag.startsWith('#') ? tag : '#$tag';
+                  return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF0F4FF),
@@ -267,9 +288,9 @@ class _PublicationCardState extends State<PublicationCard> {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ],

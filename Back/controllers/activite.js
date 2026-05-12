@@ -25,19 +25,11 @@ exports.createActivite = async (req, res) => {
   try {
     const userId = req.user.userId; // Logged-in organizer ID
 
-    console.log("📝 Creating activite for user:", userId);
-    console.log("📄 Received files:", req.files);
-    console.log("📦 Received body:", req.body);
+    console.log(
+      "� DEBUG: Creating activity with data:",
+      JSON.stringify(req.body, null, 2),
+    );
 
-    // Verify the user is an organizer
-    const organisator = await Organisator.findById(userId);
-    if (!organisator) {
-      return res.status(403).json({
-        message: "Only organizers can create activities",
-      });
-    }
-
-    // Support both camelCase (from frontend) and snake_case
     const {
       titre,
       description,
@@ -45,7 +37,9 @@ exports.createActivite = async (req, res) => {
       typeActivite,
       categorie,
       lieu,
+      location_type,
       coordonnees,
+      itineraire,
       duree,
       prix,
       capacite_max,
@@ -64,23 +58,62 @@ exports.createActivite = async (req, res) => {
       aiGeneratedImageUrl,
     } = req.body;
 
-    // Parse JSON fields that may come as strings from multipart/form-data
-    let parsedCoordonnees = coordonnees;
-    if (typeof coordonnees === "string") {
-      try {
-        parsedCoordonnees = JSON.parse(coordonnees);
-      } catch (e) {
-        console.warn("⚠️ Failed to parse coordonnees:", e);
-      }
+    // Verify the user is an organizer
+    const organisator = await Organisator.findById(userId);
+    if (!organisator) {
+      return res.status(403).json({
+        message: "Only organizers can create activities",
+      });
     }
 
-    let parsedEquipementsInclus = equipements_inclus;
-    if (typeof equipements_inclus === "string") {
-      try {
-        parsedEquipementsInclus = JSON.parse(equipements_inclus);
-      } catch (e) {
-        parsedEquipementsInclus = [equipements_inclus];
-      }
+    // Parse JSON fields if they come as strings
+    const parsedLangues =
+      typeof langues_disponibles === "string"
+        ? JSON.parse(langues_disponibles)
+        : langues_disponibles || ["English"];
+
+    const parsedEquipements =
+      typeof equipements_inclus === "string"
+        ? JSON.parse(equipements_inclus)
+        : equipements_inclus || [];
+
+    const parsedApporter =
+      typeof a_apporter === "string"
+        ? JSON.parse(a_apporter)
+        : a_apporter || [];
+
+    const parsedDates =
+      typeof dates_disponibles === "string"
+        ? JSON.parse(dates_disponibles)
+        : dates_disponibles || [];
+
+    const parsedItineraire =
+      typeof itineraire === "string"
+        ? JSON.parse(itineraire)
+        : itineraire || [];
+
+    const parsedCoordonnees =
+      typeof coordonnees === "string" ? JSON.parse(coordonnees) : coordonnees;
+
+    const effectiveLocationType =
+      location_type ||
+      (parsedItineraire && parsedItineraire.length > 0
+        ? "itinerary"
+        : parsedCoordonnees
+          ? "fixed"
+          : "custom");
+
+    // Validate: if explicitly setting itinerary type, must have itinerary data
+    if (
+      (location_type === "itinerary" ||
+        effectiveLocationType === "itinerary") &&
+      (!parsedItineraire || parsedItineraire.length === 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Itinerary type requires at least one itinerary item with address and coordinates",
+      });
     }
 
     // Upload photos to Cloudinary if files are provided
@@ -113,7 +146,9 @@ exports.createActivite = async (req, res) => {
     if (startDate) {
       const now = new Date();
       const activityStartDate = new Date(startDate);
-      const twentyFourHoursLater = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+      const twentyFourHoursLater = new Date(
+        now.getTime() + 24 * 60 * 60 * 1000,
+      ); // 24 hours from now
 
       if (activityStartDate < twentyFourHoursLater) {
         return res.status(400).json({
@@ -122,28 +157,47 @@ exports.createActivite = async (req, res) => {
       }
     }
 
-    // Create the new activity
-    const activite = new Activite({
+    // Create activity object
+    const activityData = {
       titre,
       description,
       type_activite: type_activite || typeActivite,
       categorie,
       organisateur_id: userId,
       lieu,
-      coordonnees: parsedCoordonnees,
+      location_type: effectiveLocationType,
       duree,
       prix,
       capacite_max: capacite_max || capaciteMax,
-      langues_disponibles,
+      langues_disponibles: parsedLangues,
       photos: photosUrls,
       niveau_difficulte,
-      equipements_inclus: parsedEquipementsInclus,
-      a_apporter,
-      dates_disponibles,
+      equipements_inclus: parsedEquipements,
+      a_apporter: parsedApporter,
+      dates_disponibles: parsedDates,
       date_debut: date_debut || dateDebut,
       date_fin: date_fin || dateFin,
       statut: statut || "active",
-    });
+    };
+
+    // Add location-specific data
+    if (effectiveLocationType === "fixed" && parsedCoordonnees) {
+      activityData.coordonnees = parsedCoordonnees;
+    } else if (
+      effectiveLocationType === "itinerary" &&
+      parsedItineraire &&
+      parsedItineraire.length > 0
+    ) {
+      activityData.itineraire = parsedItineraire;
+    }
+
+    console.log(
+      "🔍 DEBUG: Final activity data before save:",
+      JSON.stringify(activityData, null, 2),
+    );
+
+    // Create the new activity
+    const activite = new Activite(activityData);
 
     console.log("📅 Activity dates being saved:");
     console.log("  - date_debut:", activite.date_debut);
@@ -157,23 +211,32 @@ exports.createActivite = async (req, res) => {
     await organisator.save();
 
     // Populate organisateur_id before returning
-    const activitePopulated = await Activite.findById(activite._id).populate(
-      "organisateur_id",
-      "fullname avatar email num_tel note_moyenne nombre_avis description",
-    );
+    let activitePopulated;
+    try {
+      activitePopulated = await Activite.findById(activite._id).populate(
+        "organisateur_id",
+        "fullname avatar email num_tel note_moyenne nombre_avis description",
+      );
 
-    console.log(
-      "✅ Activity created and populated:",
-      JSON.stringify(activitePopulated, null, 2),
-    );
+      console.log(
+        "✅ Activity created and populated:",
+        JSON.stringify(activitePopulated, null, 2),
+      );
+    } catch (populateError) {
+      console.error("❌ Error populating activity:", populateError);
+      // Continue with non-populated activity if populate fails
+      activitePopulated = activite;
+    }
 
     // Emit activity created event for notification to followers (if enabled)
-    const notifyFollowers = req.body.notifyFollowers !== 'false';
+    const notifyFollowers = req.body.notifyFollowers !== "false";
     if (notifyFollowers) {
       try {
         const Follow = require("../models/follow");
-        const followers = await Follow.find({ following_id: userId }).select('follower_id');
-        const followerIds = followers.map(f => f.follower_id);
+        const followers = await Follow.find({ following_id: userId }).select(
+          "follower_id",
+        );
+        const followerIds = followers.map((f) => f.follower_id);
 
         if (followerIds.length > 0) {
           notificationEventBus.emitActivityCreated({
@@ -185,17 +248,40 @@ exports.createActivite = async (req, res) => {
           });
         }
       } catch (notifError) {
-        console.warn("Failed to send activity created notification:", notifError.message);
+        console.warn(
+          "Failed to send activity created notification:",
+          notifError.message,
+        );
       }
     }
 
-    res.status(201).json({
-      message: "Activity created successfully",
-      activite: activitePopulated,
-    });
+    try {
+      res.status(201).json({
+        success: true,
+        message: "Activity created successfully",
+        data: activitePopulated,
+      });
+    } catch (responseError) {
+      console.error("❌ Error sending response:", responseError);
+      throw responseError;
+    }
   } catch (error) {
+    console.error("❌ Create activity error:", error);
+
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map(
+        (err) => err.message,
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validationErrors,
+      });
+    }
+
     res.status(500).json({
-      message: "Error creating activity",
+      success: false,
+      message: "Internal server error",
       error: error.message,
     });
   }
@@ -279,6 +365,17 @@ exports.getAllActivites = async (req, res) => {
       Activite.countDocuments(filter),
     ]);
 
+    // Add isBookmarked field for authenticated users
+    const currentUserId = req.user?.userId;
+    if (currentUserId) {
+      activites.forEach((activity) => {
+        const bookmarkedBy = Array.isArray(activity.bookmarked_by)
+          ? activity.bookmarked_by.map((id) => String(id))
+          : [];
+        activity.isBookmarked = bookmarkedBy.includes(String(currentUserId));
+      });
+    }
+
     res.status(200).json({
       success: true,
       count: activites.length,
@@ -357,15 +454,15 @@ exports.updateActivite = async (req, res) => {
     // Verify the user owns the activity
     const activityOrganizerId = activite.organisateur_id.toString().trim();
     const userIdString = String(userId).trim();
-    
+
     if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to modify this activity",
       });
     }
 
-    console.log('📦 Full req.body keys:', Object.keys(req.body));
-    console.log('📦 Full req.body:', req.body);
+    console.log("📦 Full req.body keys:", Object.keys(req.body));
+    console.log("📦 Full req.body:", req.body);
 
     // Support both camelCase (from frontend) and snake_case
     const {
@@ -395,6 +492,11 @@ exports.updateActivite = async (req, res) => {
       aiGeneratedImageUrl,
       existing_photo_urls,
       existingPhotoUrls,
+      location_type,
+      locationType,
+      itineraire,
+      itineraire_coords,
+      itineraireCoords,
     } = req.body;
 
     // Parse JSON fields that may come as strings from multipart/form-data
@@ -420,13 +522,30 @@ exports.updateActivite = async (req, res) => {
     }
 
     let parsedExistingPhotoUrls = existing_photo_urls || existingPhotoUrls;
-    const existingPhotoUrlsProvided = (existing_photo_urls !== undefined || existingPhotoUrls !== undefined);
-    if (parsedExistingPhotoUrls !== undefined && typeof parsedExistingPhotoUrls === "string") {
+    const existingPhotoUrlsProvided =
+      existing_photo_urls !== undefined || existingPhotoUrls !== undefined;
+    if (
+      parsedExistingPhotoUrls !== undefined &&
+      typeof parsedExistingPhotoUrls === "string"
+    ) {
       try {
         parsedExistingPhotoUrls = JSON.parse(parsedExistingPhotoUrls);
       } catch (e) {
         console.warn("⚠️ Failed to parse existing_photo_urls:", e);
         parsedExistingPhotoUrls = [];
+      }
+    }
+
+    let parsedItineraireCoords = itineraire_coords || itineraireCoords;
+    if (
+      parsedItineraireCoords !== undefined &&
+      typeof parsedItineraireCoords === "string"
+    ) {
+      try {
+        parsedItineraireCoords = JSON.parse(parsedItineraireCoords);
+      } catch (e) {
+        console.warn("⚠️ Failed to parse itineraire_coords:", e);
+        parsedItineraireCoords = [];
       }
     }
 
@@ -458,6 +577,57 @@ exports.updateActivite = async (req, res) => {
       updateData.date_fin = date_fin || dateFin;
     if (statut !== undefined) updateData.statut = statut;
 
+    // Handle location type changes and clean up incompatible data
+    const newLocationType = location_type || locationType;
+    if (newLocationType !== undefined) {
+      updateData.location_type = newLocationType;
+
+      // Clean up data when changing location types
+      if (newLocationType === "itinerary") {
+        // Switching TO itinerary - keep existing itinerary or use provided one
+        if (itineraire === undefined) {
+          // No itinerary data provided - keep existing itinerary (allow temporary empty state for switching)
+          console.log(
+            "🔄 Switching TO itinerary, keeping existing itinerary data",
+          );
+        }
+      } else {
+        // Switching FROM itinerary to fixed/custom - explicitly clear itinerary data
+        console.log(
+          "🔄 Clearing itinerary data when switching to:",
+          newLocationType,
+        );
+        updateData.itineraire = [];
+        updateData.itineraire_coords = [];
+      }
+    }
+
+    let parsedItineraire = itineraire;
+    if (itineraire !== undefined && typeof itineraire === "string") {
+      try {
+        parsedItineraire = JSON.parse(itineraire);
+      } catch (e) {
+        console.warn("⚠️ Failed to parse itineraire:", e);
+      }
+    }
+    if (parsedItineraire !== undefined) {
+      if (parsedItineraire.length > 0) {
+        updateData.itineraire = parsedItineraire;
+        if (parsedItineraireCoords !== undefined) {
+          updateData.itineraire_coords = parsedItineraireCoords;
+        }
+      } else if (
+        parsedItineraire.length === 0 &&
+        (location_type || locationType) === "itinerary"
+      ) {
+        // Allow empty itinerary during type switching, will be validated later
+        console.log(
+          "⚠️ Empty itinerary provided for itinerary type - allowing for now",
+        );
+        updateData.itineraire = [];
+      }
+    }
+
     // Handle uploaded photos
     if (req.files && req.files.length > 0) {
       console.log(
@@ -470,9 +640,10 @@ exports.updateActivite = async (req, res) => {
         console.log("✅ New photos uploaded successfully:", newPhotosUrls);
 
         // Use parsed existing photo URLs if provided, otherwise use activity's current photos
-        const basePhotos = parsedExistingPhotoUrls && parsedExistingPhotoUrls.length > 0
-          ? parsedExistingPhotoUrls
-          : (activite.photos || []);
+        const basePhotos =
+          parsedExistingPhotoUrls && parsedExistingPhotoUrls.length > 0
+            ? parsedExistingPhotoUrls
+            : activite.photos || [];
 
         // If keepExistingPhotos is true, append new photos to existing ones
         if (keepExistingPhotos === "true" || keepExistingPhotos === true) {
@@ -492,7 +663,10 @@ exports.updateActivite = async (req, res) => {
       // If no new photos uploaded, check if existing_photo_urls was provided
       if (existingPhotoUrlsProvided) {
         // Field was provided - use it (even if empty to delete all photos)
-        console.log("📸 Using provided existing photo URLs (may be empty):", parsedExistingPhotoUrls || []);
+        console.log(
+          "📸 Using provided existing photo URLs (may be empty):",
+          parsedExistingPhotoUrls || [],
+        );
         updateData.photos = parsedExistingPhotoUrls || [];
       } else {
         // Field not provided - keep existing photos
@@ -503,10 +677,19 @@ exports.updateActivite = async (req, res) => {
 
     // Add AI-generated image URL if provided (and not already in photos)
     const aiImageUrl = ai_generated_image_url || aiGeneratedImageUrl;
-    if (aiImageUrl && aiImageUrl.length > 0 && !updateData.photos.includes(aiImageUrl)) {
+    if (
+      aiImageUrl &&
+      aiImageUrl.length > 0 &&
+      !updateData.photos.includes(aiImageUrl)
+    ) {
       console.log("🤖 Adding AI-generated image URL to update:", aiImageUrl);
       updateData.photos.push(aiImageUrl);
     }
+
+    console.log(
+      "📝 Update data being sent:",
+      JSON.stringify(updateData, null, 2),
+    );
 
     const activiteUpdated = await Activite.findByIdAndUpdate(
       activiteId,
@@ -517,12 +700,27 @@ exports.updateActivite = async (req, res) => {
       "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
     );
 
+    if (!activiteUpdated) {
+      console.error(
+        "❌ Failed to update activity - document not found or update failed",
+      );
+      return res.status(404).json({
+        success: false,
+        message: "Activity not found or could not be updated",
+      });
+    }
+
+    console.log("✅ Activity updated successfully:", activiteUpdated._id);
+
     // Emit activity updated event for notification to booked users (if enabled)
-    const notifyBookedUsers = req.body.notifyBookedUsers !== 'false';
+    const notifyBookedUsers = req.body.notifyBookedUsers !== "false";
     if (notifyBookedUsers) {
       try {
-        const bookings = await Inscription.find({ activite: activiteId, statut: 'confirmed' }).select('touriste');
-        const bookedUserIds = bookings.map(b => b.touriste);
+        const bookings = await Inscription.find({
+          activite: activiteId,
+          statut: "confirmed",
+        }).select("touriste");
+        const bookedUserIds = bookings.map((b) => b.touriste);
 
         if (bookedUserIds.length > 0) {
           notificationEventBus.emitActivityUpdated({
@@ -532,7 +730,37 @@ exports.updateActivite = async (req, res) => {
           });
         }
       } catch (notifError) {
-        console.warn("Failed to send activity updated notification:", notifError.message);
+        console.warn(
+          "Failed to send activity updated notification:",
+          notifError.message,
+        );
+      }
+    }
+
+    // Emit activity updated event for notification to followers (if enabled)
+    const notifyFollowers = req.body.notifyFollowers !== "false";
+    if (notifyFollowers) {
+      try {
+        const Follow = require("../models/follow");
+        const followers = await Follow.find({ following_id: userId }).select(
+          "follower_id",
+        );
+        const followerIds = followers.map((f) => f.follower_id);
+
+        if (followerIds.length > 0) {
+          notificationEventBus.emitActivityCreated({
+            organizerId: userId,
+            organizerName: organisator.fullname,
+            activityTitle: activiteUpdated.titre,
+            activityId: activiteId,
+            followerIds: followerIds,
+          });
+        }
+      } catch (notifError) {
+        console.warn(
+          "Failed to send activity updated notification to followers:",
+          notifError.message,
+        );
       }
     }
 
@@ -541,7 +769,24 @@ exports.updateActivite = async (req, res) => {
       activite: activiteUpdated,
     });
   } catch (error) {
+    console.error("❌ Update activity error:", error);
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map(
+        (err) => err.message,
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validationErrors,
+      });
+    }
+
     res.status(500).json({
+      success: false,
       message: "Error updating activity",
       error: error.message,
     });
@@ -564,7 +809,7 @@ exports.deleteActivite = async (req, res) => {
     // Verify the user owns the activity
     const activityOrganizerId = activite.organisateur_id.toString().trim();
     const userIdString = String(userId).trim();
-    
+
     if (activityOrganizerId !== userIdString) {
       return res.status(403).json({
         message: "You are not authorized to delete this activity",
@@ -572,8 +817,11 @@ exports.deleteActivite = async (req, res) => {
     }
 
     // Check if there are any bookings
-    const bookings = await Inscription.find({ activite_id: activiteId, statut: { $ne: "annulee" } });
-    
+    const bookings = await Inscription.find({
+      activite_id: activiteId,
+      statut: { $ne: "annulee" },
+    });
+
     // If there are bookings, cancellation message is required
     if (bookings.length > 0 && !cancellationMessage) {
       return res.status(400).json({
@@ -619,7 +867,7 @@ exports.deleteActivite = async (req, res) => {
     );
 
     // Get booked users for notification (reuse existing bookings variable)
-    const bookedUserIds = bookings.map(b => b.touriste);
+    const bookedUserIds = bookings.map((b) => b.touriste);
 
     // Delete the activity
     await Activite.findByIdAndDelete(activiteId);
@@ -634,7 +882,10 @@ exports.deleteActivite = async (req, res) => {
         });
       }
     } catch (notifError) {
-      console.warn("Failed to send activity cancelled notification:", notifError.message);
+      console.warn(
+        "Failed to send activity cancelled notification:",
+        notifError.message,
+      );
     }
 
     res.status(200).json({
@@ -859,25 +1110,31 @@ exports.searchActivites = async (req, res) => {
 exports.getMyActivities = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const { include_archived } = req.query;
 
     const maintenant = new Date();
     console.log("🕐 Backend timezone check:");
     console.log("  - Server time (local):", maintenant.toString());
     console.log("  - Server time (UTC):", maintenant.toISOString());
     console.log("  - Server time (timestamp):", maintenant.getTime());
+    console.log("  - include_archived:", include_archived);
 
-    // Activities whose end date has not yet passed
-    const activities = await Activite.find({
-      organisateur_id: userId,
-      date_fin: { $gte: maintenant }, // date_fin >= now
-    })
+    // Build query filter
+    const filter = { organisateur_id: userId };
+
+    // If include_archived is NOT true, only return activities whose end date has not yet passed
+    if (include_archived !== "true" && include_archived !== true) {
+      filter.date_fin = { $gte: maintenant }; // date_fin >= now
+    }
+
+    const activities = await Activite.find(filter)
       .populate(
         "organisateur_id",
         "fullname avatar note_moyenne nombre_avis date_inscription bio pays_origine specialites_activites langues_proposees types_activites",
       )
       .sort({ date_debut: 1 }); // Sort by start date
 
-    console.log(`📋 Found ${activities.length} active activities`);
+    console.log(`📋 Found ${activities.length} activities (include_archived=${include_archived})`);
     if (activities.length > 0) {
       console.log("  - First activity date_fin:", activities[0].date_fin);
     }
@@ -1000,7 +1257,7 @@ exports.toggleActivityBookmark = async (req, res) => {
     if (alreadyBookmarked) {
       // Remove bookmark
       activity.bookmarked_by = activity.bookmarked_by.filter(
-        (id) => String(id) !== userId
+        (id) => String(id) !== userId,
       );
       activity.bookmarks_count = Math.max(0, activity.bookmarks_count - 1);
     } else {
@@ -1043,7 +1300,7 @@ exports.getBookmarkedActivities = async (req, res) => {
       .lean();
 
     // Add isBookmarked field (always true for bookmarked activities)
-    const activitiesWithBookmarkStatus = activities.map(activity => ({
+    const activitiesWithBookmarkStatus = activities.map((activity) => ({
       ...activity,
       isBookmarked: true,
     }));

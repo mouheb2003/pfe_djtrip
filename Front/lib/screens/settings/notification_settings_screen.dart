@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/user_service.dart';
+import '../../../services/fcm_notification_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -14,6 +15,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   
   // Notification settings state
   bool _pushNotifications = true;
+  bool _pushNotifEnabled = true;
   bool _emailNotifications = true;
   bool _bookingReminders = true;
   bool _activityUpdates = true;
@@ -33,18 +35,17 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       final user = await UserService.getProfile();
       if (user != null && mounted) {
         final settings = user['notification_settings'] as Map<String, dynamic>?;
-        if (settings != null) {
-          setState(() {
-            _pushNotifications = settings['push_notifications'] ?? true;
-            _emailNotifications = settings['email_notifications'] ?? true;
-            _bookingReminders = settings['booking_reminders'] ?? true;
-            _activityUpdates = settings['activity_updates'] ?? true;
-            _newMessages = settings['new_messages'] ?? true;
-            _promotionalEmails = settings['promotional_emails'] ?? false;
-            _weeklyDigest = settings['weekly_digest'] ?? false;
-            _specialOffers = settings['special_offers'] ?? false;
-          });
-        }
+        setState(() {
+          _pushNotifications = settings?['push_notifications'] ?? true;
+          _pushNotifEnabled = (user['push_notif_enabled'] as bool?) ?? true;
+          _emailNotifications = settings?['email_notifications'] ?? true;
+          _bookingReminders = settings?['booking_reminders'] ?? true;
+          _activityUpdates = settings?['activity_updates'] ?? true;
+          _newMessages = settings?['new_messages'] ?? true;
+          _promotionalEmails = settings?['promotional_emails'] ?? false;
+          _weeklyDigest = settings?['weekly_digest'] ?? false;
+          _specialOffers = settings?['special_offers'] ?? false;
+        });
       }
     } catch (e) {
       print('Error loading notification settings: $e');
@@ -57,6 +58,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         switch (key) {
           case 'push_notifications':
             _pushNotifications = value;
+            break;
+          case 'push_notif_enabled':
+            _pushNotifEnabled = value;
             break;
           case 'email_notifications':
             _emailNotifications = value;
@@ -82,13 +86,48 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         }
       });
 
-      final success = await UserService.updateNotificationSettings({key: value});
+      // Handle FCM token management for push notifications
+      if (key == 'push_notif_enabled') {
+        if (value) {
+          // Enable push notifications - send token to backend
+          await FcmNotificationService().sendTokenToBackend();
+        } else {
+          // Disable push notifications - delete token from backend
+          await FcmNotificationService().deleteToken();
+        }
+      }
+
+      // Map frontend keys to backend structure
+      Map<String, dynamic> updates = {};
+      
+      if (key == 'push_notif_enabled') {
+        updates['push_notif_enabled'] = value;
+      } else if (key == 'email_notifications') {
+        updates['notifications_email'] = value;
+      } else if (key == 'booking_reminders') {
+        updates['preferences.booking.push'] = value;
+      } else if (key == 'activity_updates') {
+        updates['preferences.activity.push'] = value;
+      } else if (key == 'new_messages') {
+        updates['preferences.message.push'] = value;
+      } else if (key == 'promotional_emails') {
+        updates['preferences.promotional.push'] = value;
+      } else if (key == 'weekly_digest') {
+        updates['preferences.weekly.push'] = value;
+      } else if (key == 'special_offers') {
+        updates['preferences.special.push'] = value;
+      }
+
+      final success = await UserService.updateNotificationSettings(updates);
       if (!success && mounted) {
         // Revert on failure
         setState(() {
           switch (key) {
             case 'push_notifications':
               _pushNotifications = !value;
+              break;
+            case 'push_notif_enabled':
+              _pushNotifEnabled = !value;
               break;
             case 'email_notifications':
               _emailNotifications = !value;
@@ -155,11 +194,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             _buildSectionHeader('Notification Methods'),
             const SizedBox(height: 12),
             _buildNotificationCard(
-              icon: Icons.notifications,
-              title: 'Push Notifications',
-              subtitle: 'Receive notifications on your device',
-              value: _pushNotifications,
-              onChanged: (value) => _updateNotificationSetting('push_notifications', value),
+              icon: Icons.push_notification,
+              title: 'FCM Push Notifications',
+              subtitle: 'Control Firebase Cloud Messaging notifications',
+              value: _pushNotifEnabled,
+              onChanged: (value) => _updateNotificationSetting('push_notif_enabled', value),
             ),
             const SizedBox(height: 8),
             _buildNotificationCard(

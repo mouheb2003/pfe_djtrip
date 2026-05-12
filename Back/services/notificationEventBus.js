@@ -73,6 +73,13 @@ class NotificationEventBus extends EventEmitter {
   }
 
   /**
+   * Emit comment reaction events
+   */
+  emitReactionCreated(data) {
+    this.emit('comment.reaction', data);
+  }
+
+  /**
    * Emit post reaction events
    */
   emitPostReaction(data) {

@@ -9,10 +9,13 @@ import 'package:provider/provider.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/ai_text_service.dart';
 import '../../widgets/ai_image_generator_widget.dart';
 import '../../widgets/place_search_widget.dart';
+import '../../widgets/ai_text_widgets.dart';
 import 'activity_preview_screen.dart';
 import 'map_picker_screen.dart';
+import 'interactive_djerba_map_screen.dart' as djerba_map;
 
 class _DurOption {
   final String label;
@@ -64,6 +67,9 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   // Location
   final _locationCtrl = TextEditingController();
   LatLng? _pickedLatLng;
+  String? _selectedFixedLocation;
+  final _itineraryCtrl = TextEditingController();
+  bool _useFixedLocation = false;
 
   // Availability
   DateTime? _startDateTime;
@@ -78,6 +84,288 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
   bool _isLoading = false;
   final bool _isPublish = true;
   bool _notifyFollowers = true;
+  bool _isProcessingAi = false;
+
+  // Location and itinerary state
+  bool _useItinerary = false;
+  final List<String> _itineraryItems = [];
+  final List<Map<String, dynamic>> _itineraryLocations = [];
+
+  Widget _buildAiActionButton(IconData icon, String tooltip, VoidCallback onPressed) {
+    return AiActionButton(
+      icon: icon,
+      tooltip: tooltip,
+      onPressed: _isProcessingAi ? null : onPressed,
+    );
+  }
+
+  Future<void> _rewriteFieldText(TextEditingController controller, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.rewriteText(
+        text,
+        type: _category,
+        title: _titleCtrl.text.trim(),
+        description: fieldType == 'description' ? _descCtrl.text.trim() : null,
+      );
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        controller.text = result['result'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Text rewritten successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to rewrite text'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to rewrite text. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _improveFieldText(TextEditingController controller, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.improveText(
+        text,
+        type: _category,
+        title: _titleCtrl.text.trim(),
+        description: fieldType == 'description' ? _descCtrl.text.trim() : null,
+      );
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        controller.text = result['result'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Text improved successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to improve text'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to improve text. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _translateFieldText(TextEditingController controller, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    // Show language selection dialog
+    _showLanguageSelectionDialog(controller, text);
+  }
+
+  void _showLanguageSelectionDialog(TextEditingController controller, String text) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Select Translation Language',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B2352),
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Choose the language to translate this text to:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 200,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: AiTextService.supportedLanguages.entries.map((entry) {
+                        final langCode = entry.key;
+                        final langName = entry.value;
+                        return ListTile(
+                          leading: Icon(
+                            Icons.translate,
+                            color: const Color(0xFF4B63FF),
+                          ),
+                          title: Text(langName),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _performTranslation(controller, text, langCode, langName);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performTranslation(TextEditingController controller, String text, String langCode, String langName) async {
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.translateText(text, langCode);
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        controller.text = result['result'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Text translated to $langName'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to translate text'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to translate text. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  // Itinerary management methods
+  void _addItineraryItem() {
+    setState(() {
+      // Auto-select itinerary option when adding items
+      if (!_useItinerary) {
+        _useItinerary = true;
+        _useFixedLocation = false;
+      }
+      _itineraryItems.add('');
+      _itineraryLocations.add({});
+    });
+  }
+
+  void _removeItineraryItem(int index) {
+    setState(() {
+      _itineraryItems.removeAt(index);
+      _itineraryLocations.removeAt(index);
+    });
+  }
+
+  void _updateItineraryItem(int index, String value) {
+    setState(() {
+      _itineraryItems[index] = value;
+    });
+  }
+
+  void _updateItineraryLocation(int index, Map<String, dynamic> location) {
+    setState(() {
+      _itineraryLocations[index] = location;
+    });
+  }
+
+  Future<void> _pickLocationForItinerary(int index) async {
+    final result = await Navigator.push<djerba_map.MapPickerResult>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => djerba_map.InteractiveDjerbaMapScreen(
+          initialPosition: _itineraryLocations[index]['lat'] != null 
+              ? LatLng(_itineraryLocations[index]['lat'], _itineraryLocations[index]['lng'])
+              : null,
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      _updateItineraryLocation(index, {
+        'lat': result.latLng.latitude,
+        'lng': result.latLng.longitude,
+        'address': result.address.isNotEmpty ? result.address : 'Location ${index + 1}',
+      });
+    }
+  }
 
   static const _categories = [
     'Guided Tour',
@@ -100,6 +388,11 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         _priceCtrl.text = '0.00';
       }
     });
+    
+    // Initialize with no selection - user must explicitly choose
+    print('🔍 DEBUG CREATE INIT: No location type selected initially');
+    _useFixedLocation = false;
+    _useItinerary = false;
   }
 
   @override
@@ -112,6 +405,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     _incCtrl.dispose();
     _bringCtrl.dispose();
     _locationCtrl.dispose();
+    _itineraryCtrl.dispose();
     _priceFocus.dispose();
     super.dispose();
   }
@@ -581,13 +875,217 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       return;
     }
 
+    // Smart validation based on actual data state
+    final hasItineraryItems = _itineraryItems.isNotEmpty;
+    final hasCustomLocation = _pickedLatLng != null || _locationCtrl.text.trim().isNotEmpty;
+    final hasFixedLocation = _selectedFixedLocation != null;
+    
+    print('🔍 VALIDATION DEBUG: hasItineraryItems=$hasItineraryItems, hasCustomLocation=$hasCustomLocation, hasFixedLocation=$hasFixedLocation');
+    
+    // If user has itinerary items, validate itinerary requirements
+    if (hasItineraryItems) {
+      bool hasValidLocations = true;
+      for (int i = 0; i < _itineraryItems.length; i++) {
+        if (_itineraryItems[i].trim().isEmpty) {
+          hasValidLocations = false;
+          break;
+        }
+      }
+      
+      if (!hasValidLocations) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all itinerary step descriptions'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+    // If no itinerary items, require either fixed or custom location
+    else if (!hasCustomLocation && !hasFixedLocation) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please provide location details (fixed, custom, or itinerary)'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Additional validation for specific types
+    if (_useFixedLocation && _selectedFixedLocation == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a fixed location from the dropdown'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (!_useFixedLocation && !hasItineraryItems && _pickedLatLng == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please pick a location on the map for custom location'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Build location/itinerary data based on selection
+    String lieu;
+    List<Map<String, dynamic>>? itineraire;
+    Map<String, dynamic>? coordonnees;
+    
+    // DEBUG: Print itinerary state
+    print('🔍 [CREATE ACTIVITY] DEBUG INFO:');
+    print('🔍 _useItinerary: $_useItinerary');
+    print('🔍 _itineraryItems.length: ${_itineraryItems.length}');
+    print('🔍 _itineraryItems: $_itineraryItems');
+    print('🔍 _itineraryLocations.length: ${_itineraryLocations.length}');
+    print('🔍 _itineraryLocations: $_itineraryLocations');
+    
+    // Declare itinerarySteps outside the if block so it's accessible later
+    final itinerarySteps = <Map<String, dynamic>>[];
+    
+    // Only process itinerary if explicitly selected OR if we have items (auto-detect)
+    if (_useItinerary || _itineraryItems.isNotEmpty) {
+      // For itinerary, build structured itinerary data
+      if (_itineraryItems.isNotEmpty) {
+        for (int i = 0; i < _itineraryItems.length; i++) {
+          final item = _itineraryItems[i];
+          final location = _itineraryLocations[i];
+          
+          print('🔍 Processing item $i: "$item"');
+          print('🔍 Processing location $i: $location');
+          
+                    
+          if (item.trim().isNotEmpty) {
+            final step = <String, dynamic>{
+              'step': i + 1,
+              'description': item.trim(),
+            };
+            
+            // Add location data if available
+            if (location['address'] != null) {
+              step['location'] = {
+                'address': location['address'],
+                'latitude': location['lat'],
+                'longitude': location['lng'],
+              };
+              print('🔍 Added location to step: ${step['location']}');
+            }
+            
+            itinerarySteps.add(step);
+            print('🔍 Added step: $step');
+          } else {
+            print('🔍 Skipped empty item: "$item"');
+          }
+        }
+        
+        print('🔍 Total itinerarySteps: ${itinerarySteps.length}');
+        
+        if (itinerarySteps.isNotEmpty) {
+          // Convert itinerary items to structured array
+          itineraire = itinerarySteps.map((step) {
+            return {
+              'title': step['title'] ?? 'Step ${step['step']}',
+              'description': step['description'] ?? '',
+              'address': step['location']?['address'] ?? '',
+              'lat': step['location']?['latitude'] ?? 0.0,
+              'lng': step['location']?['longitude'] ?? 0.0,
+              'order': step['step'] ?? 0,
+            };
+          }).toList();
+          
+          print('🔍 Generated structured itineraire: $itineraire');
+          
+          // Set lieu to a more descriptive text for multi-location itinerary
+          if (itinerarySteps.first['location'] != null) {
+            // Create a descriptive lieu that indicates multiple locations
+            final firstLocation = itinerarySteps.first['location']['address'];
+            final lastLocation = itinerarySteps.last['location']?['address'] ?? firstLocation;
+            
+            if (itinerarySteps.length > 1) {
+              lieu = 'Multi-location tour: $firstLocation to $lastLocation';
+            } else {
+              lieu = firstLocation;
+            }
+            
+            // Don't set coordonnees for itinerary - let backend handle it
+            coordonnees = null;
+            print('🔍 Set lieu for multi-location: "$lieu"');
+          } else {
+            lieu = 'Multi-location itinerary';
+            print('🔍 Set lieu to default: "$lieu"');
+          }
+        } else {
+          // No itinerary items, use default
+          lieu = 'Multi-location itinerary';
+          print('🔍 No valid steps, set lieu to default: "$lieu"');
+        }
+      } else {
+        // No itinerary items, use default
+        lieu = 'Multi-location itinerary';
+        print('🔍 No itinerary items, set lieu to default: "$lieu"');
+      }
+    } else {
+      // For fixed or custom location
+      lieu = _locationCtrl.text.trim().isNotEmpty 
+          ? _locationCtrl.text.trim() 
+          : 'Location to be specified';
+      coordonnees = _pickedLatLng != null
+          ? {
+              'latitude': _pickedLatLng!.latitude,
+              'longitude': _pickedLatLng!.longitude,
+            }
+          : null;
+      print('🔍 Not using itinerary, set lieu: "$lieu"');
+    }
+    
+    print('🔍 FINAL VALUES - lieu: "$lieu", itineraire: "$itineraire"');
+
+    // Remove itineraire_coords - now handled by backend
+    // The backend will process the structured itineraire array
+    print('🔍 Backend will handle itineraire_coords from structured itineraire');
+
+    // Determine location type - SMART detection based on actual data
+    String locationType;
+    print('🔍 DEBUG: _useItinerary=$_useItinerary, _useFixedLocation=$_useFixedLocation');
+    print('🔍 DEBUG: _itineraryItems.length=${_itineraryItems.length}');
+    
+    // Priority 1: If user explicitly selected itinerary mode
+    if (_useItinerary) {
+      locationType = 'itinerary';
+      print('🔍 DEBUG: Set locationType to itinerary (explicit selection)');
+    }
+    // Priority 2: If user selected fixed location
+    else if (_useFixedLocation) {
+      locationType = 'fixed';
+      print('🔍 DEBUG: Set locationType to fixed (explicit selection)');
+    }
+    // Priority 3: Default to custom if nothing else selected
+    else {
+      locationType = 'custom';
+      print('🔍 DEBUG: Set locationType to custom (default)');
+    }
+    print('🔍 FINAL Location type: $locationType');
+
     final result = await ActivityService.createActivity(
       titre: _titleCtrl.text.trim(),
       typeActivite: _category ?? 'Other',
       description: _descCtrl.text.trim(),
       prix: double.tryParse(_priceCtrl.text) ?? 0,
       capaciteMax: int.tryParse(_capacityCtrl.text) ?? 1,
-      lieu: _locationCtrl.text.trim(),
+      lieu: lieu,
+      locationType: locationType,
+      itineraire: itineraire,
       duree: durationHours,
       dateDebut: _startDateTime!,
       dateFin: endDateTime,
@@ -597,12 +1095,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       aApporter: List.from(_itemsToBring),
       languesDisponibles: List.from(_languages),
       statut: _isPublish ? 'active' : 'inactive',
-      coordonnees: _pickedLatLng != null
-          ? {
-              'latitude': _pickedLatLng!.latitude,
-              'longitude': _pickedLatLng!.longitude,
-            }
-          : null,
+      coordonnees: coordonnees,
       notifyFollowers: _notifyFollowers,
     );
 
@@ -857,6 +1350,56 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           _descCtrl,
           maxLines: 5,
         ),
+        const SizedBox(height: 8),
+        // AI Action Buttons - only show when type and title exist
+        if (_category != null && _titleCtrl.text.trim().isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome, size: 16, color: Color(0xFF4A65E6)),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'AI Assistant',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4A65E6),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E9FF)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _buildAiActionButton(Icons.auto_fix_high, 'Rewrite', () => _rewriteFieldText(_descCtrl, 'description')),
+                    const SizedBox(width: 8),
+                    _buildAiActionButton(Icons.spellcheck, 'Improve', () => _improveFieldText(_descCtrl, 'description')),
+                    const SizedBox(width: 8),
+                    _buildAiActionButton(Icons.translate, 'Translate', () => _translateFieldText(_descCtrl, 'description')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'AI will use activity type and title to create the perfect description',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF6B7280),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
         const SizedBox(height: 20),
         const Text(
           'ACTIVITY TYPE',
@@ -1141,105 +1684,524 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle(
-          'Location',
-          'Where the magic happens. Search for a place or use the map to pin exact coordinates.',
+          'Location & Itinerary',
+          'Choose between fixed location, custom location with map, or detailed itinerary.',
         ),
-        PlaceSearchWidget(
-          controller: _locationCtrl,
-          hintText: 'Search for a place...',
-          onPlaceSelected: (place) {
-            setState(() {
-              if (place.latitude != null && place.longitude != null) {
-                _pickedLatLng = LatLng(
-                  place.latitude!,
-                  place.longitude!,
-                );
-              }
-            });
-          },
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () async {
-            final result = await Navigator.push<MapPickerResult>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MapPickerScreen(initialPosition: _pickedLatLng),
+        
+        // Location Type Selection - MANDATORY
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FE),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E9FF)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Location Type *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF131E32),
+                ),
               ),
-            );
-            if (result != null)
-              setState(() {
-                _locationCtrl.text = result.address;
-                _pickedLatLng = result.latLng;
-              });
-          },
-          child: Container(
-            height: 160,
-            decoration: BoxDecoration(
-              color: const Color(0xFF131E32),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Stack(
-              children: [
-                if (_pickedLatLng != null)
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _pickedLatLng!,
-                      zoom: 14,
+              const SizedBox(height: 12),
+              // Fixed Location Option
+              _buildLocationOption(
+                title: 'Fixed Location',
+                subtitle: 'Choose from predefined locations (beach, museum, etc.)',
+                icon: Icons.location_on,
+                isSelected: _useFixedLocation && !_useItinerary,
+                onTap: () {
+                  print('🔍 DEBUG: Fixed Location tapped - before: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                  setState(() {
+                    _useFixedLocation = true;
+                    _useItinerary = false;
+                  });
+                  print('🔍 DEBUG: Fixed Location tapped - after: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                },
+              ),
+              const SizedBox(height: 12),
+              // Custom Location Option
+              _buildLocationOption(
+                title: 'Custom Location',
+                subtitle: 'Pick any location on the map (your choice)',
+                icon: Icons.map,
+                isSelected: !_useFixedLocation && !_useItinerary,
+                onTap: () {
+                  print('🔍 DEBUG: Custom Location tapped - before: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                  setState(() {
+                    _useFixedLocation = false;
+                    _useItinerary = false;
+                  });
+                  print('🔍 DEBUG: Custom Location tapped - after: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                },
+              ),
+              const SizedBox(height: 12),
+              // Itinerary Option
+              _buildLocationOption(
+                title: 'Itinerary',
+                subtitle: 'Multi-location journey with waypoints (2+ locations)',
+                icon: Icons.route,
+                isSelected: _useItinerary,
+                onTap: () {
+                  print('🔍 DEBUG: Itinerary tapped - before: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                  setState(() {
+                    _useFixedLocation = false;
+                    _useItinerary = true;
+                  });
+                  print('🔍 DEBUG: Itinerary tapped - after: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary');
+                },
+              ),
+              const SizedBox(height: 16),
+              // Selection Status
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: const Color(0xFF6B7280),
                     ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('m'),
-                        position: _pickedLatLng!,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getSelectionStatus(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
-                    },
-                    zoomControlsEnabled: false,
-                    scrollGesturesEnabled: false,
-                    mapType: MapType.normal,
-                  ),
-                Positioned(
-                  bottom: 10,
-                  left: 10,
-                  right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Fixed Location Content
+        if (_useFixedLocation && !_useItinerary) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E9FF)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedFixedLocation,
+                isExpanded: true,
+                hint: const Text(
+                  'Select a fixed location',
+                  style: TextStyle(color: Color(0xFF717BBC)),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Djerba Explore Park', child: Text('Djerba Explore Park')),
+                  DropdownMenuItem(value: 'Houmt Souk Medina', child: Text('Houmt Souk Medina')),
+                  DropdownMenuItem(value: 'Guellala Museum', child: Text('Guellala Museum')),
+                  DropdownMenuItem(value: 'Djerba Heritage Museum', child: Text('Djerba Heritage Museum')),
+                  DropdownMenuItem(value: 'Borj Ghazi Mustapha Fort', child: Text('Borj Ghazi Mustapha Fort')),
+                  DropdownMenuItem(value: 'Midoun Beach', child: Text('Midoun Beach')),
+                  DropdownMenuItem(value: 'Sidi Mahrsi Beach', child: Text('Sidi Mahrsi Beach')),
+                  DropdownMenuItem(value: 'Djerba Golf Club', child: Text('Djerba Golf Club')),
+                  DropdownMenuItem(value: 'Crocodile Farm', child: Text('Crocodile Farm')),
+                  DropdownMenuItem(value: 'Djerba Aqua Park', child: Text('Djerba Aqua Park')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedFixedLocation = value;
+                    _locationCtrl.text = value ?? '';
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+        
+        // Custom Location Content
+        if (!_useFixedLocation && !_useItinerary) ...[
+          PlaceSearchWidget(
+            controller: _locationCtrl,
+            hintText: 'Search for a place...',
+            onPlaceSelected: (place) {
+              setState(() {
+                if (place.latitude != null && place.longitude != null) {
+                  _pickedLatLng = LatLng(
+                    place.latitude!,
+                    place.longitude!,
+                  );
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () async {
+              final result = await Navigator.push<djerba_map.MapPickerResult>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => djerba_map.InteractiveDjerbaMapScreen(initialPosition: _pickedLatLng),
+                ),
+              );
+              if (result != null) {
+                setState(() {
+                  _locationCtrl.text = result.address;
+                  _pickedLatLng = result.latLng;
+                });
+              }
+            },
+            child: Container(
+              height: 160,
+              decoration: BoxDecoration(
+                color: const Color(0xFF131E32),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Stack(
+                children: [
+                  if (_pickedLatLng != null)
+                    GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: _pickedLatLng!,
+                        zoom: 14,
+                      ),
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('m'),
+                          position: _pickedLatLng!,
+                        ),
+                      },
+                      zoomControlsEnabled: false,
+                      scrollGesturesEnabled: false,
+                      mapType: MapType.normal,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _pickedLatLng == null
-                                ? 'Pin location on map'
-                                : '${_pickedLatLng!.latitude.toStringAsFixed(4)}, ${_pickedLatLng!.longitude.toStringAsFixed(4)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                  Positioned(
+                    bottom: 10,
+                    left: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _pickedLatLng == null
+                                  ? 'Pin location on map'
+                                  : '${_pickedLatLng!.latitude.toStringAsFixed(4)}, ${_pickedLatLng!.longitude.toStringAsFixed(4)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        const Text(
-                          'PIN CHECK',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                          const Text(
+                            'PIN CHECK',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ),
+        ],
+        
+        // Itinerary Content
+        if (_useItinerary) ...[
+          _buildItinerarySection(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLocationOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4B63FF).withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF4B63FF) : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFF131E32),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFF717BBC),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF4B63FF),
+                size: 16,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method to get selection status text
+  String _getSelectionStatus() {
+    if (_useItinerary) {
+      return ' Itinerary selected - Multi-location journey will be created';
+    } else if (_useFixedLocation) {
+      return ' Fixed location selected - Predefined location will be used';
+    } else if (!_useFixedLocation && !_useItinerary) {
+      return ' Custom location selected - Map location will be used';
+    } else {
+      return ' Please select a location type above';
+    }
+  }
+
+  Widget _buildItinerarySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E9FF)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Itinerary Items',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF131E32),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Add each step of your journey with location and description',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF717BBC),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Itinerary Items List
+              ..._itineraryItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                return _buildItineraryItem(index, item);
+              }).toList(),
+              
+              // Add Item Button
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: _addItineraryItem,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E9FF)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add,
+                        color: Color(0xFF4B63FF),
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Add Itinerary Item',
+                        style: TextStyle(
+                          color: Color(0xFF4B63FF),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildItineraryItem(int index, String item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E9FF)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4B63FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Stop ${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF131E32),
+                  ),
+                ),
+              ),
+              if (_itineraryItems.length > 1)
+                GestureDetector(
+                  onTap: () => _removeItineraryItem(index),
+                  child: const Icon(
+                    Icons.close,
+                    color: Color(0xFFFF4757),
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Description Field
+          TextField(
+            onChanged: (value) => _updateItineraryItem(index, value),
+            decoration: InputDecoration(
+              hintText: 'Describe this stop...',
+              hintStyle: const TextStyle(color: Color(0xFF717BBC)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E9FF)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF4B63FF)),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF131E32),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Location Picker
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  readOnly: true,
+                  onTap: () => _pickLocationForItinerary(index),
+                  decoration: InputDecoration(
+                    hintText: _itineraryLocations[index]['address'] ?? 'Pick location on map',
+                    hintStyle: const TextStyle(color: Color(0xFF717BBC)),
+                    prefixIcon: const Icon(
+                      Icons.map,
+                      color: Color(0xFF4B63FF),
+                      size: 20,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE2E9FF)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF4B63FF)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF131E32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1523,6 +2485,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     );
   }
 
+  
   Widget _buildTextField(
     String label,
     String hint,

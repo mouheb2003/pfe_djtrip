@@ -73,9 +73,9 @@ class InscriptionModel {
           : null,
       messageTouriste: json['message_touriste'] as String?,
       messageOrganisateur: json['message_organisateur'] as String?,
-      activite: _safeMap(json['activite_id']),
-      touriste: _safeMap(json['touriste_id']),
-      organisateur: _safeMap(json['organisateur_id']),
+      activite: _safeMap(json['activite']),
+      touriste: _safeMap(json['touriste']),
+      organisateur: _safeMap(json['organisateur']),
       qrToken: json['qr_token'] as String?,
       qrTokenGeneratedAt: json['qr_token_generated_at'] != null
           ? DateTime.tryParse(json['qr_token_generated_at'].toString())

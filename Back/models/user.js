@@ -4,6 +4,15 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     fullname: String,
+    username: { 
+      type: String, 
+      unique: true, 
+      sparse: true, // Permettre aux utilisateurs existants de ne pas avoir de username initialement
+      minlength: 3,
+      maxlength: 30,
+      match: /^[a-z0-9_]+$/, // Lettres, chiffres, underscores seulement
+      index: true
+    },
     age: Number,
     num_tel: String,
     email: { type: String, required: true, unique: true },
@@ -61,8 +70,14 @@ const userSchema = new mongoose.Schema(
     banReason: String,
     bannedAt: Date,
     derniere_connexion: Date,
+    // 🚀 NEW: Real-time presence tracking field
+    lastActiveAt: { 
+      type: Date, 
+      default: Date.now 
+    },
     notifications_email: { type: Boolean, default: true },
     notifications_sms: { type: Boolean, default: false },
+    push_notif_enabled: { type: Boolean, default: true },
     consentement_donnees: { type: Boolean, default: false },
     // Booking reminder preferences
     reminderPreferences: {
@@ -133,6 +148,8 @@ const userSchema = new mongoose.Schema(
     specialites_activites: [{ type: String }],
     // 🚀 NEW: Languages offered by organizers (also available for all users)
     langues_proposees: [{ type: String }],
+    // 🚀 NEW: Reason to join (for organizers approval)
+    reasonToJoin: { type: String, maxlength: 1000 },
     // 🚀 NEW: Onboarding and approval fields
     is_onboarded: { type: Boolean, default: false },
     is_approved: { type: Boolean, default: true }, // Only for organizers
@@ -158,16 +175,18 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model("User", userSchema);
 
-// ─── Indexes for Performance ───────────────────────────────────────
+// ─── Indexes for Performance ───────────────────────────────
 userSchema.index({ accountStatus: 1 });
 userSchema.index({ userType: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index({ favorites: 1 });
 userSchema.index({ accountStatus: 1, userType: 1 });
-// 🚀 NEW: Onboarding and approval indexes
+// NEW: Onboarding and approval indexes
 userSchema.index({ is_onboarded: 1 });
 userSchema.index({ is_approved: 1, userType: 1 });
 userSchema.index({ signup_method: 1 });
 userSchema.index({ submitted_for_approval: 1 });
+// NEW: Username index for search and uniqueness
+userSchema.index({ username: 1 });
 
 module.exports = User;

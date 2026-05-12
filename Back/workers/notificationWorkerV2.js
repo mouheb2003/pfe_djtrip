@@ -369,7 +369,7 @@ async function initializeEventListeners() {
       // Send to parent comment author
       await notificationService.sendPushNotification({
         userId: data.parentCommentAuthorId,
-        title: 'Reply to your comment',
+        title: 'Reply to Your Comment',
         body: `${replierName} replied to your comment`,
         data: {
           type: 'comment_reply',
@@ -384,26 +384,23 @@ async function initializeEventListeners() {
       // Create DB notification
       await Notification.createNotification({
         user_id: data.parentCommentAuthorId,
-        type: 'reply',
-        title: 'Reply to your comment',
+        type: 'comment',
+        title: 'Reply to Your Comment',
         message: `${replierName} replied to your comment`,
         data: {
+          type: 'comment_reply',
           postId: data.postId,
           commentId: data.commentId,
           parentCommentId: data.parentCommentId,
         },
         priority: 'medium',
         related_entity_type: 'comment',
-        related_entity_id: data.parentCommentId,
+        related_entity_id: data.commentId,
       });
     } catch (error) {
       console.error('Error processing comment.reply event:', error);
     }
   });
-
-  // ============================================
-  // REVIEW EVENTS
-  // ============================================
 
   notificationEventBus.on('review.created', async (data) => {
     try {
@@ -431,6 +428,88 @@ async function initializeEventListeners() {
       });
     } catch (error) {
       console.error('Error processing review.created event:', error);
+    }
+  });
+
+  notificationEventBus.on('user.mentioned', async (data) => {
+    try {
+      console.log('📨 User mentioned event:', data);
+      
+      const commenterName = data.commenterName || 'Someone';
+      
+      // Send to mentioned user
+      await notificationService.sendPushNotification({
+        userId: data.mentionedUserId,
+        title: 'You Were Mentioned',
+        body: `${commenterName} mentioned you in a comment`,
+        data: {
+          type: 'user_mentioned',
+          postId: data.postId,
+          commentId: data.commentId,
+        },
+        notificationType: 'system',
+        priority: 'medium',
+      });
+
+      // Create DB notification
+      await Notification.createNotification({
+        user_id: data.mentionedUserId,
+        type: 'mention',
+        title: 'You Were Mentioned',
+        message: `${commenterName} mentioned you in a comment`,
+        data: {
+          type: 'user_mentioned',
+          postId: data.postId,
+          commentId: data.commentId,
+        },
+        priority: 'medium',
+        related_entity_type: 'comment',
+        related_entity_id: data.commentId,
+      });
+    } catch (error) {
+      console.error('Error processing user.mentioned event:', error);
+    }
+  });
+
+  notificationEventBus.on('comment.reaction', async (data) => {
+    try {
+      console.log('📨 Comment reaction event:', data);
+      
+      const reactorName = data.reactorName || 'Someone';
+      const reactionType = data.reactionType || 'like';
+      
+      // Send to comment author
+      await notificationService.sendPushNotification({
+        userId: data.targetOwnerId,
+        title: 'New Reaction',
+        body: `${reactorName} reacted to your comment`,
+        data: {
+          type: 'comment_reaction',
+          postId: data.postId,
+          commentId: data.targetId,
+          reactionType: reactionType,
+        },
+        notificationType: 'system',
+        priority: 'low',
+      });
+
+      // Create DB notification
+      await Notification.createNotification({
+        user_id: data.targetOwnerId,
+        type: 'reaction',
+        title: 'New Reaction',
+        message: `${reactorName} reacted to your comment`,
+        data: {
+          postId: data.postId,
+          commentId: data.targetId,
+          reactionType: reactionType,
+        },
+        priority: 'low',
+        related_entity_type: 'comment',
+        related_entity_id: data.targetId,
+      });
+    } catch (error) {
+      console.error('Error processing comment.reaction event:', error);
     }
   });
 
@@ -760,8 +839,8 @@ async function initializeEventListeners() {
       await Notification.createNotification({
         user_id: data.userId,
         type: 'appeal',
-        title: data.status === 'approved' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌',
-        message: `Your appeal has been ${data.status === 'approved' ? 'accepted' : 'rejected'}`,
+        title: data.status === 'accepted' ? 'Appeal Accepted ✅' : 'Appeal Rejected ❌',
+        message: `Your appeal has been ${data.status === 'accepted' ? 'accepted' : 'rejected'}`,
         data: { appealId: data.appealId, status: data.status },
         priority: 'urgent',
         related_entity_type: 'appeal',

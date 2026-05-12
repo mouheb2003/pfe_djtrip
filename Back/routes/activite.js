@@ -8,6 +8,7 @@ const {
   verifyToken,
   verifyOrganisator,
   verifyAdmin,
+  optionalAuth,
 } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const validate = require("../middleware/validate");
@@ -19,8 +20,10 @@ const {
 // ─── Public routes ────────────────────────────────────────────────────────────
 
 // Get all activities (optional filters: search, sort, prix_min, prix_max, type_activite, niveau_difficulte, temporalite)
+// Optional auth to include bookmark status for logged-in users
 router.get(
   "/",
+  optionalAuth,
   cacheGet("activites:all", 60),
   activiteController.getAllActivites,
 );
@@ -111,6 +114,10 @@ router.get(
 // Create a new activity (organizers only) — with Joi validation
 router.post(
   "/",
+  (req, res, next) => {
+    console.log('[ROUTE] POST /activites route hit');
+    next();
+  },
   verifyToken,
   verifyOrganisator,
   upload.array("photos", 10),
@@ -151,7 +158,7 @@ router.post(
 router.post(
   "/:activityId/bookmark",
   verifyToken,
-  invalidateCache(["activites"]),
+  invalidateCache(["activites", "activites:bookmarks"]),
   activiteController.toggleActivityBookmark,
 );
 router.get(

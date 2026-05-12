@@ -392,6 +392,30 @@ exports.createInscription = async (req, res) => {
       });
     }
 
+    // Check for booking overlaps
+    const newActivityStartDate = new Date(activite.date_debut);
+    const newActivityEndDate = new Date(activite.date_fin);
+    
+    const overlapCheck = await Inscription.checkBookingOverlap(
+      touristeId,
+      newActivityStartDate,
+      newActivityEndDate
+    );
+    
+    if (overlapCheck.hasOverlap) {
+      await session.abortTransaction();
+      console.log('[INSCRIPTION] Booking overlap detected:', overlapCheck.conflictingBooking);
+      return res.status(409).json({
+        message: "You already have a booking during this time period",
+        conflict: {
+          activityTitle: overlapCheck.conflictingBooking.activityTitle,
+          startDate: overlapCheck.conflictingBooking.startDate,
+          endDate: overlapCheck.conflictingBooking.endDate,
+          status: overlapCheck.conflictingBooking.status
+        }
+      });
+    }
+
     // Calculate total price
     const prixTotal = activite.prix * nombreParticipants;
 
@@ -1443,6 +1467,128 @@ exports.getPendingReviewReminders = async (req, res) => {
     res.status(500).json({
       message: "Error getting pending review reminders",
       error: error.message,
+    });
+  }
+};
+
+// GET /activite/:activiteId/participants
+// Get activity participants (public access - any authenticated user can see)
+exports.getActivityParticipants = async (req, res) => {
+  try {
+    const { activiteId } = req.params;
+    
+    if (!activiteId) {
+      return res.status(400).json({ message: "Activity ID is required" });
+    }
+
+    console.log(`🔍 [PARTICIPANTS] Getting participants for activity: ${activiteId}`);
+    console.log(`🔍 [PARTICIPANTS] Requested by user: ${req.user.userId} (${req.user.userType})`);
+    
+    // First, check if activity exists
+    console.log(`🔍 [PARTICIPANTS] Checking if activity exists...`);
+    const activity = await Activite.findById(activiteId);
+    if (!activity) {
+      console.log(`❌ [PARTICIPANTS] Activity not found: ${activiteId}`);
+      return res.status(404).json({ message: "Activity not found" });
+    }
+    console.log(`✅ [PARTICIPANTS] Activity found: ${activity.titre}`);
+    
+    // Check all inscriptions for this activity (any status)
+    console.log(`🔍 [PARTICIPANTS] Checking all inscriptions for activity...`);
+    const allInscriptions = await Inscription.find({ activite_id: activiteId });
+    console.log(`🔍 [PARTICIPANTS] Total inscriptions found: ${allInscriptions.length}`);
+    
+    // Check approved and verified inscriptions (both are valid participants)
+    console.log(`🔍 [PARTICIPANTS] Checking approved and verified inscriptions...`);
+    const inscriptions = await Inscription.find({
+      activite_id: activiteId,
+      statut: { $in: ['approuvee', 'verifie'] }
+    })
+    .populate({
+      path: 'touriste_id',
+      select: 'fullname avatar _id profileVisibility',
+      strictPopulate: false
+    })
+    .populate({
+      path: 'activite_id',
+      select: 'titre',
+      strictPopulate: false
+    });
+    console.log(`🔍 [PARTICIPANTS] Approved and verified inscriptions found: ${inscriptions.length}`);
+    
+    // Log status breakdown
+    const statusCounts = await Inscription.aggregate([
+      { $match: { activite_id: new mongoose.Types.ObjectId(activiteId) } },
+      { $group: { _id: '$statut', count: { $sum: 1 } } }
+    ]);
+    console.log(`🔍 [PARTICIPANTS] Status breakdown:`, statusCounts);
+
+    if (!inscriptions || inscriptions.length === 0) {
+      console.log(`🔍 [PARTICIPANTS] No participants found for activity: ${activiteId}`);
+      return res.json({
+        success: true,
+        participants: [],
+        message: "No participants found"
+      });
+    }
+
+    console.log(`🔍 [PARTICIPANTS] Found ${inscriptions.length} participants for activity: ${activiteId}`);
+
+    // Format participant data with privacy info
+    const participants = inscriptions.map(inscription => {
+      const participant = inscription.toObject();
+      const touriste = participant.touriste_id || {};  // Fixed: use touriste_id
+      const activite = participant.activite_id || {};  // Fixed: use activite_id
+      
+      // Convert ObjectId to string for frontend compatibility
+      const touristeId = touriste._id ? touriste._id.toString() : '';
+      const activiteId = activite._id ? activite._id.toString() : '';
+      
+      console.log(`🔍 [PARTICIPANT DEBUG] touriste_id:`, JSON.stringify(touriste));
+      console.log(`🔍 [PARTICIPANT DEBUG] touriste._id:`, touriste._id);
+      console.log(`🔍 [PARTICIPANT DEBUG] touristeId (string):`, touristeId);
+      
+      return {
+        _id: participant._id.toString(),
+        nombreParticipants: participant.nombre_participants,
+        statut: participant.statut,
+        dateDemande: participant.date_demande,
+        prixTotal: participant.prix_total,
+        touriste: {
+          _id: touristeId,
+          fullname: touriste.fullname || 'Unknown',
+          avatar: touriste.avatar || '',
+          profileVisibility: touriste.profileVisibility !== undefined ? touriste.profileVisibility : true
+        },
+        activite: {
+          _id: activiteId,
+          titre: activite.titre || 'Unknown Activity'
+        },
+        // Add helper methods for frontend
+        isCurrentUser: touristeId === req.user.userId,
+        canDisplay: (touriste.profileVisibility !== undefined ? touriste.profileVisibility : true) || touristeId === req.user.userId
+      };
+    });
+
+    console.log(`🔍 [PARTICIPANTS] Formatted ${participants.length} participants with privacy data`);
+    console.log(`🔍 [PARTICIPANTS] Response data:`, JSON.stringify({
+      success: true,
+      participants: participants,
+      message: `Found ${participants.length} participants`
+    }, null, 2));
+
+    res.json({
+      success: true,
+      participants: participants,
+      message: `Found ${participants.length} participants`
+    });
+
+  } catch (error) {
+    console.error('❌ [PARTICIPANTS] Error getting activity participants:', error);
+    res.status(500).json({
+      success: false,
+      message: "Error loading participants",
+      error: error.message
     });
   }
 };

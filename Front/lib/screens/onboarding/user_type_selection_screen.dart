@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
-import '../../services/navigation_service.dart';
+import 'dynamic_onboarding_screen.dart';
 
 class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key});
@@ -92,7 +92,14 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
         // Small delay to ensure cache is updated
         await Future.delayed(const Duration(milliseconds: 500));
         
-        NavigationService.navigateToOnboarding(userType: backendType);
+        // Navigate directly to onboarding screen
+        if (!mounted) return;
+        final navigator = Navigator.of(context);
+        navigator.pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => DynamicOnboardingScreen(),
+          ),
+        );
         return;
       }
 

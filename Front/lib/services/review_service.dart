@@ -174,6 +174,64 @@ class ReviewService {
     }
   }
 
+  /// Alias for submitActivityReview for consistency
+  static Future<Map<String, dynamic>> createReview({
+    required String activiteId,
+    required int note,
+    String? commentaire,
+    List<String>? tags,
+  }) async {
+    return submitActivityReview(
+      activiteId: activiteId,
+      note: note,
+      commentaire: commentaire,
+      tags: tags,
+    );
+  }
+
+  /// Submit a review for an organizer.
+  static Future<Map<String, dynamic>> createOrganizerReview({
+    required String organisateurId,
+    required int note,
+    String? commentaire,
+    List<String>? tags,
+  }) async {
+    try {
+      final body = {
+        'note': note,
+        'commentaire': commentaire,
+        if (tags != null) 'tags': tags,
+      };
+      final res = await ApiClient.post(
+        '/avis/organisateur/$organisateurId',
+        body,
+      );
+      final data = jsonDecode(res.body);
+      
+      // Handle duplicate review error
+      if (res.statusCode == 400) {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'You have already reviewed this organizer',
+          'isDuplicate': true,
+        };
+      }
+      
+      return {
+        'success': res.statusCode == 201,
+        'message': data['message'] ?? 'Unable to submit review',
+        'review': data['review'] ?? data['avis'],
+        'isDuplicate': false,
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Unable to submit review right now.',
+        'isDuplicate': false,
+      };
+    }
+  }
+
   /// Update a review/rating (activity or organizer).
   static Future<Map<String, dynamic>> updateReview({
     required String avisId,

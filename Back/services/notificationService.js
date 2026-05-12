@@ -300,18 +300,6 @@ async function sendReviewReminder({ touristId, activityTitle, bookingId }) {
   });
 }
 
-/**
- * Notification pour nouvelle activité créée par un organisateur
- * @param {string} organizerName - Nom de l'organisateur
- * @param {string} activityTitle - Titre de l'activité
- * @returns {Promise<Object>}
- */
-async function sendNewActivityNotification({ organizerName, activityTitle }) {
-  // Pour l'instant, nous n'envoyons pas de notification globale pour les nouvelles activités
-  // Cela pourrait être implémenté plus tard avec un système de followers
-  return { success: true, message: 'Activity notification not implemented yet' };
-}
-
 module.exports = {
   initializeFirebase,
   sendPushNotification,
@@ -323,5 +311,4 @@ module.exports = {
   sendBookingApprovedNotification,
   sendBookingRejectedNotification,
   sendReviewReminder,
-  sendNewActivityNotification,
 };

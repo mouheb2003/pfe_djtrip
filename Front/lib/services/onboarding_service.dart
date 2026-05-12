@@ -214,6 +214,13 @@ class OnboardingService {
       'fields': ['avatar'],
     },
     {
+      'id': 'cover_photo',
+      'title': 'Cover Photo',
+      'description': 'Add a cover photo to make your profile stand out',
+      'required': false,
+      'fields': ['cover_photo'],
+    },
+    {
       'id': 'country',
       'title': 'Country',
       'description': 'Tell us where you\'re from',
@@ -232,7 +239,14 @@ class OnboardingService {
       'title': 'Your Interests',
       'description': 'Pick a few interests to personalize your recommendations',
       'required': true,
-      'fields': ['interests'],
+      'fields': ['centres_interet'],
+    },
+    {
+      'id': 'tourist_bio',
+      'title': 'Your Bio',
+      'description': 'Tell us about yourself and what you love about traveling',
+      'required': true,
+      'fields': ['bio'],
     },
   ];
 
@@ -251,6 +265,13 @@ class OnboardingService {
       'description': 'Add a profile picture to personalize your account',
       'required': true,
       'fields': ['avatar'],
+    },
+    {
+      'id': 'cover_photo',
+      'title': 'Cover Photo',
+      'description': 'Add a cover photo to make your profile stand out',
+      'required': false,
+      'fields': ['cover_photo'],
     },
     {
       'id': 'country',
@@ -279,6 +300,20 @@ class OnboardingService {
       'description': 'What languages do you offer tours in?',
       'required': true,
       'fields': ['langues_proposees'],
+    },
+    {
+      'id': 'organizer_bio',
+      'title': 'Your Bio',
+      'description': 'Tell us about yourself and your experience',
+      'required': true,
+      'fields': ['bio'],
+    },
+    {
+      'id': 'reason_to_join',
+      'title': 'Why Join DJTrip?',
+      'description': 'Tell us why you want to become an organizer on DJTrip',
+      'required': true,
+      'fields': ['reasonToJoin'],
     },
   ];
 }

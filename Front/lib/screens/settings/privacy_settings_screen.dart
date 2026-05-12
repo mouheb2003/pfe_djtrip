@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/user_service.dart';
-import 'privacy_policy_screen.dart';
+import 'package:flutter/services.dart';
+import '../../services/user_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login_screen.dart';
+import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
+import 'privacy_policy_screen.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
-  const PrivacySettingsScreen({super.key});
+  final String? userId; // Optional: if provided, edit specific user's settings
+  
+  const PrivacySettingsScreen({
+    super.key,
+    this.userId,
+  });
 
   @override
   State<PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
 }
 
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
-  bool _isLoading = false;
-  
   // Privacy settings state
   bool _profileVisibility = true;
   bool _showOnlineStatus = true;
@@ -25,39 +30,152 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   bool _allowPhoneCalls = true;
   bool _allowLocationSharing = false;
   bool _allowDataAnalytics = false;
+  
+  // Local cache to prevent reset when re-entering screen
+  Map<String, bool>? _localPrivacySettings;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPrivacySettings();
+    _loadPrivacySettings(); // Load from backend first
   }
 
-  Future<void> _loadPrivacySettings() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data when screen regains focus (e.g., when navigating back)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_isLoading) {
+        _loadPrivacySettings();
+      }
+    });
+  }
+
+  // Load local cache first to prevent reset
+  Future<void> _loadLocalPrivacySettings() async {
     try {
-      final user = await UserService.getProfile();
-      if (user != null && mounted) {
-        final settings = user['privacy_settings'] as Map<String, dynamic>?;
-        if (settings != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = prefs.getString('privacy_settings_cache');
+      if (settingsJson != null) {
+        final settings = Map<String, bool>.fromEntries(
+          settingsJson.split(',').map((e) {
+            final parts = e.split(':');
+            return MapEntry(parts[0], parts[1] == 'true');
+          })
+        );
+        
+        if (mounted) {
           setState(() {
-            _profileVisibility = settings['profile_visibility'] ?? true;
-            _showOnlineStatus = settings['show_online_status'] ?? true;
-            _showLastSeen = settings['show_last_seen'] ?? false;
-            _allowDirectMessages = settings['allow_direct_messages'] ?? true;
-            _showPhone = settings['show_phone'] ?? false;
-            _showEmail = settings['show_email'] ?? false;
-            _allowPhoneCalls = settings['allow_phone_calls'] ?? true;
-            _allowLocationSharing = settings['allow_location_sharing'] ?? false;
-            _allowDataAnalytics = settings['allow_data_analytics'] ?? false;
+            _localPrivacySettings = settings;
+            _applyLocalSettings(settings);
           });
         }
       }
     } catch (e) {
-      print('Error loading privacy settings: $e');
+      debugPrint('⚠️ Error loading local privacy settings: $e');
+    }
+  }
+  
+  // Save settings to local cache
+  Future<void> _saveLocalPrivacySettings(Map<String, bool> settings) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = settings.entries.map((e) => '${e.key}:${e.value}').join(',');
+      await prefs.setString('privacy_settings_cache', settingsJson);
+      _localPrivacySettings = settings;
+    } catch (e) {
+      debugPrint('⚠️ Error saving local privacy settings: $e');
+    }
+  }
+  
+  // Apply local settings to UI variables
+  void _applyLocalSettings(Map<String, bool> settings) {
+    _profileVisibility = settings['profileVisibility'] ?? settings['profile_visibility'] ?? true;
+    _showOnlineStatus = settings['showOnlineStatus'] ?? settings['show_online_status'] ?? true;
+    _showLastSeen = settings['showLastSeen'] ?? settings['show_last_seen'] ?? false;
+    _allowDirectMessages = settings['allowDirectMessages'] ?? settings['allow_direct_messages'] ?? true;
+    _showPhone = settings['showPhone'] ?? settings['show_phone'] ?? false;
+    _showEmail = settings['showEmail'] ?? settings['show_email'] ?? false;
+    _allowPhoneCalls = settings['allowPhoneCalls'] ?? settings['allow_phone_calls'] ?? true;
+    _allowLocationSharing = settings['allowLocationSharing'] ?? settings['allow_location_sharing'] ?? false;
+    _allowDataAnalytics = settings['allowDataAnalytics'] ?? settings['allow_data_analytics'] ?? false;
+  }
+
+  Future<void> _loadPrivacySettings() async {
+    if (_isLoading) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      Map<String, dynamic>? user;
+      
+      if (widget.userId != null) {
+        // Load specific user's privacy settings (for admin/editing other users)
+        debugPrint('🔒 Loading privacy settings for user: ${widget.userId}');
+        user = await UserService.getUserById(widget.userId!);
+      } else {
+        // Load current user's privacy settings
+        debugPrint('🔒 Loading current user privacy settings');
+        user = await UserService.getProfile();
+      }
+      
+      if (user != null && mounted) {
+        // Privacy settings are stored directly in user document, not nested
+        final settings = {
+          'profileVisibility': user['profileVisibility'] ?? true,
+          'showOnlineStatus': user['showOnlineStatus'] ?? true,
+          'showLastSeen': user['showLastSeen'] ?? false,
+          'allowDirectMessages': user['allowDirectMessages'] ?? true,
+          'showPhone': user['showPhone'] ?? false,
+          'showEmail': user['showEmail'] ?? false,
+          'allowPhoneCalls': user['allowPhoneCalls'] ?? true,
+          'allowLocationSharing': user['allowLocationSharing'] ?? false,
+          'allowDataAnalytics': user['allowDataAnalytics'] ?? false,
+        };
+        
+        debugPrint('🔒 Loaded privacy settings from backend: $settings');
+        
+        final boolSettings = settings.map((key, value) => MapEntry(key, value as bool));
+        
+        setState(() {
+          _applyLocalSettings(boolSettings);
+          _saveLocalPrivacySettings(boolSettings);
+          _isLoading = false;
+        });
+      } else {
+        debugPrint('⚠️ No user data found, trying local cache');
+        // Fallback to local cache if backend fails
+        await _loadLocalPrivacySettings();
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading privacy settings: $e');
+      debugPrint('⚠️ Falling back to local cache');
+      
+      // Fallback to local cache if backend fails
+      await _loadLocalPrivacySettings();
+      setState(() => _isLoading = false);
+      
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Using cached settings. Network error occurred.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _updatePrivacySetting(String key, bool value) async {
+    bool success = false;
+    
     try {
+      debugPrint('🔒 Updating privacy setting: $key = $value');
+      
+      // Update UI immediately for better UX
       setState(() {
         switch (key) {
           case 'profile_visibility':
@@ -89,8 +207,52 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             break;
         }
       });
-
-      final success = await UserService.updatePrivacySettingsNew({key: value});
+      
+      // Send update to backend
+      switch (key) {
+        case 'profile_visibility':
+          success = await UserService.updatePrivacySettingsNew({'profileVisibility': value});
+          break;
+        case 'show_online_status':
+          success = await UserService.updatePrivacySettingsNew({'showOnlineStatus': value});
+          break;
+        case 'show_last_seen':
+          success = await UserService.updatePrivacySettingsNew({'showLastSeen': value});
+          break;
+        case 'allow_direct_messages':
+          success = await UserService.updatePrivacySettingsNew({'allowDirectMessages': value});
+          break;
+        case 'show_phone':
+          success = await UserService.updatePrivacySettingsNew({'showPhone': value});
+          break;
+        case 'show_email':
+          success = await UserService.updatePrivacySettingsNew({'showEmail': value});
+          break;
+        case 'allow_phone_calls':
+          success = await UserService.updatePrivacySettingsNew({'allowPhoneCalls': value});
+          break;
+        case 'allow_location_sharing':
+          success = await UserService.updatePrivacySettingsNew({'allowLocationSharing': value});
+          break;
+        case 'allow_data_analytics':
+          success = await UserService.updatePrivacySettingsNew({'allowDataAnalytics': value});
+          break;
+      }
+      
+      // Save to local cache immediately
+      final currentSettings = {
+        'profile_visibility': _profileVisibility,
+        'show_online_status': _showOnlineStatus,
+        'show_last_seen': _showLastSeen,
+        'allow_direct_messages': _allowDirectMessages,
+        'show_phone': _showPhone,
+        'show_email': _showEmail,
+        'allow_phone_calls': _allowPhoneCalls,
+        'allow_location_sharing': _allowLocationSharing,
+        'allow_data_analytics': _allowDataAnalytics,
+      };
+      await _saveLocalPrivacySettings(currentSettings);
+      
       if (!success && mounted) {
         // Revert on failure
         setState(() {
@@ -124,15 +286,33 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               break;
           }
         });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to update privacy setting'),
             backgroundColor: Colors.red,
           ),
         );
+      } else if (success && mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Privacy setting updated successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
-      print('Error updating privacy setting: $e');
+      debugPrint('❌ Error updating privacy setting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred while updating privacy setting'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -170,7 +350,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Profile Visibility',
               subtitle: 'Make your profile visible to other users',
               value: _profileVisibility,
-              onChanged: (value) => _updatePrivacySetting('profile_visibility', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('profile_visibility', value),
             ),
             const SizedBox(height: 8),
             _buildPrivacyCard(
@@ -178,7 +359,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Show Online Status',
               subtitle: 'Let others see when you\'re online',
               value: _showOnlineStatus,
-              onChanged: (value) => _updatePrivacySetting('show_online_status', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('show_online_status', value),
             ),
             const SizedBox(height: 8),
             _buildPrivacyCard(
@@ -186,11 +368,12 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Show Last Seen',
               subtitle: 'Show when you were last active',
               value: _showLastSeen,
-              onChanged: (value) => _updatePrivacySetting('show_last_seen', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('show_last_seen', value),
             ),
 
             const SizedBox(height: 24),
-            
+
             // Communication Section
             _buildSectionHeader('Communication'),
             const SizedBox(height: 12),
@@ -199,7 +382,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Allow Direct Messages',
               subtitle: 'Let users send you messages directly',
               value: _allowDirectMessages,
-              onChanged: (value) => _updatePrivacySetting('allow_direct_messages', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('allow_direct_messages', value),
             ),
             const SizedBox(height: 8),
             _buildPrivacyCard(
@@ -223,7 +407,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Allow Phone Calls',
               subtitle: 'Let users call you directly',
               value: _allowPhoneCalls,
-              onChanged: (value) => _updatePrivacySetting('allow_phone_calls', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('allow_phone_calls', value),
             ),
 
             const SizedBox(height: 24),
@@ -236,7 +421,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Location Sharing',
               subtitle: 'Share your location for better recommendations',
               value: _allowLocationSharing,
-              onChanged: (value) => _updatePrivacySetting('allow_location_sharing', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('allow_location_sharing', value),
             ),
             const SizedBox(height: 8),
             _buildPrivacyCard(
@@ -244,8 +430,16 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               title: 'Data Analytics',
               subtitle: 'Help us improve with anonymous usage data',
               value: _allowDataAnalytics,
-              onChanged: (value) => _updatePrivacySetting('allow_data_analytics', value),
+              onChanged: (value) =>
+                  _updatePrivacySetting('allow_data_analytics', value),
             ),
+
+            const SizedBox(height: 32),
+
+            // Public Profile Preview Section
+            _buildSectionHeader('Public Profile Preview'),
+            const SizedBox(height: 12),
+            _buildPublicProfilePreview(),
 
             const SizedBox(height: 32),
 
@@ -299,11 +493,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               color: const Color(0xFFE8E5FF),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF4B63FF),
-              size: 22,
-            ),
+            child: Icon(icon, color: const Color(0xFF4B63FF), size: 22),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -343,6 +533,129 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     );
   }
 
+  Widget _buildPublicProfilePreview() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Visibility Status
+          Row(
+            children: [
+              Icon(
+                _profileVisibility ? Icons.visibility : Icons.visibility_off,
+                color: _profileVisibility ? Colors.green : Colors.red,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _profileVisibility
+                      ? 'Your profile is PUBLIC'
+                      : 'Your profile is HIDDEN',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _profileVisibility ? Colors.green : Colors.red,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+
+          // What Others See
+          const Text(
+            'Others can see:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF717BBC),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Visible Fields
+          _buildVisibilityItem('Avatar & Profile Picture', true, Icons.image),
+          _buildVisibilityItem('Bio & Description', true, Icons.description),
+          _buildVisibilityItem(
+            'Online Status',
+            _showOnlineStatus,
+            Icons.online_prediction,
+          ),
+          _buildVisibilityItem('Last Seen', _showLastSeen, Icons.access_time),
+          _buildVisibilityItem('Phone Number', _showPhone, Icons.phone),
+          _buildVisibilityItem('Email Address', _showEmail, Icons.email),
+          _buildVisibilityItem(
+            'Location/Country',
+            _allowLocationSharing,
+            Icons.location_on,
+          ),
+          _buildVisibilityItem('Activities & Reviews', true, Icons.star),
+          _buildVisibilityItem(
+            'Receive Messages',
+            _allowDirectMessages,
+            Icons.mail,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisibilityItem(String title, bool isVisible, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: isVisible
+                  ? Colors.green.withOpacity(0.1)
+                  : Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              isVisible ? Icons.check : Icons.close,
+              size: 14,
+              color: isVisible ? Colors.green : Colors.red,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Icon(icon, size: 18, color: Color(0xFF717BBC)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                color: isVisible ? const Color(0xFF1E225E) : Colors.grey[400],
+                fontWeight: FontWeight.w500,
+                decoration: isVisible
+                    ? TextDecoration.none
+                    : TextDecoration.lineThrough,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     return Column(
       children: [
@@ -354,18 +667,13 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const PrivacyPolicyScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
               );
             },
             icon: const Icon(Icons.privacy_tip, size: 20),
             label: const Text(
               'View Privacy Policy',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF4B63FF),
@@ -388,10 +696,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             icon: const Icon(Icons.delete_forever, size: 20),
             label: const Text(
               'Delete Account',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
@@ -424,18 +729,12 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           children: [
             Text(
               'Are you sure you want to delete your account?',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 12),
             Text(
               'This action cannot be undone and will permanently delete:',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             SizedBox(height: 8),
             Text(
@@ -443,11 +742,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               '• All your activities and bookings\n'
               '• Your messages and conversations\n'
               '• Your photos and files',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
             ),
           ],
         ),
@@ -456,10 +751,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text(
               'Cancel',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           TextButton(
@@ -467,15 +759,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               Navigator.pop(context);
               _deleteAccount();
             },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text(
               'Delete',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -520,7 +807,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
         // Sign out and navigate to login
         await AuthService.logout();
-        
+
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),

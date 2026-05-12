@@ -441,10 +441,83 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
   }
 
   String _getItemType(Map<String, dynamic> item) {
-    if (item.containsKey('content') || item.containsKey('titre') == false) return 'post';
-    if (item.containsKey('titre') && item.containsKey('type_activite')) return 'activity';
-    if (item.containsKey('name') || item.containsKey('type')) return 'place';
+    // Check for activity fields
+    if (item.containsKey('titre') && (item.containsKey('type_activite') || item.containsKey('typeActivite'))) return 'activity';
+    // Check for place fields  
+    if (item.containsKey('name') || item.containsKey('titre') && item.containsKey('categorie')) return 'place';
+    // Check for post fields
+    if (item.containsKey('content') || item.containsKey('post_content')) return 'post';
+    // Default to activity if it has titre but no content
+    if (item.containsKey('titre') && !item.containsKey('content')) return 'activity';
     return 'post';
+  }
+
+  // Helper method to get timeline status
+  String _getTimelineStatus(Map<String, dynamic> activityData) {
+    final now = DateTime.now();
+    final startDate = _parseDateTime(activityData['startDate']);
+    final endDate = _parseDateTime(activityData['endDate']);
+    
+    if (startDate.isAfter(now)) {
+      return 'UPCOMING';
+    } else if (endDate.isAfter(now) || endDate.isAtSameMomentAs(now)) {
+      return 'ONGOING';
+    } else {
+      return 'COMPLETED';
+    }
+  }
+
+  // Helper method to parse datetime from various formats
+  DateTime _parseDateTime(dynamic dateValue) {
+    if (dateValue == null) return DateTime.now();
+    
+    if (dateValue is String) {
+      try {
+        return DateTime.parse(dateValue);
+      } catch (e) {
+        return DateTime.now();
+      }
+    } else if (dateValue is DateTime) {
+      return dateValue;
+    }
+    
+    return DateTime.now();
+  }
+
+  // Helper method to get status color
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'UPCOMING':
+        return const Color(0xFF10B981); // Green
+      case 'ONGOING':
+        return const Color(0xFFF59E0B); // Orange
+      case 'COMPLETED':
+        return const Color(0xFF6B7280); // Grey
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  // Helper method to get status text
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'UPCOMING':
+        return 'ACTIVE';
+      case 'ONGOING':
+        return 'ONGOING';
+      case 'COMPLETED':
+        return 'COMPLETED';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+
+  // Helper method to format date
+  String _formatDate(dynamic dateValue) {
+    if (dateValue == null) return '';
+    
+    final dateTime = _parseDateTime(dateValue);
+    return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
   }
 
   Widget _buildActivityCard(Map<String, dynamic> activityData) {
@@ -452,104 +525,273 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
     final isBookmarked = activityData['isBookmarked'] ?? true;
     final bookmarksCount = (activityData['bookmarks_count'] as num?)?.toInt() ?? 0;
     
+    // Get timeline status
+    final timelineStatus = _getTimelineStatus(activityData);
+    final statusColor = _getStatusColor(timelineStatus);
+    final statusText = _getStatusText(timelineStatus);
+    
+    // Format dates
+    final startDate = _formatDate(activityData['startDate']);
+    final endDate = _formatDate(activityData['endDate']);
+    
+    // Get organizer info
+    final organizerName = activityData['organisateur_id']?['fullname']?.toString() ?? 
+                        activityData['organisateur_id']?['name']?.toString() ?? 
+                        'Organizer';
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (activityData['photos'] != null && (activityData['photos'] as List).isNotEmpty)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(
-                  (activityData['photos'] as List).first.toString(),
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 150,
-                    color: const Color(0xFFF0F4FF),
-                    child: const Icon(Icons.image_not_supported, size: 40, color: Color(0xFF4B63FF)),
+            // Image section with status badge
+            Stack(
+              children: [
+                if (activityData['photos'] != null && (activityData['photos'] as List).isNotEmpty)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    child: Image.network(
+                      (activityData['photos'] as List).first.toString(),
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 180,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.image_not_supported, 
+                          size: 50, 
+                          color: Color(0xFF4B63FF),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    height: 180,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
+                      ),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: const Icon(
+                      Icons.image_not_supported, 
+                      size: 50, 
+                      color: Color(0xFF4B63FF),
+                    ),
+                  ),
+                
+                // Status badge
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                
+                // Bookmark button
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      onPressed: () async {
+                        final currentBookmarked = activityData['isBookmarked'] ?? true;
+                        final currentCount = (activityData['bookmarks_count'] as num?)?.toInt() ?? 0;
+                        setState(() {
+                          activityData['isBookmarked'] = !currentBookmarked;
+                          activityData['bookmarks_count'] = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+                        });
+                        final result = await ActivityService.toggleActivityBookmark(activityId);
+                        if (result['success'] == true) {
+                          final bookmarked = result['bookmarked'] == true;
+                          final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
+                          _onActivityBookmarkChanged(activityId, bookmarked, bookmarksCount);
+                        }
+                      },
+                      icon: Icon(
+                        isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                        color: isBookmarked ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            // Content section
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title
+                  Text(
+                    activityData['titre']?.toString() ?? 'Activity',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1B2458),
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 6),
+                  
+                  // Organizer name
+                  Text(
+                    organizerName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 10),
+                  
+                  // Location and dates row
                   Row(
                     children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: const Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          activityData['titre']?.toString() ?? 'Activity',
+                          activityData['lieu']?.toString() ?? 'Location',
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1B2458),
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
                           ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          final currentBookmarked = activityData['isBookmarked'] ?? true;
-                          final currentCount = (activityData['bookmarks_count'] as num?)?.toInt() ?? 0;
-                          setState(() {
-                            activityData['isBookmarked'] = !currentBookmarked;
-                            activityData['bookmarks_count'] = !currentBookmarked ? currentCount + 1 : currentCount - 1;
-                          });
-                          final result = await ActivityService.toggleActivityBookmark(activityId);
-                          if (result['success'] == true) {
-                            final bookmarked = result['bookmarked'] == true;
-                            final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
-                            _onActivityBookmarkChanged(activityId, bookmarked, bookmarksCount);
-                          }
-                        },
-                        icon: Icon(
-                          isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
-                          color: isBookmarked ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    activityData['lieu']?.toString() ?? 'Location',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
+                  
+                  if (startDate.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                          color: const Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          startDate,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        if (endDate.isNotEmpty) ...[
+                          const Text(' - ', style: TextStyle(color: Color(0xFF6B7280))),
+                          Text(
+                            endDate,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                  ],
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Bottom row with price and bookmarks
                   Row(
                     children: [
-                      Text(
-                        '${activityData['prix'] ?? 0} TND',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4B63FF),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4B63FF).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${activityData['prix'] ?? 0} TND',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4B63FF),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Icon(Icons.bookmark_rounded, size: 16, color: const Color(0xFF6B7280)),
+                      const Spacer(),
+                      Icon(
+                        Icons.bookmark_rounded,
+                        size: 16,
+                        color: const Color(0xFF6B7280),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$bookmarksCount',
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],

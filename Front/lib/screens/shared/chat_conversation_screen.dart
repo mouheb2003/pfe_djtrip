@@ -12,7 +12,9 @@ import '../../services/auth_service.dart';
 import '../../services/api_client.dart';
 import '../../services/message_service.dart';
 import '../../services/navigation_service.dart';
+import '../../services/ai_text_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ai_text_widgets.dart';
 import 'public_profile_screen.dart';
 import 'voice_call_screen.dart';
 import 'video_call_screen.dart';
@@ -90,6 +92,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   bool _allowPhoneCalls = true;
   Map<String, dynamic>? _partnerPrivacySettings;
 
+  // 🤖 AI Text Processing
+  bool _isProcessingAi = false;
+  String? _aiProcessedText;
+  String? _aiAction;
+
   Future<void> _checkBlockMuteStatus() async {
     try {
       final result = await MessageService.getBlockedUsers();
@@ -128,8 +135,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         
         setState(() {
           _partnerPrivacySettings = privacySettings;
-          _allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
-          _allowPhoneCalls = privacySettings['allow_phone_calls'] ?? true;
+          // Handle both camelCase (backend) and snake_case (cache) keys
+          _allowDirectMessages = privacySettings['allowDirectMessages'] ?? privacySettings['allow_direct_messages'] ?? true;
+          _allowPhoneCalls = privacySettings['allowPhoneCalls'] ?? privacySettings['allow_phone_calls'] ?? true;
         });
         
         print('DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings');
@@ -333,6 +341,551 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
   }
 
+  // 🤖 AI Text Processing Methods
+  Future<void> _rewriteMessage() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.rewriteText(text);
+
+      if (!mounted) return;
+
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        _showAiConfirmationDialog(text, result['result'], 'rewrite');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to rewrite text'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to rewrite text. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _quickTranslateMessage() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      // Detect language and translate to the other language
+      final isFrench = text.contains(RegExp(r'[àâäéèêëïîôöùûüÿç]', caseSensitive: false));
+      final targetLang = isFrench ? 'en' : 'fr';
+      
+      final result = await AiTextService.translateText(text, targetLang);
+      
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        setState(() {
+          _msgCtrl.text = result['result'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Message translated to ${targetLang == 'en' ? 'English' : 'French'}'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to translate message'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to translate message. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _improveMessage() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.improveText(text);
+
+      if (!mounted) return;
+
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        _showAiConfirmationDialog(text, result['result'], 'improve');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to improve text'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to improve text. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  void _showLanguageSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) => _translateMessage(lang),
+      ),
+    );
+  }
+
+  Future<void> _translateMessage(String lang) async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    final result = await AiTextService.translateText(text, lang);
+
+    if (!mounted) return;
+
+    setState(() => _isProcessingAi = false);
+
+    if (result['success'] == true) {
+      _showAiPreview(text, result['result'], 'translate');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['error'] ?? 'Failed to translate text'),
+          backgroundColor: const Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  void _showAiConfirmationDialog(String original, String processed, String action) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final screenSize = MediaQuery.of(context).size;
+        final maxWidth = screenSize.width * 0.85;
+        final maxHeight = screenSize.height * 0.7;
+        
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: maxWidth > 400 ? 400 : maxWidth,
+              maxHeight: maxHeight > 600 ? 600 : maxHeight,
+            ),
+            child: AlertDialog(
+              title: Text(
+                action == 'rewrite' ? 'Rewrite Message' : 'Improve Message',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B2352),
+                ),
+              ),
+              content: SizedBox(
+                width: double.infinity,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Original message:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          original,
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: null, // Allow multiple lines
+                          overflow: TextOverflow.visible, // Show overflow indicator if needed
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        action == 'rewrite' ? 'Rewritten message:' : 'Improved message:',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E8),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          processed,
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: null, // Allow multiple lines
+                          overflow: TextOverflow.visible, // Show overflow indicator if needed
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _msgCtrl.text = processed;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Message ${action == 'rewrite' ? 'rewritten' : 'improved'} successfully'),
+                        backgroundColor: const Color(0xFF4CAF50),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4B63FF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Confirm',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAiPreview(String original, String processed, String action) {
+    // Instant apply - no preview dialog for rewrite/improve
+    if (action == 'rewrite' || action == 'improve') {
+      setState(() {
+        _msgCtrl.text = processed;
+      });
+    } else {
+      // For translation, show language selection dialog
+      _showLanguageSelector();
+    }
+    return;
+    
+    // Only translate shows preview dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.translate, color: Color(0xFF4B63FF)),
+            const SizedBox(width: 8),
+            Text('Translation Preview'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Original:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(original, style: const TextStyle(color: Color(0xFF64748B))),
+            const SizedBox(height: 12),
+            const Text('Translation:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(processed, style: const TextStyle(color: Color(0xFF1E293B))),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _msgCtrl.text = processed;
+              });
+            },
+            child: const Text('Use Translation'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🤖 Show actions for received messages (translation)
+  Future<void> _showReceivedMessageActions(_UiMessage msg) async {
+    if (msg.type != 'text') return;
+
+    final action = await showGeneralDialog<String>(
+      context: context,
+      barrierLabel: 'Message actions',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.22),
+      pageBuilder: (dialogContext, _, __) {
+        return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF9FBFF),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(26),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD8E0EF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'MESSAGE OPTIONS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                          color: Color(0xFF9AA6BF),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.translate,
+                          color: Color(0xFF4B63FF),
+                        ),
+                        title: const Text(
+                          'Translate',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E225E),
+                          ),
+                        ),
+                        onTap: () => Navigator.pop(dialogContext, 'translate'),
+                      ),
+                      const SizedBox(height: 8),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.copy,
+                          color: Color(0xFF6C757D),
+                        ),
+                        title: const Text(
+                          'Copy',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E225E),
+                          ),
+                        ),
+                        onTap: () => Navigator.pop(dialogContext, 'copy'),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (action == 'translate') {
+      _showLanguageSelectorForMessage(msg);
+    } else if (action == 'copy') {
+      // Copy message text
+      // You can implement copy functionality here if needed
+    }
+  }
+
+  void _showLanguageSelectorForMessage(_UiMessage msg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) => _translateReceivedMessage(msg, lang),
+      ),
+    );
+  }
+
+  
+  void _showTranslationPreview(String original, String translated, String lang) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(
+              Icons.translate,
+              color: Color(0xFF4B63FF),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Translation (${AiTextService.supportedLanguages[lang] ?? lang})',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E225E),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Original:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6C757D),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE1E4E8)),
+                ),
+                child: Text(
+                  original,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF1E225E),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Translation:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF00B894),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF10B981)),
+                ),
+                child: Text(
+                  translated,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF1E225E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6C757D),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _showDeleteMessageDialog() async {
     final confirmed = await showGeneralDialog<bool>(
       context: context,
@@ -454,7 +1007,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Future<void> _openMessageActions(_UiMessage msg) async {
-    if (!msg.isMine) return;
+    if (!msg.isMine) {
+      // For received messages, show translation option
+      await _showReceivedMessageActions(msg);
+      return;
+    }
 
     if (!_canEditMessage(msg)) {
       await _deleteMessageFlow(msg);
@@ -699,6 +1256,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         });
       } else {
         print('❌ [ChatScreen] User ID mismatch, ignoring status update');
+      }
+    });
+
+    // 🚀 NEW: Listen for privacy settings updates
+    socket.on('privacy_settings_updated', (data) async {
+      print('🔒 [ChatScreen] Received privacy_settings_updated: $data');
+      if (!mounted) return;
+      if (data is! Map) return;
+      
+      final userId = (data['userId'] ?? '').toString();
+      if (userId == widget.partnerId) {
+        print('🔒 [ChatScreen] Partner privacy settings updated, reloading...');
+        await _loadPartnerPrivacySettings();
       }
     });
 
@@ -1967,6 +2537,44 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     ),
                   ),
                   const SizedBox(height: 4),
+                  // Add translate button for received messages
+                  if (!isMine && msg.translatedText == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: InkWell(
+                        onTap: () => _showMessageTranslationSelector(msg),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: bubbleColor.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.translate,
+                                size: 14,
+                                color: textColor.withOpacity(0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Translate',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textColor.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2310,6 +2918,67 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               style: TextStyle(color: textColor, fontSize: 14, height: 1.35),
             ),
           ],
+        ],
+      );
+    }
+
+    // Handle translated message display
+    if (msg.translatedText != null && msg.translatedText!.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Original text
+          Text(
+            msg.text,
+            style: TextStyle(
+              color: textColor.withOpacity(0.7),
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Translation divider
+          Container(
+            height: 1,
+            color: textColor.withOpacity(0.2),
+            margin: const EdgeInsets.symmetric(vertical: 4),
+          ),
+          const SizedBox(height: 4),
+          // Translated text
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  msg.translatedText!,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Language indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: textColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  msg.translatedLanguage?.toUpperCase() ?? '',
+                  style: TextStyle(
+                    color: textColor.withOpacity(0.8),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       );
     }
@@ -2733,6 +3402,176 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
   }
 
+  void _showMessageTranslationSelector(_UiMessage msg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 5,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                children: [
+                  const Text(
+                    'Translate Message',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E225E),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Select language to translate to:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: AiTextService.supportedLanguages.length,
+                    itemBuilder: (context, index) {
+                      final langCode = AiTextService.supportedLanguages.keys.elementAt(index);
+                      final langName = AiTextService.supportedLanguages.values.elementAt(index);
+                      
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          child: Text(
+                            _getLanguageFlag(langCode),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        title: Text(
+                          langName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E225E),
+                          ),
+                        ),
+                        trailing: Text(
+                          langCode.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6C757D),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _translateReceivedMessage(msg, langCode);
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLanguageFlag(String langCode) {
+    switch (langCode) {
+      case 'en': return '🇬🇧';
+      case 'fr': return '🇫🇷';
+      case 'es': return '🇪🇸';
+      case 'de': return '🇩🇪';
+      case 'ar': return '🇸🇦';
+      case 'ru': return '🇷🇺';
+      default: return '🌐';
+    }
+  }
+
+  Future<void> _translateReceivedMessage(_UiMessage msg, String langCode) async {
+    // Show loading indicator
+    setState(() {
+      final index = _messages.indexWhere((m) => m.id == msg.id);
+      if (index >= 0) {
+        // Temporarily show loading state
+        _messages[index] = _messages[index].copyWith(
+          translatedText: 'Translating...',
+          translatedLanguage: langCode,
+        );
+      }
+    });
+
+    try {
+      final result = await AiTextService.translateText(msg.text, langCode);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == msg.id);
+        if (index >= 0) {
+          if (result['success'] == true) {
+            _messages[index] = _messages[index].copyWith(
+              translatedText: result['result'],
+              translatedLanguage: langCode,
+            );
+          } else {
+            // Show error and reset translation
+            _messages[index] = _messages[index].copyWith(
+              translatedText: null,
+              translatedLanguage: null,
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['error'] ?? 'Translation failed'),
+                backgroundColor: const Color(0xFFFF4757),
+              ),
+            );
+          }
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == msg.id);
+        if (index >= 0) {
+          _messages[index] = _messages[index].copyWith(
+            translatedText: null,
+            translatedLanguage: null,
+          );
+        }
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation failed. Please try again.'),
+          backgroundColor: const Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
   void _showBlockDialog() {
     showDialog(
       context: context,
@@ -2954,6 +3793,33 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        // 🤖 AI Action Buttons (show above input when text is present)
+        if (canSend && !_isProcessingAi)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                AiActionButton(
+                  icon: Icons.translate,
+                  tooltip: 'Quick Translate',
+                  onPressed: _quickTranslateMessage,
+                ),
+                const SizedBox(width: 8),
+                AiActionButton(
+                  icon: Icons.auto_fix_high,
+                  tooltip: 'Rewrite',
+                  onPressed: _rewriteMessage,
+                ),
+                const SizedBox(width: 8),
+                AiActionButton(
+                  icon: Icons.spellcheck,
+                  tooltip: 'Improve',
+                  onPressed: _improveMessage,
                 ),
               ],
             ),
@@ -3272,6 +4138,8 @@ class _UiMessage {
   final DateTime? editedAt;
   final bool isRead;
   final DateTime? readAt;
+  final String? translatedText;
+  final String? translatedLanguage;
 
   _UiMessage({
     required this.id,
@@ -3285,6 +4153,8 @@ class _UiMessage {
     this.editedAt,
     required this.isRead,
     this.readAt,
+    this.translatedText,
+    this.translatedLanguage,
   });
 
   _UiMessage copyWith({
@@ -3293,6 +4163,8 @@ class _UiMessage {
     DateTime? editedAt,
     bool? isRead,
     DateTime? readAt,
+    String? translatedText,
+    String? translatedLanguage,
   }) {
     return _UiMessage(
       id: id,
@@ -3306,6 +4178,8 @@ class _UiMessage {
       editedAt: editedAt ?? this.editedAt,
       isRead: isRead ?? this.isRead,
       readAt: readAt ?? this.readAt,
+      translatedText: translatedText ?? this.translatedText,
+      translatedLanguage: translatedLanguage ?? this.translatedLanguage,
     );
   }
 }

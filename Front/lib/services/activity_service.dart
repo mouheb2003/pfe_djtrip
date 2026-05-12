@@ -156,29 +156,39 @@ class ActivityService {
   static Future<ActivityModel?> getActivityById(String id) async {
     try {
       print('🔍 [ACTIVITY SERVICE] Fetching activity with ID: $id');
-      final res = await ApiClient.get('/activites/$id', auth: false, cacheFirst: false);
+      final res = await ApiClient.get(
+        '/activites/$id',
+        auth: false,
+        cacheFirst: false,
+      );
       print('🔍 [ACTIVITY SERVICE] Response status: ${res.statusCode}');
       print('🔍 [ACTIVITY SERVICE] Response body: ${res.body}');
-      
+
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
         print('🔍 [ACTIVITY SERVICE] Parsed body keys: ${body.keys}');
-        print('🔍 [ACTIVITY SERVICE] Has activite key: ${body.containsKey('activite')}');
+        print(
+          '🔍 [ACTIVITY SERVICE] Has activite key: ${body.containsKey('activite')}',
+        );
         print('🔍 [ACTIVITY SERVICE] activite value: ${body['activite']}');
-        
+
         final data = (body['activite'] is Map<String, dynamic>)
             ? body['activite'] as Map<String, dynamic>
             : body;
         print('🔍 [ACTIVITY SERVICE] Data keys: ${data.keys}');
         print('🔍 [ACTIVITY SERVICE] Data _id: ${data['_id']}');
-        
+
         try {
           final activity = ActivityModel.fromJson(data);
-          print('✅ [ACTIVITY SERVICE] Successfully parsed activity: ${activity.titre}');
+          print(
+            '✅ [ACTIVITY SERVICE] Successfully parsed activity: ${activity.titre}',
+          );
           return activity;
         } catch (parseError) {
           print('❌ [ACTIVITY SERVICE] Parse error: $parseError');
-          print('❌ [ACTIVITY SERVICE] Parse error stack: ${StackTrace.current}');
+          print(
+            '❌ [ACTIVITY SERVICE] Parse error stack: ${StackTrace.current}',
+          );
           return null;
         }
       }
@@ -263,13 +273,15 @@ class ActivityService {
     bool refresh = false,
   }) async {
     try {
-      print('🔍 [ACTIVITY SERVICE] Fetching activities for organizer: $organisateurId');
+      print(
+        '🔍 [ACTIVITY SERVICE] Fetching activities for organizer: $organisateurId',
+      );
       final res = await ApiClient.get(
         '/activites/organisateur/$organisateurId',
         cacheFirst: !refresh,
       );
       print('🔍 [ACTIVITY SERVICE] Response status: ${res.statusCode}');
-      
+
       if (res.statusCode == 200) {
         final body = _safeObject(res.body);
         final list = _safeMapList(body['activites'] ?? body['activities']);
@@ -305,7 +317,7 @@ class ActivityService {
       final queryParams = <String, String>{};
       if (offset != null) queryParams['offset'] = offset.toString();
       if (limit != null) queryParams['limit'] = limit.toString();
-      
+
       final res = await ApiClient.get(
         '/activites/archived',
         cacheFirst: !refresh,
@@ -363,6 +375,9 @@ class ActivityService {
     required double prix,
     required int capaciteMax,
     required String lieu,
+    String? locationType,
+    dynamic itineraire,
+    List<Map<String, dynamic>>? itineraireCoords,
     required double duree,
     required DateTime dateDebut,
     DateTime? dateFin,
@@ -392,6 +407,24 @@ class ActivityService {
         ..fields['lieu'] = lieu
         ..fields['duree'] = duree.toString()
         ..fields['date_debut'] = dateDebut.toIso8601String();
+
+      if (itineraire != null) {
+        if (itineraire is String) {
+          if (itineraire.trim().isNotEmpty) {
+            request.fields['itineraire'] = itineraire;
+          }
+        } else {
+          request.fields['itineraire'] = jsonEncode(itineraire);
+        }
+      }
+
+      if (locationType != null && locationType.isNotEmpty) {
+        request.fields['location_type'] = locationType;
+      }
+
+      if (itineraireCoords != null && itineraireCoords.isNotEmpty) {
+        request.fields['itineraire_coords'] = jsonEncode(itineraireCoords);
+      }
 
       if (categorie != null && categorie.isNotEmpty) {
         request.fields['categorie'] = categorie;
@@ -465,6 +498,9 @@ class ActivityService {
     required double prix,
     required int capaciteMax,
     required String lieu,
+    String? locationType,
+    dynamic itineraire,
+    List<Map<String, dynamic>>? itineraireCoords,
     required double duree,
     required DateTime dateDebut,
     DateTime? dateFin,
@@ -477,6 +513,7 @@ class ActivityService {
     String? statut,
     Map<String, dynamic>? coordonnees,
     bool notifyBookedUsers = true,
+    bool notifyFollowers = false,
   }) async {
     try {
       final token = await AuthService.getAccessToken();
@@ -495,6 +532,24 @@ class ActivityService {
         ..fields['lieu'] = lieu
         ..fields['duree'] = duree.toString()
         ..fields['date_debut'] = dateDebut.toIso8601String();
+
+      if (itineraire != null) {
+        if (itineraire is String) {
+          if (itineraire.trim().isNotEmpty) {
+            request.fields['itineraire'] = itineraire;
+          }
+        } else {
+          request.fields['itineraire'] = jsonEncode(itineraire);
+        }
+      }
+
+      if (locationType != null && locationType.isNotEmpty) {
+        request.fields['location_type'] = locationType;
+      }
+
+      if (itineraireCoords != null && itineraireCoords.isNotEmpty) {
+        request.fields['itineraire_coords'] = jsonEncode(itineraireCoords);
+      }
 
       if (categorie != null && categorie.isNotEmpty) {
         request.fields['categorie'] = categorie;
@@ -533,6 +588,7 @@ class ActivityService {
       }
 
       request.fields['notifyBookedUsers'] = notifyBookedUsers.toString();
+      request.fields['notifyFollowers'] = notifyFollowers.toString();
 
       for (final file in newPhotos) {
         request.files.add(
@@ -567,18 +623,23 @@ class ActivityService {
     try {
       print('[ActivityService] Fetching all activities from /activites');
       final response = await ApiClient.get('/activites', cacheFirst: false);
-      
+
       print('[ActivityService] Response status: ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final List<dynamic> activitiesData = body['activities'] ?? body['activites'] ?? body['data'] ?? [];
-        
+        final List<dynamic> activitiesData =
+            body['activities'] ?? body['activites'] ?? body['data'] ?? [];
+
         print('[ActivityService] Found ${activitiesData.length} activities');
-        
-        return activitiesData.map((activityData) => ActivityModel.fromJson(activityData)).toList();
+
+        return activitiesData
+            .map((activityData) => ActivityModel.fromJson(activityData))
+            .toList();
       } else {
-        throw Exception('Failed to load activities: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to load activities: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('[ActivityService] Error loading activities: $e');
@@ -598,26 +659,29 @@ class ActivityService {
         query: {'page': page.toString(), 'limit': limit.toString()},
         cacheFirst: false,
       );
-      
+
       print('[ActivityService] Response status: ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final List<dynamic> activitiesData = body['activities'] ?? body['activites'] ?? body['data'] ?? [];
+        final List<dynamic> activitiesData =
+            body['activities'] ?? body['activites'] ?? body['data'] ?? [];
         final total = body['total'] ?? 0;
         final pages = body['pages'] ?? 1;
-        
-        print('[ActivityService] Found ${activitiesData.length} activities on page $page (total: $total, pages: $pages)');
-        
-        final activities = activitiesData.map((activityData) => ActivityModel.fromJson(activityData)).toList();
-        
-        return {
-          'activities': activities,
-          'total': total,
-          'pages': pages,
-        };
+
+        print(
+          '[ActivityService] Found ${activitiesData.length} activities on page $page (total: $total, pages: $pages)',
+        );
+
+        final activities = activitiesData
+            .map((activityData) => ActivityModel.fromJson(activityData))
+            .toList();
+
+        return {'activities': activities, 'total': total, 'pages': pages};
       } else {
-        throw Exception('Failed to load activities: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to load activities: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('[ActivityService] Error loading activities: $e');
@@ -631,7 +695,8 @@ class ActivityService {
       ActivityModel(
         id: '1',
         titre: 'Paris City Tour',
-        description: 'Discover the beautiful city of Paris with our guided tour.',
+        description:
+            'Discover the beautiful city of Paris with our guided tour.',
         typeActivite: 'Tour',
         categorie: 'Cultural',
         lieu: 'Paris, France',
@@ -661,7 +726,8 @@ class ActivityService {
       ActivityModel(
         id: '3',
         titre: 'Mountain Hiking Adventure',
-        description: 'Explore the stunning mountain trails with experienced guides.',
+        description:
+            'Explore the stunning mountain trails with experienced guides.',
         typeActivite: 'Adventure',
         categorie: 'Nature',
         lieu: 'Alps, France',
@@ -677,7 +743,9 @@ class ActivityService {
   }
 
   // Toggle bookmark on an activity
-  static Future<Map<String, dynamic>> toggleActivityBookmark(String activityId) async {
+  static Future<Map<String, dynamic>> toggleActivityBookmark(
+    String activityId,
+  ) async {
     try {
       final res = await ApiClient.post('/activites/$activityId/bookmark', {});
 
@@ -696,14 +764,20 @@ class ActivityService {
         'activityId': body['activityId']?.toString() ?? activityId,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to update bookmark right now.'};
+      return {
+        'success': false,
+        'message': 'Unable to update bookmark right now.',
+      };
     }
   }
 
   // Get bookmarked activities for current user
   static Future<List<Map<String, dynamic>>> getBookmarkedActivities() async {
     try {
-      final res = await ApiClient.get('/activites/bookmarks', cacheFirst: false);
+      final res = await ApiClient.get(
+        '/activites/bookmarks',
+        cacheFirst: false,
+      );
       if (res.statusCode != 200) return [];
       final body = _safeObject(res.body);
       if (body['activities'] is List) {

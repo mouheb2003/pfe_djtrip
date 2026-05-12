@@ -1,0 +1,37 @@
+{
+  "name": "ai-docs-chatbot",
+  "version": "1.0.0",
+  "description": "AI-powered documentation chatbot with RAG using Gemini",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "reindex": "node src/scripts/reindex-docs.js",
+    "test": "node src/scripts/test-chat.js"
+  },
+  "keywords": [
+    "ai",
+    "chatbot",
+    "rag",
+    "gemini",
+    "documentation",
+    "github"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "markdown-it": "^14.1.0",
+    "node-schedule": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

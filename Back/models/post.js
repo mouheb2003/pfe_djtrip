@@ -68,6 +68,23 @@ const postSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    mentions: {
+      type: [String],
+      default: [],
+    },
+    created_at: {
+      type: Date,
+      default: Date.now,
+    },
+    updated_at: {
+      type: Date,
+      default: Date.now,
+    },
+    is_archived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     likes_count: {
       type: Number,
       default: 0,

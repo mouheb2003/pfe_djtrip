@@ -12,6 +12,27 @@ import 'enhanced_api_service.dart';
 class UserService {
   UserService._();
 
+  /// Get user by username
+  static Future<Map<String, dynamic>?> getUserByUsername(String username) async {
+    try {
+      final res = await ApiClient.get('/users/username/$username', cacheFirst: false);
+      if (res.statusCode != 200) return null;
+      
+      final body = _safeDecode(res.body);
+      return body['user'] as Map<String, dynamic>?;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static Map<String, dynamic> _safeDecode(String body) {
+    try {
+      return jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
   static const String _endpoint = '/users';
   static const String _meEndpoint = '/users/me';
   static const Duration _cacheTtl = Duration(hours: 1);
@@ -233,26 +254,99 @@ class UserService {
     }
   }
 
-  /// Get user by ID
+  /// Get user by ID with intelligent presence handling
   static Future<Map<String, dynamic>?> getUserById(String userId, {bool forceRefresh = false}) async {
     try {
       _devLog('👤 [GET_USER] Fetching user $userId...');
 
+      // Check cache first for presence info
+      final cacheKey = 'GET:/users/$userId';
+      Map<String, dynamic>? cachedData;
+      
+      if (!forceRefresh) {
+        try {
+          final cachedResponse = await EnhancedApiService.instance.getCached(
+            '$_endpoint/$userId',
+            cacheTtl: _cacheTtl,
+          );
+          
+          if (cachedResponse.isSuccess) {
+            cachedData = cachedResponse.data?['user'];
+            
+            // Check if user is currently online
+            final isReallyOnline = cachedData?['isReallyOnline'] ?? false;
+            final lastActiveAtString = cachedData?['lastActiveAt']?.toString();
+            
+            if (isReallyOnline) {
+              _devLog('✅ [GET_USER] User is online - returning cached with "just now"');
+              // Add "just now" indicator for online users
+              if (cachedData != null) {
+                cachedData['presenceStatus'] = 'just now';
+                cachedData['isOnline'] = true;
+              }
+              return cachedData;
+            }
+            
+            // If offline, check if last active is recent (within 5 minutes)
+            if (lastActiveAtString != null && lastActiveAtString.isNotEmpty) {
+              final lastActiveAt = DateTime.tryParse(lastActiveAtString);
+              if (lastActiveAt != null) {
+                final now = DateTime.now();
+                final timeDiff = now.difference(lastActiveAt);
+                
+                // If very recent (within 5 minutes), use cache to optimize chances
+                if (timeDiff.inMinutes < 5) {
+                  _devLog('✅ [GET_USER] User recently active (${timeDiff.inMinutes}min ago) - using cache');
+                  if (cachedData != null) {
+                    cachedData['presenceStatus'] = _formatTimeAgo(timeDiff);
+                    cachedData['isOnline'] = false;
+                  }
+                  return cachedData;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          _devLog('⚠️ [GET_USER] Cache check failed: $e');
+        }
+      }
+
+      // Force refresh needed or cache miss/expired
       if (forceRefresh) {
         // Invalidate cache for this user before fetching
-        CacheManager.instance.remove('GET:/users/$userId');
+        CacheManager.instance.remove(cacheKey);
         CacheManager.instance.removeByPattern('GET:/users/$userId*');
         _devLog('🗑️ [GET_USER] Cache invalidated for user $userId');
       }
 
       final response = await EnhancedApiService.instance.getCached(
-        '$_endpoint/$userId',
-        cacheTtl: _cacheTtl,
+        '/users/$userId',
+        cacheTtl: forceRefresh ? const Duration(seconds: 1) : _cacheTtl,
       );
 
       if (response.isSuccess) {
-        _devLog('✅ [GET_USER] Success');
-        return response.data?['user'];
+        final userData = response.data?['user'];
+        
+        if (userData != null) {
+          // Apply presence logic to fresh data
+          final isReallyOnline = userData['isReallyOnline'] ?? false;
+          final lastActiveAtString = userData['lastActiveAt']?.toString();
+          
+          if (isReallyOnline) {
+            userData['presenceStatus'] = 'just now';
+            userData['isOnline'] = true;
+          } else if (lastActiveAtString != null && lastActiveAtString.isNotEmpty) {
+            final lastActiveAt = DateTime.tryParse(lastActiveAtString);
+            if (lastActiveAt != null) {
+              final timeDiff = DateTime.now().difference(lastActiveAt);
+              userData['presenceStatus'] = _formatTimeAgo(timeDiff);
+              userData['isOnline'] = false;
+            }
+          }
+          
+          _devLog('✅ [GET_USER] Success with presence: ${userData['presenceStatus']}');
+          return userData;
+        }
       }
 
       _devLog('❌ [GET_USER] Error: ${response.message}');
@@ -260,6 +354,19 @@ class UserService {
     } catch (e) {
       _devLog('❌ [GET_USER] Exception: $e');
       return null;
+    }
+  }
+
+  /// Format time difference into human readable format
+  static String _formatTimeAgo(Duration timeDiff) {
+    if (timeDiff.inSeconds < 60) {
+      return 'just now';
+    } else if (timeDiff.inMinutes < 60) {
+      return '${timeDiff.inMinutes}m ago';
+    } else if (timeDiff.inHours < 24) {
+      return '${timeDiff.inHours}h ago';
+    } else {
+      return '${timeDiff.inDays}d ago';
     }
   }
 
@@ -453,6 +560,7 @@ class UserService {
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
         _devLog('Privacy settings updated successfully');
+        // Invalidate cache to ensure new settings are loaded
         _invalidateProfileCache();
         return true;
       } else {
@@ -471,7 +579,7 @@ class UserService {
       _devLog('Updating notification settings...');
       
       final response = await ApiClient.patch(
-        '/users/notification-settings',
+        '/notifications/preferences',
         settings,
       );
       
@@ -545,6 +653,49 @@ class UserService {
     } catch (e) {
       _devLog('Error updating cover photo: $e');
       return false;
+    }
+  }
+
+  /// Search users by username for mentions
+  static Future<List<Map<String, dynamic>>> searchUsersByUsername(String query) async {
+    try {
+      _devLog('🔍 [USER] Searching users by username: $query');
+      
+      // Construire l'URL avec les query params
+      final uri = Uri.parse('${ApiClient.baseUrl}/mentions/search')
+          .replace(queryParameters: {
+        'query': '@$query',
+        'limit': '10',
+      });
+      
+      final raw = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${await AuthService.getAccessToken()}',
+        },
+      );
+
+      if (raw.statusCode < 200 || raw.statusCode >= 300) {
+        _devLog('❌ [USER] Username search failed: ${raw.statusCode}');
+        return [];
+      }
+
+      final parsed = jsonDecode(raw.body);
+      if (parsed is Map<String, dynamic> && parsed['success'] == true) {
+        final users = parsed['data'] as List<dynamic>?;
+        if (users != null) {
+          final userList = users.map((user) => user as Map<String, dynamic>).toList();
+          _devLog('✅ [USER] Username search successful: ${userList.length} users found');
+          return userList;
+        }
+      }
+
+      _devLog('⚠️ [USER] Username search returned no users');
+      return [];
+    } catch (e) {
+      _devLog('❌ [USER] Username search error: $e');
+      return [];
     }
   }
 

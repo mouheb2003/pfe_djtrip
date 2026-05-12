@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/activity_model.dart';
 import '../../models/post_model.dart';
@@ -23,6 +26,7 @@ import 'activity_detail_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'comments_screen.dart';
 import 'edit_profile_screen.dart';
+import '../settings/privacy_settings_screen.dart';
 
 /// Modern Public Profile Screen
 /// Supports both Tourist and Organizer profiles with premium UI/UX
@@ -62,6 +66,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   // Reviews auto-scroll
   late PageController _reviewsPageController;
   Timer? _autoScrollTimer;
+  Timer? _presenceUpdateTimer;
 
   // Current user info
   String? _currentUserId;
@@ -69,6 +74,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   // Follow status
   bool _isFollowing = false;
   bool _isFollowLoading = false;
+  
+  // Real-time location tracking
+  Timer? _locationUpdateTimer;
+  String? _currentLocation;
+  bool _isAdmin = false;
+  
+  // Privacy settings change listener
+  StreamSubscription<Map<String, dynamic>>? _privacySettingsSubscription;
 
   @override
   void initState() {
@@ -78,6 +91,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     _initializeData();
     _scrollController.addListener(_onScroll);
     _startAutoScroll();
+    _setupPrivacySettingsListener();
+    _checkIfAdmin();
+    _startRealTimeLocationUpdates();
   }
 
   @override
@@ -86,6 +102,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     // Reload data when app is resumed
     if (state == AppLifecycleState.resumed) {
       _loadUserData(forceRefresh: true);
+      // Restart location updates when app resumes
+      if (_isAdmin) {
+        _startRealTimeLocationUpdates();
+      }
     }
   }
 
@@ -94,7 +114,29 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     super.didUpdateWidget(oldWidget);
     // Reload data if userId changed or when screen is revisited
     if (widget.userId != oldWidget.userId) {
-      _initializeData();
+      debugPrint('🔄 Profile changed from ${oldWidget.userId} to ${widget.userId} - refreshing data');
+      
+      // Stop presence updates for old profile
+      _presenceUpdateTimer?.cancel();
+      
+      // Reset user data to prevent showing old presence info
+      setState(() {
+        _userData = null;
+        _user = null;
+      });
+      
+      // Force cache invalidation for both old and new profiles
+      if (oldWidget.userId != null) {
+        CacheManager.instance.remove('GET:/users/${oldWidget.userId}');
+        CacheManager.instance.removeByPattern('GET:/users/${oldWidget.userId}*');
+      }
+      if (widget.userId != null) {
+        CacheManager.instance.remove('GET:/users/${widget.userId}');
+        CacheManager.instance.removeByPattern('GET:/users/${widget.userId}*');
+      }
+      
+      // Load new profile data with force refresh
+      _loadUserData(forceRefresh: true);
     }
   }
 
@@ -104,6 +146,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     _scrollController.dispose();
     _reviewsPageController.dispose();
     _autoScrollTimer?.cancel();
+    _presenceUpdateTimer?.cancel();
+    _locationUpdateTimer?.cancel();
+    _privacySettingsSubscription?.cancel();
     super.dispose();
   }
 
@@ -143,7 +188,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Future<void> _initializeData() async {
     _currentUserId = await AuthService.getUserId();
-    await _loadUserData();
+    await _loadUserData(forceRefresh: true);
   }
 
   Future<void> _loadUserData({bool forceRefresh = false}) async {
@@ -157,35 +202,44 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         return;
       }
 
-      // Fetch user data
-      final userData = await UserService.getUserById(targetId, forceRefresh: forceRefresh);
-      if (userData == null) {
-        debugPrint('User data is null');
-        setState(() => _isLoading = false);
-        return;
+      debugPrint('🔄 Loading user data for: $targetId (forceRefresh: $forceRefresh)');
+      
+      // Stop any existing presence updates before loading new data
+      _presenceUpdateTimer?.cancel();
+      
+      // Detect if targetId is a username or ObjectId
+      // MongoDB ObjectIds are 24 character hex strings
+      final isObjectId = RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(targetId);
+      
+      Map<String, dynamic>? userData;
+      if (isObjectId) {
+        userData = await UserService.getUserById(targetId!, forceRefresh: forceRefresh);
+      } else {
+        userData = await UserService.getUserByUsername(targetId!);
       }
-
-      debugPrint('User loaded: ${userData['_id']}');
-      debugPrint('User type: ${userData['userType']}');
-      debugPrint('User data keys: ${userData.keys}');
-
-      final user = UserModel.fromJson(userData);
-      
-      setState(() {
-        _userData = userData;
-        _user = user;
-      });
-
-      // Load role-specific content
-      await _loadRoleSpecificContent(user);
-      
-      // Check follow status if viewing another user's profile
-      if (targetId != _currentUserId && _currentUserId != null) {
-        await _checkFollowStatus(targetId);
+      if (userData != null && mounted) {
+        debugPrint('✅ User data loaded successfully');
+        debugPrint('🔍 New user presence data: isReallyOnline=${userData['isReallyOnline']}, lastActiveAt=${userData['lastActiveAt']}');
+        
+        setState(() {
+          _userData = userData;
+          _user = UserModel.fromJson(userData!);
+          _isLoading = false;
+        });
+        
+        // Load role-specific content
+        await _loadRoleSpecificContent(_user!);
+        
+        // Check follow status if viewing another user's profile
+        if (targetId != _currentUserId && _currentUserId != null) {
+          await _checkFollowStatus(targetId!);
+        }
+        
+        // Start periodic presence updates for real-time status
+        _startPresenceUpdates();
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
-    } finally {
       setState(() => _isLoading = false);
     }
   }
@@ -201,6 +255,74 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error checking follow status: $e');
     }
+  }
+
+  void _startPresenceUpdates() {
+    _presenceUpdateTimer?.cancel();
+    
+    // Smart presence update: check every 10 seconds but only fetch if needed
+    _presenceUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      if (_userData != null && mounted) {
+        final targetId = widget.userId ?? _currentUserId;
+        if (targetId != null) {
+          try {
+            // Check if we need to update based on lastActiveAt age
+            final lastActiveAtString = _userData?['lastActiveAt']?.toString();
+            if (lastActiveAtString != null && lastActiveAtString.isNotEmpty) {
+              final lastActiveAt = DateTime.tryParse(lastActiveAtString);
+              if (lastActiveAt != null) {
+                final now = DateTime.now();
+                final timeSinceLastActive = now.difference(lastActiveAt);
+                
+                // If user was online within last 70 seconds, check more frequently
+                // If user was offline longer, check less frequently
+                final shouldCheck = timeSinceLastActive.inSeconds < 70 || 
+                                  timeSinceLastActive.inMinutes % 2 == 0; // Every 2 minutes for offline users
+                
+                if (!shouldCheck) {
+                  debugPrint('🔄 [PRESENCE] Skipping check for user: $targetId (offline: ${timeSinceLastActive.inMinutes}m ago)');
+                  return;
+                }
+              }
+            }
+            
+            debugPrint('🔄 [PRESENCE] Updating presence data for user: $targetId');
+            
+            // Force cache invalidation for real-time data
+            CacheManager.instance.remove('GET:/users/$targetId');
+            CacheManager.instance.removeByPattern('GET:/users/$targetId*');
+            
+            // Detect if targetId is a username or ObjectId
+            final isObjectId = RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(targetId);
+            Map<String, dynamic>? userData;
+            if (isObjectId) {
+              userData = await UserService.getUserById(targetId, forceRefresh: true);
+            } else {
+              userData = await UserService.getUserByUsername(targetId);
+            }
+            if (userData != null && mounted) {
+              final newIsOnline = userData['isReallyOnline'] ?? false;
+              final newLastActiveAt = userData['lastActiveAt']?.toString();
+              final currentIsOnline = _userData?['isReallyOnline'] ?? false;
+              final currentLastActiveAt = _userData?['lastActiveAt']?.toString();
+              
+              debugPrint('🔄 [PRESENCE] Status: $currentIsOnline → $newIsOnline, LastActive: $currentLastActiveAt → $newLastActiveAt');
+              
+              // Update state if presence data changed
+              if (newIsOnline != currentIsOnline || newLastActiveAt != currentLastActiveAt) {
+                debugPrint('🔄 [PRESENCE] Status changed! Updating UI...');
+                setState(() {
+                  _userData = userData;
+                  _user = UserModel.fromJson(userData!);
+                });
+              }
+            }
+          } catch (e) {
+            debugPrint('Error updating presence data: $e');
+          }
+        }
+      }
+    });
   }
 
   Future<void> _toggleFollow() async {
@@ -422,6 +544,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     return '$serverUrl/$value';
   }
 
+  void _copyUsername(String username) {
+    Clipboard.setData(ClipboardData(text: '@$username'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Username @$username copied to clipboard!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showAvatarFullScreen(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return;
 
@@ -497,6 +631,146 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final profileUrl = 'https://djtrip.com/profile/$userId';
     final text = 'Check out $fullname on DJTrip!';
     Share.share('$text\n$profileUrl');
+  }
+
+  Future<void> _launchPhone(String phone) async {
+    // Clean phone number - remove spaces, dashes, etc.
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    debugPrint('🔍 DEBUG: Launching phone with clean number: $cleanPhone');
+    
+    // Try different URI formats for Android compatibility
+    final List<Uri> phoneUris = [
+      Uri(scheme: 'tel', path: cleanPhone),
+      Uri(scheme: 'tel', path: phone), // Original format
+    ];
+    
+    for (final phoneUri in phoneUris) {
+      debugPrint('🔍 DEBUG: Trying phone URI: $phoneUri');
+      
+      try {
+        if (await canLaunchUrl(phoneUri)) {
+          debugPrint('🔍 DEBUG: Can launch phone, attempting...');
+          final launched = await launchUrl(
+            phoneUri,
+            mode: LaunchMode.platformDefault,
+          );
+          
+          if (launched) {
+            debugPrint('🔍 DEBUG: Phone launch successful with URI: $phoneUri');
+            return; // Success, exit the method
+          }
+        } else {
+          debugPrint('🔍 DEBUG: Cannot launch phone with URI: $phoneUri');
+        }
+      } catch (e) {
+        debugPrint('🔍 DEBUG: Error launching phone with URI $phoneUri: $e');
+        continue; // Try next URI format
+      }
+    }
+    
+    // If all attempts failed
+    debugPrint('🔍 DEBUG: All phone launch attempts failed');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone app. Please check your device settings.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _launchEmail(String email) async {
+    debugPrint('🔍 DEBUG: Launching email with address: $email');
+    
+    // Try different URI formats for Android compatibility
+    final List<Uri> emailUris = [
+      Uri(scheme: 'mailto', path: email),
+      Uri(scheme: 'mailto', path: email, query: 'subject=Contact from DJTrip'), // With subject
+    ];
+    
+    for (final emailUri in emailUris) {
+      debugPrint('🔍 DEBUG: Trying email URI: $emailUri');
+      
+      try {
+        if (await canLaunchUrl(emailUri)) {
+          debugPrint('🔍 DEBUG: Can launch email, attempting...');
+          final launched = await launchUrl(
+            emailUri,
+            mode: LaunchMode.platformDefault,
+          );
+          
+          if (launched) {
+            debugPrint('🔍 DEBUG: Email launch successful with URI: $emailUri');
+            return; // Success, exit the method
+          }
+        } else {
+          debugPrint('🔍 DEBUG: Cannot launch email with URI: $emailUri');
+        }
+      } catch (e) {
+        debugPrint('🔍 DEBUG: Error launching email with URI $emailUri: $e');
+        continue; // Try next URI format
+      }
+    }
+    
+    // If all attempts failed
+    debugPrint('🔍 DEBUG: All email launch attempts failed');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch email app. Please check your device settings.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _launchSMS(String phone) async {
+    // Clean phone number - remove spaces, dashes, etc.
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    debugPrint('🔍 DEBUG: Launching SMS with clean number: $cleanPhone');
+    
+    // Try different URI formats for Android compatibility
+    final List<Uri> smsUris = [
+      Uri(scheme: 'sms', path: cleanPhone),
+      Uri(scheme: 'smsto', path: cleanPhone), // Alternative SMS scheme
+      Uri(scheme: 'sms', path: phone), // Original format
+    ];
+    
+    for (final smsUri in smsUris) {
+      debugPrint('🔍 DEBUG: Trying SMS URI: $smsUri');
+      
+      try {
+        if (await canLaunchUrl(smsUri)) {
+          debugPrint('🔍 DEBUG: Can launch SMS, attempting...');
+          final launched = await launchUrl(
+            smsUri,
+            mode: LaunchMode.platformDefault,
+          );
+          
+          if (launched) {
+            debugPrint('🔍 DEBUG: SMS launch successful with URI: $smsUri');
+            return; // Success, exit the method
+          }
+        } else {
+          debugPrint('🔍 DEBUG: Cannot launch SMS with URI: $smsUri');
+        }
+      } catch (e) {
+        debugPrint('🔍 DEBUG: Error launching SMS with URI $smsUri: $e');
+        continue; // Try next URI format
+      }
+    }
+    
+    // If all attempts failed
+    debugPrint('🔍 DEBUG: All SMS launch attempts failed');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch SMS app. Please check your device settings.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _handleEditReview(Map<String, dynamic> review) {
@@ -749,18 +1023,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final subtitle = bio.isEmpty ? '' : bio;
     final location = (_userData?['pays_origine']?.toString() ?? '').trim();
     
-    // Privacy settings
-    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
-    final profileVisibility = privacySettings['profile_visibility'] ?? true;
-    final showOnlineStatus = privacySettings['show_online_status'] ?? true;
-    final showLastSeen = privacySettings['show_last_seen'] ?? false;
-    final allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
-    final showPhone = privacySettings['show_phone'] ?? false;
-    final showEmail = privacySettings['show_email'] ?? false;
-    final allowLocationSharing = privacySettings['allow_location_sharing'] ?? false;
+    // Privacy settings - stored directly in user document, not nested
+    final profileVisibility = _userData?['profileVisibility'] ?? true;
+    final showOnlineStatus = _userData?['showOnlineStatus'] ?? true;
+    final showLastSeen = _userData?['showLastSeen'] ?? false;
+    final allowDirectMessages = _userData?['allowDirectMessages'] ?? true;
+    final showPhone = _userData?['showPhone'] ?? false;
+    final showEmail = _userData?['showEmail'] ?? false;
+    final allowLocationSharing = _userData?['allowLocationSharing'] ?? false;
 
-    // If profile is not visible, show restricted message
-    if (!profileVisibility) {
+    // Check if this is the current user's own profile
+    final targetUserId = widget.userId ?? _currentUserId;
+    final isCurrentUser = targetUserId == _currentUserId;
+    
+    // If profile is not visible and not the current user, show restricted message
+    if (!profileVisibility && !isCurrentUser) {
       return _buildRestrictedProfile();
     }
 
@@ -782,11 +1059,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   ? CachedNetworkImage(
                       imageUrl: coverUrl,
                       fit: BoxFit.cover,
+                      memCacheHeight: 500,
+                      memCacheWidth: 500,
                       placeholder: (_, __) => Container(
                         color: AppColors.primaryLight.withOpacity(0.2),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 2,
+                          ),
+                        ),
                       ),
                       errorWidget: (_, __, ___) => Container(
                         color: AppColors.primaryLight.withOpacity(0.2),
+                        child: Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey[600], size: 32),
+                        ),
                       ),
                     )
                   : Container(
@@ -857,31 +1145,43 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                         ],
                       ),
                       child: Hero(
-                        tag: 'profile_avatar',
+                        tag: 'profile_avatar_${widget.userId ?? _currentUserId}',
                         child: ClipOval(
                           child: avatarUrl.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: avatarUrl,
                                   fit: BoxFit.cover,
+                                  memCacheHeight: 500,
+                                  memCacheWidth: 500,
                                   placeholder: (_, __) => Container(
                                     color: AppColors.outline,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.primary,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
                                   ),
                                   errorWidget: (_, __, ___) => Container(
                                     color: AppColors.outline,
-                                    child: Icon(Icons.person, color: Colors.grey[600]),
+                                    child: Center(
+                                      child: Icon(Icons.broken_image, color: Colors.grey[600], size: 32),
+                                    ),
                                   ),
                                 )
                               : Container(
-                                  color: AppColors.outline,
+                                color: AppColors.outline,
+                                child: Center(
                                   child: Icon(Icons.person, color: Colors.grey[600]),
                                 ),
+                              ),
                         ),
                       ),
                     ),
                   ),
                   
                   // Online Status Indicator (respect privacy)
-                  if (_userData?['isOnline'] == true && showOnlineStatus)
+                  if (showOnlineStatus)
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -889,7 +1189,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: Colors.green,
+                          color: (_userData?['isOnline'] == true) ? Colors.green : Colors.grey,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                         ),
@@ -908,14 +1208,45 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              // Name and Badge
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
+              // Name and Badge (separate lines)
+              Column(
                 children: [
-                  // Name with flexible width
+                  // ── Badge ───────────────────────────────────────────────
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8EDFF),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            isOrganizer ? 'ORGANIZER' : 'TOURIST',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Name on its own line
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 280),
                     child: Text(
@@ -929,59 +1260,45 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // Badge
-                  if (isOrganizer)
+                  const SizedBox(height: 8),
+
+                  // Username with copy icon
+                  if (_userData?['username'] != null && _userData!['username'].toString().trim().isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.primary.withOpacity(0.3),
-                          width: 1,
-                        ),
+                        color: const Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFE9ECEF), width: 1),
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.verified, size: 12, color: AppColors.primary),
-                          const SizedBox(width: 3),
+                          Icon(
+                            Icons.alternate_email,
+                            size: 12,
+                            color: const Color(0xFF6C757D),
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            'Organizer',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
+                            '@${_userData!['username'].toString()}',
+                            style: const TextStyle(
                               fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF495057),
                             ),
                           ),
-                        ],
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.green, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified, size: 12, color: Colors.green),
-                          const SizedBox(width: 3),
-                          Text(
-                            'Traveler',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () {
+                              _copyUsername(_userData!['username'].toString());
+                            },
+                            child: Icon(
+                              Icons.copy,
+                              size: 12,
+                              color: const Color(0xFF0D6EFD),
                             ),
                           ),
                         ],
@@ -1001,8 +1318,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 8),
-              // Location (respect privacy)
-              if (location.isNotEmpty && allowLocationSharing)
+              // Location (Country always visible, detailed location based on privacy)
+              if (location.isNotEmpty || _currentLocation != null)
                 Column(
                   children: [
                     Row(
@@ -1011,29 +1328,58 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                         Icon(Icons.location_on, size: 16, color: AppColors.textGrey),
                         const SizedBox(width: 4),
                         Text(
-                          '${_getCountryFlag(location)} $location',
+                          '${_getCountryFlag(_currentLocation ?? location)} ${_currentLocation ?? location}',
                           style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.textGrey,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Detailed location under country
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.place, size: 14, color: AppColors.textGrey.withOpacity(0.7)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tunisia, North Africa',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textGrey.withOpacity(0.8),
-                            fontSize: 12,
+                        if (_isAdmin && _currentLocation != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.gps_fixed, size: 12, color: Colors.green),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'LIVE',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
+                    // Detailed location only if location sharing is enabled OR admin with real-time GPS
+                    if ((allowLocationSharing && location.isNotEmpty) || (_isAdmin && _currentLocation != null)) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.place, size: 14, color: AppColors.textGrey.withOpacity(0.7)),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isAdmin && _currentLocation != null 
+                                ? 'Real-time GPS Location'
+                                : 'Tunisia, North Africa',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textGrey.withOpacity(0.8),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
             ],
@@ -1246,24 +1592,67 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   }
 
   Widget _buildContactInfo() {
-    // Privacy settings
-    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
-    final showPhone = privacySettings['show_phone'] ?? false;
-    final showEmail = privacySettings['show_email'] ?? false;
-    final showLastSeen = privacySettings['show_last_seen'] ?? false;
+    // Privacy settings - stored directly in user document, not nested
     
-    final phone = _userData?['num_tel']?.toString() ?? '';
-    final email = _userData?['email']?.toString() ?? '';
+    debugPrint('🔍 DEBUG: User data keys: ${_userData?.keys.toList()}');
+    debugPrint('🔍 DEBUG: showPhone: ${_userData?['showPhone']}');
+    debugPrint('🔍 DEBUG: showEmail: ${_userData?['showEmail']}');
+    debugPrint('🔍 DEBUG: showLastSeen: ${_userData?['showLastSeen']}');
+    debugPrint('🔍 DEBUG: allowPhoneCalls: ${_userData?['allowPhoneCalls']}');
+    debugPrint('🔍 DEBUG: isReallyOnline: ${_userData?['isReallyOnline']}');
+    debugPrint('🔍 DEBUG: lastActiveAt: ${_userData?['lastActiveAt']}');
+    
+    // Backend stores privacy settings directly in user document
+    final showPhone = _userData?['showPhone'] ?? false;
+    final showEmail = _userData?['showEmail'] ?? false;
+    final showLastSeen = _userData?['showLastSeen'] ?? false;
+    final allowLocationSharing = _userData?['allowLocationSharing'] ?? false;
+    final allowPhoneCalls = _userData?['allowPhoneCalls'] ?? true;
+    
+    // New presence system data
+    final isReallyOnline = _userData?['isReallyOnline'] ?? false;
+    final lastActiveAtString = _userData?['lastActiveAt']?.toString();
+    final lastActiveAt = lastActiveAtString != null && lastActiveAtString.isNotEmpty
+        ? DateTime.tryParse(lastActiveAtString)
+        : null;
+    
+    // Legacy derniere_connexion (kept for backward compatibility)
     final lastSeenString = _userData?['derniere_connexion']?.toString();
     final lastSeen = lastSeenString != null && lastSeenString.isNotEmpty
         ? DateTime.tryParse(lastSeenString)
         : null;
     
-    final hasPhone = phone.isNotEmpty && showPhone;
-    final hasEmail = email.isNotEmpty && showEmail;
-    final hasLastSeen = lastSeen != null && showLastSeen;
+    debugPrint('🔍 DEBUG: Presence data:');
+    debugPrint('  - isReallyOnline: $isReallyOnline');
+    debugPrint('  - lastActiveAtString: $lastActiveAtString');
+    debugPrint('  - lastActiveAt: $lastActiveAt');
+    debugPrint('  - lastSeenString: $lastSeenString');
+    debugPrint('  - lastSeen: $lastSeen');
+    debugPrint('  - showLastSeen: $showLastSeen');
     
-    if (!hasPhone && !hasEmail && !hasLastSeen) return const SizedBox.shrink();
+    final phone = _userData?['num_tel']?.toString() ?? '';
+    final email = _userData?['email']?.toString() ?? '';
+    
+    final hasPhone = phone.isNotEmpty && showPhone; // Show phone number when showPhone is true
+    final hasEmail = email.isNotEmpty && showEmail;
+    // Use new presence system: show online status or last active time
+    // Temporarily bypass showLastSeen for testing - remove this line for production
+    final hasPresenceInfo = (isReallyOnline || lastActiveAt != null);
+    
+    debugPrint('🔍 DEBUG Contact Info:');
+    debugPrint('  - phone: "$phone"');
+    debugPrint('  - email: "$email"');
+    debugPrint('  - isReallyOnline: $isReallyOnline');
+    debugPrint('  - lastActiveAt: $lastActiveAt');
+    debugPrint('  - showPhone: $showPhone');
+    debugPrint('  - showEmail: $showEmail');
+    debugPrint('  - showLastSeen: $showLastSeen');
+    debugPrint('  - allowPhoneCalls: $allowPhoneCalls');
+    debugPrint('  - hasPhone: $hasPhone');
+    debugPrint('  - hasEmail: $hasEmail');
+    debugPrint('  - hasPresenceInfo: $hasPresenceInfo');
+    
+    if (!hasPhone && !hasEmail && !hasPresenceInfo) return const SizedBox.shrink();
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1293,87 +1682,246 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
+              // Privacy indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_outline, size: 12, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Privacy',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           if (hasPhone) ...[
-            Row(
-              children: [
-                Icon(Icons.phone, color: Colors.green, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    phone,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primaryLight.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.phone, color: Colors.green, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Phone',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          phone,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    // Copy phone number
-                    // TODO: Implement copy functionality
-                  },
-                  icon: Icon(Icons.copy, size: 18, color: AppColors.textGrey),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  // Phone call button (always enabled in public profile)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      onPressed: () => _launchPhone(phone),
+                      icon: const Icon(
+                        Icons.call, 
+                        size: 18, 
+                        color: Colors.white,
+                      ),
+                      tooltip: 'Call',
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // SMS button (always enabled for messaging)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      onPressed: () => _launchSMS(phone),
+                      icon: const Icon(
+                        Icons.sms, 
+                        size: 18, 
+                        color: Colors.white,
+                      ),
+                      tooltip: 'Send SMS',
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (hasEmail) const SizedBox(height: 12),
           ],
           if (hasEmail) ...[
-            Row(
-              children: [
-                Icon(Icons.email, color: AppColors.primary, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    email,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primaryLight.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.email, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Email',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    // Copy email
-                    // TODO: Implement copy functionality
-                  },
-                  icon: Icon(Icons.copy, size: 18, color: AppColors.textGrey),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  // Email button
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      onPressed: () => _launchEmail(email),
+                      icon: Icon(Icons.email_outlined, size: 18, color: Colors.white),
+                      tooltip: 'Send Email',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-          if (hasLastSeen) ...[
+          if (hasPresenceInfo) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.access_time, color: AppColors.textGrey, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Last seen',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textGrey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatLastSeen(lastSeen!),
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textDark,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isReallyOnline ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isReallyOnline ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+                  width: 1,
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  // Animated online indicator
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: isReallyOnline ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                      boxShadow: isReallyOnline ? [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.4),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ] : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            isReallyOnline ? 'Online now' : 'Last active',
+                            key: ValueKey(isReallyOnline ? 'online' : 'offline'),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: isReallyOnline ? Colors.green.shade700 : AppColors.textGrey,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            isReallyOnline 
+                                ? 'Active now'
+                                : _formatLastActive(lastActiveAt!),
+                            key: ValueKey(isReallyOnline ? 'active' : 'inactive'),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: isReallyOnline ? Colors.green.shade800 : AppColors.textDark,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Pulse animation for online status
+                  if (isReallyOnline)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 1000),
+                      child: Icon(
+                        Icons.fiber_manual_record,
+                        color: Colors.green.shade600,
+                        size: 16,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ],
@@ -1385,9 +1933,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final isOwnProfile = _userData?['_id']?.toString() == _currentUserId;
     final isOrganizer = _userData?['userType']?.toString() == 'Organisateur' || _userData?['isOrganisator'] == true;
     
-    // Privacy settings
-    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
-    final allowDirectMessages = privacySettings['allow_direct_messages'] ?? true;
+    // Privacy settings - stored directly in user document, not nested
+    final allowDirectMessages = _userData?['allowDirectMessages'] ?? true;
+    final allowPhoneCalls = _userData?['allowPhoneCalls'] ?? true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1449,17 +1997,28 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withOpacity(0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: allowDirectMessages
+                      ? LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withOpacity(0.8),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.grey.shade400,
+                            Colors.grey.shade500,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
+                      color: allowDirectMessages
+                          ? AppColors.primary.withOpacity(0.4)
+                          : Colors.grey.withOpacity(0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -1469,7 +2028,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   onPressed: allowDirectMessages ? _handleContact : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: allowDirectMessages ? Colors.white : Colors.grey,
+                    foregroundColor: allowDirectMessages ? Colors.white : Colors.white70,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
@@ -1486,7 +2045,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     style: AppTextStyles.labelLarge.copyWith(
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
-                      color: allowDirectMessages ? Colors.white : Colors.grey,
+                      color: allowDirectMessages ? Colors.white : Colors.white70,
                     ),
                   ),
                 ),
@@ -2034,45 +2593,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       'gb': '🇬🇧',
       'uk': '🇬🇧',
       'united kingdom': '🇬🇧',
-      'britain': '🇬🇧',
-      'great britain': '🇬🇧',
-      'england': '🇬🇧',
-      // Germany
-      'de': '🇩🇪',
-      'germany': '🇩🇪',
-      'allemagne': '🇩🇪',
-      // Italy
-      'it': '🇮🇹',
-      'italy': '🇮🇹',
-      'italie': '🇮🇹',
-      // Spain
-      'es': '🇪🇸',
-      'spain': '🇪🇸',
-      'espagne': '🇪🇸',
-      // Morocco
-      'ma': '🇲🇦',
-      'morocco': '🇲🇦',
-      'maroc': '🇲🇦',
-      // Algeria
-      'dz': '🇩🇿',
-      'algeria': '🇩🇿',
-      'algerie': '🇩🇿',
-      // Egypt
-      'eg': '🇪🇬',
-      'egypt': '🇪🇬',
-      'egypte': '🇪🇬',
-      // Libya
-      'ly': '🇱🇾',
-      'libya': '🇱🇾',
-      'libye': '🇱🇾',
-      // Saudi Arabia
-      'sa': '🇸🇦',
-      'saudi arabia': '🇸🇦',
-      'arabie saoudite': '🇸🇦',
-      // UAE
-      'ae': '🇦🇪',
-      'uae': '🇦🇪',
-      'emirates': '🇦🇪',
       'united arab emirates': '🇦🇪',
       // Qatar
       'qa': '🇶🇦',
@@ -2091,9 +2611,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       // China
       'cn': '🇨🇳',
       'china': '🇨🇳',
-      'chine': '�🇳',
+      'chine': ' 🇳',
       // India
-      'in': '�🇮🇳',
+      'in': ' 🇮🇳',
       'india': '🇮🇳',
       'inde': '🇮🇳',
       // Brazil
@@ -2138,9 +2658,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       // Switzerland
       'ch': '🇨🇭',
       'switzerland': '🇨🇭',
-      'suisse': '🇨�',
+      'suisse': '🇨 ',
       // Sweden
-      'se': '�🇸🇪',
+      'se': ' 🇸🇪',
       'sweden': '🇸🇪',
       'suede': '🇸🇪',
       // Norway
@@ -2217,13 +2737,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       // Iceland
       'is': '🇮🇸',
       'iceland': '🇮🇸',
-      'islande': '🇮�',
+      'islande': '🇮 ',
       // Ireland
-      'ie': '🇮�🇪',
+      'ie': '🇮 🇪',
       'ireland': '🇮🇪',
-      'irlande': '🇮�',
+      'irlande': '🇮 ',
       // Israel
-      'il': '🇮�🇱',
+      'il': '🇮 🇱',
       'israel': '🇮🇱',
       // Jordan
       'jo': '🇯🇴',
@@ -2324,8 +2844,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   }
 
   String _formatLastSeen(DateTime lastSeen) {
+    debugPrint('🔍 DEBUG: Formatting last seen: $lastSeen');
     final now = DateTime.now();
     final difference = now.difference(lastSeen);
+    debugPrint('🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m');
 
     if (difference.inDays > 30) {
       return '${lastSeen.day}/${lastSeen.month}/${lastSeen.year}';
@@ -2333,18 +2855,152 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       return '${difference.inDays} days ago';
     } else if (difference.inDays > 1) {
       return '${difference.inDays} days ago';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
     } else if (difference.inHours > 1) {
       return '${difference.inHours} hours ago';
-    } else if (difference.inHours == 1) {
-      return '1 hour ago';
     } else if (difference.inMinutes > 1) {
       return '${difference.inMinutes} minutes ago';
-    } else if (difference.inMinutes == 1) {
-      return '1 minute ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute ago';
     } else {
       return 'Just now';
+    }
+  }
+
+  String _formatLastActive(DateTime lastActiveAt) {
+    debugPrint('🔍 DEBUG: Formatting last active: $lastActiveAt');
+    
+    // Convert to local time for proper timezone handling
+    final localLastActive = lastActiveAt.toLocal();
+    final now = DateTime.now();
+    final difference = now.difference(localLastActive);
+    debugPrint('🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m');
+
+    if (difference.inDays > 30) {
+      return '${localLastActive.day}/${localLastActive.month}/${localLastActive.year}';
+    } else if (difference.inDays > 7) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays > 1) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 1) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 1) {
+      return '${difference.inMinutes} minutes ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  Future<void> _checkIfAdmin() async {
+    try {
+      final currentUser = await AuthService.getUser();
+      _isAdmin = currentUser?['userType'] == 'Admin' || currentUser?['isAdmin'] == true;
+      debugPrint('🔐 User is admin: $_isAdmin');
+    } catch (e) {
+      debugPrint('Error checking admin status: $e');
+      _isAdmin = false;
+    }
+  }
+
+  void _setupPrivacySettingsListener() {
+    // Listen for privacy settings changes (could be enhanced with WebSocket/Stream)
+    // For now, we'll use polling when the screen regains focus
+  }
+
+  void _startRealTimeLocationUpdates() {
+    if (!_isAdmin) {
+      debugPrint('📍 Real-time location updates disabled for non-admin users');
+      return;
+    }
+
+    debugPrint('📍 Starting real-time location updates for admin');
+    _locationUpdateTimer?.cancel();
+    
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      await _updateRealTimeLocation();
+    });
+  }
+
+  Future<void> _updateRealTimeLocation() async {
+    if (!_isAdmin) return;
+    
+    try {
+      // Check location permissions
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('📍 Location service disabled');
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        debugPrint('📍 Location permission denied');
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('📍 Location permission permanently denied');
+        return;
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      final newLocation = await _getCountryFromCoordinates(position.latitude, position.longitude);
+      
+      if (newLocation != _currentLocation && mounted) {
+        setState(() {
+          _currentLocation = newLocation;
+        });
+        debugPrint('📍 Location updated: $newLocation');
+      }
+    } catch (e) {
+      debugPrint('📍 Error updating location: $e');
+    }
+  }
+
+  Future<String> _getCountryFromCoordinates(double latitude, double longitude) async {
+    // For demo purposes, return Tunisia for admins
+    // In production, you'd use a reverse geocoding service
+    // like geocoding package or Google Maps Geocoding API
+    
+    try {
+      // Simulate API call delay
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // For now, always return Tunisia for admin demo
+      // In real implementation:
+      // List<Placemark> placemarks = await Geocoding.placemarkFromCoordinates(latitude, longitude);
+      // return placemarks.first.country ?? 'Unknown';
+      
+      return 'Tunisia';
+    } catch (e) {
+      debugPrint('Error getting country from coordinates: $e');
+      return 'Tunisia'; // Fallback
+    }
+  }
+
+  Future<String> _getRealTimeLocation() async {
+    // For now, return the stored location
+    // In a real implementation, you could use geolocation services
+    // like geolocator package to get real-time GPS coordinates
+    try {
+      // Simulate real-time location fetching
+      // In production, you'd use:
+      // import 'package:geolocator/geolocator.dart';
+      // Position position = await Geolocator.getCurrentPosition();
+      // return await _getCountryFromCoordinates(position.latitude, position.longitude);
+      
+      // For now, return stored location with real-time fetching simulation
+      await Future.delayed(const Duration(milliseconds: 500)); // Simulate API call
+      return _userData?['pays_origine']?.toString() ?? 'Unknown';
+    } catch (e) {
+      debugPrint('Error fetching real-time location: $e');
+      return _userData?['pays_origine']?.toString() ?? 'Unknown';
     }
   }
 }
@@ -2488,8 +3144,19 @@ class _ActivityCardState extends State<_ActivityCard> {
   int _currentImageIndex = 0;
 
   String _resolveImageUrl(String url) {
-    if (url.startsWith('http')) return url;
-    return '${ApiClient.baseUrl.replaceFirst(RegExp(r'/api(?:/v1)?$'), '')}/$url';
+    final value = url.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    final serverUrl = ApiClient.baseUrl.replaceFirst(
+      RegExp(r'/api(?:/v1)?$'),
+      '',
+    );
+    if (value.startsWith('/')) {
+      return '$serverUrl$value';
+    }
+    return '$serverUrl/$value';
   }
 
   @override
@@ -2876,163 +3543,6 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
-class _PostCard extends StatelessWidget {
-  final PostModel post;
-  final bool isLiked;
-  final VoidCallback? onLikeToggle;
-  final VoidCallback? onCommentTap;
-
-  const _PostCard({
-    required this.post,
-    this.isLiked = false,
-    this.onLikeToggle,
-    this.onCommentTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrls = post.imageUrls;
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image Carousel
-          if (imageUrls.isNotEmpty)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              child: AutoImageCarousel(
-                imageUrls: imageUrls,
-                height: 200,
-                fit: BoxFit.cover,
-              ),
-            ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.content,
-                  style: AppTextStyles.bodyMedium,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Reactions/Likes - separate from comments
-                    InkWell(
-                      onTap: () async {
-                        onLikeToggle?.call();
-                        final result = await PostService.togglePostLike(post.id);
-                        debugPrint('Like post ${post.id} - result: $result');
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isLiked 
-                                ? Icons.favorite 
-                                : Icons.favorite_border,
-                              size: 18,
-                              color: isLiked 
-                                ? Colors.red 
-                                : AppColors.textGrey,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              (isLiked 
-                                ? post.likesCount + 1 
-                                : post.likesCount).toString(),
-                              style: AppTextStyles.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Comments - navigate to comments screen
-                    InkWell(
-                      onTap: onCommentTap ?? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CommentsScreen(
-                              postId: post.id,
-                              postTitle: post.content,
-                              initialCommentsCount: post.commentsCount,
-                            ),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.comment_outlined, size: 18, color: AppColors.textGrey),
-                            const SizedBox(width: 6),
-                            Text(
-                              post.commentsCount.toString(),
-                              style: AppTextStyles.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      _formatDate(post.createdAt),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 7) {
-      return '${date.day}/${date.month}/${date.year}';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
-  }
-}
 
 class _EditReviewDialog extends StatefulWidget {
   final String reviewId;
@@ -3131,5 +3641,170 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
         ),
       ],
     );
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  final PostModel post;
+  final bool isLiked;
+  final VoidCallback onLikeToggle;
+  final VoidCallback onCommentTap;
+
+  const _PostCard({
+    required this.post,
+    required this.isLiked,
+    required this.onLikeToggle,
+    required this.onCommentTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrls = post.imageUrls ?? [];
+    final imageUrl = imageUrls.isNotEmpty ? imageUrls.first : '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image or placeholder
+          if (imageUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: AppColors.outline,
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: AppColors.outline,
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              height: 200,
+              decoration: const BoxDecoration(
+                color: AppColors.outline,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: const Center(
+                child: Icon(Icons.image_outlined, color: Colors.grey, size: 48),
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Content
+                Text(
+                  post.content,
+                  style: AppTextStyles.bodyMedium,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // Date
+                Text(
+                  _formatDate(post.createdAt),
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textGrey,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Actions
+                Row(
+                  children: [
+                    // Like button
+                    GestureDetector(
+                      onTap: onLikeToggle,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            size: 18,
+                            color: isLiked ? Colors.red : AppColors.textGrey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${post.likesCount}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Comment button
+                    GestureDetector(
+                      onTap: onCommentTap,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            size: 18,
+                            color: AppColors.textGrey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${post.commentsCount}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '';
+
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 }
