@@ -405,9 +405,11 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   }
 
   Widget _detailsPanel(InscriptionModel? booking, String code) {
-    final guestName =
-        booking?.touriste?['fullname']?.toString() ?? 'Unknown Guest';
-    final activity = booking?.activite?['titre']?.toString() ?? 'N/A';
+    final act = booking?.activite ?? {};
+    final tourist = booking?.touriste ?? {};
+
+    final guestName = (tourist['fullname'] ?? tourist['nom'] ?? 'Unknown Guest').toString();
+    final activity = (act['titre'] ?? act['title'] ?? 'N/A').toString();
     final participants = booking?.nombreParticipants ?? 0;
     final bookingId = booking != null
         ? '#DJT-${booking.id.substring(booking.id.length - 5).toUpperCase()}'

@@ -346,52 +346,104 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
                       ),
                     ],
                   ),
-                  child: PopupMenuButton<_FeedFilter>(
-                    icon: Icon(
-                      _getFilterIcon(_activeFilter),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.bookmark_rounded,
                       color: AppColors.primary,
                     ),
-                    color: Colors.white,
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    itemBuilder: (context) {
-                      return _FeedFilter.values.map((filter) {
-                        final isSelected = _activeFilter == filter;
-                        return PopupMenuItem<_FeedFilter>(
-                          value: filter,
-                          child: Row(
-                            children: [
-                              Icon(
-                                _getFilterIcon(filter),
-                                color: isSelected ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _feedFilterLabel(filter),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                  color: isSelected 
-                                      ? const Color(0xFF1B2458) 
-                                      : const Color(0xFF4B5563),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList();
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BookmarkedItemsScreen(),
+                        ),
+                      );
                     },
-                    onSelected: (filter) {
-                      setState(() => _activeFilter = filter);
-                    },
+                    tooltip: 'Saved Items',
                   ),
                 ),
               ],
             ),
-            
+
+            // Horizontal Filter Bar
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _FeedFilter.values.map((filter) {
+                      final isSelected = _activeFilter == filter;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _activeFilter = filter),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  )
+                                else
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                              ],
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : Colors.grey.withValues(alpha: 0.1),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getFilterIcon(filter),
+                                  size: 18,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _feedFilterLabel(filter),
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF4B5563),
+                                    fontSize: 14,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+
             // Loading State
             if (_loading)
               const SliverFillRemaining(

@@ -764,10 +764,11 @@ async function initializeEventListeners() {
       
       // Notify users who booked this activity
       if (data.bookedUserIds && data.bookedUserIds.length > 0) {
+        // 1. Send Push Notifications
         await notificationService.sendBulkNotificationQueued({
           userIds: data.bookedUserIds,
           title: 'Activity Cancelled ❌',
-          body: `"${data.activityTitle}" has been cancelled`,
+          body: `"${data.activityTitle}" has been cancelled. Check your email for details.`,
           data: {
             type: 'activity_cancelled',
             activityId: data.activityId,
@@ -776,7 +777,7 @@ async function initializeEventListeners() {
           priority: 'urgent',
         });
 
-        // Create DB notifications
+        // 2. Create DB notifications
         const notifications = data.bookedUserIds.map(userId => ({
           user_id: userId,
           type: 'activity',
@@ -789,6 +790,27 @@ async function initializeEventListeners() {
         }));
         
         await Notification.insertMany(notifications);
+
+        // 3. Send Apology Emails
+        const Inscription = require('../models/inscription');
+        const mailService = require('../services/email');
+        
+        // Fetch bookings to get tourist emails and the cancellation reason
+        const bookings = await Inscription.find({
+          activite_id: data.activityId,
+          statut: 'annulee'
+        }).populate('touriste_id', 'fullname email');
+
+        for (const booking of bookings) {
+          if (booking.touriste_id && booking.touriste_id.email) {
+            await mailService.sendActivityCancelledEmail({
+              email: booking.touriste_id.email,
+              fullname: booking.touriste_id.fullname,
+              activityTitle: data.activityTitle,
+              reason: booking.message_organisateur
+            });
+          }
+        }
       }
     } catch (error) {
       console.error('Error processing activity.cancelled event:', error);

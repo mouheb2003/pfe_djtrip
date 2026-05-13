@@ -65,9 +65,6 @@ dependencies:
   # Google Sign In
   google_sign_in: ^6.2.2
 
-  # Facebook Auth
-  flutter_facebook_auth: ^7.1.5
-
   # Real-time messaging
   socket_io_client: ^2.0.3+1
 
@@ -100,7 +97,6 @@ dependencies:
   # Device Info for unique deviceId generation
   device_info_plus: ^10.1.0
   cached_network_image: ^3.4.1
-  webview_flutter: ^4.8.0
 
 dev_dependencies:
   flutter_test:
@@ -148,6 +144,7 @@ flutter:
   assets:
     - assets/sounds/
     - assets/logos/
+    - assets/Pics/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

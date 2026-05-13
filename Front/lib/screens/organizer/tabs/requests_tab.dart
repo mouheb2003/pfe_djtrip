@@ -96,13 +96,8 @@ class _RequestsTabState extends State<RequestsTab> {
     }
   }
 
-  String _normalizeStatus(String rawStatus) {
-    final s = rawStatus.trim().toLowerCase();
-    if (s == 'approved') return 'approuvee';
-    if (s == 'pending' || s == 'paid_pending_confirmation') return 'PAID_PENDING_CONFIRMATION';
-    if (s == 'cancelled' || s == 'canceled') return 'annulee';
-    return s;
-  }
+  // Use InscriptionModel's normalization instead
+  // Status is already normalized in the model
 
   Future<void> _syncActivityPhotos(List<InscriptionModel> items) async {
     // Collect unique activity IDs missing photos
@@ -141,7 +136,7 @@ class _RequestsTabState extends State<RequestsTab> {
   List<InscriptionModel> get _filteredRequests {
     return _inscriptions.where((item) {
       final status = _normalizeStatus(item.statut);
-      if (_tabIndex == 0) return status == 'PAID_PENDING_CONFIRMATION';
+      if (_tabIndex == 0) return status == 'en_attente';
       if (_tabIndex == 1) return status == 'approuvee';
       if (_tabIndex == 2) return status == 'annulee';
       return false;
@@ -176,7 +171,7 @@ class _RequestsTabState extends State<RequestsTab> {
 
   String _badgeText(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'PAID_PENDING_CONFIRMATION') return 'PENDING';
+    if (status == 'en_attente') return 'PENDING';
     if (status == 'approuvee') return 'CONFIRMED';
     if (status == 'annulee') return 'CANCELLED';
     return status.toUpperCase();
@@ -184,7 +179,7 @@ class _RequestsTabState extends State<RequestsTab> {
 
   Color _badgeColor(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'PAID_PENDING_CONFIRMATION') return const Color(0xFFF59E0B);
+    if (status == 'en_attente') return const Color(0xFFF59E0B);
     if (status == 'approuvee') return const Color(0xFF22C55E);
     if (status == 'annulee') return const Color(0xFF94A3B8);
     return Colors.grey;
@@ -192,7 +187,7 @@ class _RequestsTabState extends State<RequestsTab> {
 
   Color _borderColor(InscriptionModel item) {
     final status = _normalizeStatus(item.statut);
-    if (status == 'PAID_PENDING_CONFIRMATION') return const Color(0xFF315CFF);
+    if (status == 'en_attente') return const Color(0xFF315CFF);
     if (status == 'approuvee') return const Color(0xFF22C55E);
     if (status == 'annulee') return const Color(0xFFCBD5E1);
     return Colors.grey;
@@ -208,7 +203,7 @@ class _RequestsTabState extends State<RequestsTab> {
     String headerTitle = "New Requests";
 
     if (_tabIndex == 0) {
-      headerLabel = "PENDING PAYMENTS";
+      headerLabel = "PENDING BOOKINGS";
       headerTitle = "";
     } else if (_tabIndex == 1) {
       headerLabel = "CONFIRMED BOOKINGS";
@@ -388,10 +383,7 @@ class _RequestCard extends StatelessWidget {
   final InscriptionModel inscription;
   final List<String>? cachedPhotos;
 
-  const _RequestCard({
-    required this.inscription,
-    this.cachedPhotos,
-  });
+  const _RequestCard({required this.inscription, this.cachedPhotos});
 
   String _formatDate(DateTime? value) {
     if (value == null) return 'N/A';
@@ -419,9 +411,7 @@ class _RequestCard extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PublicProfileScreen(
-          userId: participantId,
-        ),
+        builder: (_) => PublicProfileScreen(userId: participantId),
       ),
     );
   }
@@ -434,14 +424,14 @@ class _RequestCard extends StatelessWidget {
       return _buildApprovedCard(context);
     } else if (status == 'annulee') {
       return _buildCancelledCard(context);
-    } else if (status == 'paid_pending_confirmation' || status == 'pending') {
+    } else if (status == 'en_attente') {
       return _buildPendingCard(context);
     } else {
       return _buildApprovedCard(context); // Default to approved card
     }
   }
 
-  // ── PENDING CARD (PAYMENT PENDING) ──────────────────────────────────────────
+  // ── PENDING CARD ────────────────────────────────────────────────────────────
   Widget _buildPendingCard(BuildContext context) {
     final activity = inscription.activite ?? const {};
     final avatar = _participantAvatar;
@@ -606,10 +596,14 @@ class _RequestCard extends StatelessWidget {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.hourglass_empty, color: Color(0xFFF59E0B), size: 16),
+                  Icon(
+                    Icons.hourglass_empty,
+                    color: Color(0xFFF59E0B),
+                    size: 16,
+                  ),
                   SizedBox(width: 8),
                   Text(
-                    'Waiting for payment confirmation',
+                    'Awaiting your approval',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -808,8 +802,7 @@ class _RequestCard extends StatelessWidget {
 
   // ── CANCELLED CARD (IMAGE 2 IN SECOND REQUEST) ────────────────────────────
   Widget _buildCancelledCard(BuildContext context) {
-    final status = inscription.statut.trim().toLowerCase();
-    final isRejected = status == 'refusee';
+    final isRejected = inscription.statut == 'refusee';
     final activity = inscription.activite ?? const {};
     final avatar = _participantAvatar;
     final name = _participantName;

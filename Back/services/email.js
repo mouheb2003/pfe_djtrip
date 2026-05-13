@@ -835,6 +835,70 @@ exports.sendSuspensionNotification = async (
   }
 };
 
+// Send activity cancellation email to participants
+exports.sendActivityCancelledEmail = async ({
+  email,
+  fullname,
+  activityTitle,
+  reason,
+}) => {
+  try {
+    const mailOptions = getBaseMailOptions({
+      to: email,
+      subject: `Activity Cancelled: ${activityTitle} - DJTrip`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #d32f2f; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .reason-box { background-color: white; border: 1px solid #ffcdd2; padding: 15px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #d32f2f; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Activity Cancelled</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullname},</h2>
+              <p>We are sorry to inform you that the activity <strong>"${activityTitle}"</strong> has been cancelled by the organizer.</p>
+              
+              <p><strong>Message from the organizer:</strong></p>
+              <div class="reason-box">
+                <p style="margin:0;">${reason || "No specific reason provided."}</p>
+              </div>
+              
+              <p>Any payments made will be handled according to our cancellation policy. You can check your booking status in the app for more details.</p>
+              
+              <p>We apologize for any inconvenience this may cause and hope you find another amazing activity on DJTrip!</p>
+            </div>
+            <div class="footer">
+              <p>© 2026 DJTrip. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nWe are sorry to inform you that the activity "${activityTitle}" has been cancelled.\n\nReason: ${reason || "No specific reason provided."}\n\nPlease check the app for more details regarding your booking.\n\n© 2026 DJTrip. All rights reserved.`,
+    });
+
+    const info = await sendMailWithLogging("activity cancelled email", mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    emailLog("error", "Error sending activity cancelled email", {
+      message: error.message,
+      code: error.code,
+    });
+    return { success: false, error: error.message };
+  }
+};
+
 // Generic email with attachment (for invoices, etc.)
 exports.sendEmailWithAttachment = async ({
   to,

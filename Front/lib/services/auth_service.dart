@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -632,9 +631,11 @@ class AuthService {
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
+    /* Facebook Auth is disabled
     try {
       await FacebookAuth.instance.logOut();
     } catch (_) {}
+    */
     // 📱 Remove FCM token on logout
     try {
       await FcmNotificationService().deleteToken();
@@ -821,66 +822,10 @@ class AuthService {
 
   /// Sign in with Facebook, then authenticate against backend.
   static Future<Map<String, dynamic>> signInWithFacebook() async {
-    try {
-      final result = await FacebookAuth.instance.login();
-
-      if (result.status == LoginStatus.cancelled) {
-        return {'success': false, 'message': 'Facebook sign-in was cancelled.'};
-      }
-
-      if (result.status != LoginStatus.success || result.accessToken == null) {
-        return {
-          'success': false,
-          'message': result.message ?? 'Facebook sign-in failed.',
-        };
-      }
-
-      final res = await ApiClient.post('/users/auth/facebook', {
-        'accessToken': result.accessToken!.tokenString,
-      }, auth: false);
-
-      Map<String, dynamic> body = {};
-      try {
-        body = jsonDecode(res.body) as Map<String, dynamic>;
-      } catch (_) {
-        body = {};
-      }
-
-      if (res.statusCode != 200) {
-        return {
-          'success': false,
-          'message': body['message'] ?? 'Facebook authentication failed',
-        };
-      }
-
-      final accessToken = body['accessToken'] as String?;
-      final refreshToken = body['refreshToken'] as String?;
-      final user = body['user'] as Map<String, dynamic>?;
-
-      if (accessToken == null || refreshToken == null || user == null) {
-        return {
-          'success': false,
-          'message': 'Invalid server response during Facebook authentication.',
-        };
-      }
-
-      await _saveTokens(accessToken, refreshToken);
-      await saveUser(user);
-
-      // Send FCM token to backend after successful login
-      try {
-        await FcmNotificationService().sendTokenToBackend();
-      } catch (_) {
-        // FCM token send failure should not block login
-      }
-
-      return {'success': true, 'user': user};
-    } catch (_) {
-      return {
-        'success': false,
-        'message': 'Facebook authentication failed. Please try again.',
-      };
-    }
+    return {
+      'success': false,
+      'message': 'Facebook sign-in is currently disabled.',
+    };
   }
 
   // ── Language Preferences ──────────────────────────────────────

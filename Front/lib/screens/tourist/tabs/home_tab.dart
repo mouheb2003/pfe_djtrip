@@ -7,7 +7,6 @@ import '../../../services/lieu_service.dart';
 import '../../../services/place_service.dart';
 import '../../../services/activity_service.dart';
 import '../place_detail_screen.dart';
-import '../place_detail_new_screen.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/ai_chat_screen.dart';
 import '../view_all_activities_screen.dart';
@@ -54,11 +53,8 @@ class _HomeTabState extends State<HomeTab> {
   bool _showSuggestions = false;
   List<Map<String, dynamic>> _searchSuggestions = [];
 
- 
+  static const String _heroImage = 'assets/Pics/Djerba.png';
 
-  static const String _heroImage =
-      'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1500&q=80';
-  
   static const String _djerbaHeroImage =
       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1500&q=80';
 
@@ -83,7 +79,9 @@ class _HomeTabState extends State<HomeTab> {
       final lieux = await LieuService.getLieux();
       print('[DEBUG] Fetched ${lieux.length} lieux');
       for (var lieu in lieux.take(3)) {
-        print('[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+        print(
+          '[DEBUG] Lieu: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
+        );
       }
 
       // Fetch all activities
@@ -136,7 +134,7 @@ class _HomeTabState extends State<HomeTab> {
 
   List<LieuModel> get _filteredVisibleLieux {
     List<LieuModel> items = _lieux;
-    
+
     // Apply search filter if search query is not empty
     if (_searchQuery.isNotEmpty) {
       items = items.where((lieu) {
@@ -145,18 +143,20 @@ class _HomeTabState extends State<HomeTab> {
         final description = lieu.description.toLowerCase();
         final category = lieu.categorie.toLowerCase();
         return title.contains(_searchQuery) ||
-               subtitle.contains(_searchQuery) ||
-               description.contains(_searchQuery) ||
-               category.contains(_searchQuery);
+            subtitle.contains(_searchQuery) ||
+            description.contains(_searchQuery) ||
+            category.contains(_searchQuery);
       }).toList();
     }
-    
+
     return items;
   }
 
   List<LieuModel> get _topDestinationsList {
     final items = List<LieuModel>.from(_filteredVisibleLieux);
-    print('[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}');
+    print(
+      '[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}',
+    );
     // D'abord prioriser les top destinations, puis trier par rating
     items.sort((a, b) {
       if (a.topDestination && !b.topDestination) return -1;
@@ -167,7 +167,9 @@ class _HomeTabState extends State<HomeTab> {
     final result = items.take(6).toList();
     print('[DEBUG] _topDestinations count: ${result.length}');
     for (var lieu in result.take(3)) {
-      print('[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}');
+      print(
+        '[DEBUG] Top destination: ${lieu.titre}, rating: ${lieu.noteMoyenne}, topDestination: ${lieu.topDestination}',
+      );
     }
     return result;
   }
@@ -175,7 +177,7 @@ class _HomeTabState extends State<HomeTab> {
   // Grouper les lieux par catégorie
   Map<String, List<LieuModel>> get _lieuxByCategory {
     final Map<String, List<LieuModel>> grouped = {};
-    
+
     for (final lieu in _filteredVisibleLieux) {
       final category = lieu.categorie?.toLowerCase().trim() ?? 'autres';
       if (!grouped.containsKey(category)) {
@@ -183,12 +185,12 @@ class _HomeTabState extends State<HomeTab> {
       }
       grouped[category]!.add(lieu);
     }
-    
+
     // Trier chaque catégorie par rating (meilleur en premier)
     for (final category in grouped.keys) {
       grouped[category]!.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
     }
-    
+
     return grouped;
   }
 
@@ -221,9 +223,14 @@ class _HomeTabState extends State<HomeTab> {
       case 'autres':
         return 'Others';
       default:
-        return category.split(' ').map((word) => 
-          word.isNotEmpty ? word[0].toUpperCase() + word.substring(1).toLowerCase() : ''
-        ).join(' ');
+        return category
+            .split(' ')
+            .map(
+              (word) => word.isNotEmpty
+                  ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                  : '',
+            )
+            .join(' ');
     }
   }
 
@@ -290,20 +297,15 @@ class _HomeTabState extends State<HomeTab> {
       final lieu = _lieux.firstWhere((l) => l.id == suggestion['id']);
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => PlaceDetailNewScreen(
-            place: lieu,
-          ),
-        ),
+        MaterialPageRoute(builder: (context) => PlaceDetailScreen(place: lieu)),
       );
     } else if (suggestion['type'] == 'activity') {
       // Navigate to activity detail screen
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ActivityDetailScreen(
-            activityId: suggestion['id'],
-          ),
+          builder: (context) =>
+              ActivityDetailScreen(activityId: suggestion['id']),
         ),
       );
     }
@@ -327,7 +329,6 @@ class _HomeTabState extends State<HomeTab> {
     };
   }
 
-  
   Widget _buildFilterButton(String text, bool isSelected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -405,7 +406,9 @@ class _HomeTabState extends State<HomeTab> {
                               },
                               onTap: () {
                                 if (_searchController.text.isNotEmpty) {
-                                  _updateSearchSuggestions(_searchController.text);
+                                  _updateSearchSuggestions(
+                                    _searchController.text,
+                                  );
                                 }
                               },
                               decoration: InputDecoration(
@@ -465,7 +468,8 @@ class _HomeTabState extends State<HomeTab> {
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: _searchSuggestions.length,
                                   itemBuilder: (context, index) {
-                                    final suggestion = _searchSuggestions[index];
+                                    final suggestion =
+                                        _searchSuggestions[index];
                                     return ListTile(
                                       leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
@@ -474,14 +478,17 @@ class _HomeTabState extends State<HomeTab> {
                                           width: 48,
                                           height: 48,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              width: 48,
-                                              height: 48,
-                                              color: Colors.grey[300],
-                                              child: const Icon(Icons.place),
-                                            );
-                                          },
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return Container(
+                                                  width: 48,
+                                                  height: 48,
+                                                  color: Colors.grey[300],
+                                                  child: const Icon(
+                                                    Icons.place,
+                                                  ),
+                                                );
+                                              },
                                         ),
                                       ),
                                       title: Text(
@@ -510,7 +517,9 @@ class _HomeTabState extends State<HomeTab> {
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
-                                            suggestion['rating']?.toStringAsFixed(1) ?? '0.0',
+                                            suggestion['rating']
+                                                    ?.toStringAsFixed(1) ??
+                                                '0.0',
                                             style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
@@ -518,7 +527,8 @@ class _HomeTabState extends State<HomeTab> {
                                           ),
                                         ],
                                       ),
-                                      onTap: () => _selectSuggestion(suggestion),
+                                      onTap: () =>
+                                          _selectSuggestion(suggestion),
                                     );
                                   },
                                 ),
@@ -528,7 +538,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Djerba Hero Section
                     Container(
                       height: 200,
@@ -580,9 +590,9 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // Top Rated Places Section
                     Row(
                       children: [
@@ -601,7 +611,8 @@ class _HomeTabState extends State<HomeTab> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const ViewAllPlacesScreen(),
+                                builder: (context) =>
+                                    const ViewAllPlacesScreen(),
                               ),
                             );
                           },
@@ -652,14 +663,16 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                           ),
                     const SizedBox(height: 32),
-                    
+
                     // Destinations by Category Sections
                     ...(_lieuxByCategory.entries.map((entry) {
                       final category = entry.key;
-                      final places = entry.value.take(5).toList(); // Top 5 par catégorie
-                      
+                      final places = entry.value
+                          .take(5)
+                          .toList(); // Top 5 par catégorie
+
                       if (places.isEmpty) return const SizedBox.shrink();
-                      
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -681,7 +694,8 @@ class _HomeTabState extends State<HomeTab> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const ViewAllPlacesScreen(),
+                                      builder: (context) =>
+                                          const ViewAllPlacesScreen(),
                                     ),
                                   );
                                 },
@@ -706,7 +720,8 @@ class _HomeTabState extends State<HomeTab> {
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: places.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 16),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 16),
                               itemBuilder: (context, index) {
                                 final lieu = places[index];
                                 return _TopDestinationCard(
@@ -726,7 +741,7 @@ class _HomeTabState extends State<HomeTab> {
                         ],
                       );
                     }).toList()),
-                    
+
                     const SizedBox(height: 32),
                     // Top Activities Section
                     Row(
@@ -768,7 +783,9 @@ class _HomeTabState extends State<HomeTab> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
                             ),
                             child: const Center(
                               child: Column(
@@ -796,8 +813,11 @@ class _HomeTabState extends State<HomeTab> {
                             height: 180,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _topActivities.length > 5 ? 5 : _topActivities.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemCount: _topActivities.length > 5
+                                  ? 5
+                                  : _topActivities.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
                               itemBuilder: (context, index) {
                                 final activity = _topActivities[index];
                                 return Container(
@@ -814,45 +834,74 @@ class _HomeTabState extends State<HomeTab> {
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         flex: 3,
                                         child: ClipRRect(
-                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(16),
+                                              ),
                                           child: Stack(
                                             children: [
                                               Container(
                                                 width: double.infinity,
                                                 height: double.infinity,
                                                 color: const Color(0xFFF3F4F6),
-                                                child: activity.imageUrl.isNotEmpty
+                                                child:
+                                                    activity.imageUrl.isNotEmpty
                                                     ? Image.network(
                                                         activity.imageUrl,
                                                         fit: BoxFit.cover,
-                                                        errorBuilder: (_, __, ___) => const Center(
-                                                          child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
-                                                        ),
+                                                        errorBuilder:
+                                                            (
+                                                              _,
+                                                              __,
+                                                              ___,
+                                                            ) => const Center(
+                                                              child: Icon(
+                                                                Icons.event,
+                                                                color: Color(
+                                                                  0xFF9CA3AF,
+                                                                ),
+                                                              ),
+                                                            ),
                                                       )
                                                     : const Center(
-                                                        child: Icon(Icons.event, color: Color(0xFF9CA3AF)),
+                                                        child: Icon(
+                                                          Icons.event,
+                                                          color: Color(
+                                                            0xFF9CA3AF,
+                                                          ),
+                                                        ),
                                                       ),
                                               ),
                                               Positioned(
                                                 top: 8,
                                                 right: 8,
                                                 child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.black.withOpacity(0.7),
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    color: Colors.black
+                                                        .withOpacity(0.7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     '${activity.noteMoyenne.toStringAsFixed(1)}',
                                                     style: const TextStyle(
                                                       color: Colors.white,
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
                                                 ),
@@ -866,7 +915,8 @@ class _HomeTabState extends State<HomeTab> {
                                         child: Padding(
                                           padding: const EdgeInsets.all(10),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 activity.title,
@@ -880,7 +930,8 @@ class _HomeTabState extends State<HomeTab> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                activity.organisateur?['name'] ?? 'Unknown',
+                                                activity.organisateur?['name'] ??
+                                                    'Unknown',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
@@ -929,9 +980,7 @@ class _HomeTabState extends State<HomeTab> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const AiChatScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const AiChatScreen()),
                 );
               },
               child: const Padding(
@@ -968,12 +1017,19 @@ class _HomeHero extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            backgroundImage,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFF167BFF)),
-          ),
+          backgroundImage.startsWith('http')
+              ? Image.network(
+                  backgroundImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFF167BFF)),
+                )
+              : Image.asset(
+                  backgroundImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: const Color(0xFF167BFF)),
+                ),
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -1226,7 +1282,9 @@ class _TopDestinationCard extends StatelessWidget {
             Expanded(
               flex: 3,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
                 child: Stack(
                   children: [
                     Image.network(
@@ -1245,7 +1303,10 @@ class _TopDestinationCard extends StatelessWidget {
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(12),
@@ -1253,7 +1314,11 @@ class _TopDestinationCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star, color: Color(0xFFFFC529), size: 12),
+                            const Icon(
+                              Icons.star,
+                              color: Color(0xFFFFC529),
+                              size: 12,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${lieu.noteMoyenne.toStringAsFixed(1)}',

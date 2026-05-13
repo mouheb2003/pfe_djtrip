@@ -4,8 +4,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
-import '../payment/stripe_payment_screen.dart';
 import 'tourist_main_screen.dart';
+import 'bookings_screen.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
   final InscriptionModel inscription;
@@ -13,7 +13,8 @@ class BookingConfirmationScreen extends StatefulWidget {
   const BookingConfirmationScreen({super.key, required this.inscription});
 
   @override
-  State<BookingConfirmationScreen> createState() => _BookingConfirmationScreenState();
+  State<BookingConfirmationScreen> createState() =>
+      _BookingConfirmationScreenState();
 }
 
 class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
@@ -86,7 +87,9 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     setState(() => _isDeleting = true);
 
     try {
-      final success = await InscriptionService.cancelInscription(widget.inscription.id);
+      final success = await InscriptionService.cancelInscription(
+        widget.inscription.id,
+      );
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -111,10 +114,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -148,7 +148,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     final isRejected = status == 'refusee';
     final isCancelled = status == 'annulee';
     final isUsed = status == 'verifie';
-    final isPaymentFailed = widget.inscription.isPaymentFailed;
     final totalPrice = _bookingTotal(activity);
     final qrData = widget.inscription.qrData;
     final hasQrData = qrData.trim().isNotEmpty;
@@ -157,9 +156,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     final showReason = (isRejected || isCancelled) && reason != null;
     final statusLabel = widget.inscription.statusLabel.toUpperCase();
     final statusColor = widget.inscription.statusColor;
-    final headline = isPaymentFailed
-        ? 'Payment Failed'
-        : isApproved
+    final headline = isApproved
         ? 'Booking Confirmed!'
         : isPending
         ? 'Waiting for approval'
@@ -168,9 +165,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         : isUsed
         ? 'Checked In'
         : 'Booking Cancelled';
-    final subtitle = isPaymentFailed
-        ? 'Your payment could not be processed. You can delete this booking and try again.'
-        : isApproved
+    final subtitle = isApproved
         ? 'Your booking is approved. Keep your QR code for check-in.'
         : isPending
         ? 'Your request has been sent. The organizer will review it soon.'
@@ -490,88 +485,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
               ],
               const SizedBox(height: 32),
               // Buttons
-              if (isPaymentFailed || widget.inscription.statut == 'PAID_PENDING_CONFIRMATION') ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: _isDeleting ? null : _deleteBooking,
-                          icon: _isDeleting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.delete_outline, size: 20),
-                          label: Text(
-                            _isDeleting ? 'Deleting...' : 'Delete',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final activity = widget.inscription.activite;
-                            if (activity == null) return;
-                            final activityId = activity['_id']?.toString() ?? '';
-                            final activityTitle = activity['titre']?.toString() ?? 'Activity';
-                            
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => StripePaymentScreen(
-                                  inscriptionId: widget.inscription.id,
-                                  activityId: activityId,
-                                  activityTitle: activityTitle,
-                                  nombreParticipants: widget.inscription.nombreParticipants,
-                                  amount: widget.inscription.prixTotal,
-                                  currency: 'TND',
-                                  description: 'Payment for $activityTitle',
-                                ),
-                              ),
-                            );
-                            
-                            // Refresh the screen after payment
-                            if (mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                          ),
-                          child: const Text(
-                            'Pay',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
               // Show cancel button for approved bookings
               if (isApproved) ...[
                 SizedBox(
@@ -611,11 +524,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Navigate to bookings tab (index 2 in TouristMainScreen)
+                      // Navigate to the My Bookings screen directly
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const TouristMainScreen(initialIndex: 2),
+                          builder: (_) => const BookingsScreen(),
                         ),
                         (route) => false,
                       );
@@ -630,7 +542,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                     ),
                     child: const Text(
                       'View My Bookings',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -656,7 +571,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                     ),
                     child: const Text(
                       'Back to Home',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

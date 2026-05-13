@@ -822,13 +822,59 @@ exports.deleteActivite = async (req, res) => {
       statut: { $ne: "annulee" },
     });
 
-    // If there are bookings, cancellation message is required
-    if (bookings.length > 0 && !cancellationMessage) {
-      return res.status(400).json({
-        message:
-          "A cancellation message is required to notify tourists before deleting this activity",
+    // Check if it's a Cancel or a permanent Delete
+    const isAlreadyCancelled = activite.statut === 'cancelled' || activite.date_fin < new Date();
+
+    if (!isAlreadyCancelled) {
+      // Logic for CANCELLATION (Soft Delete)
+      
+      // If there are bookings, cancellation message is required
+      if (bookings.length > 0 && !cancellationMessage) {
+        return res.status(400).json({
+          message:
+            "A cancellation message is required to notify tourists before cancelling this activity",
+        });
+      }
+
+      // Mark activity as cancelled
+      activite.statut = 'cancelled';
+      await activite.save();
+
+      // Cancel all related bookings and keep organizer reason visible to tourists
+      await Inscription.updateMany(
+        { activite_id: activiteId, statut: { $ne: "annulee" } },
+        {
+          $set: {
+            statut: "annulee",
+            message_organisateur: cancellationMessage,
+            date_reponse: new Date(),
+          },
+        },
+      );
+
+      // Get booked users for notification
+      const bookedUserIds = bookings.map((b) => b.touriste);
+
+      // Emit activity cancelled event
+      try {
+        if (bookedUserIds.length > 0) {
+          notificationEventBus.emitActivityCancelled({
+            activityId: activiteId,
+            activityTitle: activite.titre,
+            bookedUserIds: bookedUserIds,
+          });
+        }
+      } catch (notifError) {
+        console.warn("Failed to send activity cancelled notification:", notifError.message);
+      }
+
+      return res.status(200).json({
+        message: "Activity cancelled successfully and moved to archive",
       });
     }
+
+    // Logic for PERMANENT DELETE (Hard Delete)
+    // Only reachable if activity is already in archive (past or cancelled)
 
     // Delete Cloudinary photos (clean up orphaned assets)
     if (activite.photos && activite.photos.length > 0) {
@@ -854,42 +900,11 @@ exports.deleteActivite = async (req, res) => {
       $pull: { liste_activites: activiteId },
     });
 
-    // Cancel all related bookings and keep organizer reason visible to tourists
-    await Inscription.updateMany(
-      { activite_id: activiteId, statut: { $ne: "annulee" } },
-      {
-        $set: {
-          statut: "annulee",
-          message_organisateur: cancellationMessage,
-          date_reponse: new Date(),
-        },
-      },
-    );
-
-    // Get booked users for notification (reuse existing bookings variable)
-    const bookedUserIds = bookings.map((b) => b.touriste);
-
     // Delete the activity
     await Activite.findByIdAndDelete(activiteId);
 
-    // Emit activity cancelled event for notification to booked users
-    try {
-      if (bookedUserIds.length > 0) {
-        notificationEventBus.emitActivityCancelled({
-          activityId: activiteId,
-          activityTitle: activite.titre,
-          bookedUserIds: bookedUserIds,
-        });
-      }
-    } catch (notifError) {
-      console.warn(
-        "Failed to send activity cancelled notification:",
-        notifError.message,
-      );
-    }
-
     res.status(200).json({
-      message: "Activity deleted successfully",
+      message: "Activity deleted permanently",
     });
   } catch (error) {
     res.status(500).json({

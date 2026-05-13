@@ -31,7 +31,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   String _searchQuery = '';
   
   // Filter chips
-  final List<String> _filterOptions = ['All', 'Upcoming', 'Ongoing', 'Completed'];
+  final List<String> _filterOptions = ['All', 'Upcoming', 'Ongoing', 'Archive'];
   String _selectedFilter = 'All';
   
   // Advanced filters
@@ -156,7 +156,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
             return status == 'UPCOMING';
           case 'Ongoing':
             return status == 'ONGOING';
-          case 'Completed':
+          case 'Past':
             return status == 'PAST';
           default:
             return true;

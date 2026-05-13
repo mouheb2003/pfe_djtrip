@@ -26,6 +26,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   late TabController _tabController;
   
   List<ActivityModel> _activities = [];
+  final Set<String> _selectedActivityIds = {};
+  bool _isSelectionMode = false;
   bool _isLoading = true;
   bool _isRefreshing = false;
   
@@ -53,6 +55,145 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   void _handleTabChange() {
     if (_tabController.indexIsChanging) {
       HapticFeedback.selectionClick();
+      if (_isSelectionMode) {
+        setState(() {
+          _isSelectionMode = false;
+          _selectedActivityIds.clear();
+        });
+      }
+    }
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedActivityIds.contains(id)) {
+        _selectedActivityIds.remove(id);
+        if (_selectedActivityIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedActivityIds.add(id);
+        _isSelectionMode = true;
+      }
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _selectAll(List<ActivityModel> activities) {
+    setState(() {
+      if (_selectedActivityIds.length == activities.length) {
+        _selectedActivityIds.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedActivityIds.clear();
+        for (var a in activities) {
+          _selectedActivityIds.add(a.id);
+        }
+        _isSelectionMode = true;
+      }
+    });
+    HapticFeedback.mediumImpact();
+  }
+
+  Future<void> _bulkAction() async {
+    if (_selectedActivityIds.isEmpty) return;
+
+    final selectedActivities = _activities.where((a) => _selectedActivityIds.contains(a.id)).toList();
+    final isArchiveTab = _tabController.index == 3;
+    final hasReservations = selectedActivities.any((a) => (a.nombreReservations ?? 0) > 0);
+
+    String? reason;
+    if (!isArchiveTab && hasReservations) {
+      final reasonController = TextEditingController();
+      String? inlineError;
+
+      reason = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Cancel Selected Activities?', style: TextStyle(fontWeight: FontWeight.w700)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Some selected activities have active bookings. Please provide a cancellation reason for all participants.',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 4,
+                    minLines: 3,
+                    maxLength: 280,
+                    decoration: InputDecoration(
+                      hintText: 'Example: Activities cancelled due to logistical issues.',
+                      errorText: inlineError,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Back', style: TextStyle(color: Colors.grey))),
+                TextButton(
+                  onPressed: () {
+                    final r = reasonController.text.trim();
+                    if (r.isEmpty) {
+                      setDialogState(() => inlineError = 'Reason is required');
+                      return;
+                    }
+                    Navigator.pop(ctx, r);
+                  },
+                  child: const Text('Confirm', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (reason == null) return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isArchiveTab ? 'Delete Selected?' : 'Cancel Selected?'),
+          content: Text('Are you sure you want to ${isArchiveTab ? 'permanently delete' : 'cancel'} ${_selectedActivityIds.length} activities?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No', style: TextStyle(color: Colors.grey))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(isArchiveTab ? 'Delete' : 'Cancel', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    int successCount = 0;
+    for (var id in _selectedActivityIds) {
+      final success = await ActivityService.deleteActivity(id, cancellationMessage: reason);
+      if (success) successCount++;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$successCount activities processed successfully.'),
+          backgroundColor: const Color(0xFF22C55E),
+        ),
+      );
+      setState(() {
+        _isSelectionMode = false;
+        _selectedActivityIds.clear();
+      });
+      _loadActivities(refresh: true);
     }
   }
 
@@ -116,11 +257,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
     return _activities.where((a) => a.isOngoing).toList();
   }
 
-  List<ActivityModel> get _completedActivities {
-    return _activities.where((a) => a.isPast).toList();
-  }
-
-  List<ActivityModel> get _archivedActivities {
+  List<ActivityModel> get _pastActivities {
     return _activities.where((a) => a.isPast).toList();
   }
 
@@ -136,37 +273,40 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   }
 
   Future<void> _deleteActivity(ActivityModel activity) async {
+    final isArchive = activity.isPast || activity.statut == 'cancelled';
     final hasReservations = activity.nombreReservations != null && activity.nombreReservations! > 0;
     
     // If no reservations, show simple confirmation dialog
-    if (!hasReservations) {
+    if (!hasReservations || isArchive) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text(
-            'Delete Activity?',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          title: Text(
+            isArchive ? 'Delete Activity?' : 'Cancel Activity?',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           content: Text(
-            'Are you sure you want to delete "${activity.titre}"? This action cannot be undone.',
+            isArchive 
+              ? 'Are you sure you want to delete "${activity.titre}" permanently? This action cannot be undone.'
+              : 'Are you sure you want to cancel "${activity.titre}"? It will be moved to Archive.',
             style: const TextStyle(fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text(
-                'Cancel',
+                'No',
                 style: TextStyle(color: Colors.grey),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              child: Text(
+                isArchive ? 'Delete' : 'Cancel',
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -181,9 +321,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Activity deleted successfully.'),
-              backgroundColor: Color(0xFF22C55E),
+            SnackBar(
+              content: Text(isArchive ? 'Activity deleted permanently.' : 'Activity cancelled successfully.'),
+              backgroundColor: const Color(0xFF22C55E),
             ),
           );
           _loadActivities(refresh: true);
@@ -191,7 +331,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to delete activity.'),
+              content: Text('Action failed.'),
               backgroundColor: Color(0xFFFF4757),
             ),
           );
@@ -200,7 +340,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       return;
     }
     
-    // If there are reservations, show reason dialog
+    // If there are reservations and not archive, show reason dialog for cancellation
     final reasonController = TextEditingController();
     String? inlineError;
 
@@ -214,14 +354,14 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
               borderRadius: BorderRadius.circular(20),
             ),
             title: const Text(
-              'Delete Activity?',
+              'Cancel Activity?',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Deleting "${activity.titre}" will cancel all related bookings (${activity.nombreReservations}). Please provide a cancellation reason for tourists.',
+                  'Cancelling "${activity.titre}" will cancel all related bookings (${activity.nombreReservations}). Please provide a cancellation reason for tourists.',
                   style: const TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 16),
@@ -248,7 +388,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text(
-                  'Cancel',
+                  'Back',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -264,7 +404,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                   Navigator.pop(ctx, reason);
                 },
                 child: const Text(
-                  'Delete',
+                  'Confirm Cancellation',
                   style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -286,7 +426,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Activity deleted successfully.'),
+            content: Text('Activity cancelled successfully.'),
             backgroundColor: Color(0xFF22C55E),
           ),
         );
@@ -295,7 +435,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to delete activity.'),
+            content: Text('Failed to cancel activity.'),
             backgroundColor: Color(0xFFFF4757),
           ),
         );
@@ -375,9 +515,15 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                 ),
                 const Divider(height: 1),
                 _OptionTile(
-                  icon: Icons.delete_outline,
-                  title: 'Delete Activity',
-                  subtitle: 'Remove this activity permanently',
+                  icon: (activity.isUpcoming || activity.isOngoing) && activity.statut != 'cancelled' 
+                    ? Icons.cancel_outlined 
+                    : Icons.delete_outline,
+                  title: (activity.isUpcoming || activity.isOngoing) && activity.statut != 'cancelled' 
+                    ? 'Cancel Activity' 
+                    : 'Delete Activity',
+                  subtitle: (activity.isUpcoming || activity.isOngoing) && activity.statut != 'cancelled' 
+                    ? 'Mark this activity as cancelled' 
+                    : 'Remove this activity permanently',
                   iconColor: Colors.red,
                   textColor: Colors.red,
                   onTap: () {
@@ -419,203 +565,249 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
 
   @override
   Widget build(BuildContext context) {
+    final currentTabActivities = _getFilteredActivities(
+      _tabController.index == 0 ? _activities :
+      _tabController.index == 1 ? _activeActivities :
+      _tabController.index == 2 ? _ongoingActivities : _pastActivities
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
-              // App Bar with Title
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ShaderMask(
-                              shaderCallback: (bounds) => const LinearGradient(
-                                colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ).createShader(bounds),
-                              child: const Text(
-                                'My Activities',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Manage your created experiences',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF6B7280),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Notification Icon
-                      GestureDetector(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => NotificationsScreen(),
-                            ),
-                          );
-                          _loadUnreadCount();
-                        },
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(
-                                Icons.notifications_outlined,
-                                color: AppColors.primary,
-                                size: 22,
-                              ),
-                              if (_unreadNotificationCount > 0)
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Reservations Management Icon
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => MyReservationsScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(
-                                Icons.list_alt_outlined,
-                                color: AppColors.primary,
-                                size: 22,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                  ),
-                ),
-              ),
-              // Search Bar
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+              // Selection Mode App Bar
+              if (_isSelectionMode)
+                SliverToBoxAdapter(
                   child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                    color: AppColors.primary.withOpacity(0.05),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() {
+                            _isSelectionMode = false;
+                            _selectedActivityIds.clear();
+                          }),
+                        ),
+                        Text(
+                          '${_selectedActivityIds.length} Selected',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => _selectAll(currentTabActivities),
+                          child: Text(
+                            _selectedActivityIds.length == currentTabActivities.length ? 'Unselect All' : 'Select All',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _tabController.index == 3 ? Icons.delete_outline : Icons.cancel_outlined,
+                            color: Colors.red,
+                          ),
+                          onPressed: _bulkAction,
                         ),
                       ],
                     ),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Search your activities...',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF9CA3AF),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF6B7280),
-                          size: 22,
-                        ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.clear,
-                                  color: Color(0xFF9CA3AF),
-                                  size: 20,
+                  ),
+                )
+              else
+                // Normal App Bar
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ).createShader(bounds),
+                                child: const Text(
+                                  'My Activities',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.5,
+                                  ),
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                    _searchQuery = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Manage your created experiences',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Notification Icon
+                        GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NotificationsScreen(),
+                              ),
+                            );
+                            _loadUnreadCount();
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  Icons.notifications_outlined,
+                                  color: AppColors.primary,
+                                  size: 22,
+                                ),
+                                if (_unreadNotificationCount > 0)
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Reservations Management Icon
+                        InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MyReservationsScreen(),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  Icons.list_alt_outlined,
+                                  color: AppColors.primary,
+                                  size: 22,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              // Search Bar
+              if (!_isSelectionMode)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search your activities...',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Color(0xFF6B7280),
+                            size: 22,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Color(0xFF9CA3AF),
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
               
               // Tab Bar
               SliverToBoxAdapter(
@@ -653,10 +845,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                       ),
                       padding: const EdgeInsets.all(4),
                       tabs: [
+                        _buildTab('All', _activities.length),
                         _buildTab('Upcoming', _activeActivities.length),
                         _buildTab('Ongoing', _ongoingActivities.length),
-                        _buildTab('Archive', _completedActivities.length),
-                        _buildTab('All', _activities.length),
+                        _buildTab('Past', _pastActivities.length),
                       ],
                     ),
                   ),
@@ -667,10 +859,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
           body: TabBarView(
             controller: _tabController,
             children: [
+              _buildActivityList(_getFilteredActivities(_activities), 'all'),
               _buildActivityList(_getFilteredActivities(_activeActivities), 'active'),
               _buildActivityList(_getFilteredActivities(_ongoingActivities), 'ongoing'),
-              _buildActivityList(_getFilteredActivities(_archivedActivities), 'archive'),
-              _buildActivityList(_getFilteredActivities(_activities), 'all'),
+              _buildActivityList(_getFilteredActivities(_pastActivities), 'past'),
             ],
           ),
         ),
@@ -741,17 +933,23 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
               activity: activity,
               formattedDate: _formatDate(activity),
               statusColor: _getStatusColor(activity.timelineStatus),
+              isSelected: _selectedActivityIds.contains(activity.id),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ActivityDetailScreen(
-                      activityId: activity.id,
-                      viewOnly: true,
+                if (_isSelectionMode) {
+                  _toggleSelection(activity.id);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ActivityDetailScreen(
+                        activityId: activity.id,
+                        viewOnly: true,
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               },
+              onLongPress: () => _toggleSelection(activity.id),
               onOptionsTap: () => _showActivityOptions(activity),
             ),
           );
@@ -776,8 +974,8 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         subtitle = 'Activities happening now will appear here';
         icon = Icons.event_busy_outlined;
         break;
-      case 'completed':
-        title = 'No Completed Activities';
+      case 'past':
+        title = 'No Archived or Passed Activities Found';
         subtitle = 'Past activities will appear here';
         icon = Icons.history_outlined;
         break;
@@ -1009,14 +1207,18 @@ class _MyActivityCard extends StatefulWidget {
   final String formattedDate;
   final Color statusColor;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final VoidCallback onOptionsTap;
+  final bool isSelected;
 
   const _MyActivityCard({
     required this.activity,
     required this.formattedDate,
     required this.statusColor,
     required this.onTap,
+    this.onLongPress,
     required this.onOptionsTap,
+    this.isSelected = false,
   });
 
   @override
@@ -1040,13 +1242,20 @@ class _MyActivityCardState extends State<_MyActivityCard> {
 
     return GestureDetector(
       onTap: widget.onTap,
-      child: Container(
+      onLongPress: widget.onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
+          border: widget.isSelected 
+              ? Border.all(color: AppColors.primary, width: 2) 
+              : Border.all(color: Colors.transparent, width: 2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: widget.isSelected 
+                  ? AppColors.primary.withOpacity(0.2) 
+                  : Colors.black.withOpacity(0.08),
               blurRadius: 20,
               offset: const Offset(0, 8),
               spreadRadius: -4,
@@ -1059,7 +1268,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
             // Large Cover Image
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
+                top: Radius.circular(18),
               ),
               child: SizedBox(
                 width: double.infinity,
@@ -1067,6 +1276,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                 child: Stack(
                   children: [
                     // Image or Placeholder
+                    // ... existing image code ...
                     photos.isEmpty
                         ? Container(
                             color: const Color(0xFFF3F4F6),
@@ -1113,66 +1323,50 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                             },
                           ),
 
-                    // Status Badge (Top Left)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.statusColor,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          widget.activity.timelineStatus,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Options Button (Top Right) - Always shows
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: GestureDetector(
-                        onTap: widget.onOptionsTap,
+                    // Selection Indicator (Top Right Overlays)
+                    if (widget.isSelected)
+                      Positioned(
+                        top: 12,
+                        right: 12,
                         child: Container(
                           width: 36,
                           height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.more_vert,
-                            color: Color(0xFF1B2458),
-                            size: 20,
+                          child: const Icon(Icons.check, color: Colors.white, size: 20),
+                        ),
+                      )
+                    else
+                      // Options Button (Top Right)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: GestureDetector(
+                          onTap: widget.onOptionsTap,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.more_vert,
+                              color: Color(0xFF1B2458),
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
                     // Photo Counter (if multiple photos) - Below options button
                     if (hasMultiplePhotos)

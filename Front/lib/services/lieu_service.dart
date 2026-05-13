@@ -129,7 +129,7 @@ class LieuService {
   }
 
   static Future<Map<String, dynamic>?> getLieuById(String id) async {
-    final res = await ApiClient.get('/lieux/$id', auth: false);
+    final res = await ApiClient.get('/lieux/$id', auth: true);
     if (res.statusCode != 200) return null;
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -199,6 +199,35 @@ class LieuService {
     }
   }
 
+  // Add a review to a place
+  static Future<Map<String, dynamic>> addReview({
+    required String lieuId,
+    required int rating,
+    required String comment,
+  }) async {
+    try {
+      final res = await ApiClient.post(
+        '/lieux/$lieuId/reviews',
+        {
+          'rating': rating,
+          'comment': comment,
+        },
+      );
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return {
+        'success': res.statusCode == 201,
+        'message': body['message'] ?? 'Unable to add review',
+        'lieu': body['lieu'],
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error connecting to server',
+      };
+    }
+  }
+
   // Get bookmarked places for current user
   static Future<List<Map<String, dynamic>>> getBookmarkedLieux() async {
     try {
@@ -217,3 +246,4 @@ class LieuService {
     }
   }
 }
+

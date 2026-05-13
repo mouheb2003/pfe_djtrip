@@ -88,7 +88,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   bool _isPartnerBlocked = false;
   bool _isBlockedByPartner = false;
   bool _isConversationMuted = false;
-  
+
   // 🚀 Privacy settings tracking
   bool _allowDirectMessages = true;
   bool _allowPhoneCalls = true;
@@ -103,16 +103,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     try {
       final result = await MessageService.getBlockedUsers();
       if (!mounted) return;
-      
+
       print('DEBUG: Block check result: $result');
-      
+
       if (result['success'] == true) {
         final blockedUsers = result['blockedUsers'] as List<dynamic>;
-        final mutedPartners = result['mutedConversationPartners'] as List<dynamic>;
+        final mutedPartners =
+            result['mutedConversationPartners'] as List<dynamic>;
         final blockedByUsers = result['blockedByUsers'] as List<dynamic>;
-        
+
         print('DEBUG: Blocked users: $blockedUsers');
-        
+
         // Check block status
         setState(() {
           _isPartnerBlocked = blockedUsers.contains(widget.partnerId);
@@ -130,19 +131,28 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       // Get partner user data to check privacy settings
       final response = await ApiClient.get('/users/${widget.partnerId}');
       if (!mounted) return;
-      
+
       if (response.statusCode == 200) {
         final userData = response.body as Map<String, dynamic>;
-        final privacySettings = userData['privacy_settings'] as Map<String, dynamic>? ?? {};
-        
+        final privacySettings =
+            userData['privacy_settings'] as Map<String, dynamic>? ?? {};
+
         setState(() {
           _partnerPrivacySettings = privacySettings;
           // Handle both camelCase (backend) and snake_case (cache) keys
-          _allowDirectMessages = privacySettings['allowDirectMessages'] ?? privacySettings['allow_direct_messages'] ?? true;
-          _allowPhoneCalls = privacySettings['allowPhoneCalls'] ?? privacySettings['allow_phone_calls'] ?? true;
+          _allowDirectMessages =
+              privacySettings['allowDirectMessages'] ??
+              privacySettings['allow_direct_messages'] ??
+              true;
+          _allowPhoneCalls =
+              privacySettings['allowPhoneCalls'] ??
+              privacySettings['allow_phone_calls'] ??
+              true;
         });
-        
-        print('DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings');
+
+        print(
+          'DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings',
+        );
       }
     } catch (e) {
       print('DEBUG: Error loading partner privacy settings: $e');
@@ -212,7 +222,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     _initVoicePlayer();
     _checkBlockMuteStatus();
     _loadPartnerPrivacySettings();
-    
+
     // 🚀 Auto-message from activity details
     if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -222,7 +232,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         }
       });
     }
-    
+
     _loadMessages();
     _initSocket();
     _startAutoRefresh();
@@ -280,6 +290,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   bool _isWarningType(String type) => type.trim().toLowerCase() == 'warning';
+
+  bool _isActivityIntroMessage(_UiMessage msg) {
+    final text = msg.text.trim();
+    return msg.isMine &&
+        text.startsWith('This User Contacted you about Your Activity "') &&
+        text.contains('Activity details:') &&
+        text.contains('• Date:') &&
+        text.contains('• Location:') &&
+        text.contains('• Price:');
+  }
 
   bool get _isWarningInboxMode => _isDjTripAdminThread && !widget.isSupportChat;
 
@@ -380,7 +400,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() => _isProcessingAi = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -399,13 +419,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     try {
       // Detect language and translate to the other language
-      final isFrench = text.contains(RegExp(r'[àâäéèêëïîôöùûüÿç]', caseSensitive: false));
+      final isFrench = text.contains(
+        RegExp(r'[àâäéèêëïîôöùûüÿç]', caseSensitive: false),
+      );
       final targetLang = isFrench ? 'en' : 'fr';
-      
+
       final result = await AiTextService.translateText(text, targetLang);
-      
+
       if (!mounted) return;
-      
+
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
@@ -414,7 +436,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Message translated to ${targetLang == 'en' ? 'English' : 'French'}'),
+            content: Text(
+              'Message translated to ${targetLang == 'en' ? 'English' : 'French'}',
+            ),
             backgroundColor: const Color(0xFF4CAF50),
             duration: const Duration(seconds: 1),
           ),
@@ -429,7 +453,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() => _isProcessingAi = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -465,7 +489,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() => _isProcessingAi = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -511,14 +535,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     }
   }
 
-  void _showAiConfirmationDialog(String original, String processed, String action) {
+  void _showAiConfirmationDialog(
+    String original,
+    String processed,
+    String action,
+  ) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         final screenSize = MediaQuery.of(context).size;
         final maxWidth = screenSize.width * 0.85;
         final maxHeight = screenSize.height * 0.7;
-        
+
         return Dialog(
           backgroundColor: Colors.transparent,
           child: ConstrainedBox(
@@ -562,12 +590,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           original,
                           style: const TextStyle(fontSize: 14),
                           maxLines: null, // Allow multiple lines
-                          overflow: TextOverflow.visible, // Show overflow indicator if needed
+                          overflow: TextOverflow
+                              .visible, // Show overflow indicator if needed
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        action == 'rewrite' ? 'Rewritten message:' : 'Improved message:',
+                        action == 'rewrite'
+                            ? 'Rewritten message:'
+                            : 'Improved message:',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -586,7 +617,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           processed,
                           style: const TextStyle(fontSize: 14),
                           maxLines: null, // Allow multiple lines
-                          overflow: TextOverflow.visible, // Show overflow indicator if needed
+                          overflow: TextOverflow
+                              .visible, // Show overflow indicator if needed
                         ),
                       ),
                     ],
@@ -598,10 +630,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text(
                     'Cancel',
-                    style: TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
                   ),
                 ),
                 ElevatedButton(
@@ -612,7 +641,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Message ${action == 'rewrite' ? 'rewritten' : 'improved'} successfully'),
+                        content: Text(
+                          'Message ${action == 'rewrite' ? 'rewritten' : 'improved'} successfully',
+                        ),
                         backgroundColor: const Color(0xFF4CAF50),
                         duration: const Duration(seconds: 1),
                       ),
@@ -625,10 +656,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Confirm',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: const Text('Confirm', style: TextStyle(fontSize: 16)),
                 ),
               ],
             ),
@@ -649,7 +677,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       _showLanguageSelector();
     }
     return;
-    
+
     // Only translate shows preview dialog
     showDialog(
       context: context,
@@ -665,10 +693,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Original:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Original:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             Text(original, style: const TextStyle(color: Color(0xFF64748B))),
             const SizedBox(height: 12),
-            const Text('Translation:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Translation:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             Text(processed, style: const TextStyle(color: Color(0xFF1E293B))),
           ],
         ),
@@ -802,18 +836,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
   }
 
-  
-  void _showTranslationPreview(String original, String translated, String lang) {
+  void _showTranslationPreview(
+    String original,
+    String translated,
+    String lang,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(
-              Icons.translate,
-              color: Color(0xFF4B63FF),
-              size: 24,
-            ),
+            const Icon(Icons.translate, color: Color(0xFF4B63FF), size: 24),
             const SizedBox(width: 12),
             Text(
               'Translation (${AiTextService.supportedLanguages[lang] ?? lang})',
@@ -1255,7 +1288,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         print(
           '✅ [ChatScreen] UPDATING PARTNER STATUS to online=$isOnline at $timestamp',
         );
-        
+
         // 🚀 FIX: Debounce status updates to prevent excessive setState calls
         _statusUpdateDebounce?.cancel();
         _statusUpdateDebounce = Timer(const Duration(milliseconds: 500), () {
@@ -1277,7 +1310,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       print('🔒 [ChatScreen] Received privacy_settings_updated: $data');
       if (!mounted) return;
       if (data is! Map) return;
-      
+
       final userId = (data['userId'] ?? '').toString();
       if (userId == widget.partnerId) {
         print('🔒 [ChatScreen] Partner privacy settings updated, reloading...');
@@ -1347,7 +1380,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     // Warnings must be shown only to the warned side (receiver).
     final isWarningSentByMe = _isWarningType(messageType) && sender == me;
     if (_isWarningInboxMode && isWarningSentByMe) {
-      print('❌ [ChatScreen] Warning sent by me in warning inbox mode, returning');
+      print(
+        '❌ [ChatScreen] Warning sent by me in warning inbox mode, returning',
+      );
       return;
     }
 
@@ -1358,7 +1393,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     // In warning mode, keep only warning messages visible.
     if (warningModeActive && !_isWarningType(messageType)) {
-      print('❌ [ChatScreen] Warning mode active but not warning message, returning');
+      print(
+        '❌ [ChatScreen] Warning mode active but not warning message, returning',
+      );
       return;
     }
 
@@ -1368,7 +1405,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     print('📨 [ChatScreen] belongsToCurrentChat: $belongsToCurrentChat');
 
     if (!belongsToCurrentChat && !forceMine) {
-      print('❌ [ChatScreen] Message does not belong to current chat, returning');
+      print(
+        '❌ [ChatScreen] Message does not belong to current chat, returning',
+      );
       return;
     }
 
@@ -1388,7 +1427,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       readAt: DateTime.tryParse((data['read_at'] ?? '').toString()),
     );
 
-    print('📨 [ChatScreen] Created message: id=${msg.id}, text=${msg.text}, isMine=${msg.isMine}');
+    print(
+      '📨 [ChatScreen] Created message: id=${msg.id}, text=${msg.text}, isMine=${msg.isMine}',
+    );
 
     setState(() {
       if (_messages.any((m) => m.id == msg.id && msg.id.isNotEmpty)) {
@@ -2148,7 +2189,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2180,7 +2223,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PublicProfileScreen(userId: widget.partnerId),
+                            builder: (_) =>
+                                PublicProfileScreen(userId: widget.partnerId),
                           ),
                         );
                       }
@@ -2192,7 +2236,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           backgroundColor: cs.surfaceVariant,
                           backgroundImage: partnerAvatarProvider,
                           child: partnerAvatarProvider == null
-                              ? Icon(Icons.person, color: cs.onSurfaceVariant, size: 18)
+                              ? Icon(
+                                  Icons.person,
+                                  color: cs.onSurfaceVariant,
+                                  size: 18,
+                                )
                               : null,
                         ),
                         const SizedBox(width: 12),
@@ -2216,7 +2264,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                                 _partnerOnline ? 'Online' : 'Offline',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _partnerOnline ? Colors.green : Colors.grey,
+                                  color: _partnerOnline
+                                      ? Colors.green
+                                      : Colors.grey,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -2228,7 +2278,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (!widget.isSupportChat && !_isWarningInboxMode && !_isConversationBlocked) ...[
+                if (!widget.isSupportChat &&
+                    !_isWarningInboxMode &&
+                    !_isConversationBlocked) ...[
                   if (_allowPhoneCalls) ...[
                     IconButton(
                       onPressed: () => _onCallTap(isVideo: false),
@@ -2236,7 +2288,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       color: cs.onSurface,
                       tooltip: 'Voice call',
                       padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => _onCallTap(isVideo: true),
@@ -2244,22 +2299,34 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       color: cs.onSurface,
                       tooltip: 'Video call',
                       padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                   ] else ...[
                     IconButton(
                       onPressed: () => _showPhoneCallsDisabledDialog(),
-                      icon: Icon(Icons.phone_disabled_rounded, color: cs.outline),
+                      icon: Icon(
+                        Icons.phone_disabled_rounded,
+                        color: cs.outline,
+                      ),
                       tooltip: 'Phone calls disabled',
                       padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => _showPhoneCallsDisabledDialog(),
                       icon: Icon(Icons.videocam_off_rounded, color: cs.outline),
                       tooltip: 'Video calls disabled',
                       padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                     ),
                   ],
                 ],
@@ -2269,7 +2336,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     icon: const Icon(Icons.info_outline_rounded),
                     color: cs.outline,
                     padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                   ),
                 if (!widget.isSupportChat)
                   IconButton(
@@ -2280,10 +2350,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         builder: (_) => _buildMoreSheet(cs),
                       );
                     },
-                    icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: cs.onSurfaceVariant,
+                    ),
                     tooltip: 'More',
                     padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                   ),
               ],
             ),
@@ -2494,10 +2570,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   Widget _buildMessageItem(_UiMessage msg, ColorScheme cs) {
     final isMine = msg.isMine;
-    final bubbleColor = isMine ? const Color(0xFF4F6BFF) : const Color(0xFFF1F5F9);
+    final isActivityIntro = _isActivityIntroMessage(msg);
+    final bubbleColor = isMine
+        ? const Color(0xFF4F6BFF)
+        : const Color(0xFFF1F5F9);
     final textColor = isMine ? Colors.white : const Color(0xFF1E293B);
     final timeColor = const Color(0xFF94A3B8);
     final partnerAvatarProvider = _partnerAvatarProvider();
+    final bubbleDecoration = BoxDecoration(
+      color: isActivityIntro ? null : bubbleColor,
+      gradient: isActivityIntro
+          ? const LinearGradient(
+              colors: [Color(0xFF4F6BFF), Color(0xFF7C3AED)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            )
+          : null,
+      borderRadius: BorderRadius.circular(20),
+      border: isActivityIntro
+          ? Border.all(color: Colors.white.withOpacity(0.18), width: 1)
+          : null,
+      boxShadow: [
+        BoxShadow(
+          color: isActivityIntro
+              ? const Color(0xFF4F6BFF).withOpacity(0.26)
+              : Colors.black.withOpacity(0.05),
+          blurRadius: isActivityIntro ? 18 : 5,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
@@ -2515,7 +2617,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   backgroundColor: const Color(0xFFF1F5F9),
                   backgroundImage: partnerAvatarProvider,
                   child: partnerAvatarProvider == null
-                      ? Icon(Icons.person, size: 13, color: const Color(0xFF94A3B8))
+                      ? Icon(
+                          Icons.person,
+                          size: 13,
+                          color: const Color(0xFF94A3B8),
+                        )
                       : null,
                 ),
               ),
@@ -2535,17 +2641,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         horizontal: 13,
                         vertical: 10,
                       ),
-                      decoration: BoxDecoration(
-                        color: bubbleColor,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                      decoration: bubbleDecoration,
                       child: _buildMessageContent(msg, textColor, cs),
                     ),
                   ),
@@ -2599,7 +2695,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      if (msg.type == 'text' && msg.isEdited && msg.editedAt != null)
+                      if (msg.type == 'text' &&
+                          msg.isEdited &&
+                          msg.editedAt != null)
                         Text(
                           '  \u2022  Modified ${_formatClock(msg.editedAt)}',
                           style: TextStyle(
@@ -2616,7 +2714,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                             fontSize: 11,
                             fontWeight: FontWeight.w400,
                           ),
-                        )
+                        ),
                     ],
                   ),
                 ],
@@ -3207,9 +3305,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => PublicProfileScreen(
-                              userId: widget.partnerId,
-                            ),
+                            builder: (_) =>
+                                PublicProfileScreen(userId: widget.partnerId),
                           ),
                         );
                       },
@@ -3224,7 +3321,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     ),
                     ListTile(
                       leading: const Icon(Icons.notifications_off_outlined),
-                      title: Text(_isConversationMuted ? 'Unmute Notifications' : 'Mute Notifications'),
+                      title: Text(
+                        _isConversationMuted
+                            ? 'Unmute Notifications'
+                            : 'Mute Notifications',
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         if (_isConversationMuted) {
@@ -3235,8 +3336,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       },
                     ),
                     ListTile(
-                      leading: Icon(_isPartnerBlocked ? Icons.block : Icons.block_outlined),
-                      title: Text(_isPartnerBlocked ? 'Unblock User' : 'Block User', style: const TextStyle(color: Colors.red)),
+                      leading: Icon(
+                        _isPartnerBlocked ? Icons.block : Icons.block_outlined,
+                      ),
+                      title: Text(
+                        _isPartnerBlocked ? 'Unblock User' : 'Block User',
+                        style: const TextStyle(color: Colors.red),
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         if (_isPartnerBlocked) {
@@ -3260,8 +3366,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final messageCount = _messages.length;
     final firstMessage = _messages.isNotEmpty ? _messages.first : null;
     final startDate = firstMessage?.time;
-    final formattedDate = startDate != null 
-        ? '${startDate.day}/${startDate.month}/${startDate.year}' 
+    final formattedDate = startDate != null
+        ? '${startDate.day}/${startDate.month}/${startDate.year}'
         : 'No messages yet';
 
     showDialog(
@@ -3325,19 +3431,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 14,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
         Text(
           value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
         ),
       ],
     );
@@ -3348,7 +3445,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Mute Notifications'),
-        content: const Text('Are you sure you want to mute notifications from this conversation? You will not receive notifications for new messages.'),
+        content: const Text(
+          'Are you sure you want to mute notifications from this conversation? You will not receive notifications for new messages.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -3357,7 +3456,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final result = await MessageService.muteConversation(widget.partnerId);
+              final result = await MessageService.muteConversation(
+                widget.partnerId,
+              );
               if (!mounted) return;
               if (result['success'] == true) {
                 setState(() {
@@ -3368,7 +3469,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(result['message'] ?? 'Failed to mute conversation')),
+                  SnackBar(
+                    content: Text(
+                      result['message'] ?? 'Failed to mute conversation',
+                    ),
+                  ),
                 );
               }
             },
@@ -3384,7 +3489,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Unmute Notifications'),
-        content: const Text('Are you sure you want to unmute notifications from this conversation?'),
+        content: const Text(
+          'Are you sure you want to unmute notifications from this conversation?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -3393,7 +3500,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final result = await MessageService.unmuteConversation(widget.partnerId);
+              final result = await MessageService.unmuteConversation(
+                widget.partnerId,
+              );
               if (!mounted) return;
               if (result['success'] == true) {
                 setState(() {
@@ -3404,7 +3513,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(result['message'] ?? 'Failed to unmute conversation')),
+                  SnackBar(
+                    content: Text(
+                      result['message'] ?? 'Failed to unmute conversation',
+                    ),
+                  ),
                 );
               }
             },
@@ -3455,10 +3568,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   const SizedBox(height: 20),
                   const Text(
                     'Select language to translate to:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
                   ),
                   const SizedBox(height: 16),
                   ListView.builder(
@@ -3466,9 +3576,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: AiTextService.supportedLanguages.length,
                     itemBuilder: (context, index) {
-                      final langCode = AiTextService.supportedLanguages.keys.elementAt(index);
-                      final langName = AiTextService.supportedLanguages.values.elementAt(index);
-                      
+                      final langCode = AiTextService.supportedLanguages.keys
+                          .elementAt(index);
+                      final langName = AiTextService.supportedLanguages.values
+                          .elementAt(index);
+
                       return ListTile(
                         leading: CircleAvatar(
                           radius: 16,
@@ -3512,17 +3624,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   String _getLanguageFlag(String langCode) {
     switch (langCode) {
-      case 'en': return '🇬🇧';
-      case 'fr': return '🇫🇷';
-      case 'es': return '🇪🇸';
-      case 'de': return '🇩🇪';
-      case 'ar': return '🇸🇦';
-      case 'ru': return '🇷🇺';
-      default: return '🌐';
+      case 'en':
+        return '🇬🇧';
+      case 'fr':
+        return '🇫🇷';
+      case 'es':
+        return '🇪🇸';
+      case 'de':
+        return '🇩🇪';
+      case 'ar':
+        return '🇸🇦';
+      case 'ru':
+        return '🇷🇺';
+      default:
+        return '🌐';
     }
   }
 
-  Future<void> _translateReceivedMessage(_UiMessage msg, String langCode) async {
+  Future<void> _translateReceivedMessage(
+    _UiMessage msg,
+    String langCode,
+  ) async {
     // Show loading indicator
     setState(() {
       final index = _messages.indexWhere((m) => m.id == msg.id);
@@ -3537,9 +3659,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     try {
       final result = await AiTextService.translateText(msg.text, langCode);
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         final index = _messages.indexWhere((m) => m.id == msg.id);
         if (index >= 0) {
@@ -3565,7 +3687,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       });
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() {
         final index = _messages.indexWhere((m) => m.id == msg.id);
         if (index >= 0) {
@@ -3575,7 +3697,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           );
         }
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Translation failed. Please try again.'),
@@ -3590,7 +3712,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Block User'),
-        content: const Text('Are you sure you want to block this user? They will not be able to send you messages or contact you.'),
+        content: const Text(
+          'Are you sure you want to block this user? They will not be able to send you messages or contact you.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -3614,7 +3738,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 });
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(result['message'] ?? 'Failed to block user')),
+                  SnackBar(
+                    content: Text(result['message'] ?? 'Failed to block user'),
+                  ),
                 );
               }
             },
@@ -3630,7 +3756,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Unblock User'),
-        content: const Text('Are you sure you want to unblock this user? They will be able to send you messages again.'),
+        content: const Text(
+          'Are you sure you want to unblock this user? They will be able to send you messages again.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -3650,7 +3778,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(result['message'] ?? 'Failed to unblock user')),
+                  SnackBar(
+                    content: Text(
+                      result['message'] ?? 'Failed to unblock user',
+                    ),
+                  ),
                 );
               }
             },
@@ -3789,15 +3921,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.block,
-                  size: 16,
-                  color: Color(0xFFEF4444),
-                ),
+                const Icon(Icons.block, size: 16, color: Color(0xFFEF4444)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _isPartnerBlocked 
+                    _isPartnerBlocked
                         ? 'You have blocked this user. Messaging is disabled.'
                         : 'This user has blocked you. Messaging is disabled.',
                     style: const TextStyle(
@@ -3924,16 +4052,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                           ),
                         )
                       : isBlocked
-                          ? const Icon(
-                              Icons.block,
-                              color: Colors.white,
-                              size: 26,
-                            )
-                          : const Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 26,
-                            ),
+                      ? const Icon(Icons.block, color: Colors.white, size: 26)
+                      : const Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
                 ),
               ),
             ),
@@ -3952,8 +4076,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   hintText: isBlocked
                       ? 'Messaging disabled'
                       : (isReplyLocked
-                          ? 'Replies disabled by admin notice'
-                          : (isEditing ? 'Edit message...' : 'Type a message...')),
+                            ? 'Replies disabled by admin notice'
+                            : (isEditing
+                                  ? 'Edit message...'
+                                  : 'Type a message...')),
                   hintStyle: const TextStyle(
                     color: Color(0xFF6C7C97),
                     fontSize: 15,
@@ -4002,7 +4128,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     : (widget.isSupportChat
                           ? null // 🔧 DISABLE: No audio in support chat
                           : _startRecordingUi),
-                onLongPress: !isReplyLocked && !isMessagingDisabled && !canSend && !widget.isSupportChat
+                onLongPress:
+                    !isReplyLocked &&
+                        !isMessagingDisabled &&
+                        !canSend &&
+                        !widget.isSupportChat
                     ? _startRecordingUi
                     : null, // 🔧 DISABLE: No audio in support chat
                 borderRadius: BorderRadius.circular(actionButtonSize / 2),
@@ -4014,7 +4144,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: isMessagingDisabled ? Colors.grey.withOpacity(0.18) : sendButtonColor.withOpacity(0.18),
+                        color: isMessagingDisabled
+                            ? Colors.grey.withOpacity(0.18)
+                            : sendButtonColor.withOpacity(0.18),
                         blurRadius: 10,
                         offset: const Offset(0, 6),
                       ),
@@ -4024,13 +4156,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                     isMessagingDisabled
                         ? Icons.privacy_tip
                         : (isReplyLocked
-                            ? Icons.lock_rounded
-                            : canSend
-                                ? (isEditing ? Icons.check_rounded : Icons.send_rounded)
-                                : (widget.isSupportChat
-                                      ? Icons
-                                            .send_rounded // 🔧 Always show send in support
-                                      : Icons.mic_rounded)),
+                              ? Icons.lock_rounded
+                              : canSend
+                              ? (isEditing
+                                    ? Icons.check_rounded
+                                    : Icons.send_rounded)
+                              : (widget.isSupportChat
+                                    ? Icons
+                                          .send_rounded // 🔧 Always show send in support
+                                    : Icons.mic_rounded)),
                     color: Colors.white,
                     size: 22,
                   ),
@@ -4106,19 +4240,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
           children: [
             Text(
               'This user has disabled phone calls in their privacy settings.',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 12),
             Text(
               'You can still send messages if they have enabled direct messages, or contact them through other means.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
             ),
           ],
         ),
@@ -4127,10 +4254,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             onPressed: () => Navigator.pop(context),
             child: const Text(
               'Got it',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
         ],

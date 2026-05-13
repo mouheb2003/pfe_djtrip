@@ -1443,7 +1443,7 @@ exports.approveReservation = async (req, res) => {
     }
 
     // Verify organizer owns this activity
-    if (inscription.organisateur_id.toString() !== organizerId) {
+    if (inscription.organisateur_id.toString() !== organizerId.toString()) {
       await session.abortTransaction();
       return res.status(403).json({ message: "You can only approve reservations for your activities" });
     }
@@ -1600,7 +1600,7 @@ exports.rejectReservation = async (req, res) => {
     }
 
     // Verify organizer owns this activity
-    if (inscription.organisateur_id.toString() !== organizerId) {
+    if (inscription.organisateur_id.toString() !== organizerId.toString()) {
       return res.status(403).json({ message: "You can only reject reservations for your activities" });
     }
 

@@ -1139,6 +1139,8 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   children: [
                     _buildTopHeader(),
                     const SizedBox(height: 30),
+                    _buildAvailability(),
+                    const SizedBox(height: 30),
                     _buildCoreIdentity(),
                     const SizedBox(height: 30),
                     _buildMediaGallery(),
@@ -1148,8 +1150,6 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                     _buildLocation(),
                     const SizedBox(height: 30),
                     _buildPreparation(),
-                    const SizedBox(height: 30),
-                    _buildAvailability(),
                     const SizedBox(height: 100), // Padding for bottom bar buttons only
                   ],
                 ),

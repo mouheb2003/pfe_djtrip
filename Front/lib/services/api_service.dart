@@ -106,7 +106,8 @@ class ApiService {
 
   Future<void> warmUp() async {
     await initialize();
-    await get('/health', auth: false, timeout: const Duration(seconds: 25));
+    final uri = Uri.parse('${ApiConfig.serverBaseUrl}/api/health');
+    await _client.get(uri).timeout(const Duration(seconds: 25));
   }
 
   Future<Map<String, String>> _buildHeaders({
@@ -243,9 +244,13 @@ class ApiService {
             final body = jsonDecode(response.body);
             print('[API 403] Full response body: $body');
             print('[API 403] forceLogout: ${body['forceLogout']}');
-            print('[API 403] requires_onboarding: ${body['requires_onboarding']}');
+            print(
+              '[API 403] requires_onboarding: ${body['requires_onboarding']}',
+            );
             print('[API 403] type: ${body['type']}');
-            print('[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})');
+            print(
+              '[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})',
+            );
             print('[API 403] remainingSeconds: ${body['remainingSeconds']}');
             
             // Handle onboarding requirement
@@ -597,7 +602,7 @@ class ApiService {
     _devLog('[API CALL] PUT FULL URL: ${uri.toString()}');
     final requestHeaders = await _buildHeaders(auth: auth, headers: headers);
 
-    final response = await _sendWithRetry(
+    var response = await _sendWithRetry(
       label: 'PUT $path',
       timeout: timeout,
       auth: auth,
@@ -606,6 +611,32 @@ class ApiService {
       retryOriginal: () =>
           put(path, body, auth: auth, headers: headers, timeout: timeout),
     );
+
+    // Fallback automatique entre /api et /api/v1 si route introuvable (404)
+    if (response.statusCode == 404) {
+      try {
+        final bodyJson = safeDecodeObject(response.body);
+        final msg = bodyJson['message']?.toString() ?? '';
+        if (msg.toLowerCase().contains('route not found') || msg.toLowerCase().contains('not found')) {
+          final original = uri;
+          Uri? alt;
+          final p = original.path;
+          if (p.startsWith('/api/v1/')) {
+            alt = original.replace(path: p.replaceFirst('/api/v1/', '/api/'));
+          } else if (p.startsWith('/api/')) {
+            alt = original.replace(path: p.replaceFirst('/api/', '/api/v1/'));
+          }
+          if (alt != null) {
+            _devLog('[API FALLBACK] Retrying PUT with: ${alt.toString()}');
+            response = await _client.put(
+              alt,
+              headers: requestHeaders,
+              body: jsonEncode(body),
+            );
+          }
+        }
+      } catch (_) {}
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       await _invalidateByMutationPath(path);

@@ -20,10 +20,13 @@ class MyActivitiesScreen extends StatefulWidget {
 }
 
 class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
-  int _tabIndex = 0; // 0 Upcoming, 1 Ongoing, 2 Past
+  int _tabIndex = 0; // 0 All, 1 Upcoming, 2 Ongoing, 3 Past
   bool _isLoading = true;
   String? _errorMessage;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   Map<String, List<ActivityModel>> _buckets = {
+    'all': [],
     'upcoming': [],
     'ongoing': [],
     'past': [],
@@ -35,6 +38,12 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   List<ActivityModel> _sortMostRecentFirst(List<ActivityModel> items) {
@@ -90,6 +99,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     }
 
     return {
+      'all': _sortMostRecentFirst(uniqueById.values.toList()),
       'upcoming': _sortMostRecentFirst(upcoming),
       'ongoing': _sortMostRecentFirst(ongoing),
       'past': _sortMostRecentFirst(past),
@@ -113,6 +123,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
       print(
         'DEBUG: Activity timeline filtered. Counts: '
+        'All=${filteredResult['all']?.length}, '
         'Upcoming=${filteredResult['upcoming']?.length}, '
         'Ongoing=${filteredResult['ongoing']?.length}, '
         'Past=${filteredResult['past']?.length}',
@@ -141,6 +152,74 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     }
   }
 
+  bool _matchesSearch(ActivityModel activity) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+
+    final values = <String>[
+      activity.titre,
+      activity.description,
+      activity.lieu,
+      activity.categorie,
+      activity.typeActivite,
+      activity.formattedLieu,
+    ];
+
+    return values.any((value) => value.toLowerCase().contains(query));
+  }
+
+  int _searchRank(ActivityModel activity) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return 0;
+
+    final title = activity.titre.toLowerCase();
+    if (title.contains(query)) return 0;
+
+    final otherFields = <String>[
+      activity.description,
+      activity.lieu,
+      activity.categorie,
+      activity.typeActivite,
+      activity.formattedLieu,
+    ];
+
+    if (otherFields.any((value) => value.toLowerCase().contains(query))) {
+      return 1;
+    }
+
+    return 2;
+  }
+
+  List<ActivityModel> _activitiesForCurrentTab() {
+    final items = switch (_tabIndex) {
+      1 => _buckets['upcoming'] ?? const <ActivityModel>[],
+      2 => _buckets['ongoing'] ?? const <ActivityModel>[],
+      3 => _buckets['past'] ?? const <ActivityModel>[],
+      _ => _buckets['all'] ?? const <ActivityModel>[],
+    };
+
+    final filtered = items.where(_matchesSearch).toList(growable: false);
+    if (_searchQuery.trim().isEmpty) return filtered;
+
+    filtered.sort((a, b) {
+      final rankCompare = _searchRank(a).compareTo(_searchRank(b));
+      if (rankCompare != 0) return rankCompare;
+      final dateA =
+          _displayActivityDate(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final dateB =
+          _displayActivityDate(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return dateB.compareTo(dateA);
+    });
+
+    return filtered;
+  }
+
+  void _updateSearch(String value) {
+    setState(() {
+      _searchQuery = value;
+    });
+  }
+
   DateTime? _displayActivityDate(ActivityModel activity) {
     return activity.dateDebut ?? DateTime.now();
   }
@@ -151,10 +230,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     final latestByActivityId = _buildLatestBookingMap(bookings);
 
     return latestByActivityId.map((key, value) {
-      // If latest booking is cancelled, treat as no booking (allow rebooking)
-      if (value.isCancelled) {
-        return MapEntry(key, ''); // Empty string means no active booking
-      }
+      // Return the status even if cancelled so the button shows "Check reservation status"
       return MapEntry(key, value.statut);
     });
   }
@@ -163,11 +239,23 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     Map<String, List<InscriptionModel>> bookings,
   ) {
     final latestByActivityId = <String, InscriptionModel>{};
+    print(
+      '🔍 [MY ACTIVITIES] Building booking map from: pending=${bookings['pending']?.length ?? 0}, confirmed=${bookings['confirmed']?.length ?? 0}, cancelled=${bookings['cancelled']?.length ?? 0}',
+    );
 
-    void collect(List<InscriptionModel> items) {
+    void collect(List<InscriptionModel> items, String bucket) {
+      print(
+        '🔍 [MY ACTIVITIES] Collecting from $bucket: ${items.length} items',
+      );
       for (final item in items) {
         final activityId = (item.activite?['_id'] ?? '').toString();
-        if (activityId.isEmpty) continue;
+        print(
+          '🔍 [MY ACTIVITIES] $bucket item: ActivityID="$activityId", Inscription=${item.id}, Status=${item.statut}',
+        );
+        if (activityId.isEmpty) {
+          print('🔍 [MY ACTIVITIES] Skipping: empty activity ID');
+          continue;
+        }
 
         final previous = latestByActivityId[activityId];
         final currentDate = item.dateDemande;
@@ -175,26 +263,43 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
         if (previous == null) {
           latestByActivityId[activityId] = item;
+          print(
+            '🔍 [MY ACTIVITIES] Set first booking for activity $activityId',
+          );
           continue;
         }
 
         if (currentDate == null && previousDate != null) continue;
         if (currentDate != null && previousDate == null) {
           latestByActivityId[activityId] = item;
+          print(
+            '🔍 [MY ACTIVITIES] Updated to newer booking for activity $activityId',
+          );
           continue;
         }
         if (currentDate != null && previousDate != null) {
           if (currentDate.isAfter(previousDate)) {
             latestByActivityId[activityId] = item;
+            print(
+              '🔍 [MY ACTIVITIES] Updated to newer booking (by date) for activity $activityId',
+            );
           }
         }
       }
     }
 
-    collect(bookings['pending'] ?? const <InscriptionModel>[]);
-    collect(bookings['confirmed'] ?? const <InscriptionModel>[]);
-    collect(bookings['cancelled'] ?? const <InscriptionModel>[]);
+    collect(bookings['pending'] ?? const <InscriptionModel>[], 'pending');
+    collect(bookings['confirmed'] ?? const <InscriptionModel>[], 'confirmed');
+    collect(bookings['cancelled'] ?? const <InscriptionModel>[], 'cancelled');
 
+    print(
+      '✅ [MY ACTIVITIES] Final booking map has ${latestByActivityId.length} activities',
+    );
+    for (final entry in latestByActivityId.entries) {
+      print(
+        '  - Activity ${entry.key}: Booking ${entry.value.id} (Status: ${entry.value.statut})',
+      );
+    }
     return latestByActivityId;
   }
 
@@ -213,18 +318,15 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   String _buttonLabelFor(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
-    // If status is empty (cancelled booking) or null, show Book Now
-    // PAYMENT_FAILED is already handled here as it has a non-empty status
-    if (_tabIndex == 0 && status != null && status.isNotEmpty) {
-      return 'Check Booking Status';
+    if (status != null && status.isNotEmpty) {
+      return 'Check reservation status';
     }
-    return _tabIndex == 0 ? 'Participate' : 'View Details';
+    return activity.isUpcoming ? 'Participate' : 'View Details';
   }
 
   void _onPrimaryAction(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
-    // If status is empty (cancelled booking) or null, book the activity
-    if (_tabIndex == 0 && status != null && status.isNotEmpty) {
+    if (status != null && status.isNotEmpty) {
       final booking = _latestBookingByActivityId[activity.id];
       if (booking == null) return;
       Navigator.push(
@@ -235,12 +337,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       );
       return;
     }
-    // Book the activity
-    _bookActivity(activity);
-  }
-
-  void _bookActivity(ActivityModel activity) {
-    if (_tabIndex == 0) {
+    if (activity.isUpcoming) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -251,19 +348,6 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     }
 
     _openDetails(activity);
-  }
-
-  List<ActivityModel> get _currentItems {
-    switch (_tabIndex) {
-      case 0:
-        return _buckets['upcoming']!;
-      case 1:
-        return _buckets['ongoing']!;
-      case 2:
-        return _buckets['past']!;
-      default:
-        return _buckets['upcoming']!;
-    }
   }
 
   String _monthName(int month) {
@@ -330,19 +414,19 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       MaterialPageRoute(
         builder: (_) => ActivityDetailScreen(
           activityId: activity.id,
-          viewOnly: _tabIndex != 0, // Only Upcoming shows Book button
+          viewOnly: !activity.isUpcoming,
         ),
       ),
     );
   }
 
   String _statusBadgeFor(ActivityModel activity) {
-    switch (_tabIndex) {
-      case 0:
+    switch (activity.timelineStatus) {
+      case 'UPCOMING':
         return 'Upcoming';
-      case 1:
+      case 'ONGOING':
         return 'Ongoing';
-      case 2:
+      case 'PAST':
         return 'Completed';
       default:
         return 'Active';
@@ -364,7 +448,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _currentItems;
+    final items = _activitiesForCurrentTab();
+    final hasFilters = _searchQuery.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F3FE),
@@ -380,11 +465,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -401,7 +486,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                           Text(
                             'My Activities',
                             style: TextStyle(
-                              fontSize: 30,
+                              fontSize: 31,
                               height: 1,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF1F235F),
@@ -424,6 +509,17 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                       },
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _SearchBar(
+                  controller: _searchController,
+                  onChanged: _updateSearch,
+                  onClear: () {
+                    _searchController.clear();
+                    _updateSearch('');
+                  },
                 ),
               ),
               Padding(
@@ -451,6 +547,12 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   buttonLabelFor: _buttonLabelFor,
                   statusBadgeFor: _statusBadgeFor,
                   statusColorFor: _statusColorFor,
+                  emptyTitle: hasFilters
+                      ? 'No matching activities'
+                      : 'No activities yet',
+                  emptySubtitle: hasFilters
+                      ? 'Try a different keyword or clear the search.'
+                      : 'Your activities will appear here once they are available.',
                 ),
               ),
             ],
@@ -515,6 +617,7 @@ class _TopActionPill extends StatelessWidget {
 class _ActivitiesSegmentedControl extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
+  static const List<String> _labels = ['All', 'Upcoming', 'Ongoing', 'Past'];
 
   const _ActivitiesSegmentedControl({
     required this.currentIndex,
@@ -531,8 +634,8 @@ class _ActivitiesSegmentedControl extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2DDFF)),
       ),
       child: Row(
-        children: List.generate(3, (index) {
-          final label = ['Upcoming', 'Ongoing', 'Past'][index];
+        children: List.generate(_labels.length, (index) {
+          final label = _labels[index];
           final active = currentIndex == index;
           return Expanded(
             child: InkWell(
@@ -592,6 +695,8 @@ class _ActivitiesFeed extends StatelessWidget {
   final String Function(ActivityModel) buttonLabelFor;
   final String Function(ActivityModel) statusBadgeFor;
   final Color Function(ActivityModel) statusColorFor;
+  final String emptyTitle;
+  final String emptySubtitle;
 
   const _ActivitiesFeed({
     required this.isLoading,
@@ -610,6 +715,8 @@ class _ActivitiesFeed extends StatelessWidget {
     required this.buttonLabelFor,
     required this.statusBadgeFor,
     required this.statusColorFor,
+    required this.emptyTitle,
+    required this.emptySubtitle,
   });
 
   @override
@@ -659,20 +766,38 @@ class _ActivitiesFeed extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Column(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.explore_off_rounded,
-                    size: 44,
-                    color: AppColors.textGrey,
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0EEFF),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.explore_off_rounded,
+                      size: 30,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Text(
-                    'No activities yet',
-                    style: TextStyle(
+                    emptyTitle,
+                    style: const TextStyle(
+                      color: AppColors.textDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    emptySubtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
                       color: AppColors.textGrey,
-                      fontWeight: FontWeight.w700,
+                      height: 1.4,
                     ),
                   ),
                 ],
@@ -919,6 +1044,149 @@ class _FeaturedActivityCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _SearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E7F3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search by title, location or category',
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF5F678A),
+          ),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF5F678A),
+                  ),
+                  onPressed: onClear,
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgeChip extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+  final Color textColor;
+
+  const _BadgeChip({
+    required this.label,
+    required this.backgroundColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.7,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardTopGlow extends StatelessWidget {
+  const _CardTopGlow();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white.withOpacity(0.18), Colors.transparent],
           ),
         ),
       ),

@@ -18,6 +18,8 @@ class _BookingsTabState extends State<BookingsTab> {
   int _tabIndex = 0;
   bool _isLoading = true;
   String? _errorMessage;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   Map<String, List<InscriptionModel>> _buckets = {
     'pending': [],
     'confirmed': [],
@@ -28,8 +30,14 @@ class _BookingsTabState extends State<BookingsTab> {
   @override
   void initState() {
     super.initState();
-    _tabIndex = widget.initialTabIndex.clamp(0, 3);
+    _tabIndex = widget.initialTabIndex.clamp(0, 4);
     _loadInscriptions();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInscriptions() async {
@@ -57,19 +65,65 @@ class _BookingsTabState extends State<BookingsTab> {
     }
   }
 
-  List<InscriptionModel> get _currentItems {
+  List<InscriptionModel> _itemsForCurrentTab() {
+    final all = <InscriptionModel>[];
+    all.addAll(_buckets['pending'] ?? []);
+    all.addAll(_buckets['confirmed'] ?? []);
+    all.addAll(_buckets['cancelled'] ?? []);
+    all.addAll(_buckets['used'] ?? []);
+
+    List<InscriptionModel> base;
     switch (_tabIndex) {
       case 0:
-        return _buckets['pending'] ?? [];
+        base = all;
+        break;
       case 1:
-        return _buckets['confirmed'] ?? [];
+        base = _buckets['pending'] ?? [];
+        break;
       case 2:
-        return _buckets['cancelled'] ?? [];
+        base = _buckets['confirmed'] ?? [];
+        break;
       case 3:
-        return _buckets['used'] ?? [];
+        base = _buckets['cancelled'] ?? [];
+        break;
+      case 4:
+        base = _buckets['used'] ?? [];
+        break;
       default:
-        return _buckets['pending'] ?? [];
+        base = all;
+        break;
     }
+
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return base;
+
+    bool matches(InscriptionModel ins) {
+      try {
+        final activity = ins.activite ?? {};
+        final title = (activity['titre'] as String?)?.toLowerCase() ?? '';
+        final lieu =
+            (activity['lieu'] ??
+                    activity['localisation'] ??
+                    activity['adresse'])
+                ?.toString()
+                .toLowerCase() ??
+            '';
+        final cat =
+            (activity['categorie'] ?? activity['typeActivite'] ?? '')
+                ?.toString()
+                .toLowerCase() ??
+            '';
+        final id = (ins.id ?? '').toLowerCase();
+        return title.contains(query) ||
+            lieu.contains(query) ||
+            cat.contains(query) ||
+            id.contains(query);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    return base.where(matches).toList(growable: false);
   }
 
   String _monthName(int month) {
@@ -162,12 +216,26 @@ class _BookingsTabState extends State<BookingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final items = _itemsForCurrentTab();
+
     return RefreshIndicator(
       onRefresh: _loadInscriptions,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _SearchBar(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              onClear: () => setState(() {
+                _searchController.clear();
+                _searchQuery = '';
+              }),
+            ),
+          ),
           const SizedBox(height: 8),
           _BookingsSegmentedControl(
             currentIndex: _tabIndex,
@@ -200,7 +268,7 @@ class _BookingsTabState extends State<BookingsTab> {
                 ),
               ),
             )
-          else if (_currentItems.isEmpty)
+          else if (items.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 70),
               child: Center(
@@ -242,9 +310,7 @@ class _BookingsTabState extends State<BookingsTab> {
             Builder(
               builder: (context) {
                 try {
-                  final sortedItems = List<InscriptionModel>.from(
-                    _currentItems,
-                  );
+                  final sortedItems = List<InscriptionModel>.from(items);
 
                   // Remove duplicates based on inscription ID and activity ID
                   final uniqueItems = <String, InscriptionModel>{};
@@ -331,6 +397,62 @@ class _BookingsTabState extends State<BookingsTab> {
   }
 }
 
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _SearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE3E7F3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search bookings by title, location or ID',
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF5F678A),
+          ),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF5F678A),
+                  ),
+                  onPressed: onClear,
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BookingsSegmentedControl extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
@@ -350,8 +472,14 @@ class _BookingsSegmentedControl extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2DDFF)),
       ),
       child: Row(
-        children: List.generate(4, (index) {
-          final label = ['Pending for payment', 'Approved', 'Cancelled', 'Used'][index];
+        children: List.generate(5, (index) {
+          final label = [
+            'All',
+            'Pending',
+            'Approved',
+            'Cancelled',
+            'Used',
+          ][index];
           final active = currentIndex == index;
           return Expanded(
             child: InkWell(

@@ -89,7 +89,7 @@ class ActivityService {
     try {
       final res = await ApiClient.get(
         '/activites',
-        auth: false,
+        auth: true,
         query: filters,
         cacheFirst: !refresh,
       );
@@ -111,7 +111,7 @@ class ActivityService {
       // For pull-to-refresh screens, prefer a fresh response over local cache.
       final res = await ApiClient.get(
         '/activites/timeline',
-        auth: false,
+        auth: true,
         cacheFirst: false,
       );
       if (res.statusCode == 200) {
@@ -158,7 +158,7 @@ class ActivityService {
       print('🔍 [ACTIVITY SERVICE] Fetching activity with ID: $id');
       final res = await ApiClient.get(
         '/activites/$id',
-        auth: false,
+        auth: true,
         cacheFirst: false,
       );
       print('🔍 [ACTIVITY SERVICE] Response status: ${res.statusCode}');
@@ -622,7 +622,7 @@ class ActivityService {
   static Future<List<ActivityModel>> getAllActivities() async {
     try {
       print('[ActivityService] Fetching all activities from /activites');
-      final response = await ApiClient.get('/activites', cacheFirst: false);
+      final response = await ApiClient.get('/activites', auth: true, cacheFirst: false);
 
       print('[ActivityService] Response status: ${response.statusCode}');
 
@@ -656,6 +656,7 @@ class ActivityService {
       print('[ActivityService] Fetching activities page $page (limit: $limit)');
       final response = await ApiClient.get(
         '/activites',
+        auth: true,
         query: {'page': page.toString(), 'limit': limit.toString()},
         cacheFirst: false,
       );

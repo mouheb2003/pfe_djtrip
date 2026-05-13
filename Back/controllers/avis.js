@@ -49,17 +49,24 @@ async function refreshActiviteStats(activiteId) {
 // ─── Helper: recalculate and persist organizer stats ─────────────────────────
 async function refreshOrganisateurStats(organisateurId) {
   try {
-    const all = await Avis.find({
+    // Get all activities for this organizer that have reviews
+    const activities = await Activite.find({ 
       organisateur_id: organisateurId,
-      type: "organisateur",
+      nombre_avis: { $gt: 0 }
     });
+
+    // Calculate average of activity ratings
     const noteMoyenne =
-      all.length > 0
-        ? Math.round((all.reduce((s, a) => s + a.note, 0) / all.length) * 10) / 10
+      activities.length > 0
+        ? Math.round((activities.reduce((s, a) => s + a.note_moyenne, 0) / activities.length) * 10) / 10
         : 0;
+
+    // Total count of reviews across all activities
+    const totalAvis = activities.reduce((s, a) => s + a.nombre_avis, 0);
+
     await Organisator.findByIdAndUpdate(organisateurId, {
       note_moyenne: noteMoyenne,
-      nombre_avis: all.length,
+      nombre_avis: totalAvis,
     });
   } catch (error) {
     console.error('[refreshOrganisateurStats] Error:', error);
@@ -118,6 +125,7 @@ exports.submitActivityReview = async (req, res) => {
     await inscription.marquerCommeReviewed();
 
     await refreshActiviteStats(activiteId);
+    await refreshOrganisateurStats(inscription.organisateur_id);
 
     // Emit review created event for notification
     try {

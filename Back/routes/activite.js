@@ -8,7 +8,7 @@ const {
   verifyToken,
   verifyOrganisator,
   verifyAdmin,
-  optionalAuth,
+  optionalToken,
 } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const validate = require("../middleware/validate");
@@ -23,7 +23,7 @@ const {
 // Optional auth to include bookmark status for logged-in users
 router.get(
   "/",
-  optionalAuth,
+  optionalToken,
   cacheGet("activites:all", 60),
   activiteController.getAllActivites,
 );
@@ -32,6 +32,7 @@ router.get(
 // This is for the central MyActivities global screen
 router.get(
   "/timeline",
+  optionalToken,
   cacheGet("activites:timeline", 60),
   activiteController.getGlobalActivitiesByTimeline,
 );
@@ -100,12 +101,28 @@ router.get(
   activiteController.getActivitesByOrganisateur,
 );
 
+// Bookmark routes (for both Tourist and Organizer)
+router.get(
+  "/bookmarks",
+  verifyToken,
+  cacheGet("activites:bookmarks", 60),
+  activiteController.getBookmarkedActivities,
+);
+
+router.post(
+  "/:activityId/bookmark",
+  verifyToken,
+  invalidateCache(["activites", "activites:bookmarks"]),
+  activiteController.toggleActivityBookmark,
+);
+
 // ─── Parameterized public routes ──────────────────────────────────────────────
 
 // ⚠️  These MUST come after named routes above to avoid route conflicts
 // Get an activity by ID (no cache to ensure fresh data on navigation)
 router.get(
   "/:id",
+  optionalToken,
   activiteController.getActiviteById,
 );
 
@@ -152,20 +169,6 @@ router.post(
   verifyToken,
   verifyOrganisator,
   aiImageGenerator.generateActivityImage,
-);
-
-// Bookmark routes (for both Tourist and Organizer)
-router.post(
-  "/:activityId/bookmark",
-  verifyToken,
-  invalidateCache(["activites", "activites:bookmarks"]),
-  activiteController.toggleActivityBookmark,
-);
-router.get(
-  "/bookmarks",
-  verifyToken,
-  cacheGet("activites:bookmarks", 60),
-  activiteController.getBookmarkedActivities,
 );
 
 module.exports = wrapRouter(router);

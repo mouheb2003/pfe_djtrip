@@ -34,41 +34,44 @@ class _OrganizerBookingDetailScreenState
   String _normalizeStatus(String rawStatus) {
     final s = rawStatus.trim().toLowerCase();
     if (s == 'approved') return 'approuvee';
-    if (s == 'pending' || s == 'paid_pending_confirmation') return 'PAID_PENDING_CONFIRMATION';
+    if (s == 'pending' || s.endsWith('pending_confirmation'))
+      return 'en_attente';
     if (s == 'cancelled' || s == 'canceled') return 'annulee';
     return s;
   }
 
   @override
   Widget build(BuildContext context) {
+    final activityModel = _inscription.activityModel;
     final act = _inscription.activite ?? {};
-    final photos = act['photos'] as List?;
-    final imageUrl = photos != null && photos.isNotEmpty
-        ? photos[0] as String
-        : '';
-    final title = act['titre'] as String? ?? 'Activity';
-    final lieu = act['lieu'] as String? ?? 'Location';
+    
+    final imageUrl = activityModel?.thumbnailUrl ?? '';
+    final title = activityModel?.titre ?? (act['titre'] ?? act['title'] ?? 'Unknown Activity').toString();
+    final lieu = activityModel?.formattedLieu ?? (act['lieu'] ?? act['location'] ?? 'Location').toString();
+    
     final placeCount = _inscription.nombreParticipants;
-    final unitPrice = (act['prix'] as num?)?.toDouble() ?? 0.0;
-    final subtotal = unitPrice * placeCount;
+    final unitPrice = activityModel?.prix ?? (act['prix'] as num?)?.toDouble() ?? 0.0;
+    final subtotal = _inscription.prixTotal > 0 ? _inscription.prixTotal : (unitPrice * placeCount);
     const serviceFee = 4.50;
     final total = subtotal + serviceFee;
 
     // Tourist (not organizer)
     final tourist = _inscription.touriste ?? {};
-    final touristName = (tourist['fullname'] as String?) ?? 'Tourist Name';
-    final touristPhoto = (tourist['avatar'] as String?) ?? '';
+    final touristName = (tourist['fullname'] ?? tourist['nom'] ?? 'Tourist Name').toString();
+    final touristPhoto = (tourist['avatar'] ?? tourist['photoProfil'] ?? '').toString();
 
     // Get activity dates properly
-    DateTime? activityDate;
-    if (act['date_debut'] != null) {
-      activityDate = DateTime.tryParse(act['date_debut'].toString());
-    } else if (act['dateDebut'] != null) {
-      activityDate = DateTime.tryParse(act['dateDebut'].toString());
+    DateTime? activityDate = activityModel?.dateDebut;
+    if (activityDate == null) {
+      if (act['date_debut'] != null) {
+        activityDate = DateTime.tryParse(act['date_debut'].toString());
+      } else if (act['dateDebut'] != null) {
+        activityDate = DateTime.tryParse(act['dateDebut'].toString());
+      }
     }
 
     final status = _normalizeStatus(_inscription.statut);
-    final isPending = status == 'PAID_PENDING_CONFIRMATION';
+    final isPending = status == 'en_attente';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -114,18 +117,34 @@ class _OrganizerBookingDetailScreenState
               ? Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: null, // Cannot reject payment pending
-                        icon: const Icon(Icons.block, size: 20),
-                        label: const Text('Awaiting Payment'),
+                      child: OutlinedButton(
+                        onPressed: _isUpdating ? null : () => _handleAction('reject'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFF59E0B),
-                          side: const BorderSide(color: Color(0xFFFCD34D)),
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
                         ),
+                        child: const Text('Reject'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isUpdating ? null : () => _handleAction('approve'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: _isUpdating 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Approve'),
                       ),
                     ),
                   ],
@@ -551,9 +570,33 @@ class _OrganizerBookingDetailScreenState
     );
   }
 
+  void _handleAction(String type) async {
+    setState(() => _isUpdating = true);
+    try {
+      final success = type == 'approve'
+          ? await InscriptionService.approveReservation(_inscription.id)
+          : await InscriptionService.rejectReservation(_inscription.id);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Reservation ${type}ed successfully')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'PAID_PENDING_CONFIRMATION':
+      case 'en_attente':
         return const Color(0xFFF59E0B);
       case 'approuvee':
         return const Color(0xFF22C55E);
@@ -566,8 +609,8 @@ class _OrganizerBookingDetailScreenState
 
   String _getStatusLabel(String status) {
     switch (status) {
-      case 'PAID_PENDING_CONFIRMATION':
-        return 'PAYMENT PENDING';
+      case 'en_attente':
+        return 'PENDING';
       case 'approuvee':
         return 'CONFIRMED';
       case 'annulee':

@@ -5,7 +5,7 @@ const router = express.Router();
 const lieuController = require("../controllers/lieu");
 console.log('[LIEU ROUTES] Lieu controller loaded');
 const wrapRouter = require("../middleware/wrapRouter");
-const { verifyToken, verifyAdmin } = require("../middleware/auth");
+const { verifyToken, verifyAdmin, optionalToken } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const Config = require("../models/lieu").Config;
 
@@ -28,8 +28,15 @@ router.get("/config/google-maps-key", async (req, res) => {
 // Get all lieux
 router.get("/", lieuController.getAllLieux);
 
+// Bookmark routes (MUST be before /:id to avoid conflict)
+router.get(
+  "/bookmarks",
+  verifyToken,
+  lieuController.getBookmarkedLieux,
+);
+
 // Get a single lieu by ID or slug
-router.get("/:id", lieuController.getLieuById);
+router.get("/:id", optionalToken, lieuController.getLieuById);
 
 // ==================== AUTHENTICATED ENDPOINTS ====================
 
@@ -41,6 +48,9 @@ router.put("/:id", verifyToken, verifyAdmin, lieuController.updateLieu);
 
 // Delete a lieu (ADMIN only)
 router.delete("/:id", verifyToken, verifyAdmin, lieuController.deleteLieu);
+
+// Add a review to a lieu
+router.post("/:id/reviews", verifyToken, lieuController.addReview);
 
 // Upload images for a lieu (ADMIN only)
 router.post("/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
@@ -71,11 +81,6 @@ router.post(
   "/:lieuId/bookmark",
   verifyToken,
   lieuController.toggleLieuBookmark,
-);
-router.get(
-  "/bookmarks",
-  verifyToken,
-  lieuController.getBookmarkedLieux,
 );
 
 console.log('[LIEU ROUTES] All routes defined, wrapping router...');

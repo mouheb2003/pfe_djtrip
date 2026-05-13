@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
 import '../../services/user_service.dart';
-import 'package:intl/intl.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../shared/activity_detail_screen.dart';
+import '../../theme/app_theme.dart';
 import '../shared/chat_conversation_screen.dart';
 import '../shared/public_profile_screen.dart';
-import '../payment/stripe_payment_screen.dart';
+import 'bookings_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final InscriptionModel inscription;
@@ -83,6 +83,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
+  int _bookingsTabIndexForStatus(String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'en_attente':
+        return 1;
+      case 'approuvee':
+        return 2;
+      case 'annulee':
+        return 3;
+      case 'verifie':
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -101,32 +116,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ? Map<String, dynamic>.from(act['organisateur_id'] as Map)
             : null) ??
         const <String, dynamic>{};
-    
-    final organizerId = (orgaRaw['_id'] ?? orgaRaw['id'] ?? '').toString().trim();
-    
-    print('[BOOKING DETAIL] Organizer ID: $organizerId');
-    print('[BOOKING DETAIL] Initial organizer data: $orgaRaw');
-    
-    // Check if rating or reviews are missing
-    final hasRating = orgaRaw['note_moyenne'] != null || 
-                      orgaRaw['noteMoyenne'] != null || 
-                      orgaRaw['rating'] != null;
-    final hasReviews = orgaRaw['nombre_avis'] != null || 
-                       orgaRaw['nombreAvis'] != null || 
-                       orgaRaw['reviewsCount'] != null;
-    
-    print('[BOOKING DETAIL] Has rating: $hasRating, Has reviews: $hasReviews');
-    
-    if (organizerId.isNotEmpty && (!hasRating || !hasReviews)) {
+
+    final organizerId = (orgaRaw['_id'] ?? orgaRaw['id'] ?? '')
+        .toString()
+        .trim();
+
+    if (organizerId.isNotEmpty &&
+        (orgaRaw['note_moyenne'] == null &&
+                orgaRaw['noteMoyenne'] == null &&
+                orgaRaw['rating'] == null ||
+            orgaRaw['nombre_avis'] == null &&
+                orgaRaw['nombreAvis'] == null &&
+                orgaRaw['reviewsCount'] == null)) {
       setState(() => _isLoadingOrganizer = true);
       try {
         final fullData = await UserService.getUserById(organizerId);
-        print('[BOOKING DETAIL] Fetched full organizer data: $fullData');
         if (mounted && fullData != null) {
           setState(() => _fullOrganizerData = fullData);
         }
-      } catch (e) {
-        print('[BOOKING DETAIL] Error fetching organizer data: $e');
       } finally {
         if (mounted) {
           setState(() => _isLoadingOrganizer = false);
@@ -140,81 +147,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
 
-  Future<void> _navigateToPayment() async {
-    final act = _inscription.activite ?? {};
-    final activityId = act['_id']?.toString() ?? act['id']?.toString();
-    final activityTitle = act['titre']?.toString() ?? 'Activity';
-    final nombreParticipants = _inscription.nombreParticipants ?? 1;
-
-    if (activityId == null || activityId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Activity information not found'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StripePaymentScreen(
-            inscriptionId: _inscription.id,
-            activityId: activityId,
-            activityTitle: activityTitle,
-            nombreParticipants: nombreParticipants,
-            amount: _inscription.prixTotal,
-            currency: 'TND',
-            description: 'Payment for $activityTitle',
-          ),
-        ),
-      );
-
-      // Refresh booking details after payment
-      setState(() {
-        _isCancelling = true;
-      });
-
-      final updatedInscription = await InscriptionService.getInscriptionById(_inscription.id);
-
-      if (updatedInscription != null && mounted) {
-        setState(() {
-          _inscription = updatedInscription;
-          _isCancelling = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _isCancelling = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isCancelling = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _cancelBooking() async {
     if (!_inscription.canBeCancelledWithTime) {
       final hoursRemaining = _inscription.hoursUntilCancellationDeadline;
-      String message;
-      
-      if (hoursRemaining <= 0) {
-        message = 'This booking cannot be cancelled - the activity has already started or passed.';
-      } else {
-        message = 'This booking cannot be cancelled.';
-      }
-      
+      final message = hoursRemaining <= 0
+          ? 'This reservation cannot be cancelled - the activity has already started or passed.'
+          : 'This reservation cannot be cancelled.';
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -228,19 +167,19 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel Booking'),
-        content: Text(
-          'Are you sure you want to cancel this booking? This action cannot be undone.',
+        title: const Text('Cancel Reservation'),
+        content: const Text(
+          'Are you sure you want to cancel this reservation? This action cannot be undone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep Booking'),
+            child: const Text('Keep Reservation'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Cancel Booking'),
+            child: const Text('Cancel Reservation'),
           ),
         ],
       ),
@@ -273,20 +212,18 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Booking cancelled successfully'),
+              content: Text('Reservation cancelled successfully'),
               backgroundColor: Colors.green,
             ),
           );
         }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to cancel booking'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to cancel reservation'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -298,7 +235,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         );
       }
     } finally {
-      setState(() => _isCancelling = false);
+      if (mounted) {
+        setState(() => _isCancelling = false);
+      }
     }
   }
 
@@ -306,16 +245,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Widget build(BuildContext context) {
     final act = _inscription.activite ?? {};
     final photoUrls = _activityPhotoUrls(act);
-    final imageUrl = photoUrls.isNotEmpty ? photoUrls[0] : '';
     final title = act['titre'] as String? ?? 'Activity';
     final lieu = act['lieu'] as String? ?? 'Location';
     final placeCount = _inscription.nombreParticipants;
     final unitPrice = (act['prix'] as num?)?.toDouble() ?? 0.0;
     final subtotal = unitPrice * placeCount;
-    const serviceFee = 4.50; // Mock service fee for the design
+    const serviceFee = 4.50;
     final total = subtotal + serviceFee;
 
-    // Organizer profile (real values when available)
     final orgaRaw =
         _fullOrganizerData ??
         _inscription.organisateur ??
@@ -334,14 +271,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final orgaPhoto = (orgaRaw['avatar'] ?? orgaRaw['photoProfil'] ?? '')
         .toString();
     final orgaRating = _asDouble(
-      orgaRaw['note_moyenne'] ?? 
-      orgaRaw['noteMoyenne'] ?? 
-      orgaRaw['rating'] ?? 
-      orgaRaw['averageRating'] ??
-      orgaRaw['avg_rating'] ??
-      orgaRaw['avgRating'] ??
-      orgaRaw['moyenne'] ??
-      orgaRaw['average'],
+      orgaRaw['note_moyenne'] ??
+          orgaRaw['noteMoyenne'] ??
+          orgaRaw['rating'] ??
+          orgaRaw['averageRating'] ??
+          orgaRaw['avg_rating'] ??
+          orgaRaw['avgRating'] ??
+          orgaRaw['moyenne'] ??
+          orgaRaw['average'],
     );
     final orgaReviews = _asInt(
       orgaRaw['nombre_avis'] ??
@@ -354,7 +291,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           orgaRaw['avisCount'],
     );
 
-    // Get activity dates properly
     DateTime? activityDate;
     if (act['date_debut'] != null) {
       activityDate = DateTime.tryParse(act['date_debut'].toString());
@@ -379,14 +315,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => BookingsScreen(
+                  initialTabIndex: _bookingsTabIndexForStatus(
+                    _inscription.statut,
+                  ),
+                ),
+              ),
+              (route) => false,
+            );
+          },
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.share, color: AppColors.primary),
-            onPressed: () {
-              // Share action
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -396,7 +341,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Status Icon
               Container(
                 width: 80,
                 height: 80,
@@ -430,8 +374,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               Text(
                 _inscription.isApproved
                     ? 'Booking Confirmed!'
-                    : _inscription.statut == 'PAID_PENDING_CONFIRMATION'
-                    ? 'Waiting for payment'
                     : _inscription.isPending
                     ? 'Waiting for approval'
                     : _inscription.isCancelled
@@ -447,8 +389,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               Text(
                 _inscription.isApproved
                     ? 'Your booking is approved. Keep your QR code for check-in.'
-                    : _inscription.statut == 'PAID_PENDING_CONFIRMATION'
-                    ? 'Complete your payment to confirm your booking.'
                     : _inscription.isPending
                     ? 'Your request has been sent. The organizer will review it soon.'
                     : _inscription.isCancelled
@@ -462,7 +402,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              // Top media section: show QR for approved bookings, otherwise activity carousel
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: SizedBox(
@@ -477,7 +416,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Booking Summary Card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -545,8 +483,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             icon: Icons.calendar_today,
                             label: 'DATE',
                             value: activityDate != null
-                                ? DateFormat('MMM dd, yyyy').format(activityDate!)
-                                : DateFormat('MMM dd, yyyy').format(_inscription.dateDemande ?? DateTime.now()),
+                                ? DateFormat(
+                                    'MMM dd, yyyy',
+                                  ).format(activityDate)
+                                : _formatDate(_inscription.dateDemande),
                           ),
                         ),
                         Expanded(
@@ -572,7 +512,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           child: _SummaryRow(
                             icon: Icons.confirmation_number_outlined,
                             label: 'ID',
-                            value: '#DJT-${_inscription.id.substring(_inscription.id.length - 5).toUpperCase()}',
+                            value:
+                                '#DJT-${_inscription.id.substring(_inscription.id.length - 5).toUpperCase()}',
                           ),
                         ),
                       ],
@@ -603,7 +544,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              if (_inscription.isApproved) ...[
+              if (_inscription.isApproved)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -632,9 +573,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ],
                   ),
                 ),
-              ],
               const SizedBox(height: 24),
-              // Organizer section with contact and profile buttons
               const Text(
                 'Organizer',
                 style: TextStyle(
@@ -668,7 +607,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               : null,
                           child: orgaPhoto.isEmpty
                               ? Text(
-                                  orgaName.isNotEmpty ? orgaName[0].toUpperCase() : 'O',
+                                  orgaName.isNotEmpty
+                                      ? orgaName[0].toUpperCase()
+                                      : 'O',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -691,15 +632,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                                  const Icon(
+                                    Icons.star,
+                                    size: 14,
+                                    color: Colors.amber,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    orgaRating > 0 ? orgaRating.toStringAsFixed(1) : 'N/A',
+                                    orgaRating > 0
+                                        ? orgaRating.toStringAsFixed(1)
+                                        : 'N/A',
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '(${orgaReviews} reviews)',
+                                    '($orgaReviews reviews)',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
@@ -730,7 +677,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                   }
                                 : null,
                             icon: const Icon(Icons.person_outline, size: 16),
-                            label: const Text('Profile', style: TextStyle(fontSize: 13)),
+                            label: const Text(
+                              'Profile',
+                              style: TextStyle(fontSize: 13),
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -738,7 +688,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                 horizontal: 12,
                                 vertical: 12,
                               ),
-                              minimumSize: Size(0, 40),
+                              minimumSize: const Size(0, 40),
                             ),
                           ),
                         ),
@@ -751,7 +701,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               organizerAvatar: orgaPhoto,
                             ),
                             icon: const Icon(Icons.chat_outlined, size: 16),
-                            label: const Text('Contact', style: TextStyle(fontSize: 13)),
+                            label: const Text(
+                              'Contact',
+                              style: TextStyle(fontSize: 13),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: const BorderSide(color: AppColors.primary),
@@ -759,7 +712,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                 horizontal: 12,
                                 vertical: 12,
                               ),
-                              minimumSize: Size(0, 40),
+                              minimumSize: const Size(0, 40),
                             ),
                           ),
                         ),
@@ -768,7 +721,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 120), // Space for bottom navigation
+              const SizedBox(height: 120),
             ],
           ),
         ),
@@ -809,13 +762,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _inscription.statut == 'PAID_PENDING_CONFIRMATION'
+                child: (_inscription.isPending ||
+                        (_inscription.isApproved &&
+                            _inscription.canBeCancelledWithTime))
                     ? ElevatedButton.icon(
-                        onPressed: _navigateToPayment,
-                        icon: const Icon(Icons.payment, size: 20),
-                        label: const Text('Pay'),
+                        onPressed: _isCancelling ? null : _cancelBooking,
+                        icon: _isCancelling
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.cancel_outlined, size: 20),
+                        label: Text(
+                          _isCancelling
+                              ? 'Cancelling...'
+                              : 'Cancel Reservation',
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF59E0B),
+                          backgroundColor: Colors.red,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -824,72 +792,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           ),
                         ),
                       )
-                    : _inscription.isApproved
-                        ? ElevatedButton.icon(
-                            onPressed: _isCancelling ? null : _cancelBooking,
-                            icon: _isCancelling
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.cancel_outlined, size: 20),
-                            label: Text(
-                              _isCancelling ? 'Cancelling...' : 'Cancel Booking',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                            ),
-                          )
-                        : _inscription.canBeCancelledWithTime
-                            ? ElevatedButton.icon(
-                                onPressed: _isCancelling ? null : _cancelBooking,
-                                icon: _isCancelling
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.cancel_outlined, size: 20),
-                                label: Text(
-                                  _isCancelling ? 'Cancelling...' : 'Cancel Booking',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                ),
-                              )
-                            : ElevatedButton.icon(
-                                onPressed: null,
-                                icon: const Icon(Icons.info_outline, size: 20),
-                                label: Text(_inscription.statusLabel),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                ),
-                              ),
+                    : ElevatedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.info_outline, size: 20),
+                        label: Text(_inscription.statusLabel),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),

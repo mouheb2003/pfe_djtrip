@@ -216,16 +216,27 @@ class InscriptionService {
   static Future<Map<String, List<InscriptionModel>>> getMyBookings() async {
     try {
       final body = await _get('/inscriptions/touriste/my-bookings');
+      print('🔍 [SERVICE] API Response body keys: ${body.keys.toList()}');
+      print('🔍 [SERVICE] API Response success: ${body['success']}');
+      print('🔍 [SERVICE] API Response data type: ${body['data'].runtimeType}');
 
       if (body['success'] == true && body['data'] != null) {
         final data = body['data'] as Map<String, dynamic>;
+        print('🔍 [SERVICE] Data buckets available: ${data.keys.toList()}');
+
+        for (final key in data.keys) {
+          print(
+            '🔍 [SERVICE] Bucket "$key": ${data[key] is List ? (data[key] as List).length : 'not a list'}',
+          );
+        }
 
         List<InscriptionModel> parseList(dynamic listRaw, String listName) {
           if (listRaw is! List) {
-            print('$listName is not a List: $listRaw');
+            print('❌ [SERVICE] $listName is not a List: $listRaw');
             return [];
           }
 
+          print('🔍 [SERVICE] Parsing $listName with ${listRaw.length} items');
           final result = <InscriptionModel>[];
           for (int i = 0; i < listRaw.length; i++) {
             try {
@@ -235,31 +246,44 @@ class InscriptionService {
               if (item is Map<String, dynamic>) {
                 final inscription = InscriptionModel.fromJson(item);
                 result.add(inscription);
+                print(
+                  '🔍 [SERVICE] $listName[$i]: ID=${inscription.id}, Status=${inscription.statut}, ActivityID=${inscription.activite?['_id']}',
+                );
               } else {
-                print('Item $i in $listName is not a Map: $item');
+                print('❌ [SERVICE] Item $i in $listName is not a Map: $item');
               }
             } catch (e) {
-              print('Error parsing item $i in $listName: $e');
+              print('❌ [SERVICE] Error parsing item $i in $listName: $e');
               continue; // Skip problematic items
             }
           }
 
+          print('✅ [SERVICE] $listName parsed: ${result.length} items');
           return result;
         }
 
+        // Only accept the normalized `pending` key from the API.
+        final pending = parseList(data['pending'], 'pending');
+
         final result = {
-          'pending_for_payment': parseList(data['pending_for_payment'], 'pending_for_payment'),
+          'pending': pending,
           'confirmed': parseList(data['confirmed'], 'confirmed'),
           'cancelled': parseList(data['cancelled'], 'cancelled'),
           'used': parseList(data['used'], 'used'),
         };
 
+        print(
+          '✅ [SERVICE] Final buckets: pending=${result['pending']!.length}, confirmed=${result['confirmed']!.length}, cancelled=${result['cancelled']!.length}, used=${result['used']!.length}',
+        );
         return result;
       }
 
-      return {'pending_for_payment': [], 'confirmed': [], 'cancelled': [], 'used': []};
+      print(
+        '⚠️ [SERVICE] Invalid response: success=${body['success']}, data is ${body['data']}',
+      );
+      return {'pending': [], 'confirmed': [], 'cancelled': [], 'used': []};
     } catch (e) {
-      print('Error in getMyBookings: $e');
+      print('❌ [SERVICE] Error in getMyBookings: $e');
       throw Exception(_extractErrorMessage(e.toString()));
     }
   }
@@ -322,9 +346,7 @@ class InscriptionService {
   static Future<List<InscriptionModel>> getActivityParticipants({
     required String activiteId,
   }) async {
-    final query = <String, String>{
-      'activite_id': activiteId,
-    };
+    final query = <String, String>{'activite_id': activiteId};
 
     final res = await ApiClient.get(
       '/inscriptions/activite/$activiteId/participants',
@@ -335,24 +357,29 @@ class InscriptionService {
     if (res.statusCode == 200) {
       final body = _decodeObject(res.body);
       final list = _extractInscriptions(body);
-      
+
       // Map the backend response to frontend model structure
       final mappedList = list.map((participant) {
         print('🔍 [SERVICE DEBUG] Original participant: $participant');
-        
+
         // If participant has the new structure with nested touriste object
         if (participant['touriste'] != null) {
           // Create a new structure that matches InscriptionModel.fromJson expectations
           final mapped = {
             '_id': participant['_id'],
             'statut': participant['statut'],
-            'nombre_participants': participant['nombreParticipants'] ?? participant['nombre_participants'],
+            'nombre_participants':
+                participant['nombreParticipants'] ??
+                participant['nombre_participants'],
             'prix_total': participant['prixTotal'] ?? participant['prix_total'],
-            'date_demande': participant['dateDemande'] ?? participant['date_demande'],
+            'date_demande':
+                participant['dateDemande'] ?? participant['date_demande'],
             'touriste_id': participant['touriste']['_id'],
             'activite_id': participant['activite']['_id'],
-            'touriste': participant['touriste'], // Keep the nested object for UI display
-            'activite': participant['activite'], // Keep the nested object for UI display
+            'touriste':
+                participant['touriste'], // Keep the nested object for UI display
+            'activite':
+                participant['activite'], // Keep the nested object for UI display
           };
           print('🔍 [SERVICE DEBUG] Mapped participant: $mapped');
           return mapped;
@@ -361,7 +388,7 @@ class InscriptionService {
         print('🔍 [SERVICE DEBUG] Using original participant structure');
         return participant;
       }).toList();
-      
+
       return mappedList.map(InscriptionModel.fromJson).toList();
     }
     try {
@@ -500,28 +527,29 @@ class InscriptionService {
   static Future<Map<String, dynamic>> validateQrBooking(String qrData) async {
     try {
       print('[QR SERVICE OLD] Starting validation for QR: $qrData');
-      
+
       final res = await ApiClient.post('/inscriptions/qr/validate', {
         'qrData': qrData,
       });
-      
+
       print('[QR SERVICE OLD] Status code: ${res.statusCode}');
       print('[QR SERVICE OLD] Response body: ${res.body}');
-      
+
       final body = _decodeObject(res.body);
       final data = _decodeObject(body['data']);
-      
+
       print('[QR SERVICE OLD] Parsed body: $body');
       print('[QR SERVICE OLD] Parsed data: $data');
       print('[QR SERVICE OLD] Success: ${body['success']}');
-      
+
       return {
         'success': body['success'] == true || res.statusCode == 200,
         'statusCode': res.statusCode,
         'message': body['message'] ?? 'Unknown validation result',
         'code': body['code'],
         'booking': data['booking'] ?? body['booking'],
-        'canMarkUsed': data['canMarkUsed'] == true || body['canMarkUsed'] == true,
+        'canMarkUsed':
+            data['canMarkUsed'] == true || body['canMarkUsed'] == true,
         'tokenType': data['tokenType'] ?? body['tokenType'],
       };
     } catch (e) {
@@ -558,12 +586,14 @@ class InscriptionService {
   // Organizer: Get all reservations for organizer
   static Future<List<InscriptionModel>> getOrganizerReservations() async {
     try {
-      final res = await ApiClient.get('/inscriptions/organisateur/mes-demandes');
-      
+      final res = await ApiClient.get(
+        '/inscriptions/organisateur/mes-demandes',
+      );
+
       if (res.statusCode == 200) {
         final body = _decodeObject(res.body);
         final inscriptions = _extractInscriptions(body);
-        
+
         return inscriptions.map((inscriptionData) {
           return InscriptionModel.fromJson(inscriptionData);
         }).toList();
@@ -576,12 +606,15 @@ class InscriptionService {
   }
 
   // Organizer: Approve a reservation
-  static Future<bool> approveReservation(String inscriptionId, {String? messageOrganisateur}) async {
+  static Future<bool> approveReservation(
+    String inscriptionId, {
+    String? messageOrganisateur,
+  }) async {
     try {
       final res = await ApiClient.put('/inscriptions/$inscriptionId/approve', {
         'message_organisateur': messageOrganisateur ?? '',
       });
-      
+
       return res.statusCode == 200;
     } catch (e) {
       print('Error approving reservation: $e');
@@ -590,12 +623,15 @@ class InscriptionService {
   }
 
   // Organizer: Reject a reservation
-  static Future<bool> rejectReservation(String inscriptionId, {String? messageOrganisateur}) async {
+  static Future<bool> rejectReservation(
+    String inscriptionId, {
+    String? messageOrganisateur,
+  }) async {
     try {
       final res = await ApiClient.put('/inscriptions/$inscriptionId/reject', {
         'message_organisateur': messageOrganisateur ?? '',
       });
-      
+
       return res.statusCode == 200;
     } catch (e) {
       print('Error rejecting reservation: $e');

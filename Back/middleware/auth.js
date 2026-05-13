@@ -197,7 +197,7 @@ exports.verifyToken = async (req, res, next) => {
 };
 
 // Optional authentication middleware - tries to verify token but continues even if missing/invalid
-exports.optionalAuth = async (req, res, next) => {
+exports.optionalToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {

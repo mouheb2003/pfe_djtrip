@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'activity_model.dart';
 
 class InscriptionModel {
   final String id;
-  final String statut; // approuvee | annulee | verifie | PAID_PENDING_CONFIRMATION
+  final String statut; // approuvee | annulee | verifie | en_attente
   final int nombreParticipants;
   final double prixTotal;
   final DateTime? dateDemande;
@@ -62,10 +63,31 @@ class InscriptionModel {
     return null;
   }
 
+  static String _normalizeStatus(dynamic rawStatus) {
+    final status = rawStatus?.toString().trim().toLowerCase() ?? '';
+    if (status == 'approved' ||
+        status == 'confirmée' ||
+        status == 'confirmed') {
+      return 'approuvee';
+    }
+    if (status == 'pending' ||
+        status == 'en attente' ||
+        status.endsWith('pending_confirmation')) {
+      return 'en_attente';
+    }
+    if (status == 'rejected' || status == 'refusée') {
+      return 'refusee';
+    }
+    if (status == 'cancelled' || status == 'canceled' || status == 'annulée') {
+      return 'annulee';
+    }
+    return status;
+  }
+
   factory InscriptionModel.fromJson(Map<String, dynamic> json) {
     return InscriptionModel(
       id: json['_id'] as String? ?? '',
-      statut: json['statut'] as String? ?? 'PAID_PENDING_CONFIRMATION',
+      statut: _normalizeStatus(json['statut']),
       nombreParticipants: (json['nombre_participants'] as num? ?? 1).toInt(),
       prixTotal: (json['prix_total'] as num? ?? 0).toDouble(),
       dateDemande: json['date_demande'] != null
@@ -95,10 +117,8 @@ class InscriptionModel {
         return 'Confirmed';
       case 'verifie':
         return 'Used';
-      case 'PAID_PENDING_CONFIRMATION':
-        return 'Payment Pending';
-      case 'PAYMENT_FAILED':
-        return 'Payment Failed';
+      case 'en_attente':
+        return 'Pending';
       case 'annulee':
         return 'Cancelled';
       default:
@@ -112,10 +132,8 @@ class InscriptionModel {
         return const Color(0xFF22C55E);
       case 'verifie':
         return const Color(0xFF14B8A6);
-      case 'PAID_PENDING_CONFIRMATION':
+      case 'en_attente':
         return const Color(0xFFF59E0B);
-      case 'PAYMENT_FAILED':
-        return const Color(0xFFDC2626);
       case 'annulee':
         return const Color(0xFF94A3B8);
       default:
@@ -123,13 +141,13 @@ class InscriptionModel {
     }
   }
 
-  bool get isUpcoming => statut == 'approuvee' || statut == 'PAID_PENDING_CONFIRMATION';
-  bool get isPending => statut == 'PAID_PENDING_CONFIRMATION';
+  bool get isUpcoming => statut == 'approuvee' || statut == 'en_attente';
+  bool get isPending => statut == 'en_attente';
   bool get isApproved => statut == 'approuvee';
   bool get isUsed => statut == 'verifie';
-  bool get isRejected => false; // No longer used with auto-approval
+  bool get isRejected => statut == 'refusee';
   bool get isCancelled => statut == 'annulee';
-  bool get isPaymentFailed => statut == 'PAYMENT_FAILED';
+  bool get isPaymentFailed => false;
 
   bool get canBeCancelled => isApproved || isPending;
   bool get canBeApproved => false; // No longer used with auto-approval
@@ -139,16 +157,16 @@ class InscriptionModel {
   /// Cancellation allowed any time before activity starts
   bool get canBeCancelledWithTime {
     if (!canBeCancelled) return false;
-    
+
     final activityDate = activite?['date_debut'] ?? activite?['dateDebut'];
     if (activityDate == null) return false;
-    
+
     final startDate = DateTime.tryParse(activityDate.toString());
     if (startDate == null) return false;
-    
+
     final now = DateTime.now();
     final hoursBeforeStart = startDate.difference(now).inHours;
-    
+
     // Cancellation allowed any time before activity starts
     return hoursBeforeStart > 0;
   }
@@ -157,15 +175,20 @@ class InscriptionModel {
   int get hoursUntilCancellationDeadline {
     final activityDate = activite?['date_debut'] ?? activite?['dateDebut'];
     if (activityDate == null) return 0;
-    
+
     final startDate = DateTime.tryParse(activityDate.toString());
     if (startDate == null) return 0;
-    
+
     final now = DateTime.now();
     return startDate.difference(now).inHours;
   }
 
   String get qrData => 'DJTRIP_BOOKING:${qrToken ?? id}';
+
+  ActivityModel? get activityModel {
+    if (activite == null) return null;
+    return ActivityModel.fromJson(activite!);
+  }
 
   String? get organizerReason {
     final value = messageOrganisateur?.trim();

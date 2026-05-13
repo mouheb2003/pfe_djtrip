@@ -22,7 +22,7 @@ class DJTripLogo extends StatelessWidget {
         ],
       ),
       child: Image.asset(
-        'assets/logos/logo2.png',
+        'assets/logos/app_logo.png',
         height: size,
         width: size,
         fit: BoxFit.contain,

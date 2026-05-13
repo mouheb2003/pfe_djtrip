@@ -14,7 +14,6 @@ import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
-import '../payment/stripe_payment_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
@@ -51,7 +50,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingReviews = false;
   String? _errorMsg;
-  
+
   // Ongoing review state
   int _activityRating = 0;
   int _organizerRating = 0;
@@ -129,13 +128,28 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 
   String _generateActivityMessage() {
     if (_activity == null) return '';
-    
-    final title = _activity!.title;
-    final date = _activity!.dateDebut != null ? _activity!.dateDebut.toString().split(' ')[0] : 'Date TBD';
-    final location = _activity!.lieu;
-    final price = _activity!.prixFormatted;
-    
-    return 'Hi! I\'m interested in your activity "$title" on $date at $location. Could you provide more information about this activity?';
+
+    final title = _activity!.titre.isNotEmpty
+        ? _activity!.titre
+        : (_activity!.title ?? 'Activity');
+    final date = _activity!.dateDebut != null
+        ? _fmtDate(_activity!.dateDebut)
+        : 'Date TBD';
+    final location = (_activity!.lieu ?? _activity!.formattedLieu ?? '')
+        .toString()
+        .trim();
+    final price = _activity!.prix > 0
+        ? '${_activity!.prix.toStringAsFixed(2)} TND'
+        : 'Price N/A';
+
+    return [
+      'This User Contacted you about Your Activity "$title".',
+      '',
+      'Activity details:',
+      '• Date: $date',
+      '• Location: ${location.isNotEmpty ? location : 'Not specified'}',
+      '• Price: $price',
+    ].join('\n');
   }
 
   bool get _isActivityOrganizer {
@@ -150,42 +164,34 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   bool get _hasBookingForActivity {
     final booking = _bookingForActivity;
     if (booking == null) return false;
-    // If latest booking is cancelled, treat as no booking (allow rebooking)
+    // If cancelled, allow rebooking (Participate button)
     return !booking.isCancelled;
+  }
+
+  bool get _canCancelBooking {
+    final booking = _bookingForActivity;
+    if (booking == null) return false;
+    // Can cancel if pending or approved, and not already cancelled or rejected
+    return (booking.isPending || booking.isApproved) &&
+        !booking.isCancelled &&
+        !booking.isRejected;
   }
 
   bool get _hasAlreadyReviewedActivity {
     if (_reviews.isEmpty) return false;
     return _reviews.any((review) {
-      final touristeId = review['touriste_id']?['_id']?.toString() ??
+      final touristeId =
+          review['touriste_id']?['_id']?.toString() ??
           review['touriste_id']?['id']?.toString() ??
           '';
       return touristeId == _currentUserId;
     });
   }
 
-  bool get _hasPendingPaymentBooking {
-    final booking = _bookingForActivity;
-    if (booking == null) return false;
-    return booking.statut == 'PAID_PENDING_CONFIRMATION';
-  }
-
-  bool get _isPaymentFailed {
-    final booking = _bookingForActivity;
-    if (booking == null) return false;
-    return booking.isPaymentFailed;
-  }
-
-  bool get _isPaidBooking {
-    final booking = _bookingForActivity;
-    if (booking == null) return false;
-    return booking.isApproved;
-  }
-
   /// Check if a participant can be displayed based on privacy settings
   bool _canDisplayParticipant(Map<String, dynamic> participant) {
     if (participant.isEmpty) return false;
-    
+
     // Extract ID from both possible structures (same logic as in logging)
     String participantUserId = '';
     if (participant['touriste']?['_id'] != null) {
@@ -193,27 +199,40 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     } else if (participant['touriste_id']?['_id'] != null) {
       participantUserId = participant['touriste_id']['_id'].toString();
     } else {
-      participantUserId = (participant['touriste']?['_id'] ?? participant['touriste']?['id'] ?? '').toString();
+      participantUserId =
+          (participant['touriste']?['_id'] ??
+                  participant['touriste']?['id'] ??
+                  '')
+              .toString();
     }
-    
+
     if (participantUserId.isEmpty) return false;
-    
-    print('🔍 [PARTICIPANT DEBUG FRONTEND] participantUserId: "$participantUserId"');
+
+    print(
+      '🔍 [PARTICIPANT DEBUG FRONTEND] participantUserId: "$participantUserId"',
+    );
     print('🔍 [PARTICIPANT DEBUG FRONTEND] _currentUserId: "$_currentUserId"');
-    print('🔍 [PARTICIPANT DEBUG FRONTEND] comparison result: ${participantUserId == _currentUserId}');
-    print('🔍 [PARTICIPANT DEBUG FRONTEND] _isActivityOrganizer: $_isActivityOrganizer');
-    
+    print(
+      '🔍 [PARTICIPANT DEBUG FRONTEND] comparison result: ${participantUserId == _currentUserId}',
+    );
+    print(
+      '🔍 [PARTICIPANT DEBUG FRONTEND] _isActivityOrganizer: $_isActivityOrganizer',
+    );
+
     // Always show if viewer is the participant themselves (even if profileVisibility is false)
     // This is because a user can always see their own profile
     if (participantUserId == _currentUserId) return true;
-    
+
     // Always show if viewer is activity organizer
     if (_isActivityOrganizer) return true;
-    
+
     // Check participant's privacy settings
-    final profileVisibility = participant['touriste']?['profileVisibility'] ?? true;
-    print('🔍 [PARTICIPANT DEBUG FRONTEND] profileVisibility: $profileVisibility');
-    
+    final profileVisibility =
+        participant['touriste']?['profileVisibility'] ?? true;
+    print(
+      '🔍 [PARTICIPANT DEBUG FRONTEND] profileVisibility: $profileVisibility',
+    );
+
     return profileVisibility == true;
   }
 
@@ -228,14 +247,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     Map<String, List<InscriptionModel>> bookings,
   ) {
     InscriptionModel? latest;
+    print('🔍 [LATEST BOOKING SEARCH] Searching for activity: $activityId');
 
     void collect(List<InscriptionModel> items) {
       for (final item in items) {
         final itemActivityId = (item.activite?['_id'] ?? '').toString();
+        print(
+          '🔍 [LATEST BOOKING SEARCH] Comparing activity ID: "$itemActivityId" vs "$activityId" - Match: ${itemActivityId == activityId}',
+        );
         if (itemActivityId != activityId) continue;
 
         if (latest == null) {
           latest = item;
+          print(
+            '🔍 [LATEST BOOKING SEARCH] Set as first match: ${item.id} (Date: ${item.dateDemande})',
+          );
           continue;
         }
 
@@ -245,12 +271,18 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         if (currentDate == null && previousDate != null) continue;
         if (currentDate != null && previousDate == null) {
           latest = item;
+          print(
+            '🔍 [LATEST BOOKING SEARCH] Updated to newer (null->date): ${item.id}',
+          );
           continue;
         }
         if (currentDate != null &&
             previousDate != null &&
             currentDate.isAfter(previousDate)) {
           latest = item;
+          print(
+            '🔍 [LATEST BOOKING SEARCH] Updated to newer (date comparison): ${item.id}',
+          );
         }
       }
     }
@@ -259,6 +291,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     collect(bookings['confirmed'] ?? const <InscriptionModel>[]);
     collect(bookings['cancelled'] ?? const <InscriptionModel>[]);
 
+    print('🔍 [LATEST BOOKING SEARCH] Final result: ${latest?.id ?? "null"}');
     return latest;
   }
 
@@ -384,7 +417,22 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
       if (role == 'touriste' || role == 'tourist') {
         final bookings = await InscriptionService.getMyBookings();
         if (!mounted) return;
+        print(
+          '🔍 [ACTIVITY DETAIL] Bookings loaded - pending: ${bookings['pending']?.length ?? 0}, confirmed: ${bookings['confirmed']?.length ?? 0}, cancelled: ${bookings['cancelled']?.length ?? 0}, used: ${bookings['used']?.length ?? 0}',
+        );
+        print('🔍 [ACTIVITY DETAIL] Activity ID: ${widget.activityId}');
+        for (final entry in bookings.entries) {
+          print('🔍 [ACTIVITY DETAIL] Bucket "${entry.key}":');
+          for (final item in entry.value) {
+            print(
+              '  - Inscription ID: ${item.id}, Status: ${item.statut}, Activity ID: ${item.activite?['_id'] ?? 'N/A'}',
+            );
+          }
+        }
         booking = _latestBookingForActivity(widget.activityId, bookings);
+        print(
+          '🔍 [ACTIVITY DETAIL] Latest booking found: ${booking?.id ?? 'null'} (Status: ${booking?.statut ?? 'N/A'})',
+        );
       }
 
       setState(() {
@@ -427,6 +475,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     }
   }
 
+  void _checkReservationStatus() {
+    final booking = _bookingForActivity;
+    if (booking == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingDetailScreen(inscription: booking),
+      ),
+    );
+  }
+
   Future<void> _bookActivity() async {
     if (_activity == null) return;
     setState(() => _isBooking = true);
@@ -442,98 +501,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     }
   }
 
-  Future<void> _navigateToPayment() async {
-    final booking = _bookingForActivity;
-    if (booking == null || _activity == null) return;
-
-    try {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StripePaymentScreen(
-            inscriptionId: booking.id,
-            activityId: _activity!.id,
-            activityTitle: _activity!.titre,
-            nombreParticipants: booking.nombreParticipants ?? 1,
-            amount: booking.prixTotal,
-            currency: 'TND',
-            description: 'Payment for ${_activity!.titre}',
-          ),
-        ),
-      );
-
-      // Refresh booking status after payment
-      await _loadActivity(isRefresh: true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _retryPayment() async {
-    final booking = _bookingForActivity;
-    if (booking == null || _activity == null) return;
-
-    // Delete the failed booking first
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Retry Payment'),
-        content: const Text(
-          'This will delete the failed booking and create a new payment. Continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Continue',
-              style: TextStyle(color: Colors.green),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isBooking = true);
-    try {
-      // Delete the failed booking
-      await InscriptionService.deleteInscription(booking.id);
-
-      // Refresh activity to clear the booking
-      await _loadActivity(isRefresh: true);
-
-      if (!mounted) return;
-
-      // Navigate to booking selection to create new booking
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookingSelectionScreen(activity: _activity!),
-        ),
-      );
-
-      // Refresh again after booking
-      await _loadActivity(isRefresh: true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isBooking = false);
-    }
-  }
-
   Future<void> _deletePendingBooking() async {
     final booking = _bookingForActivity;
     if (booking == null) return;
@@ -541,9 +508,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Booking'),
+        title: const Text('Cancel Reservation'),
         content: const Text(
-          'Are you sure you want to delete this pending booking?',
+          'Are you sure you want to cancel this reservation?',
         ),
         actions: [
           TextButton(
@@ -552,7 +519,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Cancel', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -562,19 +529,25 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 
     setState(() => _isBooking = true);
     try {
-      final success = await InscriptionService.cancelInscription(booking.id);
-      if (success && mounted) {
+      bool success = false;
+      if (booking.canBeCancelledWithTime) {
+        success = await InscriptionService.cancelInscription(booking.id);
+      }
+
+      if (!mounted) return;
+
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Booking deleted successfully'),
+            content: Text('Reservation cancelled successfully'),
             backgroundColor: Colors.green,
           ),
         );
         await _loadActivity(isRefresh: true);
-      } else if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to delete booking'),
+            content: Text('This reservation can no longer be cancelled.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -594,31 +567,39 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     if (_activity == null) return;
     // Allow all users to see participants, but apply privacy filtering
     if (!(_activity!.isOngoing || _activity!.isPast)) {
-      print('🔍 [PARTICIPANTS] Activity not ongoing/past, skipping participants load');
+      print(
+        '🔍 [PARTICIPANTS] Activity not ongoing/past, skipping participants load',
+      );
       return;
     }
 
     setState(() => _loadingParticipants = true);
     try {
-      print('🔍 [PARTICIPANTS] Loading participants for activity: ${widget.activityId}');
+      print(
+        '🔍 [PARTICIPANTS] Loading participants for activity: ${widget.activityId}',
+      );
       print('🔍 [PARTICIPANTS] Current user ID: $_currentUserId');
       print('🔍 [PARTICIPANTS] Current user type: $_currentUserType');
       print('🔍 [PARTICIPANTS] Is activity organizer: $_isActivityOrganizer');
-      print('🔍 [PARTICIPANTS] Activity organizer ID: ${_activity?.organisateur?['_id']}');
-      
+      print(
+        '🔍 [PARTICIPANTS] Activity organizer ID: ${_activity?.organisateur?['_id']}',
+      );
+
       // Use public endpoint - any authenticated user can see participants
       print('🔍 [PARTICIPANTS] Using public endpoint for participants...');
       final participants = await InscriptionService.getActivityParticipants(
         activiteId: widget.activityId,
       );
-      print('🔍 [PARTICIPANTS] Total participants loaded from API: ${participants.length}');
-      
+      print(
+        '🔍 [PARTICIPANTS] Total participants loaded from API: ${participants.length}',
+      );
+
       // Log each participant's privacy details
       for (int i = 0; i < participants.length; i++) {
         final participant = participants[i];
         final participantData = participant.toJson();
         print('🔍 [PARTICIPANT $i] RAW DATA: ${participantData}');
-        
+
         // Extract ID from both possible structures
         String participantUserId = '';
         if (participantData['touriste']?['_id'] != null) {
@@ -626,37 +607,51 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         } else if (participantData['touriste_id']?['_id'] != null) {
           participantUserId = participantData['touriste_id']['_id'].toString();
         } else {
-          participantUserId = (participantData['touriste']?['_id'] ?? participantData['touriste']?['id'] ?? '').toString();
+          participantUserId =
+              (participantData['touriste']?['_id'] ??
+                      participantData['touriste']?['id'] ??
+                      '')
+                  .toString();
         }
-        
-        final profileVisibility = participantData['touriste']?['profileVisibility'] ?? true;
+
+        final profileVisibility =
+            participantData['touriste']?['profileVisibility'] ?? true;
         final canDisplay = _canDisplayParticipant(participantData);
-        
+
         print('🔍 [PARTICIPANT $i] ID: $participantUserId');
         print('🔍 [PARTICIPANT $i] ProfileVisibility: $profileVisibility');
-        print('🔍 [PARTICIPANT $i] Is current user: ${participantUserId == _currentUserId}');
+        print(
+          '🔍 [PARTICIPANT $i] Is current user: ${participantUserId == _currentUserId}',
+        );
         print('🔍 [PARTICIPANT $i] Can display: $canDisplay');
         print('🔍 [PARTICIPANT $i] ---');
       }
-      
+
       if (mounted) {
         setState(() {
           _participants = participants;
           _loadingParticipants = false;
         });
       }
-      
+
       // Log filtering results
-      final visibleParticipants = participants.where((p) => _canDisplayParticipant(p.toJson())).toList();
-      final hiddenParticipants = participants.where((p) => !_canDisplayParticipant(p.toJson())).toList();
-      print('🔍 [PARTICIPANTS] Visible participants: ${visibleParticipants.length}');
-      print('🔍 [PARTICIPANTS] Hidden participants: ${hiddenParticipants.length}');
-      
+      final visibleParticipants = participants
+          .where((p) => _canDisplayParticipant(p.toJson()))
+          .toList();
+      final hiddenParticipants = participants
+          .where((p) => !_canDisplayParticipant(p.toJson()))
+          .toList();
+      print(
+        '🔍 [PARTICIPANTS] Visible participants: ${visibleParticipants.length}',
+      );
+      print(
+        '🔍 [PARTICIPANTS] Hidden participants: ${hiddenParticipants.length}',
+      );
     } catch (e) {
       print('❌ [PARTICIPANTS] Error loading participants: $e');
       print('❌ [PARTICIPANTS] Error type: ${e.runtimeType}');
       print('❌ [PARTICIPANTS] Error details: ${e.toString()}');
-      
+
       if (mounted) {
         setState(() {
           _participants = [];
@@ -712,9 +707,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 
       // Submit organizer review if rated
       if (_organizerRating > 0 && _activity?.organisateur != null) {
-        final organizerId = (_activity?.organisateur?['_id'] ??
-                _activity?.organisateur?['id'])
-            .toString();
+        final organizerId =
+            (_activity?.organisateur?['_id'] ?? _activity?.organisateur?['id'])
+                .toString();
         if (organizerId.isNotEmpty) {
           await ReviewService.createOrganizerReview(
             organisateurId: organizerId,
@@ -741,7 +736,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     } catch (e) {
       print('❌ Error submitting review: $e');
       if (mounted) {
-        setState(() => _errorMsg = 'Failed to submit review. Please try again.');
+        setState(
+          () => _errorMsg = 'Failed to submit review. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmittingReview = false);
@@ -750,7 +747,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 
   /// Scroll to review section when user clicks "Review" button
   void _scrollToReviewSection() {
-    final ScrollController scrollController = PrimaryScrollController.of(context);
+    final ScrollController scrollController = PrimaryScrollController.of(
+      context,
+    );
     if (scrollController != null) {
       // Find the review section in the scroll view
       // Scroll to the review section (approximately at 0.7 of the total scroll extent)
@@ -765,11 +764,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   /// Show add review modal for ongoing activities
   void _showAddReviewModal(BuildContext context) {
     if (_activity?.organisateur == null) return;
-    
-    final organizerId = (_activity?.organisateur?['_id'] ?? 
-                      _activity?.organisateur?['id'])
-                    .toString();
-    
+
+    final organizerId =
+        (_activity?.organisateur?['_id'] ?? _activity?.organisateur?['id'])
+            .toString();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -858,7 +857,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                           style: TextStyle(
                             fontSize: 15,
                             height: 1.6,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         _SectionTitle('Included Equipment'),
@@ -866,7 +867,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                           items: activity.equipementsInclus,
                           emptyLabel: 'No equipment specified',
                           icon: Icons.check_circle,
-                          chipColor: Theme.of(context).colorScheme.surfaceVariant,
+                          chipColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceVariant,
                           iconColor: Theme.of(context).colorScheme.primary,
                         ),
                         _SectionTitle('What to Bring'),
@@ -874,7 +877,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                           items: activity.aApporter,
                           emptyLabel: 'Nothing special is required',
                           icon: Icons.shopping_basket_outlined,
-                          chipColor: Theme.of(context).colorScheme.surfaceVariant,
+                          chipColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceVariant,
                           iconColor: Theme.of(context).colorScheme.primary,
                         ),
                         if (showLocation) ...[
@@ -965,13 +970,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                               ),
                               child: Text(
                                 'No participants yet for this Activity.',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             )
                           else
                             ..._participants
-                                .where((participant) => _canDisplayParticipant(participant.toJson()))
+                                .where(
+                                  (participant) => _canDisplayParticipant(
+                                    participant.toJson(),
+                                  ),
+                                )
                                 .map(
                                   (participant) => _ParticipantCard(
                                     participant: participant,
@@ -980,12 +993,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                 )
                                 .toList(),
                           // Show privacy notice if some participants are hidden
-                          if (_participants.any((p) => !_canDisplayParticipant(p.toJson())))
+                          if (_participants.any(
+                            (p) => !_canDisplayParticipant(p.toJson()),
+                          ))
                             Container(
                               margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceVariant,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.outline,
@@ -996,7 +1013,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   Icon(
                                     Icons.privacy_tip_outlined,
                                     size: 20,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -1004,7 +1023,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                       'Some participants have chosen to keep their profiles private.',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
@@ -1035,7 +1056,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   'Share your experience while the activity is ongoing!',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -1045,7 +1068,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -1060,7 +1085,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                         size: 28,
                                       ),
                                       onPressed: () {
-                                        setState(() => _activityRating = index + 1);
+                                        setState(
+                                          () => _activityRating = index + 1,
+                                        );
                                       },
                                     );
                                   }),
@@ -1087,7 +1114,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                         size: 28,
                                       ),
                                       onPressed: () {
-                                        setState(() => _organizerRating = index + 1);
+                                        setState(
+                                          () => _organizerRating = index + 1,
+                                        );
                                       },
                                     );
                                   }),
@@ -1099,7 +1128,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   maxLines: 4,
                                   decoration: InputDecoration(
                                     hintText: 'Share your experience...',
-                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
+                                    hintStyle: TextStyle(
+                                      color: Color(0xFF9CA3AF),
+                                    ),
                                     filled: true,
                                     fillColor: const Color(0xFFF9FAFB),
                                     border: OutlineInputBorder(
@@ -1147,14 +1178,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                           ),
                           const SizedBox(height: 24),
                         ],
-                        if (!_loadingReviews) 
+                        if (!_loadingReviews)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _SectionTitle('Reviews'),
                               // Add Review Button for participants who haven't reviewed yet (ongoing activities ONLY)
-                              if (_hasBookingForActivity && 
-                                  !_isActivityOrganizer && 
+                              if (_hasBookingForActivity &&
+                                  !_isActivityOrganizer &&
                                   !_hasAlreadyReviewedActivity &&
                                   _activity?.isOngoing == true)
                                 ElevatedButton.icon(
@@ -1167,7 +1198,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF3B82F6),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -1205,6 +1239,93 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                               .toList(),
                         // Reviews are now available for both ongoing and completed activities
                         // No need to show "reviews will be available" message anymore
+                        if (_hasBookingForActivity &&
+                            !_isActivityOrganizer) ...[
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFF),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFFDBEAFE),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF3B82F6,
+                                        ).withOpacity(0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.verified_outlined,
+                                        color: Color(0xFF3B82F6),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Reservation Status',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'You already have a reservation for this activity.',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _openBookingStatus,
+                                    icon: const Icon(
+                                      Icons.info_outline,
+                                      size: 18,
+                                    ),
+                                    label: const Text(
+                                      'Check Reservation Status',
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF3B82F6),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1212,7 +1333,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
               ],
             ),
           ),
-          if (!widget.viewOnly && !_isActivityOrganizer && !_isPaidBooking)
+          if (!widget.viewOnly && !_isActivityOrganizer)
             Positioned(
               left: 0,
               right: 0,
@@ -1220,27 +1341,19 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
               child: _StickyBottomBar(
                 price: activity.prixFormatted,
                 showPrice: !_hasBookingForActivity,
-                buttonLabel: _isPaymentFailed
-                    ? 'Pay'
-                    : (_hasPendingPaymentBooking
-                          ? 'Pay'
-                          : (_hasBookingForActivity
-                                ? 'Check Booking Status'
-                                : (_isPastActivity && _hasBookingForActivity
-                                      ? 'Check Booking Status'
-                                      : 'Book Now'))),
+                buttonLabel: _hasBookingForActivity
+                    ? 'Check reservation status'
+                    : 'Participate',
+                isCancel: false,
                 onBook: _isBooking
                     ? null
-                    : (_isPaymentFailed
-                          ? _retryPayment
-                          : (_hasPendingPaymentBooking
-                                ? _navigateToPayment
-                                : (_hasBookingForActivity
-                                      ? _openBookingStatus
-                                      : _bookActivity))),
+                    : (_hasBookingForActivity
+                          ? _checkReservationStatus
+                          : _bookActivity),
                 isLoading: _isBooking,
-                showDeleteButton: _isPaymentFailed,
-                onDelete: _isPaymentFailed ? _deletePendingBooking : null,
+                showDeleteButton: _hasBookingForActivity,
+                deleteIcon: Icons.cancel_outlined,
+                onDelete: _deletePendingBooking,
               ),
             ),
         ],
@@ -1529,18 +1642,21 @@ class _ParticipantCard extends StatelessWidget {
   final InscriptionModel participant;
   final String currentUserId;
 
-  const _ParticipantCard({required this.participant, required this.currentUserId});
+  const _ParticipantCard({
+    required this.participant,
+    required this.currentUserId,
+  });
 
   String _participantName() {
     final touriste = participant.touriste;
     print('🔍 [CARD DEBUG] participant.touriste: $touriste');
-    
+
     if (touriste != null && touriste is Map<String, dynamic>) {
       final name = (touriste['fullname'] ?? '').toString().trim();
       print('🔍 [CARD DEBUG] extracted name: "$name"');
       if (name.isNotEmpty) return name;
     }
-    
+
     // Show "X places" for group bookings instead of "Participant"
     final places = participant.nombreParticipants ?? 1;
     print('🔍 [CARD DEBUG] using places: $places');
@@ -1570,17 +1686,17 @@ class _ParticipantCard extends StatelessWidget {
     final participantId = _participantId();
     final nbParticipants = participant.nombreParticipants ?? 1;
     final bookingDate = participant.dateDemande;
-    
+
     // Check if this is the current user
     final isCurrentUser = participantId == currentUserId;
-    
+
     // Check privacy settings
     final touriste = participant.touriste;
     bool profileVisibility = true;
     if (touriste != null && touriste is Map<String, dynamic>) {
       profileVisibility = touriste['profileVisibility'] ?? true;
     }
-    
+
     // If not current user and profileVisibility is false, show only alert
     if (!isCurrentUser && !profileVisibility) {
       return Container(
@@ -2282,6 +2398,8 @@ class _StickyBottomBar extends StatelessWidget {
   final bool isLoading;
   final bool showDeleteButton;
   final VoidCallback? onDelete;
+  final IconData deleteIcon;
+  final bool isCancel;
   const _StickyBottomBar({
     required this.price,
     required this.showPrice,
@@ -2290,6 +2408,8 @@ class _StickyBottomBar extends StatelessWidget {
     required this.isLoading,
     this.showDeleteButton = false,
     this.onDelete,
+    this.deleteIcon = Icons.delete_outline,
+    this.isCancel = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -2346,7 +2466,7 @@ class _StickyBottomBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Icon(Icons.delete_outline, size: 20),
+                child: Icon(deleteIcon, size: 20),
               ),
             ),
             const SizedBox(width: 12),
@@ -2357,9 +2477,11 @@ class _StickyBottomBar extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onBook,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: showDeleteButton
-                      ? const Color(0xFFF59E0B)
-                      : const Color(0xFF3B82F6),
+                  backgroundColor: isCancel
+                      ? Colors.red
+                      : (showDeleteButton
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFF3B82F6)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -2368,7 +2490,7 @@ class _StickyBottomBar extends StatelessWidget {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
                         buttonLabel,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

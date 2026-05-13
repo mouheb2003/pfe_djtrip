@@ -137,22 +137,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // CUSTOM ICON: Blue square with white italic 'D'
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'D',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.white,
-                                ),
-                              ),
+                            // Official App Logo
+                            Image.asset(
+                              'assets/logos/app_logo.png',
+                              width: 32,
+                              height: 32,
                             ),
                             const SizedBox(width: 10),
                             // ANIMATED TEXT: 'DJTrip' letter-by-letter

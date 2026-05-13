@@ -65,13 +65,27 @@ exports.getAllLieux = async (req, res) => {
 // Get a place by ID
 exports.getLieuById = async (req, res) => {
   try {
+    const userId = req.user ? req.user.userId : null;
     const lieu = await Lieu.findById(req.params.id);
     if (!lieu) {
       return res
         .status(404)
         .json({ success: false, message: "Place not found" });
     }
-    res.status(200).json({ success: true, lieu });
+
+    // Convert to plain object to add dynamic properties
+    const lieuObj = lieu.toObject();
+
+    // Check if bookmarked by current user
+    if (userId && Array.isArray(lieu.bookmarked_by)) {
+      lieuObj.isBookmarked = lieu.bookmarked_by.some(
+        (id) => String(id) === String(userId)
+      );
+    } else {
+      lieuObj.isBookmarked = false;
+    }
+
+    res.status(200).json({ success: true, lieu: lieuObj });
   } catch (error) {
     res.status(500).json({
       success: false,

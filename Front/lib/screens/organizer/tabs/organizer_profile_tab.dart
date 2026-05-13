@@ -1083,56 +1083,6 @@ class _StatItem extends StatelessWidget {
 }
 
 
-class _ActivityTile extends StatelessWidget {
-  final String imageUrl;
-  final VoidCallback? onTap;
-
-  const _ActivityTile({required this.imageUrl, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            GestureDetector(
-              onTap: onTap,
-              child: imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFE8E8F6),
-                        child: const Center(
-                          child: Icon(
-                            Icons.image_not_supported,
-                            color: Color(0xFF8C93BE),
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: const Color(0xFFE8E8F6),
-                      child: const Center(
-                        child: Icon(
-                          Icons.terrain_rounded,
-                          color: Color(0xFF8C93BE),
-                          size: 30,
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 class _LanguageChip extends StatelessWidget {
   final String label;
 

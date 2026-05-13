@@ -135,10 +135,10 @@ class _SplashScreenState extends State<SplashScreen>
                                   color: Colors.white.withOpacity(0.3),
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.surfing,
-                                color: Colors.white,
-                                size: 72,
+                              child: Image.asset(
+                                'assets/logos/app_logo.png',
+                                width: 72,
+                                height: 72,
                               ),
                             ),
                             Positioned(

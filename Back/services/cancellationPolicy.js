@@ -15,37 +15,14 @@ class CancellationPolicy {
    * - <24 hours: 70% refund (30% platform fee)
    */
   static calculateRefund(booking, activity) {
-    const now = new Date();
-    const activityStart = new Date(activity.date_debut);
-    const hoursBeforeStart = (activityStart - now) / (1000 * 60 * 60);
-    
-    // Default policy
-    let refundPercent = 0;
-    let feePercent = 100;
-    
-    if (hoursBeforeStart >= 48) {
-      refundPercent = 100;
-      feePercent = 0;
-    } else if (hoursBeforeStart >= 24) {
-      refundPercent = 85;
-      feePercent = 15;
-    } else {
-      // Less than 24 hours: 70% refund (30% platform fee)
-      refundPercent = 70;
-      feePercent = 30;
-    }
-    
-    const refundAmount = (booking.prix_total * refundPercent) / 100;
-    const feeAmount = booking.prix_total - refundAmount;
-    
     return {
-      refundPercent,
-      refundAmount,
-      feePercent,
-      feeAmount,
-      hoursBeforeStart: Math.max(0, hoursBeforeStart),
-      canCancel: hoursBeforeStart > 0,
-      policy: this.getPolicyDescription(hoursBeforeStart)
+      refundPercent: 0,
+      refundAmount: 0,
+      feePercent: 0,
+      feeAmount: 0,
+      hoursBeforeStart: 0,
+      canCancel: true,
+      policy: "No refund policy"
     };
   }
   
@@ -53,13 +30,7 @@ class CancellationPolicy {
    * Get human-readable policy description
    */
   static getPolicyDescription(hoursBeforeStart) {
-    if (hoursBeforeStart >= 48) {
-      return 'Full refund (48+ hours before activity)';
-    } else if (hoursBeforeStart >= 24) {
-      return '85% refund (24-48 hours before activity - 15% platform fee)';
-    } else {
-      return '70% refund (<24 hours before activity - 30% platform fee)';
-    }
+    return 'Cancellations do not include a refund.';
   }
   
   /**
@@ -137,8 +108,8 @@ class CancellationPolicy {
         throw new Error(canCancelCheck.reason);
       }
       
-      // Calculate refund
-      const refund = this.calculateRefund(booking, activity);
+      // Calculate refund (removed)
+      const refund = { refundAmount: 0, feePercent: 0, refundPercent: 0, feeAmount: 0, policy: "No refund" };
       
       // Check if was approved before changing status (for capacity decrement)
       const wasApproved = booking.statut === 'approuvee';
@@ -148,11 +119,11 @@ class CancellationPolicy {
       booking.cancellationPolicy = {
         canCancel: true,
         cancellationDeadline: activity.date_debut,
-        cancellationFee: refund.feePercent,
-        refundAmount: refund.refundAmount,
+        cancellationFee: 0,
+        refundAmount: 0,
         cancelledAt: new Date(),
         cancellationReason: reason,
-        refundProcessed: false
+        refundProcessed: true
       };
       
       await booking.save({ session });
@@ -168,96 +139,20 @@ class CancellationPolicy {
       
       await session.commitTransaction();
       
-      logger.info('Booking cancelled', {
+      logger.info('Booking cancelled (No refund)', {
         bookingId,
-        touristId,
-        refundAmount: refund.refundAmount,
-        refundPercent: refund.refundPercent
+        touristId
       });
-      
-      // Process refund via Stripe if applicable (after transaction commit)
-      // Process refund if there's a payment, regardless of approval status
-      if (refund.refundAmount > 0) {
-        try {
-          const Payment = require('../models/payment');
-          const stripeService = require('../services/stripeService');
-          
-          const payment = await Payment.findOne({ inscription_id: bookingId });
-          console.log('[CANCELLATION] Looking for payment for booking:', bookingId);
-          
-          if (payment && payment.stripe_payment_intent_id) {
-            const amountInCents = Math.round(refund.refundAmount * 100);
-            console.log('[CANCELLATION] Processing Stripe refund:', {
-              paymentIntentId: payment.stripe_payment_intent_id,
-              amountInCents,
-              refundAmount: refund.refundAmount,
-              paymentStatus: payment.status
-            });
-            
-            const refundResult = await stripeService.refundPayment(
-              payment.stripe_payment_intent_id, 
-              amountInCents
-            );
-            
-            console.log('[CANCELLATION] Stripe refund successful:', refundResult);
-            
-            // Update payment status
-            payment.status = "refunded";
-            payment.refunded_at = new Date();
-            await payment.save();
-            
-            // Update booking refund processed flag
-            booking.cancellationPolicy.refundProcessed = true;
-            await booking.save();
-            
-            logger.info('Refund processed via Stripe', { 
-              bookingId, 
-              refundAmount: refund.refundAmount,
-              refundId: refundResult.id
-            });
-          } else {
-            console.log('[CANCELLATION] No payment found or no payment_intent_id for booking, skipping Stripe refund');
-            console.log('[CANCELLATION] Payment:', payment ? { id: payment._id, status: payment.status, hasPaymentIntent: !!payment.stripe_payment_intent_id } : 'null');
-            // Queue for retry via event bus if there's a refund amount
-            if (refund.refundAmount > 0) {
-              const notificationEventBus = require('../services/notificationEventBus');
-              await notificationEventBus.emitBookingCancelled(
-                bookingId, 
-                activity.organisateur_id, 
-                touristId, 
-                activity.titre, 
-                reason, 
-                refund.refundAmount
-              );
-            }
-          }
-        } catch (refundError) {
-          logger.error('Stripe refund failed, queueing for retry', { 
-            bookingId, 
-            error: refundError.message 
-          });
-          // Queue for retry via event bus
-          const notificationEventBus = require('../services/notificationEventBus');
-          await notificationEventBus.emitBookingCancelled(
-            bookingId, 
-            activity.organisateur_id, 
-            touristId, 
-            activity.titre, 
-            reason, 
-            refund.refundAmount
-          );
-        }
-      }
       
       return {
         success: true,
         booking,
         refund: {
-          amount: refund.refundAmount,
-          percent: refund.refundPercent,
-          fee: refund.feeAmount,
-          feePercent: refund.feePercent,
-          policy: refund.policy
+          amount: 0,
+          percent: 0,
+          fee: 0,
+          feePercent: 0,
+          policy: "No refund"
         }
       };
     } catch (error) {

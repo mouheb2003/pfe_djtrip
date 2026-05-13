@@ -1147,6 +1147,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     );
   }
 
+  bool get _isOngoing => widget.activity.isOngoing;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1167,6 +1169,42 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                   ),
                   children: [
                     _buildTopInfo(),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle(
+                      'Availability',
+                      'When is this activity available? Control the season start and end.',
+                    ),
+                    Opacity(
+                      opacity: _isOngoing ? 0.6 : 1.0,
+                      child: IgnorePointer(
+                        ignoring: _isOngoing,
+                        child: _buildCard([
+                          _buildLabel('SEASON START DATE'),
+                          _buildDatePicker(
+                            _fmtFullDate(_startDateTime),
+                            _pickDateTime,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildLabel('SEASON END DATE (AUTO-CALCULATED)'),
+                          _buildDatePicker(
+                            _fmtFullDate(_endDateTime),
+                            null,
+                            isDisabled: true,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildLabel('DURATION (HOURS)'),
+                          _buildDurationChips(),
+                        ]),
+                      ),
+                    ),
+                    if (_isOngoing)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Availability cannot be modified while activity is ongoing',
+                          style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     const SizedBox(height: 32),
                     _buildSectionTitle(
                       'Core Identity',
@@ -1299,7 +1337,16 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
+                        readOnly: _isOngoing,
                       ),
+                      if (_isOngoing)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4, bottom: 8),
+                          child: Text(
+                            'Price cannot be modified while activity is ongoing',
+                            style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                       const SizedBox(height: 16),
                       _buildLabel('MAX CAPACITY'),
                       _buildTextField(
@@ -1326,162 +1373,176 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       'Location & Itinerary',
                       'Choose between fixed location, custom location with map, or detailed itinerary.',
                     ),
-                    _buildCard([
-                      // Location Type Selection
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F9FE),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E9FF)),
-                        ),
-                        child: Column(
-                          children: [
-                            // Fixed Location Option
-                            _buildLocationOption(
-                              title: 'Fixed Location',
-                              subtitle: 'Choose from predefined locations',
-                              icon: Icons.location_on,
-                              isSelected: _useFixedLocation && !_useItinerary,
-                              onTap: () {
-                                setState(() {
-                                  _useFixedLocation = true;
-                                  _useItinerary = false;
-                                });
-                              },
+                    Opacity(
+                      opacity: _isOngoing ? 0.6 : 1.0,
+                      child: IgnorePointer(
+                        ignoring: _isOngoing,
+                        child: _buildCard([
+                          // Location Type Selection
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8F9FE),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E9FF)),
                             ),
-                            const SizedBox(height: 12),
-                            // Custom Location Option
-                            _buildLocationOption(
-                              title: 'Custom Location',
-                              subtitle: 'Pick any location on the map',
-                              icon: Icons.map,
-                              isSelected: !_useFixedLocation && !_useItinerary,
-                              onTap: () {
-                                print(
-                                  '🔍 DEBUG EDIT: Custom Location tapped - before: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary',
-                                );
-                                setState(() {
-                                  _useFixedLocation = false;
-                                  _useItinerary = false;
-                                });
-                                print(
-                                  '🔍 DEBUG EDIT: Custom Location tapped - after: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary',
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            // Itinerary Option
-                            _buildLocationOption(
-                              title: 'Itinerary',
-                              subtitle: 'Multi-location journey with waypoints',
-                              icon: Icons.route,
-                              isSelected: _useItinerary,
-                              onTap: () {
-                                setState(() {
-                                  _useFixedLocation = false;
-                                  _useItinerary = true;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Fixed Location Content
-                      if (_useFixedLocation && !_useItinerary) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E9FF)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedFixedLocation,
-                              isExpanded: true,
-                              hint: const Text(
-                                'Select a fixed location',
-                                style: TextStyle(color: Color(0xFF717BBC)),
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Djerba Explore Park',
-                                  child: Text('Djerba Explore Park'),
+                            child: Column(
+                              children: [
+                                // Fixed Location Option
+                                _buildLocationOption(
+                                  title: 'Fixed Location',
+                                  subtitle: 'Choose from predefined locations',
+                                  icon: Icons.location_on,
+                                  isSelected: _useFixedLocation && !_useItinerary,
+                                  onTap: () {
+                                    setState(() {
+                                      _useFixedLocation = true;
+                                      _useItinerary = false;
+                                    });
+                                  },
                                 ),
-                                DropdownMenuItem(
-                                  value: 'Houmt Souk Medina',
-                                  child: Text('Houmt Souk Medina'),
+                                const SizedBox(height: 12),
+                                // Custom Location Option
+                                _buildLocationOption(
+                                  title: 'Custom Location',
+                                  subtitle: 'Pick any location on the map',
+                                  icon: Icons.map,
+                                  isSelected: !_useFixedLocation && !_useItinerary,
+                                  onTap: () {
+                                    print(
+                                      '🔍 DEBUG EDIT: Custom Location tapped - before: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary',
+                                    );
+                                    setState(() {
+                                      _useFixedLocation = false;
+                                      _useItinerary = false;
+                                    });
+                                    print(
+                                      '🔍 DEBUG EDIT: Custom Location tapped - after: _useFixedLocation=$_useFixedLocation, _useItinerary=$_useItinerary',
+                                    );
+                                  },
                                 ),
-                                DropdownMenuItem(
-                                  value: 'Guellala Museum',
-                                  child: Text('Guellala Museum'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Djerba Heritage Museum',
-                                  child: Text('Djerba Heritage Museum'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Borj Ghazi Mustapha Fort',
-                                  child: Text('Borj Ghazi Mustapha Fort'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Midoun Beach',
-                                  child: Text('Midoun Beach'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Sidi Mahrsi Beach',
-                                  child: Text('Sidi Mahrsi Beach'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Djerba Golf Club',
-                                  child: Text('Djerba Golf Club'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Crocodile Farm',
-                                  child: Text('Crocodile Farm'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Djerba Aqua Park',
-                                  child: Text('Djerba Aqua Park'),
+                                const SizedBox(height: 12),
+                                // Itinerary Option
+                                _buildLocationOption(
+                                  title: 'Itinerary',
+                                  subtitle: 'Multi-location journey with waypoints',
+                                  icon: Icons.route,
+                                  isSelected: _useItinerary,
+                                  onTap: () {
+                                    setState(() {
+                                      _useFixedLocation = false;
+                                      _useItinerary = true;
+                                    });
+                                  },
                                 ),
                               ],
-                              onChanged: (value) {
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Fixed Location Content
+                          if (_useFixedLocation && !_useItinerary) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E9FF)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedFixedLocation,
+                                  isExpanded: true,
+                                  hint: const Text(
+                                    'Select a fixed location',
+                                    style: TextStyle(color: Color(0xFF717BBC)),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'Djerba Explore Park',
+                                      child: Text('Djerba Explore Park'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Houmt Souk Medina',
+                                      child: Text('Houmt Souk Medina'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Guellala Museum',
+                                      child: Text('Guellala Museum'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Djerba Heritage Museum',
+                                      child: Text('Djerba Heritage Museum'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Borj Ghazi Mustapha Fort',
+                                      child: Text('Borj Ghazi Mustapha Fort'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Midoun Beach',
+                                      child: Text('Midoun Beach'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Sidi Mahrsi Beach',
+                                      child: Text('Sidi Mahrsi Beach'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Djerba Golf Club',
+                                      child: Text('Djerba Golf Club'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Crocodile Farm',
+                                      child: Text('Crocodile Farm'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Djerba Aqua Park',
+                                      child: Text('Djerba Aqua Park'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedFixedLocation = value;
+                                      _locationCtrl.text = value ?? '';
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ] else if (!_useFixedLocation && !_useItinerary) ...[
+                            // Custom Location Content
+                            PlaceSearchWidget(
+                              controller: _locationCtrl,
+                              hintText: 'Search for a place...',
+                              onPlaceSelected: (place) {
                                 setState(() {
-                                  _selectedFixedLocation = value;
-                                  _locationCtrl.text = value ?? '';
+                                  if (place.latitude != null &&
+                                      place.longitude != null) {
+                                    _pickedLatLng = LatLng(
+                                      place.latitude!,
+                                      place.longitude!,
+                                    );
+                                  }
                                 });
                               },
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _buildMapPreview(),
+                          ] else if (_useItinerary) ...[
+                            // Itinerary Content
+                            _buildItinerarySection(),
+                          ],
+                        ]),
+                      ),
+                    ),
+                    if (_isOngoing)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Location cannot be modified while activity is ongoing',
+                          style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w600),
                         ),
-                      ] else if (!_useFixedLocation && !_useItinerary) ...[
-                        // Custom Location Content
-                        PlaceSearchWidget(
-                          controller: _locationCtrl,
-                          hintText: 'Search for a place...',
-                          onPlaceSelected: (place) {
-                            setState(() {
-                              if (place.latitude != null &&
-                                  place.longitude != null) {
-                                _pickedLatLng = LatLng(
-                                  place.latitude!,
-                                  place.longitude!,
-                                );
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildMapPreview(),
-                      ] else if (_useItinerary) ...[
-                        // Itinerary Content
-                        _buildItinerarySection(),
-                      ],
-                    ]),
+                      ),
                     const SizedBox(height: 32),
                     _buildSectionTitle(
                       'Preparation',
@@ -1501,28 +1562,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                         'Add item...',
                         Icons.list_alt_rounded,
                       ),
-                    ]),
-                    const SizedBox(height: 32),
-                    _buildSectionTitle(
-                      'Availability',
-                      'When is this activity available? Control the season start and end.',
-                    ),
-                    _buildCard([
-                      _buildLabel('SEASON START DATE'),
-                      _buildDatePicker(
-                        _fmtFullDate(_startDateTime),
-                        _pickDateTime,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildLabel('SEASON END DATE (AUTO-CALCULATED)'),
-                      _buildDatePicker(
-                        _fmtFullDate(_endDateTime),
-                        null,
-                        isDisabled: true,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildLabel('DURATION (HOURS)'),
-                      _buildDurationChips(),
                     ]),
                     const SizedBox(height: 40),
                     _buildSaveButton(),

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../models/lieu_model.dart';
 import '../../services/lieu_service.dart';
-import 'place_detail_new_screen.dart';
+import 'place_detail_screen.dart';
 import '../../widgets/place_card.dart';
 
 class ViewAllPlacesScreen extends StatefulWidget {
@@ -19,7 +19,7 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   List<LieuModel> _places = [];
   List<LieuModel> _filteredPlaces = [];
   bool _isLoading = true;
@@ -30,45 +30,51 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
   final _searchController = TextEditingController();
 
   final List<String> _categories = [
-    'All', 'hotel', 'restaurant', 'museum', 'park', 'beach', 'shopping', 'entertainment', 'historical', 'landmark'
+    'All',
+    'hotel',
+    'restaurant',
+    'museum',
+    'park',
+    'beach',
+    'shopping',
+    'entertainment',
+    'historical',
+    'landmark',
   ];
 
   final List<String> _sortOptions = [
-    'Popular', 'Newest', 'Rating', 'Name A-Z', 'Name Z-A'
+    'Popular',
+    'Newest',
+    'Rating',
+    'Name A-Z',
+    'Name Z-A',
   ];
 
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-    
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
+
     _loadPlaces();
-    
+
     _fadeController.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) {
@@ -87,7 +93,7 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
 
   Future<void> _loadPlaces() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final places = await LieuService.getLieux();
       setState(() {
@@ -110,19 +116,25 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
     setState(() {
       _filteredPlaces = _places.where((place) {
         // Search filter
-        final matchesSearch = _searchQuery.isEmpty ||
+        final matchesSearch =
+            _searchQuery.isEmpty ||
             place.titre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            place.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            place.sousTitre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            place.description.toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            ) ||
+            place.sousTitre.toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            ) ||
             place.categorie.toLowerCase().contains(_searchQuery.toLowerCase());
-        
+
         // Category filter
-        final matchesCategory = _selectedCategory == 'All' ||
+        final matchesCategory =
+            _selectedCategory == 'All' ||
             place.categorie.toLowerCase() == _selectedCategory.toLowerCase();
-        
+
         return matchesSearch && matchesCategory;
       }).toList();
-      
+
       // Apply sorting
       _sortPlaces();
     });
@@ -132,13 +144,17 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
     setState(() {
       switch (_selectedSort) {
         case 'Popular':
-          _filteredPlaces.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
+          _filteredPlaces.sort(
+            (a, b) => b.noteMoyenne.compareTo(a.noteMoyenne),
+          );
           break;
         case 'Newest':
           _filteredPlaces.sort((a, b) => b.nombreAvis.compareTo(a.nombreAvis));
           break;
         case 'Rating':
-          _filteredPlaces.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
+          _filteredPlaces.sort(
+            (a, b) => b.noteMoyenne.compareTo(a.noteMoyenne),
+          );
           break;
         case 'Name A-Z':
           _filteredPlaces.sort((a, b) => a.titre.compareTo(b.titre));
@@ -245,10 +261,16 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                       onChanged: _onSearchChanged,
                       decoration: InputDecoration(
                         hintText: 'Search places, cities, locations...',
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF6C757D)),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFF6C757D),
+                        ),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, color: Color(0xFF6C757D)),
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Color(0xFF6C757D),
+                                ),
                                 onPressed: () {
                                   _searchController.clear();
                                   _onSearchChanged('');
@@ -262,9 +284,9 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Filters
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -285,7 +307,10 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                             child: DropdownButton<String>(
                               value: _selectedCategory,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6C757D)),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Color(0xFF6C757D),
+                              ),
                               items: _categories.map((category) {
                                 return DropdownMenuItem<String>(
                                   value: category,
@@ -307,9 +332,9 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(width: 12),
-                      
+
                       // Sort Filter
                       Expanded(
                         child: Container(
@@ -323,7 +348,10 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                             child: DropdownButton<String>(
                               value: _selectedSort,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6C757D)),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: Color(0xFF6C757D),
+                              ),
                               items: _sortOptions.map((sort) {
                                 return DropdownMenuItem<String>(
                                   value: sort,
@@ -349,9 +377,9 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 20),
-              
+
               // Results Count
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -390,22 +418,24 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Places List/Grid
               Expanded(
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF4B63FF),
+                          ),
                         ),
                       )
                     : _filteredPlaces.isEmpty
-                        ? _buildEmptyState()
-                        : _isGridView
-                            ? _buildGridView()
-                            : _buildListView(),
+                    ? _buildEmptyState()
+                    : _isGridView
+                    ? _buildGridView()
+                    : _buildListView(),
               ),
             ],
           ),
@@ -419,11 +449,7 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.location_off,
-            size: 64,
-            color: const Color(0xFF6C757D),
-          ),
+          Icon(Icons.location_off, size: 64, color: const Color(0xFF6C757D)),
           const SizedBox(height: 16),
           Text(
             'No places found',
@@ -436,10 +462,7 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search or filters',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6C757D),
-            ),
+            style: const TextStyle(fontSize: 16, color: Color(0xFF6C757D)),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -478,17 +501,18 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
         itemCount: _filteredPlaces.length,
         itemBuilder: (context, index) {
           return SizedBox(
-          height: 280,
-          child: _CustomPlaceCard(
-            place: _filteredPlaces[index],
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PlaceDetailNewScreen(place: _filteredPlaces[index]),
+            height: 280,
+            child: _CustomPlaceCard(
+              place: _filteredPlaces[index],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PlaceDetailScreen(place: _filteredPlaces[index]),
+                ),
               ),
             ),
-          ),
-        );
+          );
         },
       ),
     );
@@ -506,7 +530,8 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => PlaceDetailNewScreen(place: _filteredPlaces[index]),
+                builder: (_) =>
+                    PlaceDetailScreen(place: _filteredPlaces[index]),
               ),
             ),
           ),
@@ -538,13 +563,9 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
       duration: const Duration(milliseconds: 100),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -578,7 +599,7 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
       onTapCancel: _handleTapCancel,
       child: ScaleTransition(
         scale: _scaleAnimation,
-          child: Container(
+        child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -598,7 +619,9 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
               Expanded(
                 flex: 3,
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                   child: Stack(
                     children: [
                       Image.network(
@@ -618,7 +641,10 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                         top: 12,
                         right: 12,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
                             borderRadius: BorderRadius.circular(12),
@@ -626,7 +652,11 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star, color: Color(0xFFFFC529), size: 12),
+                              const Icon(
+                                Icons.star,
+                                color: Color(0xFFFFC529),
+                                size: 12,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '${widget.place.noteMoyenne.toStringAsFixed(1)}',
@@ -665,7 +695,9 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        widget.place.sousTitre.isNotEmpty ? widget.place.sousTitre : 'Djerba',
+                        widget.place.sousTitre.isNotEmpty
+                            ? widget.place.sousTitre
+                            : 'Djerba',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -680,7 +712,9 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                         children: [
                           Expanded(
                             child: Text(
-                              widget.place.prix == 'FREE' ? 'Free' : '${widget.place.prix}',
+                              widget.place.prix == 'FREE'
+                                  ? 'Free'
+                                  : '${widget.place.prix}',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 12,

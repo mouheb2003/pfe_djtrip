@@ -3,7 +3,6 @@ import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
-import '../payment/stripe_payment_screen.dart';
 import 'booking_confirmation_screen.dart';
 import 'booking_detail_screen.dart';
 
@@ -23,14 +22,11 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   int _currentImage = 0;
   late final PageController _imagePageController;
 
-  final double _serviceFee = 5.0;
-
   int get _totalParticipants => _adults + _children;
   int get _maxParticipants => widget.activity.placesDisponibles;
   bool get _canAddParticipant => _totalParticipants < _maxParticipants;
 
   double get _subtotal => (_adults + _children) * widget.activity.prix;
-  double get _total => _subtotal + _serviceFee;
   String get _currency => 'TND';
 
   List<String> get _activityImages {
@@ -282,10 +278,6 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
             value: '${_subtotal.toStringAsFixed(0)} $_currency',
           ),
           const SizedBox(height: 8),
-          _PriceRow(
-            label: 'Service fee',
-            value: '${_serviceFee.toStringAsFixed(0)} $_currency',
-          ),
           const SizedBox(height: 12),
           Divider(color: const Color(0xFFD8DEE8), endIndent: 0),
           const SizedBox(height: 12),
@@ -301,7 +293,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                 ),
               ),
               Text(
-                '${_total.toStringAsFixed(0)} $_currency',
+                '${_subtotal.toStringAsFixed(0)} $_currency',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -344,14 +336,12 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     Text(
-                      'Pay & Confirm',
+                      'Confirm Booking',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.payment, size: 20),
                   ],
                 ),
         ),
@@ -385,7 +375,7 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
     setState(() => _isLoading = true);
 
-    // Step 1: Create inscription with PAID_PENDING_CONFIRMATION status
+    // Step 1: Create inscription with the normal booking flow
     try {
       final inscriptionResult = await InscriptionService.createInscription(
         activiteId: widget.activity.id,
@@ -394,7 +384,9 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
       if (!mounted) return;
 
-      final inscriptionId = inscriptionResult['inscription']?['_id']?.toString() ?? inscriptionResult['inscription']?['id']?.toString();
+      final inscriptionId =
+          inscriptionResult['inscription']?['_id']?.toString() ??
+          inscriptionResult['inscription']?['id']?.toString();
 
       if (inscriptionId == null || inscriptionId.isEmpty) {
         if (!mounted) return;
@@ -408,81 +400,62 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
         return;
       }
 
-      // Step 2: Navigate to Stripe payment screen with inscriptionId
-      final paymentCompleted = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StripePaymentScreen(
-            inscriptionId: inscriptionId,
-            activityId: widget.activity.id,
-            activityTitle: widget.activity.titre,
-            nombreParticipants: requested,
-            adults: _adults,
-            children: _children,
-            amount: _total,
-            currency: _currency,
-            description: 'Booking for ${widget.activity.titre}',
-          ),
+      // Step 2: Navigate directly to the booking confirmation screen.
+      final inscriptionJson = inscriptionResult['inscription'];
+      final inscription = InscriptionModel.fromJson(inscriptionJson);
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking submitted successfully.'),
+          backgroundColor: Colors.green,
         ),
       );
 
-      if (!mounted) return;
-
-      if (paymentCompleted == true) {
-        // Payment successful, navigate to booking details
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking confirmed!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Navigate to booking detail screen
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BookingDetailScreen(
-              inscription: InscriptionModel.fromJson(inscriptionResult['inscription']),
-            ),
-          ),
-        );
-      }
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      if (paymentCompleted != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment cancelled or failed. You can retry payment from the activity details.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookingConfirmationScreen(inscription: inscription),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      
+
       // Handle booking overlap errors
       String errorMessage = 'Error: $e';
       Color backgroundColor = Colors.red;
-      
-      if (e.toString().contains('status code 409') || e.toString().contains('already have a booking during this time period')) {
+
+      if (e.toString().contains('status code 409') ||
+          e.toString().contains(
+            'already have a booking during this time period',
+          ) ||
+          RegExp(
+            r'already\s+registered',
+            caseSensitive: false,
+          ).hasMatch(e.toString()) ||
+          e.toString().toLowerCase().contains('user already registered')) {
         // Extract conflict details if available
         String conflictDetails = '';
         try {
           // Try to parse the error response for conflict details
           if (e.toString().contains('conflict:')) {
-            final conflictMatch = RegExp(r'conflict:\s*({.*?})').firstMatch(e.toString());
+            final conflictMatch = RegExp(
+              r'conflict:\s*({.*?})',
+            ).firstMatch(e.toString());
             if (conflictMatch != null) {
-              conflictDetails = '\n\nConflicting activity: ${conflictMatch.group(1)}';
+              conflictDetails =
+                  '\n\nConflicting activity: ${conflictMatch.group(1)}';
             }
           }
         } catch (_) {}
-        
-        errorMessage = 'You already have a booking during this time period.$conflictDetails';
+        // Normalize to a clear message the user requested.
+        errorMessage = 'User already registered';
         backgroundColor = Colors.orange;
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),

@@ -40,7 +40,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
   bool _isLoadingAll = false;
 
   List<Map<String, dynamic>> _myPosts = [];
-List<Map<String, dynamic>> _featuredPlaces = [];
+  List<Map<String, dynamic>> _featuredPlaces = [];
 
   @override
   void initState() {
@@ -109,7 +109,8 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                       final authorId = author is Map<String, dynamic>
                           ? (author['_id'] ?? author['id'] ?? '').toString()
                           : author?.toString() ?? '';
-                      return currentUserId.isNotEmpty && authorId == currentUserId;
+                      return currentUserId.isNotEmpty &&
+                          authorId == currentUserId;
                     }).toList())
               .take(12)
               .toList();
@@ -241,7 +242,6 @@ List<Map<String, dynamic>> _featuredPlaces = [];
     await _loadAll();
   }
 
-  
   Future<void> _deletePost(String postId) async {
     final confirmed = await showGeneralDialog<bool>(
       context: context,
@@ -283,7 +283,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Title
                   const Text(
                     'Delete Post',
@@ -295,7 +295,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Description
                   const Text(
                     'This post will be permanently deleted.\nYou won\'t be able to recover it later.',
@@ -308,7 +308,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Buttons
                   Row(
                     children: [
@@ -334,7 +334,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                         ),
                       ),
                       const SizedBox(width: 12),
-                      
+
                       // Delete button
                       Expanded(
                         child: ElevatedButton(
@@ -462,7 +462,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                         await Share.share(content);
                       },
                     ),
-                                        const Divider(height: 26, color: Color(0xFFE0E1EF)),
+                    const Divider(height: 26, color: Color(0xFFE0E1EF)),
                     _ActionRow(
                       icon: Icons.delete_rounded,
                       label: 'Delete Post',
@@ -688,18 +688,14 @@ List<Map<String, dynamic>> _featuredPlaces = [];
   void _navigateToPlaceDetails(Map<String, dynamic> place) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => PlaceDetailScreen(place: place),
-      ),
+      MaterialPageRoute(builder: (_) => PlaceDetailScreen(place: place)),
     );
   }
 
   void _navigateToAllPlaces() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AllPlacesSimpleScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const AllPlacesSimpleScreen()),
     );
   }
 
@@ -899,7 +895,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                               const Spacer(),
                             ],
                           ),
-                                                  ],
+                        ],
                       ),
                     ),
                   ),
@@ -914,216 +910,216 @@ List<Map<String, dynamic>> _featuredPlaces = [];
 
   String _displayLocation() {
     final parts = <String>[];
-    
+
     if (_user?.paysOrigine?.isNotEmpty == true) {
       final countryName = _user!.paysOrigine!;
       final flag = _getCountryFlag(countryName);
       parts.add('$flag $countryName');
     }
-    
+
     return parts.join(' • ');
   }
 
   String _getCountryFlag(String country) {
-  if (country.isEmpty) return '�';
-  
-  // Clean the country name - remove extra spaces and lowercase
-  final cleanCountry = country.trim().toLowerCase();
-  
-  // Common country codes to flag emojis
-  final countryFlags = {
-    // Tunisia variations
-    'tn': '🇹🇳',
-    'tunisia': '🇹🇳',
-    'tunisie': '🇹🇳',
-    'tunisian': '🇹🇳',
-    // France variations
-    'fr': '🇫🇷',
-    'france': '🇫🇷',
-    // USA variations
-    'us': '🇺🇸',
-    'usa': '🇺🇸',
-    'united states': '🇺🇸',
-    'united states of america': '🇺🇸',
-    'america': '🇺🇸',
-    // UK variations
-    'gb': '🇬🇧',
-    'uk': '🇬🇧',
-    'united kingdom': '🇬🇧',
-    'britain': '🇬🇧',
-    'great britain': '🇬🇧',
-    'england': '🇬🇧',
-    // Germany
-    'de': '🇩🇪',
-    'germany': '🇩🇪',
-    'allemagne': '🇩🇪',
-    // Italy
-    'it': '🇮🇹',
-    'italy': '🇮🇹',
-    'italie': '🇮🇹',
-    // Spain
-    'es': '🇪🇸',
-    'spain': '🇪🇸',
-    'espagne': '🇪🇸',
-    // Morocco
-    'ma': '🇲🇦',
-    'morocco': '🇲🇦',
-    'maroc': '🇲🇦',
-    // Algeria
-    'dz': '🇩🇿',
-    'algeria': '🇩🇿',
-    'algerie': '🇩🇿',
-    // Egypt
-    'eg': '🇪🇬',
-    'egypt': '🇪🇬',
-    'egypte': '🇪🇬',
-    // Libya
-    'ly': '🇱🇾',
-    'libya': '🇱🇾',
-    'libye': '🇱🇾',
-    // Saudi Arabia
-    'sa': '🇸🇦',
-    'saudi arabia': '🇸🇦',
-    'arabie saoudite': '🇸🇦',
-    // UAE
-    'ae': '🇦🇪',
-    'uae': '🇦🇪',
-    'emirates': '🇦🇪',
-    'united arab emirates': '🇦🇪',
-    // Qatar
-    'qa': '🇶🇦',
-    'qatar': '🇶🇦',
-    // Canada
-    'ca': '🇨🇦',
-    'canada': '🇨🇦',
-    // Australia
-    'au': '🇦🇺',
-    'australia': '🇦🇺',
-    'australie': '🇦🇺',
-    // Japan
-    'jp': '🇯🇵',
-    'japan': '🇯🇵',
-    'japon': '🇯🇵',
-    // China
-    'cn': '🇨🇳',
-    'china': '🇨🇳',
-    'chine': '🇨🇳',
-    // India
-    'in': '🇮🇳',
-    'india': '🇮🇳',
-    'inde': '🇮🇳',
-    // Brazil
-    'br': '🇧🇷',
-    'brazil': '🇧🇷',
-    'bresil': '🇧🇷',
-    // Mexico
-    'mx': '🇲🇽',
-    'mexico': '🇲🇽',
-    'mexique': '🇲🇽',
-    // Argentina
-    'ar': '🇦🇷',
-    'argentina': '🇦🇷',
-    'argentine': '🇦🇷',
-    // South Africa
-    'za': '🇿🇦',
-    'south africa': '🇿🇦',
-    'afrique du sud': '🇿🇦',
-    // Nigeria
-    'ng': '🇳🇬',
-    'nigeria': '🇳🇬',
-    // Kenya
-    'ke': '🇰🇪',
-    'kenya': '🇰🇪',
-    // Turkey
-    'tr': '🇹🇷',
-    'turkey': '🇹🇷',
-    'turquie': '🇹🇷',
-    // Greece
-    'gr': '🇬🇷',
-    'greece': '🇬🇷',
-    'grece': '🇬🇷',
-    // Netherlands
-    'nl': '🇳🇱',
-    'netherlands': '🇳🇱',
-    'pays-bas': '🇳🇱',
-    'pays bas': '🇳🇱',
-    // Belgium
-    'be': '🇧🇪',
-    'belgium': '🇧🇪',
-    'belgique': '🇧🇪',
-    // Switzerland
-    'ch': '🇨🇭',
-    'switzerland': '🇨🇭',
-    'suisse': '🇨🇭',
-    // Sweden
-    'se': '🇸🇪',
-    'sweden': '🇸🇪',
-    'suede': '🇸🇪',
-    // Norway
-    'no': '🇳🇴',
-    'norway': '🇳🇴',
-    'norvege': '🇳🇴',
-    // Denmark
-    'dk': '🇩🇰',
-    'denmark': '🇩🇰',
-    'danemark': '🇩🇰',
-    // Finland
-    'fi': '🇫🇮',
-    'finland': '🇫🇮',
-    'finlande': '🇫🇮',
-    // Poland
-    'pl': '🇵🇱',
-    'poland': '🇵🇱',
-    'pologne': '🇵🇱',
-    // Czech Republic
-    'cz': '🇨🇿',
-    'czech': '🇨🇿',
-    'czech republic': '🇨🇿',
-    'republique tcheque': '🇨🇿',
-    // Austria
-    'at': '🇦🇹',
-    'austria': '🇦🇹',
-    'autriche': '🇦🇹',
-    // Hungary
-    'hu': '🇭🇺',
-    'hungary': '🇭🇺',
-    'hongrie': '🇭🇺',
-    // Portugal
-    'pt': '🇵🇹',
-    'portugal': '🇵🇹',
-    // Russia
-    'ru': '🇷🇺',
-    'russia': '🇷🇺',
-    'russie': '🇷🇺',
-    // Ukraine
-    'ua': '🇺🇦',
-    'ukraine': '🇺🇦',
-    // Romania
-    'ro': '🇷🇴',
-    'romania': '🇷🇴',
-    'roumanie': '🇷🇴',
-    // Bulgaria
-    'bg': '🇧🇬',
-    'bulgaria': '🇧🇬',
-    'bulgarie': '🇧🇬',
-    // Croatia
-    'hr': '🇭🇷',
-    'croatia': '🇭🇷',
-    'croatie': '🇭🇷',
-    // Slovenia
-    'si': '🇸🇮',
-    'slovenia': '🇸🇮',
-    'slovenie': '🇸🇮',
-    // Slovakia
-    'sk': '🇸🇰',
-    'slovakia': '🇸🇰',
-    'slovaquie': '🇸🇰',
-    // Estonia
-    'ee': '🇪🇪',
-    'estonia': '🇪🇪',
-  };
-  
-  return countryFlags[cleanCountry] ?? '🌍';
+    if (country.isEmpty) return '�';
+
+    // Clean the country name - remove extra spaces and lowercase
+    final cleanCountry = country.trim().toLowerCase();
+
+    // Common country codes to flag emojis
+    final countryFlags = {
+      // Tunisia variations
+      'tn': '🇹🇳',
+      'tunisia': '🇹🇳',
+      'tunisie': '🇹🇳',
+      'tunisian': '🇹🇳',
+      // France variations
+      'fr': '🇫🇷',
+      'france': '🇫🇷',
+      // USA variations
+      'us': '🇺🇸',
+      'usa': '🇺🇸',
+      'united states': '🇺🇸',
+      'united states of america': '🇺🇸',
+      'america': '🇺🇸',
+      // UK variations
+      'gb': '🇬🇧',
+      'uk': '🇬🇧',
+      'united kingdom': '🇬🇧',
+      'britain': '🇬🇧',
+      'great britain': '🇬🇧',
+      'england': '🇬🇧',
+      // Germany
+      'de': '🇩🇪',
+      'germany': '🇩🇪',
+      'allemagne': '🇩🇪',
+      // Italy
+      'it': '🇮🇹',
+      'italy': '🇮🇹',
+      'italie': '🇮🇹',
+      // Spain
+      'es': '🇪🇸',
+      'spain': '🇪🇸',
+      'espagne': '🇪🇸',
+      // Morocco
+      'ma': '🇲🇦',
+      'morocco': '🇲🇦',
+      'maroc': '🇲🇦',
+      // Algeria
+      'dz': '🇩🇿',
+      'algeria': '🇩🇿',
+      'algerie': '🇩🇿',
+      // Egypt
+      'eg': '🇪🇬',
+      'egypt': '🇪🇬',
+      'egypte': '🇪🇬',
+      // Libya
+      'ly': '🇱🇾',
+      'libya': '🇱🇾',
+      'libye': '🇱🇾',
+      // Saudi Arabia
+      'sa': '🇸🇦',
+      'saudi arabia': '🇸🇦',
+      'arabie saoudite': '🇸🇦',
+      // UAE
+      'ae': '🇦🇪',
+      'uae': '🇦🇪',
+      'emirates': '🇦🇪',
+      'united arab emirates': '🇦🇪',
+      // Qatar
+      'qa': '🇶🇦',
+      'qatar': '🇶🇦',
+      // Canada
+      'ca': '🇨🇦',
+      'canada': '🇨🇦',
+      // Australia
+      'au': '🇦🇺',
+      'australia': '🇦🇺',
+      'australie': '🇦🇺',
+      // Japan
+      'jp': '🇯🇵',
+      'japan': '🇯🇵',
+      'japon': '🇯🇵',
+      // China
+      'cn': '🇨🇳',
+      'china': '🇨🇳',
+      'chine': '🇨🇳',
+      // India
+      'in': '🇮🇳',
+      'india': '🇮🇳',
+      'inde': '🇮🇳',
+      // Brazil
+      'br': '🇧🇷',
+      'brazil': '🇧🇷',
+      'bresil': '🇧🇷',
+      // Mexico
+      'mx': '🇲🇽',
+      'mexico': '🇲🇽',
+      'mexique': '🇲🇽',
+      // Argentina
+      'ar': '🇦🇷',
+      'argentina': '🇦🇷',
+      'argentine': '🇦🇷',
+      // South Africa
+      'za': '🇿🇦',
+      'south africa': '🇿🇦',
+      'afrique du sud': '🇿🇦',
+      // Nigeria
+      'ng': '🇳🇬',
+      'nigeria': '🇳🇬',
+      // Kenya
+      'ke': '🇰🇪',
+      'kenya': '🇰🇪',
+      // Turkey
+      'tr': '🇹🇷',
+      'turkey': '🇹🇷',
+      'turquie': '🇹🇷',
+      // Greece
+      'gr': '🇬🇷',
+      'greece': '🇬🇷',
+      'grece': '🇬🇷',
+      // Netherlands
+      'nl': '🇳🇱',
+      'netherlands': '🇳🇱',
+      'pays-bas': '🇳🇱',
+      'pays bas': '🇳🇱',
+      // Belgium
+      'be': '🇧🇪',
+      'belgium': '🇧🇪',
+      'belgique': '🇧🇪',
+      // Switzerland
+      'ch': '🇨🇭',
+      'switzerland': '🇨🇭',
+      'suisse': '🇨🇭',
+      // Sweden
+      'se': '🇸🇪',
+      'sweden': '🇸🇪',
+      'suede': '🇸🇪',
+      // Norway
+      'no': '🇳🇴',
+      'norway': '🇳🇴',
+      'norvege': '🇳🇴',
+      // Denmark
+      'dk': '🇩🇰',
+      'denmark': '🇩🇰',
+      'danemark': '🇩🇰',
+      // Finland
+      'fi': '🇫🇮',
+      'finland': '🇫🇮',
+      'finlande': '🇫🇮',
+      // Poland
+      'pl': '🇵🇱',
+      'poland': '🇵🇱',
+      'pologne': '🇵🇱',
+      // Czech Republic
+      'cz': '🇨🇿',
+      'czech': '🇨🇿',
+      'czech republic': '🇨🇿',
+      'republique tcheque': '🇨🇿',
+      // Austria
+      'at': '🇦🇹',
+      'austria': '🇦🇹',
+      'autriche': '🇦🇹',
+      // Hungary
+      'hu': '🇭🇺',
+      'hungary': '🇭🇺',
+      'hongrie': '🇭🇺',
+      // Portugal
+      'pt': '🇵🇹',
+      'portugal': '🇵🇹',
+      // Russia
+      'ru': '🇷🇺',
+      'russia': '🇷🇺',
+      'russie': '🇷🇺',
+      // Ukraine
+      'ua': '🇺🇦',
+      'ukraine': '🇺🇦',
+      // Romania
+      'ro': '🇷🇴',
+      'romania': '🇷🇴',
+      'roumanie': '🇷🇴',
+      // Bulgaria
+      'bg': '🇧🇬',
+      'bulgaria': '🇧🇬',
+      'bulgarie': '🇧🇬',
+      // Croatia
+      'hr': '🇭🇷',
+      'croatia': '🇭🇷',
+      'croatie': '🇭🇷',
+      // Slovenia
+      'si': '🇸🇮',
+      'slovenia': '🇸🇮',
+      'slovenie': '🇸🇮',
+      // Slovakia
+      'sk': '🇸🇰',
+      'slovakia': '🇸🇰',
+      'slovaquie': '🇸🇰',
+      // Estonia
+      'ee': '🇪🇪',
+      'estonia': '🇪🇪',
+    };
+
+    return countryFlags[cleanCountry] ?? '🌍';
   }
 
   String _safeBio() {
@@ -1312,7 +1308,11 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.verified, size: 12, color: AppColors.primary),
+                        Icon(
+                          Icons.verified,
+                          size: 12,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           _isOrganizer ? 'ORGANIZER' : 'TOURIST',
@@ -1344,11 +1344,17 @@ List<Map<String, dynamic>> _featuredPlaces = [];
               if (user?.username != null && user!.username!.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8F9FA),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE9ECEF), width: 1),
+                    border: Border.all(
+                      color: const Color(0xFFE9ECEF),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1381,11 +1387,7 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.copy,
-                                size: 14,
-                                color: Colors.white,
-                              ),
+                              Icon(Icons.copy, size: 14, color: Colors.white),
                               const SizedBox(width: 4),
                               const Text(
                                 'Copy',
@@ -1548,132 +1550,9 @@ List<Map<String, dynamic>> _featuredPlaces = [];
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              InkWell(
-                onTap: _openCreatePostDialog,
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundImage: _user?.avatar != null
-                            ? NetworkImage(_user!.avatar!)
-                            : null,
-                        child: _user?.avatar == null
-                            ? const Icon(Icons.person, size: 16)
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Tap to create a new post',
-                          style: TextStyle(
-                            color: Color(0xFF8C90B3),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.add_circle_outline,
-                        color: AppColors.primary.withOpacity(0.7),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               const SizedBox(height: 12),
-              const Text(
-                'MANAGED',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              // Favorites Places Section
-            const Text(
-              'FAVORITES PLACES',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                const Text(
-                  'Your Favorite Places',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1B2458),
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: _navigateToAllPlaces,
-                  child: const Text(
-                    'SEE ALL',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (_featuredPlaces.isEmpty)
-              Container(
-                height: 160,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Center(
-                  child: Text(
-                    'No favorite places yet',
-                    style: TextStyle(
-                      color: AppColors.textGrey,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              )
-            else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                itemCount: _featuredPlaces.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.8,
-                ),
-                itemBuilder: (context, index) {
-                  final place = _featuredPlaces[index];
-                  return _PlaceCard(
-                    place: place,
-                    onTap: () => _navigateToPlaceDetails(place),
-                  );
-                },
-              ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -1709,96 +1588,6 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _PostCard extends StatelessWidget {
-  final Map<String, dynamic> post;
-  final VoidCallback onMore;
-  final VoidCallback onOpenDetails;
-
-  const _PostCard({
-    required this.post,
-    required this.onMore,
-    required this.onOpenDetails,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrls =
-        (post['image_urls'] as List?)
-            ?.whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList() ??
-        const <String>[];
-    final imageUrl = imageUrls.isNotEmpty
-        ? imageUrls.first
-        : (post['image_url'] as String?)?.trim() ?? '';
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            GestureDetector(
-              onTap: onOpenDetails,
-              child: imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFE8E8F6),
-                        child: const Center(
-                          child: Icon(
-                            Icons.image_not_supported,
-                            color: Color(0xFF8C93BE),
-                            size: 38,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: const Color(0xFFE8E8F6),
-                      child: const Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          color: Color(0xFF8C93BE),
-                          size: 38,
-                        ),
-                      ),
-                    ),
-            ),
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.28),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  onPressed: onMore,
-                  icon: const Icon(
-                    Icons.more_horiz_rounded,
-                    color: Colors.white,
-                  ),
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 30,
-                    height: 30,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1968,7 +1757,10 @@ class _CommentTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       GestureDetector(
-                        onTap: () => onReply(id, authorId == currentUserId ? 'You' : authorName),
+                        onTap: () => onReply(
+                          id,
+                          authorId == currentUserId ? 'You' : authorName,
+                        ),
                         child: const Text(
                           'Reply',
                           style: TextStyle(
@@ -2035,180 +1827,6 @@ class _EditBadge extends StatelessWidget {
         ],
       ),
       child: const Icon(Icons.edit, size: 15, color: Colors.white),
-    );
-  }
-}
-
-class _PlaceCard extends StatelessWidget {
-  final Map<String, dynamic> place;
-  final VoidCallback onTap;
-
-  const _PlaceCard({
-    required this.place,
-    required this.onTap,
-  });
-
-  String get _name => (place['name'] ?? place['title'] ?? place['titre'] ?? 'Place').toString();
-  String get _image => (place['main_image'] ?? place['image'] ?? place['imagePortrait'] ?? '').toString();
-  String get _city => (place['city'] ?? '').toString();
-  String get _rating => (place['rating'] ?? '0.0').toString();
-  bool get _isFeatured => place['is_featured'] == true || place['top_destination'] == true || place['topDestination'] == true;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image section
-            Expanded(
-              flex: 3,
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      color: const Color(0xFFF5F5F5),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: _image.isNotEmpty
-                          ? Image.network(
-                              _image,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: const Color(0xFFE8E8F6),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.location_on,
-                                    size: 40,
-                                    color: Color(0xFFB8BCC8),
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: const Color(0xFFE8E8F6),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.location_on,
-                                  size: 40,
-                                  color: Color(0xFFB8BCC8),
-                                ),
-                              ),
-                            ),
-                    ),
-                  ),
-                  // Featured badge
-                  if (_isFeatured)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'TOP',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  // Guide arrow
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: GuideArrowButton(onTap: onTap),
-                  ),
-                ],
-              ),
-            ),
-            // Info section
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _city.isNotEmpty ? _city : 'Location',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          size: 12,
-                          color: Colors.orange,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _rating,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
