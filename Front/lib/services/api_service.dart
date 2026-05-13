@@ -106,7 +106,8 @@ class ApiService {
 
   Future<void> warmUp() async {
     await initialize();
-    await get('/health', auth: false, timeout: const Duration(seconds: 25));
+    final uri = Uri.parse('${ApiConfig.serverBaseUrl}/api/health');
+    await _client.get(uri).timeout(const Duration(seconds: 25));
   }
 
   Future<Map<String, String>> _buildHeaders({
@@ -243,11 +244,15 @@ class ApiService {
             final body = jsonDecode(response.body);
             print('[API 403] Full response body: $body');
             print('[API 403] forceLogout: ${body['forceLogout']}');
-            print('[API 403] requires_onboarding: ${body['requires_onboarding']}');
+            print(
+              '[API 403] requires_onboarding: ${body['requires_onboarding']}',
+            );
             print('[API 403] type: ${body['type']}');
-            print('[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})');
+            print(
+              '[API 403] suspendedUntil: ${body['suspendedUntil']} (${body['suspendedUntil']?.runtimeType})',
+            );
             print('[API 403] remainingSeconds: ${body['remainingSeconds']}');
-            
+
             // Handle onboarding requirement
             if (body is Map && body['requires_onboarding'] == true) {
               print('[API 403] Checking onboarding status before redirect');
@@ -255,12 +260,16 @@ class ApiService {
                 final user = await AuthService.getUser();
                 final isOnboarded = user?['is_onboarded'] ?? false;
                 final userType = user?['userType'];
-                print('[API 403] is_onboarded: $isOnboarded, userType: $userType');
-                
+                print(
+                  '[API 403] is_onboarded: $isOnboarded, userType: $userType',
+                );
+
                 // Only redirect to onboarding if user is not already onboarded
                 if (!isOnboarded) {
                   print('[API 403] Redirecting to onboarding');
-                  await NavigationService.navigateToOnboarding(userType: userType);
+                  await NavigationService.navigateToOnboarding(
+                    userType: userType,
+                  );
                 } else {
                   print('[API 403] User already onboarded, skipping redirect');
                 }
@@ -270,7 +279,7 @@ class ApiService {
               }
               return response;
             }
-            
+
             // Handle account restrictions (suspended, banned, etc.)
             if (body is Map && body['forceLogout'] == true) {
               final restriction = <String, dynamic>{};
@@ -280,7 +289,9 @@ class ApiService {
               final suspendedUntil = body['suspendedUntil'];
               final remainingSeconds = body['remainingSeconds'];
 
-              print('[API 403] Extracted - type: $type, suspendedUntil: $suspendedUntil, remainingSeconds: $remainingSeconds');
+              print(
+                '[API 403] Extracted - type: $type, suspendedUntil: $suspendedUntil, remainingSeconds: $remainingSeconds',
+              );
 
               if (type.isNotEmpty) restriction['type'] = type;
               if (fromReason.isNotEmpty) restriction['reason'] = fromReason;
@@ -303,9 +314,14 @@ class ApiService {
 
               print('[API 403] Final restriction map: $restriction');
               await AuthService.clearLocalSession();
-              _devLog('[RESTRICT] type=' + (restriction['type']?.toString() ?? '-') +
-                  ' remaining=' + (restriction['remainingSeconds']?.toString() ?? '-') +
-                  ' until=' + (restriction['suspendedUntil']?.toString() ?? '-'));
+              _devLog(
+                '[RESTRICT] type=' +
+                    (restriction['type']?.toString() ?? '-') +
+                    ' remaining=' +
+                    (restriction['remainingSeconds']?.toString() ?? '-') +
+                    ' until=' +
+                    (restriction['suspendedUntil']?.toString() ?? '-'),
+              );
               await NavigationService.forceLogoutToLogin(
                 message: popupMessage,
                 restriction: restriction,
@@ -699,9 +715,14 @@ class ApiService {
   }
 
   // Update reminder preferences
-  static Future<void> updateReminderPreferences(Map<String, dynamic> preferences) async {
+  static Future<void> updateReminderPreferences(
+    Map<String, dynamic> preferences,
+  ) async {
     final api = ApiService.instance;
-    final response = await api.put('/users/me/reminder-preferences', preferences);
+    final response = await api.put(
+      '/users/me/reminder-preferences',
+      preferences,
+    );
     if (response.statusCode != 200) {
       throw Exception('Failed to update reminder preferences');
     }

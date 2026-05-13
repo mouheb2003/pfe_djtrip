@@ -23,6 +23,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   int _tabIndex = 0; // 0 Upcoming, 1 Ongoing, 2 Past
   bool _isLoading = true;
   String? _errorMessage;
+  String _searchQuery = '';
+  late TextEditingController _searchController;
   Map<String, List<ActivityModel>> _buckets = {
     'upcoming': [],
     'ongoing': [],
@@ -34,7 +36,14 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   List<ActivityModel> _sortMostRecentFirst(List<ActivityModel> items) {
@@ -254,16 +263,46 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   List<ActivityModel> get _currentItems {
+    final List<ActivityModel> allItems;
     switch (_tabIndex) {
       case 0:
-        return _buckets['upcoming']!;
+        allItems = _buckets['upcoming'] ?? [];
+        break;
       case 1:
-        return _buckets['ongoing']!;
+        allItems = _buckets['ongoing'] ?? [];
+        break;
       case 2:
-        return _buckets['past']!;
+        allItems = _buckets['past'] ?? [];
+        break;
       default:
-        return _buckets['upcoming']!;
+        allItems = _buckets['upcoming'] ?? [];
     }
+
+    // Apply search filter
+    if (_searchQuery.isEmpty) {
+      return allItems;
+    }
+
+    return allItems.where((activity) {
+      final titleMatches = activity.titre.toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      final locationMatches = activity.lieu.toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      return titleMatches || locationMatches;
+    }).toList();
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _onSearchChanged('');
   }
 
   String _monthName(int month) {
@@ -426,8 +465,59 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   ],
                 ),
               ),
+              // Search Bar
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search activities, locations...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 15,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF6B7280),
+                        size: 20,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: _ActivitiesSegmentedControl(
                   currentIndex: _tabIndex,
                   onChanged: (value) => setState(() => _tabIndex = value),

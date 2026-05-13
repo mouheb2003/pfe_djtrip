@@ -2,49 +2,147 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_theme.dart';
 import '../shared/activity_detail_screen.dart';
+import '../shared/activity_card.dart';
+import '../../services/activity_service.dart';
+import '../../services/review_service.dart';
+import '../../models/activity_model.dart';
 
-class PlaceDetailScreen extends StatelessWidget {
+class PlaceDetailScreen extends StatefulWidget {
   final Map<String, dynamic> place;
 
   const PlaceDetailScreen({super.key, required this.place});
 
-  String get _name => (place['name'] ?? place['title'] ?? place['titre'] ?? 'Lieu').toString();
+  @override
+  State<PlaceDetailScreen> createState() => _PlaceDetailScreenState();
+}
+
+class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
+  int _selectedRating = 0;
+  bool _submittingRating = false;
+  List<ActivityModel> _relatedActivities = [];
+  bool _loadingActivities = true;
+
+  String get _name =>
+      (widget.place['name'] ??
+              widget.place['title'] ??
+              widget.place['titre'] ??
+              'Lieu')
+          .toString();
   String get _shortDescription =>
-      (place['short_description'] ?? place['description'] ?? 'Aucune description disponible pour ce lieu.')
+      (widget.place['short_description'] ??
+              widget.place['description'] ??
+              'Aucune description disponible pour ce lieu.')
           .toString();
   String get _experienceDescription =>
-      (place['experience_description'] ?? '').toString();
+      (widget.place['experience_description'] ?? '').toString();
   String get _heritageHistory =>
-      (place['heritage_history'] ?? '').toString();
+      (widget.place['heritage_history'] ?? '').toString();
   String get _mainImage =>
-      (place['main_image'] ?? place['image'] ?? place['imagePortrait'] ?? '').toString();
+      (widget.place['main_image'] ??
+              widget.place['image'] ??
+              widget.place['imagePortrait'] ??
+              '')
+          .toString();
   bool get _isFeatured =>
-      place['is_featured'] == true || place['top_destination'] == true || place['topDestination'] == true;
+      widget.place['is_featured'] == true ||
+      widget.place['top_destination'] == true ||
+      widget.place['topDestination'] == true;
   String get _rating =>
-      (place['rating'] ??
-              (place['noteMoyenne'] as num?)?.toStringAsFixed(1) ??
+      (widget.place['rating'] ??
+              (widget.place['noteMoyenne'] as num?)?.toStringAsFixed(1) ??
               '0.0')
           .toString();
-  int get _reviewsCount => (place['review_count'] as num?)?.toInt() ?? (place['nombreAvis'] as num?)?.toInt() ?? 0;
-  String get _city => (place['city'] ?? '').toString();
-  String get _country => (place['country'] ?? '').toString();
-  String get _openingHours => (place['opening_hours'] ?? '').toString();
-  String get _closingHours => (place['closing_hours'] ?? '').toString();
-  String get _languages => (place['languages_spoken'] as List?)?.join(', ') ?? '';
-  bool get _bookingRequired => place['booking_required'] == true;
-  String get _priceRange => (place['price_range'] ?? place['price'] ?? place['prix'] ?? 'N/A').toString();
-  double? get _pricePerAdult => (place['price_per_adult'] as num?)?.toDouble();
-  double? get _minPrice => (place['min_price'] as num?)?.toDouble();
-  double? get _maxPrice => (place['max_price'] as num?)?.toDouble();
+  int get _reviewsCount =>
+      (widget.place['review_count'] as num?)?.toInt() ??
+      (widget.place['nombreAvis'] as num?)?.toInt() ??
+      0;
+  String get _city => (widget.place['city'] ?? '').toString();
+  String get _country => (widget.place['country'] ?? '').toString();
+  String get _openingHours => (widget.place['opening_hours'] ?? '').toString();
+  String get _closingHours => (widget.place['closing_hours'] ?? '').toString();
+  String get _languages =>
+      (widget.place['languages_spoken'] as List?)?.join(', ') ?? '';
+  bool get _bookingRequired => widget.place['booking_required'] == true;
+  String get _priceRange =>
+      (widget.place['price_range'] ??
+              widget.place['price'] ??
+              widget.place['prix'] ??
+              'N/A')
+          .toString();
+  double? get _pricePerAdult =>
+      (widget.place['price_per_adult'] as num?)?.toDouble();
+  double? get _minPrice => (widget.place['min_price'] as num?)?.toDouble();
+  double? get _maxPrice => (widget.place['max_price'] as num?)?.toDouble();
   String? get _activityId =>
-      (place['activity_id'] ?? place['activiteLiee'])?.toString();
-  double? get _lat => (place['coordinates']?['latitude'] as num?)?.toDouble() ?? (place['coordonnees']?['latitude'] as num?)?.toDouble();
-  double? get _lng => (place['coordinates']?['longitude'] as num?)?.toDouble() ?? (place['coordonnees']?['longitude'] as num?)?.toDouble();
+      (widget.place['activity_id'] ?? widget.place['activiteLiee'])?.toString();
+  double? get _lat =>
+      (widget.place['coordinates']?['latitude'] as num?)?.toDouble() ??
+      (widget.place['coordonnees']?['latitude'] as num?)?.toDouble();
+  double? get _lng =>
+      (widget.place['coordinates']?['longitude'] as num?)?.toDouble() ??
+      (widget.place['coordonnees']?['longitude'] as num?)?.toDouble();
 
-  List<String> get _tags {
-    final raw = place['tags'];
-    if (raw is List) return raw.whereType<String>().toList();
-    return const [];
+  @override
+  void initState() {
+    super.initState();
+    _loadRelatedActivities();
+  }
+
+  Future<void> _loadRelatedActivities() async {
+    setState(() => _loadingActivities = true);
+    try {
+      final all = await ActivityService.getActivities();
+      final nameLower = _name.toLowerCase();
+      final filtered = all.where((a) {
+        final lieu = a.lieu.toLowerCase();
+        final coord = a.coordonnees ?? {};
+        final lat = (coord['latitude'] as num?)?.toDouble();
+        final lng = (coord['longitude'] as num?)?.toDouble();
+        final coordMatch =
+            _lat != null && _lng != null && lat != null && lng != null
+            ? (((lat - _lat!).abs() < 0.01) && ((lng - _lng!).abs() < 0.01))
+            : false;
+        return lieu.contains(nameLower) || coordMatch;
+      }).toList();
+      setState(() {
+        _relatedActivities = filtered;
+      });
+    } catch (_) {
+      setState(() {
+        _relatedActivities = [];
+      });
+    } finally {
+      setState(() => _loadingActivities = false);
+    }
+  }
+
+  Future<void> _submitRating() async {
+    if (_selectedRating <= 0) return;
+    setState(() => _submittingRating = true);
+    try {
+      if (_activityId != null) {
+        final res = await ReviewService.submitActivityReview(
+          activiteId: _activityId!,
+          note: _selectedRating,
+        );
+        final ok = res['success'] == true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ok ? 'Merci pour votre note' : (res['message'] ?? 'Erreur'),
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note enregistrée localement (pas d\'activité liée)'),
+          ),
+        );
+      }
+    } finally {
+      setState(() => _submittingRating = false);
+    }
   }
 
   Future<void> _openMap() async {
@@ -79,6 +177,8 @@ class PlaceDetailScreen extends StatelessWidget {
                     _buildLocationInfo(),
                     const SizedBox(height: 16),
                     _buildRatingInfo(),
+                    const SizedBox(height: 12),
+                    _buildRatingSelector(),
                     const SizedBox(height: 16),
                     _buildTimingInfo(),
                     const SizedBox(height: 16),
@@ -87,6 +187,8 @@ class PlaceDetailScreen extends StatelessWidget {
                     _buildBookingInfo(),
                     const SizedBox(height: 16),
                     _buildPriceInfo(),
+                    const SizedBox(height: 24),
+                    _buildRelatedActivitiesSection(),
                     const SizedBox(height: 24),
                     _buildTheExperienceSection(),
                     const SizedBox(height: 24),
@@ -193,6 +295,163 @@ class PlaceDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Notez ce lieu',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(5, (i) {
+            final idx = i + 1;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedRating = idx),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Icon(
+                  idx <= _selectedRating ? Icons.star : Icons.star_border,
+                  color: Colors.orange,
+                  size: 28,
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            ElevatedButton(
+              onPressed: _submittingRating ? null : _submitRating,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _submittingRating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Soumettre',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: () => setState(() => _selectedRating = 0),
+              child: const Text('Annuler'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRelatedActivitiesSection() {
+    if (_loadingActivities) {
+      return SizedBox(
+        height: 80,
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+    if (_relatedActivities.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Activités liées',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Column(
+          children: _relatedActivities
+              .map((a) => _buildActivityTile(a))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityTile(ActivityModel a) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ActivityDetailScreen(activityId: a.id),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE8EEF5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 72,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                image: a.photos.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(a.photos.first),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    a.titre,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    a.prixFormatted,
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF64748B)),
           ],
         ),
       ),
@@ -352,11 +611,13 @@ class PlaceDetailScreen extends StatelessWidget {
   Widget _buildPriceInfo() {
     String priceText = _priceRange;
     if (_pricePerAdult != null) {
-      priceText = 'Starting from ${_pricePerAdult!.toStringAsFixed(2)} TND / adult';
+      priceText =
+          'Starting from ${_pricePerAdult!.toStringAsFixed(2)} TND / adult';
     } else if (_minPrice != null && _maxPrice != null) {
-      priceText = '${_minPrice!.toStringAsFixed(0)}-${_maxPrice!.toStringAsFixed(0)} TND';
+      priceText =
+          '${_minPrice!.toStringAsFixed(0)}-${_maxPrice!.toStringAsFixed(0)} TND';
     }
-    
+
     return Row(
       children: [
         const Icon(Icons.attach_money, color: Color(0xFF64748B), size: 16),
@@ -426,9 +687,13 @@ class PlaceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildExperienceHighlightsSection() {
-    final highlights = (place['experience_highlights'] as List?)?.whereType<String>().toList() ?? [];
+    final highlights =
+        (widget.place['experience_highlights'] as List?)
+            ?.whereType<String>()
+            .toList() ??
+        [];
     if (highlights.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -441,46 +706,50 @@ class PlaceDetailScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...highlights.map((highlight) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 6, right: 8),
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  highlight,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                    height: 1.5,
+        ...highlights.map(
+          (highlight) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 6, right: 8),
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: Text(
+                    highlight,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF64748B),
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
       ],
     );
   }
 
   Widget _buildIncludedServicesSection() {
-    final amenities = (place['amenities'] as List?)?.whereType<String>().toList() ?? [];
-    final wheelchairAccess = place['wheelchair_access'] == true;
-    
+    final amenities =
+        (widget.place['amenities'] as List?)?.whereType<String>().toList() ??
+        [];
+    final wheelchairAccess = widget.place['wheelchair_access'] == true;
+
     if (amenities.isEmpty && !wheelchairAccess) return const SizedBox.shrink();
-    
+
     final services = <String>[...amenities];
     if (wheelchairAccess) services.add('Wheelchair Access');
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -496,7 +765,9 @@ class PlaceDetailScreen extends StatelessWidget {
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: services.map((service) => _buildServiceItem(service)).toList(),
+          children: services
+              .map((service) => _buildServiceItem(service))
+              .toList(),
         ),
       ],
     );
@@ -506,9 +777,11 @@ class PlaceDetailScreen extends StatelessWidget {
     IconData icon = Icons.check_circle_outline;
     if (service.toLowerCase().contains('wifi')) icon = Icons.wifi;
     if (service.toLowerCase().contains('parking')) icon = Icons.local_parking;
-    if (service.toLowerCase().contains('drink') || service.toLowerCase().contains('snack')) icon = Icons.restaurant;
+    if (service.toLowerCase().contains('drink') ||
+        service.toLowerCase().contains('snack'))
+      icon = Icons.restaurant;
     if (service.toLowerCase().contains('wheelchair')) icon = Icons.accessible;
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -527,9 +800,9 @@ class PlaceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildGuestReviewsSection() {
-    final reviews = (place['reviews'] as List?) ?? [];
+    final reviews = (widget.place['reviews'] as List?) ?? [];
     if (reviews.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -550,10 +823,13 @@ class PlaceDetailScreen extends StatelessWidget {
   Widget _buildReviewItem(Map<String, dynamic> review) {
     final rating = (review['rating'] as num?)?.toDouble() ?? 0.0;
     final comment = (review['comment'] ?? '').toString();
-    final date = review['date'] != null 
-        ? DateTime.tryParse(review['date'].toString())?.toString().split(' ')[0] ?? ''
+    final date = review['date'] != null
+        ? DateTime.tryParse(
+                review['date'].toString(),
+              )?.toString().split(' ')[0] ??
+              ''
         : '';
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -574,11 +850,7 @@ class PlaceDetailScreen extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
+                child: Icon(Icons.person, color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -606,11 +878,14 @@ class PlaceDetailScreen extends StatelessWidget {
               ),
               Row(
                 children: [
-                  ...List.generate(5, (index) => Icon(
-                    index < rating ? Icons.star : Icons.star_border,
-                    color: Colors.orange,
-                    size: 16,
-                  )),
+                  ...List.generate(
+                    5,
+                    (index) => Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     rating.toStringAsFixed(1),
@@ -645,9 +920,10 @@ class PlaceDetailScreen extends StatelessWidget {
     if (_pricePerAdult != null) {
       priceText = '${_pricePerAdult!.toStringAsFixed(2)} TND';
     } else if (_minPrice != null && _maxPrice != null) {
-      priceText = '${_minPrice!.toStringAsFixed(0)}-${_maxPrice!.toStringAsFixed(0)} TND';
+      priceText =
+          '${_minPrice!.toStringAsFixed(0)}-${_maxPrice!.toStringAsFixed(0)} TND';
     }
-    
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       decoration: BoxDecoration(
@@ -712,7 +988,11 @@ class PlaceDetailScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.white, size: 20),
+                  const Icon(
+                    Icons.calendar_today,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Participate',

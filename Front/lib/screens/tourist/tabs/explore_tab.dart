@@ -360,8 +360,53 @@ class _ExploreTabState extends State<ExploreTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Bouton Itinerary (S'affiche quand on sélectionne un point)
-                if ((_selectedLieu != null || _customPickedLocation != null) &&
+                // Bouton Plus Détails (S'affiche quand on sélectionne un lieu)
+                if (_selectedLieu != null && !_showItineraryPanel)
+                  Hero(
+                    tag: 'details_fab',
+                    child: Material(
+                      color: const Color(0xFF2158F6),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(28)),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(28),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PlaceDetailScreen(
+                                place: _toPlaceMap(_selectedLieu!),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.info, color: Colors.white),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Plus Détails",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Bouton Itinerary (S'affiche quand on a une position personnalisée)
+                if (_customPickedLocation != null &&
+                    _selectedLieu == null &&
                     !_showItineraryPanel)
                   Hero(
                     tag: 'itinerary_fab',
@@ -558,10 +603,7 @@ class _ExploreTabState extends State<ExploreTab> {
             spreadRadius: 0,
           ),
         ],
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,7 +652,7 @@ class _ExploreTabState extends State<ExploreTab> {
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Section Point de départ
           _buildRouteSection(
             title: 'Point de départ',
@@ -619,9 +661,9 @@ class _ExploreTabState extends State<ExploreTab> {
             controller: _originCtrl,
             isOrigin: true,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Ligne de connexion
           Container(
             height: 2,
@@ -637,9 +679,9 @@ class _ExploreTabState extends State<ExploreTab> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Section Destination
           _buildRouteSection(
             title: 'Destination',
@@ -648,9 +690,9 @@ class _ExploreTabState extends State<ExploreTab> {
             controller: _destinationCtrl,
             isOrigin: false,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Bouton d'action
           Container(
             width: double.infinity,
@@ -679,11 +721,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.navigation,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      Icon(Icons.navigation, color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Naviguer avec Google Maps',
@@ -716,10 +754,7 @@ class _ExploreTabState extends State<ExploreTab> {
       decoration: BoxDecoration(
         color: Colors.grey.withOpacity(0.05),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,16 +776,15 @@ class _ExploreTabState extends State<ExploreTab> {
                   color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 18,
-                ),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -768,7 +802,9 @@ class _ExploreTabState extends State<ExploreTab> {
                       color: Color(0xFF1A1A1A),
                     ),
                     decoration: InputDecoration(
-                      hintText: isOrigin ? 'Ma position actuelle' : 'Destination sélectionnée',
+                      hintText: isOrigin
+                          ? 'Ma position actuelle'
+                          : 'Destination sélectionnée',
                       hintStyle: TextStyle(
                         color: Colors.grey.shade500,
                         fontSize: 14,
@@ -831,10 +867,7 @@ class _ExploreTabState extends State<ExploreTab> {
               ),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 13,
-                ),
+                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
