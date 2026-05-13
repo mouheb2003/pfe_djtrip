@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import '../../config/api_config.dart';
 import '../../../models/comment_model.dart';
 import '../../../models/post_model.dart';
 import '../../../services/post_service.dart';
@@ -29,7 +30,8 @@ class CommentsScreen extends StatefulWidget {
   State<CommentsScreen> createState() => _CommentsScreenState();
 }
 
-class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObserver {
+class _CommentsScreenState extends State<CommentsScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _commentFocusNode = FocusNode();
@@ -45,7 +47,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
   String? _currentUserId;
   String? _postOwnerId;
   String? _currentUserRole;
-  
+
   // Request cancellation token to prevent duplicate requests
   String? _currentRequestId;
 
@@ -53,15 +55,36 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
   io.Socket? _socket;
 
   // Reaction emojis
-  static const List<String> _reactionEmojis = ['❤️', '👏', '🔥', '😂', '😮', '😢', '👍', '🎉'];
-  
+  static const List<String> _reactionEmojis = [
+    '❤️',
+    '👏',
+    '🔥',
+    '😂',
+    '😮',
+    '😢',
+    '👍',
+    '🎉',
+  ];
+
   // Reaction types - all reactions use red color when selected
   static const Map<String, Map<String, dynamic>> _reactionTypes = {
     'like': {'emoji': '👍', 'icon': Icons.thumb_up, 'color': Colors.red},
     'love': {'emoji': '❤️', 'icon': Icons.favorite, 'color': Colors.red},
-    'laugh': {'emoji': '😂', 'icon': Icons.sentiment_very_satisfied, 'color': Colors.red},
-    'wow': {'emoji': '😮', 'icon': Icons.sentiment_neutral, 'color': Colors.red},
-    'sad': {'emoji': '😢', 'icon': Icons.sentiment_dissatisfied, 'color': Colors.red},
+    'laugh': {
+      'emoji': '😂',
+      'icon': Icons.sentiment_very_satisfied,
+      'color': Colors.red,
+    },
+    'wow': {
+      'emoji': '😮',
+      'icon': Icons.sentiment_neutral,
+      'color': Colors.red,
+    },
+    'sad': {
+      'emoji': '😢',
+      'icon': Icons.sentiment_dissatisfied,
+      'color': Colors.red,
+    },
     'angry': {'emoji': '😢', 'icon': Icons.mood_bad, 'color': Colors.red},
   };
 
@@ -93,7 +116,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     super.didUpdateWidget(oldWidget);
     // Reload comments if postId changes
     if (oldWidget.postId != widget.postId) {
-      print('[COMMENTS SCREEN] PostId changed from ${oldWidget.postId} to ${widget.postId}, reloading comments');
+      print(
+        '[COMMENTS SCREEN] PostId changed from ${oldWidget.postId} to ${widget.postId}, reloading comments',
+      );
       _resetState();
       _loadComments();
     }
@@ -119,7 +144,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         _currentUserRole = currentUser['role']?.toString();
       });
     }
-    
+
     // Get post owner ID
     if (widget.post != null) {
       setState(() {
@@ -143,14 +168,10 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     if (token == null) return;
 
     try {
-      _socket = io.io(
-        'http://10.0.2.2:3000', // For Android emulator
-        // 'http://localhost:3000', // For iOS simulator
-        <String, dynamic>{
-          'transports': ['websocket'],
-          'auth': {'token': token},
-        },
-      );
+      _socket = io.io(ApiConfig.serverBaseUrl, <String, dynamic>{
+        'transports': ['websocket'],
+        'auth': {'token': token},
+      });
 
       _socket!.on('connect', (_) {
         print('Socket connected');
@@ -182,7 +203,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         if (mounted) {
           final updatedComment = CommentModel.fromJson(data);
           setState(() {
-            final index = _comments.indexWhere((c) => c.id == updatedComment.id);
+            final index = _comments.indexWhere(
+              (c) => c.id == updatedComment.id,
+            );
             if (index != -1) {
               _comments[index] = updatedComment;
             }
@@ -221,36 +244,42 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
     // Generate unique request ID
     final requestId = DateTime.now().millisecondsSinceEpoch.toString();
     _currentRequestId = requestId;
-    
+
     try {
-      print('[LOAD COMMENTS] Loading comments for postId: ${widget.postId}, requestId: $requestId');
-      
+      print(
+        '[LOAD COMMENTS] Loading comments for postId: ${widget.postId}, requestId: $requestId',
+      );
+
       // Set loading state
       if (mounted) {
         setState(() {
           _isLoadingComments = true;
         });
       }
-      
+
       final comments = await PostService.getPostComments(widget.postId);
       print('[LOAD COMMENTS] Received ${comments.length} comments');
-      
+
       // Check if this is still the current request
       if (_currentRequestId != requestId) {
         print('[LOAD COMMENTS] Request cancelled, newer request in progress');
         return;
       }
-      
+
       if (mounted) {
-        final allComments = comments.map((json) => CommentModel.fromJson(json)).toList();
+        final allComments = comments
+            .map((json) => CommentModel.fromJson(json))
+            .toList();
         print('[LOAD COMMENTS] Parsed ${allComments.length} comments');
-        
+
         setState(() {
           _comments = allComments;
           _isLoadingComments = false;
         });
-        
-        print('[LOAD COMMENTS] State updated with ${_comments.length} comments');
+
+        print(
+          '[LOAD COMMENTS] State updated with ${_comments.length} comments',
+        );
       }
     } catch (e) {
       print('[LOAD COMMENTS] Error loading comments: $e');
@@ -270,38 +299,41 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
 
   Future<void> _loadReplies(String commentId) async {
     // Check if already loaded or loading
-    if (_repliesMap.containsKey(commentId) || _repliesLoadingMap[commentId] == true) {
+    if (_repliesMap.containsKey(commentId) ||
+        _repliesLoadingMap[commentId] == true) {
       print('[LOAD REPLIES] Already loaded or loading for comment $commentId');
       return;
     }
 
     try {
       print('[LOAD REPLIES] Loading replies for commentId: $commentId');
-      
+
       // Set loading state for this specific comment
       if (mounted) {
         setState(() {
           _repliesLoadingMap[commentId] = true;
         });
       }
-      
+
       final result = await PostService.getCommentReplies(
         commentId: commentId,
         page: 1,
         limit: 10,
       );
-      
+
       if (result['success'] == true && mounted) {
         final replies = (result['replies'] as List)
             .map((json) => CommentModel.fromJson(json))
             .toList();
-        
+
         setState(() {
           _repliesMap[commentId] = replies;
           _repliesLoadingMap[commentId] = false;
         });
-        
-        print('[LOAD REPLIES] Loaded ${replies.length} replies for comment $commentId');
+
+        print(
+          '[LOAD REPLIES] Loaded ${replies.length} replies for comment $commentId',
+        );
       } else if (mounted) {
         setState(() {
           _repliesLoadingMap[commentId] = false;
@@ -375,13 +407,15 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         if (result['comment'] != null) {
           final realComment = CommentModel.fromJson(result['comment']);
           setState(() {
-            final index = _comments.indexWhere((c) => c.id == optimisticComment.id);
+            final index = _comments.indexWhere(
+              (c) => c.id == optimisticComment.id,
+            );
             if (index != -1) {
               _comments[index] = realComment;
             }
           });
         }
-        
+
         if (mounted) {
           HapticFeedback.lightImpact();
         }
@@ -390,11 +424,13 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         setState(() {
           _comments.removeWhere((c) => c.id == optimisticComment.id);
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']?.toString() ?? 'Failed to post comment'),
+              content: Text(
+                result['message']?.toString() ?? 'Failed to post comment',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -405,7 +441,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
       setState(() {
         _comments.removeWhere((c) => c.id == optimisticComment.id);
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -423,18 +459,21 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
 
   Future<void> _reactToComment(String commentId, String reactionType) async {
     debugPrint('Reacting to comment: $commentId with type: $reactionType');
-    
+
     // Check if it's a reply or root comment
-    final isReply = _comments.any((c) => c.id != commentId) || 
-                   _repliesMap.values.any((replies) => replies.any((r) => r.id == commentId));
-    
+    final isReply =
+        _comments.any((c) => c.id != commentId) ||
+        _repliesMap.values.any(
+          (replies) => replies.any((r) => r.id == commentId),
+        );
+
     // Find the comment in root comments
     final commentIndex = _comments.indexWhere((c) => c.id == commentId);
-    
+
     CommentModel? targetComment;
     int? targetIndex;
     String? parentCommentId;
-    
+
     if (commentIndex != -1) {
       // It's a root comment
       targetComment = _comments[commentIndex];
@@ -451,23 +490,23 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         }
       }
     }
-    
+
     if (targetComment == null) {
       debugPrint('Comment not found: $commentId');
       return;
     }
-    
+
     final oldComment = targetComment;
-    
+
     // Toggle reaction locally
     final currentReaction = oldComment.userReaction;
     final isRemoving = currentReaction == reactionType;
-    
+
     final newReactions = List<Map<String, dynamic>>.from(oldComment.reactions);
-    final newTotalReactions = isRemoving 
+    final newTotalReactions = isRemoving
         ? (oldComment.totalReactions ?? 0) - 1
         : (oldComment.totalReactions ?? 0) + 1;
-    
+
     if (isRemoving) {
       newReactions.removeWhere((r) => r['user_id'] == _currentUserId);
     } else {
@@ -478,7 +517,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         'created_at': DateTime.now().toIso8601String(),
       });
     }
-    
+
     final updatedComment = CommentModel(
       id: oldComment.id,
       postId: widget.postId,
@@ -493,12 +532,14 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
       userReaction: isRemoving ? null : reactionType,
       parentCommentId: oldComment.parentCommentId,
     );
-    
+
     // Update UI immediately
     setState(() {
       if (parentCommentId != null) {
         // It's a reply - update in replies map
-        final replies = List<CommentModel>.from(_repliesMap[parentCommentId] ?? []);
+        final replies = List<CommentModel>.from(
+          _repliesMap[parentCommentId] ?? [],
+        );
         replies[targetIndex!] = updatedComment;
         _repliesMap[parentCommentId] = replies;
       } else {
@@ -506,9 +547,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         _comments[commentIndex] = updatedComment;
       }
     });
-    
+
     HapticFeedback.lightImpact();
-    
+
     // Send to server in background
     try {
       await PostService.reactToComment(commentId, reactionType);
@@ -521,7 +562,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
       if (mounted) {
         setState(() {
           if (parentCommentId != null) {
-            final replies = List<CommentModel>.from(_repliesMap[parentCommentId] ?? []);
+            final replies = List<CommentModel>.from(
+              _repliesMap[parentCommentId] ?? [],
+            );
             replies[targetIndex!] = oldComment;
             _repliesMap[parentCommentId] = replies;
           } else {
@@ -617,216 +660,248 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
           Expanded(
             child: _isLoadingComments && _comments.isEmpty
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF4B63FF),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF4B63FF)),
                   )
                 : _comments.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No comments yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Be the first to share your thoughts!',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () async {
-                          print('[COMMENTS SCREEN] Manual refresh triggered');
-                          _resetState();
-                          await _loadComments();
-                        },
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _comments.length,
-                          itemBuilder: (context, index) {
-                            final comment = _comments[index];
-                            final replies = _repliesMap[comment.id] ?? [];
-                            final isLoadingReplies = _repliesLoadingMap[comment.id] == true;
-                            
-                            return _CommentTree(
-                              comment: comment,
-                              replies: replies,
-                              isLoadingReplies: isLoadingReplies,
-                              currentUserId: _currentUserId,
-                              postOwnerId: _postOwnerId,
-                              currentUserRole: _currentUserRole,
-                              onReply: _setReply,
-                              onReact: _reactToComment,
-                              onEdit: (commentId, newContent) async {
-                                setState(() => _isPostingComment = true);
-                                try {
-                                  final result = await PostService.updateComment(commentId, newContent);
-                                  if (result['success'] == true) {
-                                    await _loadComments();
-                                    HapticFeedback.lightImpact();
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Comment updated successfully'),
-                                          backgroundColor: Colors.green,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(result['message'] ?? 'Failed to update comment'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error updating comment: $e'),
-                                        backgroundColor: Colors.red,
+                        const SizedBox(height: 16),
+                        Text(
+                          'No comments yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Be the first to share your thoughts!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      print('[COMMENTS SCREEN] Manual refresh triggered');
+                      _resetState();
+                      await _loadComments();
+                    },
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _comments.length,
+                      itemBuilder: (context, index) {
+                        final comment = _comments[index];
+                        final replies = _repliesMap[comment.id] ?? [];
+                        final isLoadingReplies =
+                            _repliesLoadingMap[comment.id] == true;
+
+                        return _CommentTree(
+                          comment: comment,
+                          replies: replies,
+                          isLoadingReplies: isLoadingReplies,
+                          currentUserId: _currentUserId,
+                          postOwnerId: _postOwnerId,
+                          currentUserRole: _currentUserRole,
+                          onReply: _setReply,
+                          onReact: _reactToComment,
+                          onEdit: (commentId, newContent) async {
+                            setState(() => _isPostingComment = true);
+                            try {
+                              final result = await PostService.updateComment(
+                                commentId,
+                                newContent,
+                              );
+                              if (result['success'] == true) {
+                                await _loadComments();
+                                HapticFeedback.lightImpact();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Comment updated successfully',
                                       ),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) {
-                                    setState(() => _isPostingComment = false);
-                                  }
+                                      backgroundColor: Colors.green,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
                                 }
-                              },
-                              onDelete: (commentId) async {
-                                final confirmed = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Delete Comment'),
-                                    content: const Text('Are you sure you want to delete this comment?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('Cancel'),
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        result['message'] ??
+                                            'Failed to update comment',
                                       ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error updating comment: $e'),
+                                    backgroundColor: Colors.red,
                                   ),
                                 );
-                                if (confirmed == true) {
-                                  setState(() => _isPostingComment = true);
-                                  try {
-                                    final result = await PostService.deleteComment(commentId);
-                                    if (result['success'] == true) {
-                                      await _loadComments();
-                                      HapticFeedback.lightImpact();
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Error deleting comment: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _isPostingComment = false);
-                                    }
-                                  }
-                                }
-                              },
-                              onToggleReplies: _toggleReplies,
-                              postReply: (content, parentCommentId) async {
-                                setState(() => _isPostingComment = true);
-                                
-                                try {
-                                  print('[POST REPLY] Calling API with parentCommentId: $parentCommentId');
-                                  final result = await PostService.addPostComment(
-                                    postId: widget.postId,
-                                    content: content,
-                                    parentCommentId: parentCommentId,
-                                  );
-                                  print('[POST REPLY] API result: $result');
-                                  
-                                  if (result['success'] == true) {
-                                    // Reload replies for this comment
-                                    await _loadReplies(parentCommentId);
-                                    
-                                    // Update parent comment's reply count
-                                    setState(() {
-                                      final parentIndex = _comments.indexWhere((c) => c.id == parentCommentId);
-                                      if (parentIndex != -1) {
-                                        final parentComment = _comments[parentIndex];
-                                        _comments[parentIndex] = parentComment.copyWith(
-                                          repliesCount: parentComment.repliesCount + 1,
-                                        );
-                                      }
-                                    });
-                                    
-                                    HapticFeedback.lightImpact();
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Reply posted successfully'),
-                                          backgroundColor: Colors.green,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    print('[POST REPLY] API returned failure: ${result['message']}');
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(result['message'] ?? 'Failed to post reply'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                } catch (e) {
-                                  print('[POST REPLY] Error: $e');
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error posting reply: $e'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) {
-                                    setState(() => _isPostingComment = false);
-                                  }
-                                }
-                              },
-                            );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isPostingComment = false);
+                              }
+                            }
                           },
-                        ),
-                      ),
+                          onDelete: (commentId) async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Comment'),
+                                content: const Text(
+                                  'Are you sure you want to delete this comment?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed == true) {
+                              setState(() => _isPostingComment = true);
+                              try {
+                                final result = await PostService.deleteComment(
+                                  commentId,
+                                );
+                                if (result['success'] == true) {
+                                  await _loadComments();
+                                  HapticFeedback.lightImpact();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Error deleting comment: $e',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isPostingComment = false);
+                                }
+                              }
+                            }
+                          },
+                          onToggleReplies: _toggleReplies,
+                          postReply: (content, parentCommentId) async {
+                            setState(() => _isPostingComment = true);
+
+                            try {
+                              print(
+                                '[POST REPLY] Calling API with parentCommentId: $parentCommentId',
+                              );
+                              final result = await PostService.addPostComment(
+                                postId: widget.postId,
+                                content: content,
+                                parentCommentId: parentCommentId,
+                              );
+                              print('[POST REPLY] API result: $result');
+
+                              if (result['success'] == true) {
+                                // Reload replies for this comment
+                                await _loadReplies(parentCommentId);
+
+                                // Update parent comment's reply count
+                                setState(() {
+                                  final parentIndex = _comments.indexWhere(
+                                    (c) => c.id == parentCommentId,
+                                  );
+                                  if (parentIndex != -1) {
+                                    final parentComment =
+                                        _comments[parentIndex];
+                                    _comments[parentIndex] = parentComment
+                                        .copyWith(
+                                          repliesCount:
+                                              parentComment.repliesCount + 1,
+                                        );
+                                  }
+                                });
+
+                                HapticFeedback.lightImpact();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Reply posted successfully',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                print(
+                                  '[POST REPLY] API returned failure: ${result['message']}',
+                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        result['message'] ??
+                                            'Failed to post reply',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              print('[POST REPLY] Error: $e');
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error posting reply: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isPostingComment = false);
+                              }
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
           ),
 
           // Comment Input
@@ -849,11 +924,16 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                 // Reply indicator
                 if (_replyingToId != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4B63FF).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF4B63FF).withOpacity(0.3)),
+                      border: Border.all(
+                        color: const Color(0xFF4B63FF).withOpacity(0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -886,11 +966,10 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                   const SizedBox(height: 8),
                 ],
 
-                
                 _buildReactionEmojis(),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Input field
                 GestureDetector(
                   onTap: () {
@@ -901,7 +980,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                       // User avatar
                       _buildUserAvatar(),
                       const SizedBox(width: 12),
-                      
+
                       Expanded(
                         child: Stack(
                           children: [
@@ -937,9 +1016,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(width: 8),
-                      
+
                       // Send button
                       _isPostingComment
                           ? const SizedBox(
@@ -1031,7 +1110,9 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
           _comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
           break;
         case 'popular':
-          _comments.sort((a, b) => b.totalReactions.compareTo(a.totalReactions));
+          _comments.sort(
+            (a, b) => b.totalReactions.compareTo(a.totalReactions),
+          );
           break;
       }
     });
@@ -1056,15 +1137,11 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                 ? NetworkImage(post.authorAvatar!)
                 : null,
             child: post.authorAvatar?.isEmpty != false
-                ? const Icon(
-                    Icons.person,
-                    color: Color(0xFF4B63FF),
-                    size: 20,
-                  )
+                ? const Icon(Icons.person, color: Color(0xFF4B63FF), size: 20)
                 : null,
           ),
           const SizedBox(width: 12),
-          
+
           // Content
           Expanded(
             child: Column(
@@ -1082,19 +1159,12 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                     ),
                     if (post.isVerified) ...[
                       const SizedBox(width: 4),
-                      const Icon(
-                        Icons.verified,
-                        color: Colors.blue,
-                        size: 14,
-                      ),
+                      const Icon(Icons.verified, color: Colors.blue, size: 14),
                     ],
                     const SizedBox(width: 8),
                     Text(
                       TimeAgo.format(post.createdAt).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -1120,9 +1190,12 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
   Widget _buildUserAvatar() {
     final currentUser = AuthService.currentUser;
     final String? photoUrl = currentUser?['photo'];
-    final String userName = currentUser?['username'] ?? currentUser?['name'] ?? 'User';
-    final String firstLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
-    
+    final String userName =
+        currentUser?['username'] ?? currentUser?['name'] ?? 'User';
+    final String firstLetter = userName.isNotEmpty
+        ? userName[0].toUpperCase()
+        : 'U';
+
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 16,
@@ -1134,16 +1207,12 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
         child: photoUrl.isEmpty ? null : null, // Show initial if no photo
       );
     }
-    
+
     // Default avatar with icon
     return CircleAvatar(
       radius: 16,
       backgroundColor: const Color(0xFFE8E5FF),
-      child: Icon(
-        Icons.person,
-        size: 18,
-        color: const Color(0xFF4B63FF),
-      ),
+      child: Icon(Icons.person, size: 18, color: const Color(0xFF4B63FF)),
     );
   }
 
@@ -1176,10 +1245,7 @@ class _CommentsScreenState extends State<CommentsScreen> with WidgetsBindingObse
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 18),
-                  ),
+                  child: Text(emoji, style: const TextStyle(fontSize: 18)),
                 ),
               ),
             );
@@ -1344,7 +1410,7 @@ class _CommentTreeState extends State<_CommentTree> {
                     : null,
               ),
               const SizedBox(width: 12),
-              
+
               // Comment content
               Expanded(
                 child: Column(
@@ -1354,7 +1420,9 @@ class _CommentTreeState extends State<_CommentTree> {
                     Row(
                       children: [
                         Text(
-                          widget.comment.authorId == widget.currentUserId ? 'You' : widget.comment.authorName,
+                          widget.comment.authorId == widget.currentUserId
+                              ? 'You'
+                              : widget.comment.authorName,
                           style: TextStyle(
                             fontSize: fontSize,
                             fontWeight: FontWeight.w700,
@@ -1372,26 +1440,27 @@ class _CommentTreeState extends State<_CommentTree> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    
+
                     // Comment text with mention highlighting
                     _buildCommentContent(widget.comment.content, fontSize),
-                    
+
                     // Actions
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         // Reactions
                         GestureDetector(
-                          onTap: () => widget.onReact(widget.comment.id, 'love'),
+                          onTap: () =>
+                              widget.onReact(widget.comment.id, 'love'),
                           child: Row(
                             children: [
                               Icon(
-                                widget.comment.userReaction != null 
-                                    ? Icons.favorite 
+                                widget.comment.userReaction != null
+                                    ? Icons.favorite
                                     : Icons.favorite_border,
                                 size: fontSize + 2,
-                                color: widget.comment.userReaction != null 
-                                    ? Colors.red 
+                                color: widget.comment.userReaction != null
+                                    ? Colors.red
                                     : const Color(0xFF6B7280),
                               ),
                               if (widget.comment.totalReactions > 0) ...[
@@ -1400,8 +1469,8 @@ class _CommentTreeState extends State<_CommentTree> {
                                   widget.comment.totalReactions.toString(),
                                   style: TextStyle(
                                     fontSize: fontSize,
-                                    color: widget.comment.userReaction != null 
-                                        ? Colors.red 
+                                    color: widget.comment.userReaction != null
+                                        ? Colors.red
                                         : const Color(0xFF6B7280),
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1411,7 +1480,7 @@ class _CommentTreeState extends State<_CommentTree> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        
+
                         // Reply button (only if depth < 3)
                         if (widget.comment.depth < 3)
                           GestureDetector(
@@ -1420,22 +1489,27 @@ class _CommentTreeState extends State<_CommentTree> {
                                 _showReplyField = !_showReplyField;
                               });
                               if (_showReplyField) {
-                                Future.delayed(const Duration(milliseconds: 100), () {
-                                  _replyFocusNode.requestFocus();
-                                });
+                                Future.delayed(
+                                  const Duration(milliseconds: 100),
+                                  () {
+                                    _replyFocusNode.requestFocus();
+                                  },
+                                );
                               }
                             },
                             child: Text(
                               _showReplyField ? 'Cancel' : 'Reply',
                               style: TextStyle(
                                 fontSize: fontSize,
-                                color: _showReplyField ? Colors.red : Colors.grey[700],
+                                color: _showReplyField
+                                    ? Colors.red
+                                    : Colors.grey[700],
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                         const SizedBox(width: 8),
-                        
+
                         // Edit button
                         if (_canEdit)
                           GestureDetector(
@@ -1446,9 +1520,9 @@ class _CommentTreeState extends State<_CommentTree> {
                               color: Colors.grey,
                             ),
                           ),
-                        
+
                         const SizedBox(width: 8),
-                        
+
                         // Delete button
                         if (_canDelete)
                           GestureDetector(
@@ -1467,7 +1541,7 @@ class _CommentTreeState extends State<_CommentTree> {
             ],
           ),
         ),
-        
+
         // Inline reply field with animation
         AnimatedSize(
           duration: const Duration(milliseconds: 300),
@@ -1498,33 +1572,48 @@ class _CommentTreeState extends State<_CommentTree> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
-                                : const Icon(Icons.send, color: Color(0xFF4B63FF)),
+                                : const Icon(
+                                    Icons.send,
+                                    color: Color(0xFF4B63FF),
+                                  ),
                             onPressed: _isPostingReply
                                 ? null
                                 : () async {
-                                    final replyText = _replyController.text.trim();
+                                    final replyText = _replyController.text
+                                        .trim();
                                     if (replyText.isNotEmpty) {
                                       setState(() => _isPostingReply = true);
                                       try {
-                                        await widget.postReply(replyText, widget.comment.id);
+                                        await widget.postReply(
+                                          replyText,
+                                          widget.comment.id,
+                                        );
                                         _replyController.clear();
                                         setState(() {
                                           _showReplyField = false;
                                         });
                                       } catch (e) {
                                         if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             SnackBar(
-                                              content: Text('Error posting reply: $e'),
+                                              content: Text(
+                                                'Error posting reply: $e',
+                                              ),
                                               backgroundColor: Colors.red,
                                             ),
                                           );
                                         }
                                       } finally {
                                         if (mounted) {
-                                          setState(() => _isPostingReply = false);
+                                          setState(
+                                            () => _isPostingReply = false,
+                                          );
                                         }
                                       }
                                     }
@@ -1540,7 +1629,7 @@ class _CommentTreeState extends State<_CommentTree> {
                 )
               : const SizedBox.shrink(),
         ),
-        
+
         // Nested replies with lazy loading
         if (hasReplies)
           Padding(
@@ -1599,20 +1688,22 @@ class _CommentTreeState extends State<_CommentTree> {
                         ),
                       ),
                       // Render replies
-                      ...widget.replies.map((reply) => _CommentTree(
-                            comment: reply,
-                            replies: [], // No nested replies for now
-                            isLoadingReplies: false,
-                            currentUserId: widget.currentUserId,
-                            postOwnerId: widget.postOwnerId,
-                            currentUserRole: widget.currentUserRole,
-                            onReply: widget.onReply,
-                            onReact: widget.onReact,
-                            onEdit: widget.onEdit,
-                            onDelete: widget.onDelete,
-                            onToggleReplies: widget.onToggleReplies,
-                            postReply: widget.postReply,
-                          )),
+                      ...widget.replies.map(
+                        (reply) => _CommentTree(
+                          comment: reply,
+                          replies: [], // No nested replies for now
+                          isLoadingReplies: false,
+                          currentUserId: widget.currentUserId,
+                          postOwnerId: widget.postOwnerId,
+                          currentUserRole: widget.currentUserRole,
+                          onReply: widget.onReply,
+                          onReact: widget.onReact,
+                          onEdit: widget.onEdit,
+                          onDelete: widget.onDelete,
+                          onToggleReplies: widget.onToggleReplies,
+                          postReply: widget.postReply,
+                        ),
+                      ),
                     ],
                   ),
               ],
@@ -1625,7 +1716,7 @@ class _CommentTreeState extends State<_CommentTree> {
   Widget _buildCommentContent(String content, double fontSize) {
     final RegExp mentionRegex = RegExp(r'@(\w+)');
     final matches = mentionRegex.allMatches(content);
-    
+
     if (matches.isEmpty) {
       return Text(
         content,
@@ -1642,38 +1733,44 @@ class _CommentTreeState extends State<_CommentTree> {
 
     for (final match in matches) {
       if (match.start > lastMatchEnd) {
-        spans.add(TextSpan(
-          text: content.substring(lastMatchEnd, match.start),
-          style: TextStyle(
-            fontSize: fontSize,
-            color: const Color(0xFF2D3748),
-            height: 1.4,
+        spans.add(
+          TextSpan(
+            text: content.substring(lastMatchEnd, match.start),
+            style: TextStyle(
+              fontSize: fontSize,
+              color: const Color(0xFF2D3748),
+              height: 1.4,
+            ),
           ),
-        ));
+        );
       }
 
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: TextStyle(
-          fontSize: fontSize,
-          color: const Color(0xFF4B63FF),
-          fontWeight: FontWeight.w600,
-          height: 1.4,
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: TextStyle(
+            fontSize: fontSize,
+            color: const Color(0xFF4B63FF),
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
         ),
-      ));
+      );
 
       lastMatchEnd = match.end;
     }
 
     if (lastMatchEnd < content.length) {
-      spans.add(TextSpan(
-        text: content.substring(lastMatchEnd),
-        style: TextStyle(
-          fontSize: fontSize,
-          color: const Color(0xFF2D3748),
-          height: 1.4,
+      spans.add(
+        TextSpan(
+          text: content.substring(lastMatchEnd),
+          style: TextStyle(
+            fontSize: fontSize,
+            color: const Color(0xFF2D3748),
+            height: 1.4,
+          ),
         ),
-      ));
+      );
     }
 
     return Text.rich(TextSpan(children: spans));
@@ -1700,11 +1797,7 @@ class _SortOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: const Color(0xFF4B63FF),
-              size: 20,
-            ),
+            Icon(icon, color: const Color(0xFF4B63FF), size: 20),
             const SizedBox(width: 16),
             Text(
               title,

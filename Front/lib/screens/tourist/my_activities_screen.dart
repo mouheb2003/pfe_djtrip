@@ -23,8 +23,13 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   int _tabIndex = 0; // 0 All, 1 Upcoming, 2 Ongoing, 3 Past
   bool _isLoading = true;
   String? _errorMessage;
+<<<<<<< HEAD
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+=======
+  String _searchQuery = '';
+  late TextEditingController _searchController;
+>>>>>>> 0a1c8878fc3e1c950514c5997940ad7019f78f8a
   Map<String, List<ActivityModel>> _buckets = {
     'all': [],
     'upcoming': [],
@@ -37,6 +42,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     _load();
   }
 
@@ -350,6 +356,52 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     _openDetails(activity);
   }
 
+<<<<<<< HEAD
+=======
+  List<ActivityModel> get _currentItems {
+    final List<ActivityModel> allItems;
+    switch (_tabIndex) {
+      case 0:
+        allItems = _buckets['upcoming'] ?? [];
+        break;
+      case 1:
+        allItems = _buckets['ongoing'] ?? [];
+        break;
+      case 2:
+        allItems = _buckets['past'] ?? [];
+        break;
+      default:
+        allItems = _buckets['upcoming'] ?? [];
+    }
+
+    // Apply search filter
+    if (_searchQuery.isEmpty) {
+      return allItems;
+    }
+
+    return allItems.where((activity) {
+      final titleMatches = activity.titre.toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      final locationMatches = activity.lieu.toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      return titleMatches || locationMatches;
+    }).toList();
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _onSearchChanged('');
+  }
+
+>>>>>>> 0a1c8878fc3e1c950514c5997940ad7019f78f8a
   String _monthName(int month) {
     const months = [
       'Jan',
@@ -511,7 +563,9 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                   ],
                 ),
               ),
+              // Search Bar
               Padding(
+<<<<<<< HEAD
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: _SearchBar(
                   controller: _searchController,
@@ -524,6 +578,59 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+=======
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search activities, locations...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 15,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF6B7280),
+                        size: 20,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+>>>>>>> 0a1c8878fc3e1c950514c5997940ad7019f78f8a
                 child: _ActivitiesSegmentedControl(
                   currentIndex: _tabIndex,
                   onChanged: (value) => setState(() => _tabIndex = value),

@@ -1,4 +1,6 @@
-﻿import 'env_config.dart';
+﻿import 'package:flutter/foundation.dart';
+
+import 'env_config.dart';
 
 class ApiConfig {
   static const String _overrideBaseUrl = String.fromEnvironment(
@@ -21,7 +23,24 @@ class ApiConfig {
     if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
     }
-    return 'http://192.168.148.99:3000';
+    return 'http://$value';
+  }
+
+  static String _localDevelopmentBaseUrl() {
+    if (kIsWeb) {
+      return 'http://localhost:3000';
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'http://10.0.2.2:3000';
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+      case TargetPlatform.fuchsia:
+        return 'http://localhost:3000';
+    }
   }
 
   static String get serverBaseUrl {
@@ -33,8 +52,7 @@ class ApiConfig {
       return 'https://backdjtrip.onrender.com';
     }
 
-    // Default local API target for Android emulator.
-    return _ensureScheme('http://192.168.148.99:3000');
+    return _localDevelopmentBaseUrl();
   }
 
   static String get baseUrl => '$serverBaseUrl/api/v1';
