@@ -13,7 +13,7 @@
 Vous avez **déjà** un Google Web Client ID dans votre `.env` backend:
 
 ```
-GOOGLE_CLIENT_ID=891015623935-f9dmcdek9blg8gusgetuu52bor903lv8.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=488329502891-h71m67eo5hmk36q81ds4kkkd6kc3c0ot.apps.googleusercontent.com
 ```
 
 **C'EST LE MÊME ID à utiliser en Flutter!**
@@ -27,7 +27,7 @@ GOOGLE_CLIENT_ID=891015623935-f9dmcdek9blg8gusgetuu52bor903lv8.apps.googleuserco
 ```bash
 cd Front
 flutter run \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=891015623935-f9dmcdek9blg8gusgetuu52bor903lv8.apps.googleusercontent.com \
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=488329502891-h71m67eo5hmk36q81ds4kkkd6kc3c0ot.apps.googleusercontent.com \
   --dart-define=API_URL=http://10.0.2.2:3000/api/v1
 ```
 
@@ -36,7 +36,7 @@ flutter run \
 ```bash
 cd Front
 flutter run \
-  --dart-define=GOOGLE_SERVER_CLIENT_ID=891015623935-f9dmcdek9blg8gusgetuu52bor903lv8.apps.googleusercontent.com \
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=488329502891-h71m67eo5hmk36q81ds4kkkd6kc3c0ot.apps.googleusercontent.com \
   --dart-define=API_URL=http://localhost:3000/api/v1
 ```
 
@@ -135,6 +135,12 @@ flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=... --dart-define=FACEBOOK_APP
 ---
 
 ## 📋 Checklist Rapide
+
+## ⚠️ Important
+
+Le fichier `Front/android/app/google-services.json` doit provenir du **même projet Firebase/Google Cloud** que le Web Client ID utilisé par `GOOGLE_CLIENT_ID`.
+
+Si votre `google-services.json` contient un autre `project_id` ou un autre `client_id`, Google Sign-In Android peut afficher `misconfigured on Android` même si le code est correct.
 
 - [ ] Vérifier GOOGLE_CLIENT_ID dans Back/.env
 - [ ] Lancer `flutter run` avec `--dart-define=GOOGLE_SERVER_CLIENT_ID`

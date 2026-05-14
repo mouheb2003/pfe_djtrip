@@ -174,7 +174,18 @@ class PlaceListItem extends StatelessWidget {
 }
 
 class MapExplorerScreen extends StatefulWidget {
-  const MapExplorerScreen({super.key});
+  final double? initialLatitude;
+  final double? initialLongitude;
+  final String? initialPlaceName;
+  final String? initialPlaceAddress;
+
+  const MapExplorerScreen({
+    super.key,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialPlaceName,
+    this.initialPlaceAddress,
+  });
 
   @override
   State<MapExplorerScreen> createState() => _MapExplorerScreenState();
@@ -245,9 +256,27 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
   @override
   void initState() {
     super.initState();
+    final hasInitialTarget =
+        widget.initialLatitude != null && widget.initialLongitude != null;
+    if (hasInitialTarget) {
+      final target = LatLng(widget.initialLatitude!, widget.initialLongitude!);
+      _currentCenter = target;
+      _selectedPlace = MapPlace(
+        placeId: 'initial_target',
+        name: (widget.initialPlaceName ?? '').trim().isNotEmpty
+            ? widget.initialPlaceName!.trim()
+            : 'Selected place',
+        position: target,
+        address: (widget.initialPlaceAddress ?? '').trim().isNotEmpty
+            ? widget.initialPlaceAddress!.trim()
+            : null,
+      );
+      _searchController.text = _selectedPlace!.name;
+    }
+
     _selectedPlaceTypes = [];
     _autocompleteSessionToken = _createSessionToken();
-    unawaited(_loadNearby(center: _djerbaCenter));
+    unawaited(_loadNearby(center: _currentCenter));
     unawaited(_loadLieuxFromBD());
   }
 
@@ -1822,6 +1851,16 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
               ),
               onMapCreated: (controller) {
                 _mapController = controller;
+                if (widget.initialLatitude != null &&
+                    widget.initialLongitude != null) {
+                  unawaited(
+                    controller.animateCamera(
+                      CameraUpdate.newCameraPosition(
+                        CameraPosition(target: _currentCenter, zoom: 15.0),
+                      ),
+                    ),
+                  );
+                }
               },
               onTap: (_) {
                 _searchFocusNode.unfocus();

@@ -1,5 +1,68 @@
 const Lieu = require("../models/lieu");
 const LieuService = require("../services/lieu");
+const User = require("../models/user");
+
+async function enrichLieuReviewsWithUsers(lieuObj) {
+  if (!lieuObj || !Array.isArray(lieuObj.reviews) || lieuObj.reviews.length === 0) {
+    return lieuObj;
+  }
+
+  const userIds = Array.from(
+    new Set(
+      lieuObj.reviews
+        .map((review) => {
+          const plainReview = review.toObject ? review.toObject() : review;
+          return (plainReview?.user ?? "").toString().trim();
+        })
+        .filter((id) => id.length > 0),
+    ),
+  );
+
+  if (userIds.length === 0) {
+    return lieuObj;
+  }
+
+  try {
+    const users = await User.find({ _id: { $in: userIds } })
+      .select("_id fullname username avatar")
+      .lean();
+
+    const usersById = new Map(
+      users.map((user) => [String(user._id), user]),
+    );
+
+    lieuObj.reviews = lieuObj.reviews.map((review) => {
+      const plainReview = review.toObject ? review.toObject() : review;
+      const reviewUserId = (plainReview?.user ?? "").toString().trim();
+      const user = usersById.get(reviewUserId);
+      
+      const enriched = { ...plainReview };
+      
+      if (user) {
+        const fullname = (user.fullname ?? "").toString().trim();
+        const username = (user.username ?? "").toString().trim();
+        const authorName = fullname || username || "User";
+        
+        enriched.authorName = authorName;
+        enriched.userName = username;
+        enriched.touriste_id = {
+          _id: String(user._id),
+          fullname,
+          username,
+          avatar: user.avatar ?? "",
+        };
+      } else {
+        enriched.authorName = "User";
+      }
+      
+      return enriched;
+    });
+  } catch (error) {
+    console.error('[ENRICH REVIEWS] Error:', error);
+  }
+
+  return lieuObj;
+}
 
 // Create a new place
 exports.createLieu = async (req, res) => {
@@ -85,6 +148,9 @@ exports.getLieuById = async (req, res) => {
       lieuObj.isBookmarked = false;
     }
 
+    // Enrich reviews with user data
+    await enrichLieuReviewsWithUsers(lieuObj);
+
     res.status(200).json({ success: true, lieu: lieuObj });
   } catch (error) {
     res.status(500).json({
@@ -147,6 +213,15 @@ exports.deleteLieu = async (req, res) => {
 exports.addReview = async (req, res) => {
   try {
     const { rating, comment } = req.body;
+    const currentUserId = (req.user?.userId ?? req.user?.id ?? "").toString();
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const lieu = await Lieu.findById(req.params.id);
     
     if (!lieu) {
@@ -156,7 +231,9 @@ exports.addReview = async (req, res) => {
     }
 
     // Check if user already reviewed
-    const existingReview = lieu.reviews.find(review => review.user === req.user.id);
+    const existingReview = lieu.reviews.find(
+      (review) => String(review.user) === currentUserId,
+    );
     if (existingReview) {
       return res
         .status(400)
@@ -165,7 +242,7 @@ exports.addReview = async (req, res) => {
 
     // Add new review
     lieu.reviews.push({
-      user: req.user.id,
+      user: currentUserId,
       comment,
       rating,
       date: new Date(),
@@ -176,11 +253,14 @@ exports.addReview = async (req, res) => {
     lieu.rating = lieu.reviews.reduce((acc, review) => acc + review.rating, 0) / lieu.reviews.length;
 
     await lieu.save();
+
+    const lieuObj = lieu.toObject();
+    await enrichLieuReviewsWithUsers(lieuObj);
     
     res.status(201).json({
       success: true,
       message: "Review added successfully",
-      lieu,
+      lieu: lieuObj,
     });
   } catch (error) {
     res.status(500).json({
@@ -329,6 +409,131 @@ exports.getBookmarkedLieux = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error loading bookmarked places",
+      error: error.message,
+    });
+  }
+};
+
+// Update a review
+exports.updateReview = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const currentUserId = (req.user?.userId ?? req.user?.id ?? "").toString();
+    const { id: lieuId, reviewId } = req.params;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const lieu = await Lieu.findById(lieuId);
+    
+    if (!lieu) {
+      return res.status(404).json({
+        success: false,
+        message: "Place not found",
+      });
+    }
+
+    // Find and update the review
+    const reviewIndex = lieu.reviews.findIndex(
+      (review) => String(review._id) === reviewId && String(review.user) === currentUserId,
+    );
+
+    if (reviewIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found or you don't have permission to update it",
+      });
+    }
+
+    lieu.reviews[reviewIndex].comment = comment;
+    lieu.reviews[reviewIndex].rating = rating;
+    lieu.reviews[reviewIndex].date = new Date();
+
+    // Recalculate rating
+    lieu.review_count = lieu.reviews.length;
+    lieu.rating = lieu.reviews.reduce((acc, review) => acc + review.rating, 0) / lieu.reviews.length;
+
+    await lieu.save();
+
+    const lieuObj = lieu.toObject();
+    await enrichLieuReviewsWithUsers(lieuObj);
+
+    res.status(200).json({
+      success: true,
+      message: "Review updated successfully",
+      lieu: lieuObj,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating review",
+      error: error.message,
+    });
+  }
+};
+
+// Delete a review
+exports.deleteReview = async (req, res) => {
+  try {
+    const currentUserId = (req.user?.userId ?? req.user?.id ?? "").toString();
+    const { id: lieuId, reviewId } = req.params;
+
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const lieu = await Lieu.findById(lieuId);
+    
+    if (!lieu) {
+      return res.status(404).json({
+        success: false,
+        message: "Place not found",
+      });
+    }
+
+    // Find and remove the review
+    const reviewIndex = lieu.reviews.findIndex(
+      (review) => String(review._id) === reviewId && String(review.user) === currentUserId,
+    );
+
+    if (reviewIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found or you don't have permission to delete it",
+      });
+    }
+
+    lieu.reviews.splice(reviewIndex, 1);
+
+    // Recalculate rating
+    lieu.review_count = lieu.reviews.length;
+    if (lieu.reviews.length > 0) {
+      lieu.rating = lieu.reviews.reduce((acc, review) => acc + review.rating, 0) / lieu.reviews.length;
+    } else {
+      lieu.rating = 0;
+    }
+
+    await lieu.save();
+
+    const lieuObj = lieu.toObject();
+    await enrichLieuReviewsWithUsers(lieuObj);
+
+    res.status(200).json({
+      success: true,
+      message: "Review deleted successfully",
+      lieu: lieuObj,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error deleting review",
       error: error.message,
     });
   }

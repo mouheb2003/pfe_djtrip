@@ -52,6 +52,12 @@ router.delete("/:id", verifyToken, verifyAdmin, lieuController.deleteLieu);
 // Add a review to a lieu
 router.post("/:id/reviews", verifyToken, lieuController.addReview);
 
+// Update a review
+router.put("/:id/reviews/:reviewId", verifyToken, lieuController.updateReview);
+
+// Delete a review
+router.delete("/:id/reviews/:reviewId", verifyToken, lieuController.deleteReview);
+
 // Upload images for a lieu (ADMIN only)
 router.post("/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);
 router.post("/:id/upload-images", verifyToken, verifyAdmin, upload.any(), lieuController.uploadImages);

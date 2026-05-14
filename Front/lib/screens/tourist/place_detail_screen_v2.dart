@@ -1,8 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../features/maps/presentation/map_explorer_screen.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/lieu_service.dart';
 import '../../services/review_service.dart';
+import '../../services/place_service.dart';
+import '../shared/activity_detail_screen.dart';
+import '../shared/bookmarked_items_screen.dart';
 
 class PlaceDetailScreenV2 extends StatefulWidget {
   final dynamic place;
@@ -14,14 +21,24 @@ class PlaceDetailScreenV2 extends StatefulWidget {
 
 class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
   bool _showFull = false;
+  bool _showLongDescription = false;
+  int _currentImageIndex = 0;
+  late PageController _pageController;
+  Timer? _autoPlayTimer;
   bool _isLoadingActivities = false;
+  bool _isSaved = false;
+  bool _isSavingState = false;
   List<ActivityModel> _activities = const [];
   List<Map<String, dynamic>> _reviews = const [];
   final TextEditingController _reviewController = TextEditingController();
   int _selectedRating = 0;
   bool _isSubmittingReview = false;
+  Map<String, dynamic> _placeData = const {};
+  String _currentUserId = '';
+  String _currentUserDisplayName = '';
 
   Map<String, dynamic> get _place {
+    if (_placeData.isNotEmpty) return _placeData;
     final raw = widget.place;
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) {
@@ -33,13 +50,58 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
   @override
   void initState() {
     super.initState();
+    _placeData = _normalizePlace(widget.place);
+    _pageController = PageController();
     _bootstrapData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoPlay());
+  }
+
+  Map<String, dynamic> _normalizePlace(dynamic raw) {
+    if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
+    if (raw is Map) {
+      return raw.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return {};
   }
 
   @override
   void dispose() {
+    _stopAutoPlay();
+    _pageController.dispose();
     _reviewController.dispose();
     super.dispose();
+  }
+
+  void _startAutoPlay() {
+    _stopAutoPlay();
+    final imgs = _extractImages();
+    if (imgs.length <= 1) return;
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      if (!_pageController.hasClients) return;
+      final next = (_currentImageIndex + 1) % imgs.length;
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  void _stopAutoPlay() {
+    try {
+      _autoPlayTimer?.cancel();
+    } catch (_) {}
+    _autoPlayTimer = null;
+  }
+
+  void _restartAutoPlay() {
+    _stopAutoPlay();
+    // slight delay to avoid racing with onPageChanged animations
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _startAutoPlay();
+    });
   }
 
   String _stringFrom(List<String> keys, {String fallback = ''}) {
@@ -76,6 +138,480 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     return fallback;
   }
 
+  String _contactFrom(List<String> keys, {String fallback = ''}) {
+    final contactInfo = _place['contactInfo'];
+    if (contactInfo is Map) {
+      for (final key in keys) {
+        final value = contactInfo[key];
+        if (value == null) continue;
+        final text = value.toString().trim();
+        if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+      }
+    }
+
+    final contact = _place['contact'];
+    if (contact is Map) {
+      for (final key in keys) {
+        final value = contact[key];
+        if (value == null) continue;
+        final text = value.toString().trim();
+        if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+      }
+    }
+
+    final contactInfoSnake = _place['contact_info'];
+    if (contactInfoSnake is Map) {
+      for (final key in keys) {
+        final value = contactInfoSnake[key];
+        if (value == null) continue;
+        final text = value.toString().trim();
+        if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+      }
+    }
+
+    for (final key in keys) {
+      final value = _place[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+
+    return fallback;
+  }
+
+  String _firstPlaceValue(List<String> keys, {String fallback = ''}) {
+    for (final key in keys) {
+      final value = _place[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+    return fallback;
+  }
+
+  Map<String, double>? _extractCoordinates() {
+    final latRaw = _place['latitude'] ?? _place['lat'];
+    final lngRaw = _place['longitude'] ?? _place['lng'] ?? _place['lon'];
+    final lat = latRaw is num
+        ? latRaw.toDouble()
+        : double.tryParse(latRaw?.toString() ?? '');
+    final lng = lngRaw is num
+        ? lngRaw.toDouble()
+        : double.tryParse(lngRaw?.toString() ?? '');
+    if (lat != null && lng != null) {
+      return {'lat': lat, 'lng': lng};
+    }
+
+    final coord =
+        _place['coordonnees'] ?? _place['coordinates'] ?? _place['location'];
+    if (coord is Map) {
+      double? lat;
+      double? lng;
+      for (final key in ['lat', 'latitude']) {
+        final v = coord[key];
+        if (v is num) lat = v.toDouble();
+        if (v is String) lat ??= double.tryParse(v);
+      }
+      for (final key in ['lng', 'lon', 'longitude']) {
+        final v = coord[key];
+        if (v is num) lng = v.toDouble();
+        if (v is String) lng ??= double.tryParse(v);
+      }
+      if (lat != null && lng != null) return {'lat': lat, 'lng': lng};
+    }
+
+    final coordStr = _stringFrom(['coordonnees', 'coords', 'latlng']);
+    if (coordStr.isNotEmpty && coordStr.contains(',')) {
+      final parts = coordStr.split(',');
+      final a = double.tryParse(parts[0].trim());
+      final b = double.tryParse(parts[1].trim());
+      if (a != null && b != null) return {'lat': a, 'lng': b};
+    }
+
+    return null;
+  }
+
+  Future<void> _openMap(String title, String subtitle) async {
+    final coords = _extractCoordinates();
+    if (coords != null) {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MapExplorerScreen(
+            initialLatitude: coords['lat'],
+            initialLongitude: coords['lng'],
+            initialPlaceName: title,
+            initialPlaceAddress: subtitle,
+          ),
+        ),
+      );
+      return;
+    } else {
+      if (!mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const MapExplorerScreen()));
+    }
+  }
+
+  Future<void> _openWebsite(String url) async {
+    if (url.isEmpty) return;
+    var parsed = url.trim();
+    if (!parsed.startsWith('http')) parsed = 'https://$parsed';
+    final uri = Uri.tryParse(parsed);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  Future<void> _callPhone(String phone) async {
+    if (phone.isEmpty) return;
+    final cleaned = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: cleaned);
+    try {
+      await launchUrl(uri);
+    } catch (_) {}
+  }
+
+  String _shortDescription(String longDescription) {
+    final direct = _stringFrom([
+      'short_description',
+      'shortDescription',
+      'summary',
+      'subtitle',
+      'excerpt',
+    ]);
+    if (direct.isNotEmpty) return direct;
+
+    final cleaned = longDescription.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (cleaned.isEmpty) return 'No description available.';
+
+    final match = RegExp(r'^(.{0,180}?)([\.\!\?]|$)').firstMatch(cleaned);
+    if (match != null) {
+      final candidate = (match.group(1) ?? '').trim();
+      if (candidate.isNotEmpty) return candidate;
+    }
+
+    return cleaned.length > 180
+        ? '${cleaned.substring(0, 180).trim()}…'
+        : cleaned;
+  }
+
+  String _reviewAuthorName(Map<String, dynamic> review) {
+    String pickFromMap(Map<dynamic, dynamic> data, List<String> keys) {
+      for (final key in keys) {
+        final value = data[key];
+        final text = value?.toString().trim() ?? '';
+        if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+      }
+      return '';
+    }
+
+    final touristeId = review['touriste_id'];
+    if (touristeId is Map) {
+      final name = pickFromMap(touristeId, [
+        'fullname',
+        'fullName',
+        'nom',
+        'name',
+        'username',
+      ]);
+      if (name.isNotEmpty) return name;
+    }
+
+    final touriste = review['touriste'];
+    if (touriste is Map) {
+      final name = pickFromMap(touriste, [
+        'fullname',
+        'fullName',
+        'nom',
+        'name',
+        'username',
+      ]);
+      if (name.isNotEmpty) return name;
+    }
+
+    final user = review['user'];
+    if (user is Map) {
+      final name = pickFromMap(user, [
+        'fullname',
+        'fullName',
+        'nom',
+        'name',
+        'username',
+      ]);
+      if (name.isNotEmpty) return name;
+    }
+
+    for (final key in [
+      'authorName',
+      'userName',
+      'username',
+      'nom',
+      'name',
+      'user_fullname',
+      'user_full_name',
+      'user_name',
+    ]) {
+      final text = review[key]?.toString().trim() ?? '';
+      if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+    }
+
+    final rawUserId =
+        (review['user'] ??
+                review['userId'] ??
+                review['utilisateur'] ??
+                review['user_id'] ??
+                '')
+            .toString()
+            .trim();
+    if (rawUserId.isNotEmpty &&
+        rawUserId == _currentUserId &&
+        _currentUserDisplayName.isNotEmpty) {
+      return _currentUserDisplayName;
+    }
+
+    return 'User';
+  }
+
+  String _reviewSubmittedDate(Map<String, dynamic> review) {
+    DateTime? parseDate(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is DateTime) return raw;
+      final text = raw.toString().trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') return null;
+      return DateTime.tryParse(text);
+    }
+
+    final dt =
+        parseDate(review['createdAt']) ??
+        parseDate(review['dateDepot']) ??
+        parseDate(review['date_depot']) ??
+        parseDate(review['datePublication']) ??
+        parseDate(review['date_publication']) ??
+        parseDate(review['submittedAt']) ??
+        parseDate(review['date']) ??
+        parseDate(review['updatedAt']);
+
+    if (dt == null) return '';
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year} $h:$min';
+  }
+
+  String _displayNameFromUser(Map<String, dynamic> user) {
+    final fullname = (user['fullname'] ?? user['fullName'] ?? '')
+        .toString()
+        .trim();
+    if (fullname.isNotEmpty) return fullname;
+
+    final firstName = (user['prenom'] ?? user['firstName'] ?? '')
+        .toString()
+        .trim();
+    final lastName = (user['nom'] ?? user['lastName'] ?? '').toString().trim();
+    final merged = '$firstName $lastName'.trim();
+    if (merged.isNotEmpty) return merged;
+
+    final username = (user['username'] ?? user['name'] ?? '').toString().trim();
+    return username;
+  }
+
+  List<Map<String, dynamic>> _enrichLieuReviewsWithCurrentUserName(
+    List<Map<String, dynamic>> reviews,
+  ) {
+    if (_currentUserId.isEmpty || _currentUserDisplayName.isEmpty) {
+      return reviews;
+    }
+
+    return reviews
+        .map((review) {
+          final rawUserId =
+              (review['user'] ??
+                      review['userId'] ??
+                      review['utilisateur'] ??
+                      review['user_id'] ??
+                      '')
+                  .toString()
+                  .trim();
+          if (rawUserId == _currentUserId) {
+            return {...review, 'authorName': _currentUserDisplayName};
+          }
+          return review;
+        })
+        .toList(growable: false);
+  }
+
+  bool _isCurrentUserReview(Map<String, dynamic> review) {
+    if (_currentUserId.isEmpty) return false;
+    final reviewUserId =
+        (review['user'] ??
+                review['userId'] ??
+                review['utilisateur'] ??
+                review['user_id'] ??
+                '')
+            .toString()
+            .trim();
+    return reviewUserId == _currentUserId;
+  }
+
+  void _editReview(Map<String, dynamic> review) {
+    final comment = (review['commentaire'] ?? review['comment'] ?? '')
+        .toString();
+    final rating = review['note'] ?? review['rating'] ?? 0;
+
+    _reviewController.text = comment;
+    _selectedRating = (rating is num)
+        ? rating.toInt()
+        : int.tryParse(rating.toString()) ?? 0;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Review'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _reviewController,
+                decoration: const InputDecoration(hintText: 'Your comment'),
+                maxLines: 4,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Text('Rating: '),
+                  ...List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        Icons.star,
+                        color: index < _selectedRating
+                            ? Colors.orange
+                            : Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() => _selectedRating = index + 1);
+                        Navigator.pop(context);
+                        _editReview(review);
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => _submitEditReview(review),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitEditReview(Map<String, dynamic> review) async {
+    final comment = _reviewController.text.trim();
+    if (comment.isEmpty || _selectedRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add a comment and rating')),
+      );
+      return;
+    }
+
+    try {
+      setState(() => _isSubmittingReview = true);
+
+      final reviewId = review['_id'] ?? review['id'] ?? '';
+      if (reviewId.isEmpty) {
+        throw Exception('Review ID not found');
+      }
+
+      final response = await LieuService.updateReview(
+        lieuId: _place['_id'].toString(),
+        reviewId: reviewId,
+        rating: _selectedRating,
+        comment: comment,
+      );
+
+      if (response['success'] == true) {
+        Navigator.pop(context);
+        _reviewController.clear();
+        _selectedRating = 0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Review updated successfully')),
+        );
+        await _fetchReviews();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error updating review: $e')));
+    } finally {
+      setState(() => _isSubmittingReview = false);
+    }
+  }
+
+  Future<void> _deleteReview(Map<String, dynamic> review) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Review?'),
+        content: const Text('Are you sure you want to delete this review?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDeleteReview(review);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteReview(Map<String, dynamic> review) async {
+    try {
+      setState(() => _isSubmittingReview = true);
+
+      final reviewId = review['_id'] ?? review['id'] ?? '';
+      if (reviewId.isEmpty) {
+        throw Exception('Review ID not found');
+      }
+
+      final response = await LieuService.deleteReview(
+        lieuId: _place['_id'].toString(),
+        reviewId: reviewId,
+      );
+
+      if (response['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Review deleted successfully')),
+        );
+        await _fetchReviews();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting review: $e')));
+    } finally {
+      setState(() => _isSubmittingReview = false);
+    }
+  }
+
   List<String> _extractImages() {
     final images = <String>[];
     final gallery = _place['gallery'];
@@ -108,7 +644,48 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     return images;
   }
 
+  Future<void> _fetchReviews() async {
+    try {
+      final lieuId = _place['_id'].toString();
+      if (lieuId.isEmpty) return;
+
+      final lieu = await LieuService.getLieuById(lieuId);
+      if (lieu != null && mounted) {
+        setState(() {
+          _reviews = List<Map<String, dynamic>>.from(lieu['reviews'] ?? []);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching reviews: $e')));
+      }
+    }
+  }
+
   Future<void> _bootstrapData() async {
+    final currentUser = await AuthService.getUser();
+    if (mounted && currentUser != null) {
+      setState(() {
+        _currentUserId = (currentUser['_id'] ?? '').toString().trim();
+        _currentUserDisplayName = _displayNameFromUser(currentUser);
+      });
+    }
+
+    final placeId = _stringFrom(['_id', 'id', 'lieu_id', 'lieuId']);
+    if (placeId.isNotEmpty) {
+      final remotePlace = await LieuService.getLieuById(placeId);
+      if (mounted && remotePlace != null) {
+        setState(() {
+          _placeData = {..._place, ...remotePlace};
+          if (_placeData['isBookmarked'] == true) {
+            _isSaved = true;
+          }
+        });
+      }
+    }
+
     final localReviewsRaw = _place['reviews'];
     List<Map<String, dynamic>> localReviews = const [];
     if (localReviewsRaw is List) {
@@ -116,6 +693,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
           .whereType<Map>()
           .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
           .toList();
+      localReviews = _enrichLieuReviewsWithCurrentUserName(localReviews);
     }
 
     if (mounted) {
@@ -195,7 +773,147 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
 
   String get _reviewLieuId {
     final id = _stringFrom(['_id', 'id', 'lieu_id', 'lieuId']);
+    print('DEBUG _reviewLieuId: $id');
+    print('DEBUG _place keys: ${_place.keys.toList()}');
     return id;
+  }
+
+  Future<void> _toggleSave() async {
+    final placeId = _reviewLieuId;
+    if (placeId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible de sauvegarder')),
+      );
+      return;
+    }
+
+    setState(() => _isSavingState = true);
+
+    try {
+      print('DEBUG: Attempting to toggle bookmark for placeId: $placeId');
+      final success = await PlaceService.toggleBookmark(placeId);
+      print('DEBUG: toggleBookmark result: $success');
+
+      if (mounted) {
+        setState(() {
+          if (success) {
+            _isSaved = !_isSaved;
+
+            if (_isSaved) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.bookmark,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Ajouté aux favoris',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: const Color(0xFF4B63FF),
+                  duration: const Duration(seconds: 5),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 6,
+                  action: SnackBarAction(
+                    label: 'See All',
+                    textColor: Colors.white,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const BookmarkedItemsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.bookmark_border,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Retiré des favoris',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.grey[700],
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 6,
+                ),
+              );
+            }
+          }
+          _isSavingState = false;
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Exception during toggleBookmark: $e');
+      if (mounted) {
+        setState(() => _isSavingState = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$e'),
+            backgroundColor: Colors.red[400],
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _submitReview() async {
@@ -264,9 +982,12 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
               .whereType<Map>()
               .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
               .toList();
+          final enrichedReviews = _enrichLieuReviewsWithCurrentUserName(
+            latestReviews,
+          );
           if (mounted && latestReviews.isNotEmpty) {
             setState(() {
-              _reviews = latestReviews;
+              _reviews = enrichedReviews;
             });
           }
         }
@@ -291,14 +1012,30 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
 
   @override
   Widget build(BuildContext context) {
+    const pageBackground = Colors.white;
+    const surface = Color(0xFFF8FAFC);
+    const surfaceAlt = Color(0xFFF3F4F6);
+    const textPrimary = Color(0xFF111827);
+    const textSecondary = Color(0xFF6B7280);
+    const borderColor = Color(0xFFE5E7EB);
+
     final title = _stringFrom([
       'name',
       'title',
       'titre',
     ], fallback: 'Unknown place');
-    final city = _stringFrom(['city']);
-    final country = _stringFrom(['country']);
-    final subtitle = [city, country].where((e) => e.isNotEmpty).join(', ');
+    final address = _firstPlaceValue([
+      'address',
+      'formattedAddress',
+      'formatted_address',
+      'adresse',
+      'location_name',
+    ]);
+    final city = _firstPlaceValue(['city']);
+    final country = _firstPlaceValue(['country']);
+    final subtitle = address.isNotEmpty
+        ? address
+        : [city, country].where((e) => e.isNotEmpty).join(', ');
     final ratingValue = _doubleFrom([
       'rating',
       'noteMoyenne',
@@ -315,32 +1052,69 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
       'description',
       'desc',
     ], fallback: 'No description available.');
-    final openingHours = _stringFrom([
+    final hasLongDescription =
+        description.trim().isNotEmpty &&
+        description.trim().toLowerCase() != 'no description available.';
+    final shortDescription = _shortDescription(description);
+    final openingHours = _firstPlaceValue([
       'opening_hours',
       'openingHours',
-    ], fallback: 'Not specified');
-    final price = _stringFrom([
-      'price_range',
-      'price',
-      'prix',
-    ], fallback: 'Not specified');
-    final header = _stringFrom([
-      'main_image',
-      'imagePortrait',
-      'image',
-      'displayImage',
+      'openinghours',
+      'horaires',
+      'hours',
+      'workingHours',
+      'schedule',
+    ]);
+    final website = _contactFrom([
+      'website',
+      'webSite',
+      'siteWeb',
+      'site_web',
+      'site',
+      'booking_link',
+      'url',
+    ]);
+    final phone = _contactFrom([
+      'telephone',
+      'phone',
+      'tel',
+      'phoneNumber',
+      'phone_number',
+      'formatted_phone_number',
+      'mobile',
+      'num_tel',
+    ]);
+    final email = _contactFrom([
+      'email',
+      'mail',
+      'contact_email',
+      'contactEmail',
     ]);
     final images = _extractImages();
 
+    // Debug: log practical info values to help diagnose missing display
+    debugPrint('PlaceDetail DEBUG title: $title');
+    debugPrint('PlaceDetail DEBUG address/subtitle: $subtitle');
+    debugPrint('PlaceDetail DEBUG openingHours: $openingHours');
+    debugPrint('PlaceDetail DEBUG website: $website');
+    debugPrint('PlaceDetail DEBUG phone: $phone');
+    debugPrint('PlaceDetail DEBUG email: $email');
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: pageBackground,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: textPrimary),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.more_horiz)),
+          IconButton(
+            onPressed: _isSavingState ? null : _toggleSave,
+            icon: Icon(
+              _isSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: textPrimary,
+            ),
+          ),
         ],
       ),
       body: Column(
@@ -350,160 +1124,448 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        height: 300,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          image: header.isNotEmpty
-                              ? DecorationImage(
-                                  image: NetworkImage(header),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          color: Colors.grey[900],
-                        ),
-                      ),
-                      Container(
-                        height: 300,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.7),
-                            ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Stack(
+                        children: [
+                          SizedBox(
+                            height: 300,
+                            width: double.infinity,
+                            child: images.isNotEmpty
+                                ? Listener(
+                                    onPointerDown: (_) => _stopAutoPlay(),
+                                    onPointerUp: (_) => _restartAutoPlay(),
+                                    child: PageView.builder(
+                                      controller: _pageController,
+                                      physics: const PageScrollPhysics(),
+                                      itemCount: images.length,
+                                      onPageChanged: (idx) {
+                                        setState(
+                                          () => _currentImageIndex = idx,
+                                        );
+                                        _restartAutoPlay();
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final img = images[index];
+                                        return img.isNotEmpty
+                                            ? Image.network(
+                                                img,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Container(
+                                                      color: Colors.white12,
+                                                    ),
+                                              )
+                                            : Container(
+                                                color: Colors.grey[900],
+                                              );
+                                      },
+                                    ),
+                                  )
+                                : Container(color: Colors.grey[900]),
                           ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 20,
-                        bottom: 24,
-                        right: 20,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    title,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const SizedBox(height: 6),
-                                  if (subtitle.isNotEmpty)
-                                    Text(
-                                      subtitle,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.star,
-                                              color: Colors.orange,
-                                              size: 16,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              '$rating ($reviewCount)',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                          Container(
+                            height: 300,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
                                 ],
                               ),
                             ),
-                            FloatingActionButton(
-                              mini: true,
-                              backgroundColor: Colors.white24,
-                              onPressed: () {},
-                              child: const Icon(
-                                Icons.bookmark_border,
-                                color: Colors.white,
+                          ),
+                          Positioned(
+                            left: 20,
+                            bottom: 24,
+                            right: 20,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (subtitle.isNotEmpty)
+                                        Text(
+                                          subtitle,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white24,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.star,
+                                                  color: Colors.orange,
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  '$rating ($reviewCount)',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      if (shortDescription.isNotEmpty)
+                                        Text(
+                                          shortDescription,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                            height: 1.4,
+                                          ),
+                                          maxLines: _showFull ? null : 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      if (shortDescription.isNotEmpty)
+                                        TextButton(
+                                          onPressed: () => setState(
+                                            () => _showFull = !_showFull,
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: Text(
+                                            _showFull
+                                                ? 'Show less'
+                                                : 'Show more',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (images.length > 1)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 8,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(images.length, (i) {
+                                  final active = i == _currentImageIndex;
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    width: active ? 10 : 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: active
+                                          ? Colors.white
+                                          : Colors.white38,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                  );
+                                }),
                               ),
                             ),
-                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (images.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12.0),
+                      child: SizedBox(
+                        height: 72,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: images.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, i) {
+                            final img = images[i];
+                            final selected = i == _currentImageIndex;
+                            return GestureDetector(
+                              onTap: () {
+                                _pageController.animateToPage(
+                                  i,
+                                  duration: const Duration(milliseconds: 350),
+                                  curve: Curves.easeInOut,
+                                );
+                                setState(() => _currentImageIndex = i);
+                                _restartAutoPlay();
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: 100,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: selected
+                                          ? const Color(0xFF4B63FF)
+                                          : borderColor,
+                                      width: 2,
+                                    ),
+                                    color: surface,
+                                  ),
+                                  child: img.isNotEmpty
+                                      ? Image.network(
+                                          img,
+                                          fit: BoxFit.cover,
+                                          width: 100,
+                                          height: 72,
+                                          errorBuilder: (_, __, ___) =>
+                                              Container(color: Colors.white12),
+                                        )
+                                      : Container(color: Colors.white12),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    ],
-                  ),
+                    ),
                   const SizedBox(height: 18),
+                  if (hasLongDescription)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Long description',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              height: 1.5,
+                            ),
+                            maxLines: _showLongDescription ? null : 4,
+                            overflow: _showLongDescription
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                          ),
+                          if (description.length > 180)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: () => setState(
+                                  () => _showLongDescription =
+                                      !_showLongDescription,
+                                ),
+                                child: Text(
+                                  _showLongDescription
+                                      ? 'Show less'
+                                      : 'Show all',
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (hasLongDescription) const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 18.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            if (subtitle.isNotEmpty)
-                              _infoPill(Icons.location_on, subtitle),
-                            _infoPill(Icons.access_time, openingHours),
-                            _infoPill(Icons.price_check, price),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
                         Text(
-                          'About',
+                          'Info pratique',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          description,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            height: 1.4,
-                          ),
-                          maxLines: _showFull ? null : 4,
-                          overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Location row with "See in map" action
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 18,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    subtitle.isNotEmpty
+                                        ? subtitle
+                                        : 'Not specified',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: subtitle.isNotEmpty
+                                      ? () => _openMap(title, subtitle)
+                                      : null,
+                                  child: const Text('See in map'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Opening hours
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  size: 18,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    openingHours.isNotEmpty
+                                        ? openingHours
+                                        : 'Not specified',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Website
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.language,
+                                  size: 18,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: website.isNotEmpty
+                                      ? TextButton(
+                                          onPressed: () =>
+                                              _openWebsite(website),
+                                          child: Text(
+                                            website,
+                                            style: const TextStyle(
+                                              color: Color(0xFF111827),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Not specified',
+                                          style: const TextStyle(
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Phone
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.phone,
+                                  size: 18,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: phone.isNotEmpty
+                                      ? TextButton(
+                                          onPressed: () => _callPhone(phone),
+                                          child: Text(
+                                            phone,
+                                            style: const TextStyle(
+                                              color: Color(0xFF111827),
+                                            ),
+                                          ),
+                                        )
+                                      : Text(
+                                          'Not specified',
+                                          style: const TextStyle(
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Email
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.email_outlined,
+                                  size: 18,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    email.isNotEmpty ? email : 'Not specified',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        TextButton(
-                          onPressed: () =>
-                              setState(() => _showFull = !_showFull),
-                          child: Text(
-                            _showFull ? 'Show less' : 'Read more',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
                           'Activities',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -519,12 +1581,13 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: surface,
+                              border: Border.all(color: borderColor),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: const Text(
                               'No activities found for this place.',
-                              style: TextStyle(color: Colors.white70),
+                              style: TextStyle(color: textSecondary),
                             ),
                           )
                         else
@@ -538,54 +1601,71 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                 final photo = activity.photos.isNotEmpty
                                     ? activity.photos.first
                                     : '';
-                                return Container(
-                                  width: 250,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                          width: double.infinity,
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                return InkWell(
+                                  onTap: () {
+                                    if (activity.id.trim().isEmpty) return;
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ActivityDetailScreen(
+                                          activityId: activity.id,
+                                          viewOnly: !activity.isUpcoming,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    width: 250,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: surface,
+                                      border: Border.all(color: borderColor),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Container(
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              color: surfaceAlt,
+                                              image: photo.isNotEmpty
+                                                  ? DecorationImage(
+                                                      image: NetworkImage(
+                                                        photo,
+                                                      ),
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : null,
                                             ),
-                                            color: Colors.white24,
-                                            image: photo.isNotEmpty
-                                                ? DecorationImage(
-                                                    image: NetworkImage(photo),
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : null,
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        activity.titre,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          activity.titre,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: textPrimary,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${activity.prixFormatted} • ${activity.dureeFormatted}',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.8),
-                                          fontSize: 12,
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${activity.prixFormatted} • ${activity.dureeFormatted}',
+                                          style: TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
@@ -593,54 +1673,9 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                           ),
                         const SizedBox(height: 16),
                         Text(
-                          'Gallery',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (images.isEmpty)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white10,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Text(
-                              'No gallery images available.',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          )
-                        else
-                          SizedBox(
-                            height: 88,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: images.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, i) => ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  images[i],
-                                  width: 120,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 120,
-                                    color: Colors.white12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        Text(
                           'Reviews',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -650,7 +1685,8 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white10,
+                            color: surface,
+                            border: Border.all(color: borderColor),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Column(
@@ -659,7 +1695,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                               const Text(
                                 'Rate this place',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: textPrimary,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -686,7 +1722,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                           : Icons.star_border_rounded,
                                       color: isOn
                                           ? Colors.orange
-                                          : Colors.white54,
+                                          : textSecondary,
                                     ),
                                   );
                                 }),
@@ -697,17 +1733,36 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                 enabled: !_isSubmittingReview,
                                 minLines: 2,
                                 maxLines: 4,
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(color: textPrimary),
                                 decoration: InputDecoration(
                                   hintText: 'Write your comment...',
                                   hintStyle: const TextStyle(
-                                    color: Colors.white54,
+                                    color: textSecondary,
                                   ),
                                   filled: true,
-                                  fillColor: Colors.white12,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 14,
+                                  ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
+                                    borderSide: const BorderSide(
+                                      color: borderColor,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: borderColor,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF4B63FF),
+                                      width: 1.5,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -734,7 +1789,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                         : 'Submit review',
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF00C2A8),
+                                    backgroundColor: const Color(0xFF4B63FF),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -751,25 +1806,19 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: surface,
+                              border: Border.all(color: borderColor),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: const Text(
                               'No reviews yet.',
-                              style: TextStyle(color: Colors.white70),
+                              style: TextStyle(color: textSecondary),
                             ),
                           )
                         else
                           ..._reviews.take(4).map((review) {
-                            final author = (review['touriste'] is Map)
-                                ? (review['touriste']['nom'] ??
-                                          review['touriste']['name'] ??
-                                          'User')
-                                      .toString()
-                                : (review['authorName'] ??
-                                          review['userName'] ??
-                                          'User')
-                                      .toString();
+                            final author = _reviewAuthorName(review);
+                            final submittedDate = _reviewSubmittedDate(review);
                             final noteRaw = review['note'] ?? review['rating'];
                             final note = noteRaw is num
                                 ? noteRaw.toDouble()
@@ -786,7 +1835,8 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white10,
+                                color: surface,
+                                border: Border.all(color: borderColor),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Column(
@@ -795,12 +1845,31 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
-                                          author,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              author,
+                                              style: const TextStyle(
+                                                color: textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            if (submittedDate.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 2,
+                                                ),
+                                                child: Text(
+                                                  submittedDate,
+                                                  style: const TextStyle(
+                                                    color: textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
                                       const Icon(
@@ -812,9 +1881,34 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                       Text(
                                         note.toStringAsFixed(1),
                                         style: const TextStyle(
-                                          color: Colors.white70,
+                                          color: textSecondary,
                                         ),
                                       ),
+                                      if (_isCurrentUserReview(review))
+                                        PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _editReview(review);
+                                            } else if (value == 'delete') {
+                                              _deleteReview(review);
+                                            }
+                                          },
+                                          itemBuilder: (BuildContext context) =>
+                                              [
+                                                const PopupMenuItem<String>(
+                                                  value: 'edit',
+                                                  child: Text('Edit'),
+                                                ),
+                                                const PopupMenuItem<String>(
+                                                  value: 'delete',
+                                                  child: Text('Delete'),
+                                                ),
+                                              ],
+                                          icon: const Icon(
+                                            Icons.more_vert,
+                                            size: 20,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                   if (text.isNotEmpty) ...[
@@ -822,7 +1916,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                     Text(
                                       text,
                                       style: const TextStyle(
-                                        color: Colors.white70,
+                                        color: textSecondary,
                                         height: 1.3,
                                       ),
                                     ),
@@ -839,42 +1933,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            color: const Color(0xFF071025),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00C2A8),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Book Now',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white10,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                  ),
-                  child: const Icon(Icons.share, color: Colors.white),
-                ),
-              ],
-            ),
-          ),
+          // Bottom action bar (Book Now / Share) removed per user request.
         ],
       ),
     );
@@ -884,14 +1943,15 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: const Color(0xFFF3F4F6),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white70, size: 16),
+          Icon(icon, color: const Color(0xFF6B7280), size: 16),
           const SizedBox(width: 8),
-          Text(text, style: const TextStyle(color: Colors.white70)),
+          Text(text, style: const TextStyle(color: Color(0xFF6B7280))),
         ],
       ),
     );

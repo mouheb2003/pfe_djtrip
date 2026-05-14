@@ -9,6 +9,7 @@ import '../../widgets/publication_card.dart';
 import '../../models/post_model.dart';
 import '../../models/activity_model.dart';
 import '../../models/lieu_model.dart';
+import '../tourist/place_detail_screen_v2.dart';
 
 enum BookmarkType { all, posts, activities, places }
 
@@ -427,34 +428,40 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                               _onPostLikeChanged(postId, liked, likesCount);
                             }
                           },
-                          onBookmarkChanged: (bookmarked, bookmarksCount) async {
-                            final postId = (item['_id'] ?? '').toString();
-                            if (postId.isEmpty) return;
-                            final currentBookmarked =
-                                item['isBookmarked'] ?? true;
-                            final currentCount =
-                                (item['bookmarks_count'] as num?)?.toInt() ?? 0;
-                            setState(() {
-                              item['isBookmarked'] = !currentBookmarked;
-                              item['bookmarks_count'] = !currentBookmarked
-                                  ? currentCount + 1
-                                  : currentCount - 1;
-                            });
-                            final result = await PostService.togglePostBookmark(
-                              postId,
-                            );
-                            if (result['success'] == true) {
-                              final bookmarked = result['bookmarked'] == true;
-                              final bookmarksCount =
-                                  (result['bookmarksCount'] as num?)?.toInt() ??
-                                  currentCount;
-                              _onPostBookmarkChanged(
-                                postId,
-                                bookmarked,
-                                bookmarksCount,
-                              );
-                            }
-                          },
+                          onBookmarkChanged:
+                              (bookmarked, bookmarksCount) async {
+                                final postId = (item['_id'] ?? '').toString();
+                                if (postId.isEmpty) return;
+                                final currentBookmarked =
+                                    item['isBookmarked'] ?? true;
+                                final currentCount =
+                                    (item['bookmarks_count'] as num?)
+                                        ?.toInt() ??
+                                    0;
+                                setState(() {
+                                  item['isBookmarked'] = !currentBookmarked;
+                                  item['bookmarks_count'] = !currentBookmarked
+                                      ? currentCount + 1
+                                      : currentCount - 1;
+                                });
+                                final result =
+                                    await PostService.togglePostBookmark(
+                                      postId,
+                                    );
+                                if (result['success'] == true) {
+                                  final bookmarked =
+                                      result['bookmarked'] == true;
+                                  final bookmarksCount =
+                                      (result['bookmarksCount'] as num?)
+                                          ?.toInt() ??
+                                      currentCount;
+                                  _onPostBookmarkChanged(
+                                    postId,
+                                    bookmarked,
+                                    bookmarksCount,
+                                  );
+                                }
+                              },
                           onShare: () {},
                           onReport: () {},
                           onMute: () {},
@@ -889,130 +896,140 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PlaceDetailScreenV2(place: placeData),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (placeData['main_image'] != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: Image.network(
-                  placeData['main_image'].toString(),
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (placeData['main_image'] != null)
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  child: Image.network(
+                    placeData['main_image'].toString(),
                     height: 150,
-                    color: const Color(0xFFF0F4FF),
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      size: 40,
-                      color: Color(0xFF4B63FF),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 150,
+                      color: const Color(0xFFF0F4FF),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 40,
+                        color: Color(0xFF4B63FF),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          placeData['name']?.toString() ?? 'Place',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1B2458),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            placeData['name']?.toString() ?? 'Place',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1B2458),
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          final currentBookmarked =
-                              placeData['isBookmarked'] ?? true;
-                          final currentCount =
-                              (placeData['bookmarks_count'] as num?)?.toInt() ??
-                              0;
-                          setState(() {
-                            placeData['isBookmarked'] = !currentBookmarked;
-                            placeData['bookmarks_count'] = !currentBookmarked
-                                ? currentCount + 1
-                                : currentCount - 1;
-                          });
-                          final result = await LieuService.toggleLieuBookmark(
-                            lieuId,
-                          );
-                          if (result['success'] == true) {
-                            final bookmarked = result['bookmarked'] == true;
-                            final bookmarksCount =
-                                (result['bookmarksCount'] as num?)?.toInt() ??
-                                currentCount;
-                            _onPlaceBookmarkChanged(
+                        IconButton(
+                          onPressed: () async {
+                            final currentBookmarked =
+                                placeData['isBookmarked'] ?? true;
+                            final currentCount =
+                                (placeData['bookmarks_count'] as num?)
+                                    ?.toInt() ??
+                                0;
+                            setState(() {
+                              placeData['isBookmarked'] = !currentBookmarked;
+                              placeData['bookmarks_count'] = !currentBookmarked
+                                  ? currentCount + 1
+                                  : currentCount - 1;
+                            });
+                            final result = await LieuService.toggleLieuBookmark(
                               lieuId,
-                              bookmarked,
-                              bookmarksCount,
                             );
-                          }
-                        },
-                        icon: Icon(
-                          isBookmarked
-                              ? Icons.bookmark
-                              : Icons.bookmark_border_rounded,
-                          color: isBookmarked
-                              ? const Color(0xFF4B63FF)
-                              : const Color(0xFF6B7280),
+                            if (result['success'] == true) {
+                              final bookmarked = result['bookmarked'] == true;
+                              final bookmarksCount =
+                                  (result['bookmarksCount'] as num?)?.toInt() ??
+                                  currentCount;
+                              _onPlaceBookmarkChanged(
+                                lieuId,
+                                bookmarked,
+                                bookmarksCount,
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            isBookmarked
+                                ? Icons.bookmark
+                                : Icons.bookmark_border_rounded,
+                            color: isBookmarked
+                                ? const Color(0xFF4B63FF)
+                                : const Color(0xFF6B7280),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    placeData['city']?.toString() ??
-                        placeData['address']?.toString() ??
-                        'Location',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.bookmark_rounded,
-                        size: 16,
-                        color: const Color(0xFF6B7280),
+                    const SizedBox(height: 8),
+                    Text(
+                      placeData['city']?.toString() ??
+                          placeData['address']?.toString() ??
+                          'Location',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$bookmarksCount',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.bookmark_rounded,
+                          size: 16,
+                          color: const Color(0xFF6B7280),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 4),
+                        Text(
+                          '$bookmarksCount',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

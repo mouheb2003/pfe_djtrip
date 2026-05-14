@@ -195,7 +195,10 @@ class LieuService {
         'lieuId': body['lieuId']?.toString() ?? lieuId,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to update bookmark right now.'};
+      return {
+        'success': false,
+        'message': 'Unable to update bookmark right now.',
+      };
     }
   }
 
@@ -206,13 +209,10 @@ class LieuService {
     required String comment,
   }) async {
     try {
-      final res = await ApiClient.post(
-        '/lieux/$lieuId/reviews',
-        {
-          'rating': rating,
-          'comment': comment,
-        },
-      );
+      final res = await ApiClient.post('/lieux/$lieuId/reviews', {
+        'rating': rating,
+        'comment': comment,
+      });
 
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       return {
@@ -221,10 +221,7 @@ class LieuService {
         'lieu': body['lieu'],
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Error connecting to server',
-      };
+      return {'success': false, 'message': 'Error connecting to server'};
     }
   }
 
@@ -245,5 +242,47 @@ class LieuService {
       return [];
     }
   }
-}
 
+  // Update a review
+  static Future<Map<String, dynamic>> updateReview({
+    required String lieuId,
+    required String reviewId,
+    required int rating,
+    required String comment,
+  }) async {
+    try {
+      final res = await ApiClient.put('/lieux/$lieuId/reviews/$reviewId', {
+        'rating': rating,
+        'comment': comment,
+      });
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to update review',
+        'lieu': body['lieu'],
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Error connecting to server'};
+    }
+  }
+
+  // Delete a review
+  static Future<Map<String, dynamic>> deleteReview({
+    required String lieuId,
+    required String reviewId,
+  }) async {
+    try {
+      final res = await ApiClient.delete('/lieux/$lieuId/reviews/$reviewId');
+
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return {
+        'success': res.statusCode == 200,
+        'message': body['message'] ?? 'Unable to delete review',
+        'lieu': body['lieu'],
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Error connecting to server'};
+    }
+  }
+}
