@@ -30,8 +30,6 @@ class TouristMainScreen extends StatefulWidget {
 class _TouristMainScreenState extends State<TouristMainScreen> {
   int _currentIndex = 0;
   late List<Widget> _pages;
-  Timer? _noveltyTimer;
-  final Duration _noveltyRefreshInterval = const Duration(seconds: 30);
   String _homeSignature = '';
   String _activitiesSignature = '';
   String _networkSignature = '';
@@ -66,9 +64,6 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
     ];
 
     _refreshNoveltyBadges();
-    _noveltyTimer = Timer.periodic(_noveltyRefreshInterval, (_) {
-      _refreshNoveltyBadges();
-    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
@@ -79,7 +74,6 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
 
   @override
   void dispose() {
-    _noveltyTimer?.cancel();
     super.dispose();
   }
 
@@ -261,6 +255,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         showMessagesDot: _showMessagesDot,
       );
     });
+    _refreshNoveltyBadges();
   }
 
   void _openNotifications() {
@@ -283,7 +278,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         children: [
           IndexedStack(index: _currentIndex, children: _pages),
           Positioned(
-bottom: 18,
+            bottom: 18,
             left: 16,
             right: 16,
             child: _buildFloatingNavBar(navBg, navActive, navInactive),
@@ -301,7 +296,7 @@ bottom: 18,
       children: [
         // Main pill-shaped nav bar
         Container(
-height: 70,
+          height: 70,
           decoration: BoxDecoration(
             color: navBg,
             borderRadius: BorderRadius.circular(30),
@@ -416,7 +411,7 @@ class _NavItem extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-AnimatedContainer(
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   width: isActive ? 50 : 40,
@@ -477,4 +472,3 @@ class _RedDot extends StatelessWidget {
     );
   }
 }
-

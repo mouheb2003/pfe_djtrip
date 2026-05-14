@@ -297,7 +297,31 @@ class _HomeTabState extends State<HomeTab> {
       final lieu = _lieux.firstWhere((l) => l.id == suggestion['id']);
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => PlaceDetailScreen(place: lieu)),
+        MaterialPageRoute(
+          builder: (context) => PlaceDetailScreen(
+            place: {
+              'titre': lieu.titre,
+              'name': lieu.titre,
+              'description': lieu.description,
+              'short_description': lieu.description,
+              'imagePortrait': lieu.imagePortrait,
+              'main_image': lieu.imagePortrait,
+              'image': lieu.imagePortrait,
+              'topDestination': lieu.topDestination,
+              'noteMoyenne': lieu.noteMoyenne,
+              'nombreAvis': lieu.nombreAvis,
+              'city': lieu.city,
+              'country': lieu.country,
+              'opening_hours': lieu.openingHours ?? '',
+              'closing_hours': lieu.closingHours ?? '',
+              'prix': lieu.prix,
+              'price': lieu.prix,
+              'amenities': lieu.amenities,
+              'reviews': lieu.reviews,
+              'booking_required': lieu.bookingRequired,
+            },
+          ),
+        ),
       );
     } else if (suggestion['type'] == 'activity') {
       // Navigate to activity detail screen

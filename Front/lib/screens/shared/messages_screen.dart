@@ -17,8 +17,6 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen>
     with WidgetsBindingObserver {
-  static const Duration _refreshInterval = Duration(seconds: 4);
-
   int _tabIndex = 0;
   final _tabs = const ['All Chats', 'Unread', 'Archived'];
 
@@ -31,8 +29,6 @@ class _MessagesScreenState extends State<MessagesScreen>
   String? _currentUserId;
 
   io.Socket? _socket;
-  Timer? _presenceReloadTimer;
-  Timer? _autoRefreshTimer;
 
   void _disposeSocket() {
     _socket?.off('user_status');
@@ -44,19 +40,6 @@ class _MessagesScreenState extends State<MessagesScreen>
     _socket = null;
   }
 
-  void _startAutoRefresh() {
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer.periodic(_refreshInterval, (_) {
-      if (!mounted) return;
-      _loadConversations();
-    });
-  }
-
-  void _stopAutoRefresh() {
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = null;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -64,7 +47,6 @@ class _MessagesScreenState extends State<MessagesScreen>
     _loadCurrentUserId();
     _loadConversations();
     _initSocket();
-    _startAutoRefresh();
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -78,8 +60,6 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   @override
   void dispose() {
-    _presenceReloadTimer?.cancel();
-    _stopAutoRefresh();
     _disposeSocket();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -89,9 +69,8 @@ class _MessagesScreenState extends State<MessagesScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (_socket == null) _initSocket();
-      _startAutoRefresh();
+      _loadConversations();
     } else {
-      _stopAutoRefresh();
       _disposeSocket();
     }
   }
@@ -142,12 +121,6 @@ class _MessagesScreenState extends State<MessagesScreen>
           return c;
         }).toList();
       });
-
-      _presenceReloadTimer?.cancel();
-      _presenceReloadTimer = Timer(
-        const Duration(milliseconds: 300),
-        _loadConversations,
-      );
     });
 
     socket.on('new_message', (_) => _loadConversations());
@@ -294,7 +267,9 @@ class _MessagesScreenState extends State<MessagesScreen>
                         itemBuilder: (_, i) {
                           final c = _filteredConversations[i];
                           return Dismissible(
-                            key: ValueKey('conversation-${c.partnerId}-$_dismissKeyCounter'),
+                            key: ValueKey(
+                              'conversation-${c.partnerId}-$_dismissKeyCounter',
+                            ),
                             direction: DismissDirection.horizontal,
                             background: _SwipeActionBackground(
                               color: c.isArchived
@@ -318,14 +293,18 @@ class _MessagesScreenState extends State<MessagesScreen>
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: const Text('Leave Conversation'),
-                                    content: const Text('Are you sure you want to leave this conversation?'),
+                                    content: const Text(
+                                      'Are you sure you want to leave this conversation?',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
                                         child: const Text('Cancel'),
                                       ),
                                       TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
                                         style: TextButton.styleFrom(
                                           foregroundColor: Colors.red,
                                         ),

@@ -507,8 +507,32 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      PlaceDetailScreen(place: _filteredPlaces[index]),
+                  builder: (_) => PlaceDetailScreen(
+                    place: {
+                      'titre': _filteredPlaces[index].titre,
+                      'name': _filteredPlaces[index].titre,
+                      'description': _filteredPlaces[index].description,
+                      'short_description': _filteredPlaces[index].description,
+                      'imagePortrait': _filteredPlaces[index].imagePortrait,
+                      'main_image': _filteredPlaces[index].imagePortrait,
+                      'image': _filteredPlaces[index].imagePortrait,
+                      'topDestination': _filteredPlaces[index].topDestination,
+                      'noteMoyenne': _filteredPlaces[index].noteMoyenne,
+                      'nombreAvis': _filteredPlaces[index].nombreAvis,
+                      'city': _filteredPlaces[index].city,
+                      'country': _filteredPlaces[index].country,
+                      'opening_hours':
+                          _filteredPlaces[index].openingHours ?? '',
+                      'closing_hours':
+                          _filteredPlaces[index].closingHours ?? '',
+                      'prix': _filteredPlaces[index].prix,
+                      'price': _filteredPlaces[index].prix,
+                      'amenities': _filteredPlaces[index].amenities,
+                      'reviews': _filteredPlaces[index].reviews,
+                      'booking_required':
+                          _filteredPlaces[index].bookingRequired,
+                    },
+                  ),
                 ),
               ),
             ),
@@ -530,8 +554,29 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    PlaceDetailScreen(place: _filteredPlaces[index]),
+                builder: (_) => PlaceDetailScreen(
+                  place: {
+                    'titre': _filteredPlaces[index].titre,
+                    'name': _filteredPlaces[index].titre,
+                    'description': _filteredPlaces[index].description,
+                    'short_description': _filteredPlaces[index].description,
+                    'imagePortrait': _filteredPlaces[index].imagePortrait,
+                    'main_image': _filteredPlaces[index].imagePortrait,
+                    'image': _filteredPlaces[index].imagePortrait,
+                    'topDestination': _filteredPlaces[index].topDestination,
+                    'noteMoyenne': _filteredPlaces[index].noteMoyenne,
+                    'nombreAvis': _filteredPlaces[index].nombreAvis,
+                    'city': _filteredPlaces[index].city,
+                    'country': _filteredPlaces[index].country,
+                    'opening_hours': _filteredPlaces[index].openingHours ?? '',
+                    'closing_hours': _filteredPlaces[index].closingHours ?? '',
+                    'prix': _filteredPlaces[index].prix,
+                    'price': _filteredPlaces[index].prix,
+                    'amenities': _filteredPlaces[index].amenities,
+                    'reviews': _filteredPlaces[index].reviews,
+                    'booking_required': _filteredPlaces[index].bookingRequired,
+                  },
+                ),
               ),
             ),
           ),

@@ -43,12 +43,12 @@ class ScreenNetwork extends StatefulWidget {
   State<ScreenNetwork> createState() => _ScreenNetworkState();
 }
 
-class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateMixin {
+class _ScreenNetworkState extends State<ScreenNetwork>
+    with TickerProviderStateMixin {
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
   bool _isFetching = false;
   String _currentUserId = '';
-  Timer? _autoRefreshTimer;
   late final ScrollController _scrollController;
   late final TabController _tabController;
   bool _isScrolled = false;
@@ -58,7 +58,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
 
   List<Map<String, dynamic>> get _visiblePosts {
     var result = _posts;
-    
+
     switch (_activeFilter) {
       case _FeedFilter.allPublications:
         return result;
@@ -120,7 +120,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
     if (!mounted) return;
     final postId = (post['_id'] ?? '').toString();
     if (postId.isEmpty) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Report submitted successfully'),
@@ -133,7 +133,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
     if (!mounted) return;
     final authorId = _extractAuthorId(post);
     if (authorId.isEmpty) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Author muted successfully'),
@@ -145,7 +145,9 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
   void _onLikeChanged(String postId, bool liked, int likesCount) {
     if (!mounted) return;
     setState(() {
-      final postIndex = _posts.indexWhere((p) => (p['_id']?.toString() ?? '') == postId);
+      final postIndex = _posts.indexWhere(
+        (p) => (p['_id']?.toString() ?? '') == postId,
+      );
       if (postIndex != -1) {
         _posts[postIndex]['is_liked'] = liked;
         _posts[postIndex]['likes_count'] = likesCount;
@@ -156,7 +158,9 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
   void _onBookmarkChanged(String postId, bool bookmarked, int bookmarksCount) {
     if (!mounted) return;
     setState(() {
-      final postIndex = _posts.indexWhere((p) => (p['_id']?.toString() ?? '') == postId);
+      final postIndex = _posts.indexWhere(
+        (p) => (p['_id']?.toString() ?? '') == postId,
+      );
       if (postIndex != -1) {
         _posts[postIndex]['is_bookmarked'] = bookmarked;
       }
@@ -166,7 +170,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
   Future<void> _loadFeed({bool showLoader = true}) async {
     if (!mounted) return;
     if (_isFetching) return;
-    
+
     if (showLoader) {
       setState(() => _loading = true);
     }
@@ -174,21 +178,27 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final userId = userProvider.user is Map ? (userProvider.user as Map)['_id']?.toString() ?? '' : (userProvider.user as UserModel?)?.id ?? '';
+      final userId = userProvider.user is Map
+          ? (userProvider.user as Map)['_id']?.toString() ?? ''
+          : (userProvider.user as UserModel?)?.id ?? '';
       _currentUserId = userId;
 
       final posts = await PostService.getFeedPosts();
-      
+
       if (!mounted) return;
       setState(() {
-        _posts = posts.map((post) => {
-          ...post,
-          'is_liked': post['is_liked'] ?? false,
-          'is_bookmarked': post['is_bookmarked'] ?? false,
-          'likes_count': post['likes_count'] ?? 0,
-          'comments_count': post['comments_count'] ?? 0,
-          'shares_count': post['shares_count'] ?? 0,
-        }).toList();
+        _posts = posts
+            .map(
+              (post) => {
+                ...post,
+                'is_liked': post['is_liked'] ?? false,
+                'is_bookmarked': post['is_bookmarked'] ?? false,
+                'likes_count': post['likes_count'] ?? 0,
+                'comments_count': post['comments_count'] ?? 0,
+                'shares_count': post['shares_count'] ?? 0,
+              },
+            )
+            .toList();
         _loading = false;
       });
     } catch (e) {
@@ -205,7 +215,8 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
 
   void _handleScroll() {
     if (!mounted) return;
-    final isScrolled = _scrollController.hasClients && _scrollController.offset > 0;
+    final isScrolled =
+        _scrollController.hasClients && _scrollController.offset > 0;
     if (isScrolled != _isScrolled) {
       setState(() => _isScrolled = isScrolled);
     }
@@ -224,14 +235,10 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabChange);
     _loadFeed();
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      _loadFeed(showLoader: false);
-    });
   }
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
     _scrollController.dispose();
     _tabController.dispose();
     super.dispose();
@@ -272,10 +279,7 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: _isScrolled
-                            ? [
-                                Colors.white,
-                                Colors.white,
-                              ]
+                            ? [Colors.white, Colors.white]
                             : [
                                 const Color(0xFFE8F4FD),
                                 const Color(0xFFF0F4FF),
@@ -392,7 +396,9 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
                               boxShadow: [
                                 if (isSelected)
                                   BoxShadow(
-                                    color: AppColors.primary.withValues(alpha: 0.3),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   )
@@ -490,58 +496,57 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
               )
             else
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final post = _visiblePosts[index];
-                    return PublicationCard(
-                      post: PostModel.fromJson(post),
-                      onLikeChanged: (liked, likesCount) {
-                        final postId = (post['_id']?.toString() ?? '');
-                        if (postId.isEmpty) return;
-                        _onLikeChanged(postId, liked, likesCount);
-                      },
-                      onBookmarkChanged: (bookmarked, bookmarksCount) {
-                        final postId = (post['_id']?.toString() ?? '');
-                        if (postId.isEmpty) return;
-                        _onBookmarkChanged(postId, bookmarked, bookmarksCount);
-                      },
-                      onReport: () => _reportPost(post),
-                      onMute: () => _muteAuthor(post),
-                      onShare: () {
-                        final postId = (post['_id']?.toString() ?? '');
-                        if (postId.isEmpty) return;
-                        final content = (post['content'] ?? '').toString();
-                        final imageUrl = (post['image_url'] ?? post['imageUrl'] ?? '').toString();
-                        if (postId.isEmpty) return;
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => TikTokShareWidget(
-                            postId: postId,
-                            postContent: content,
-                            postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final post = _visiblePosts[index];
+                  return PublicationCard(
+                    post: PostModel.fromJson(post),
+                    onLikeChanged: (liked, likesCount) {
+                      final postId = (post['_id']?.toString() ?? '');
+                      if (postId.isEmpty) return;
+                      _onLikeChanged(postId, liked, likesCount);
+                    },
+                    onBookmarkChanged: (bookmarked, bookmarksCount) {
+                      final postId = (post['_id']?.toString() ?? '');
+                      if (postId.isEmpty) return;
+                      _onBookmarkChanged(postId, bookmarked, bookmarksCount);
+                    },
+                    onReport: () => _reportPost(post),
+                    onMute: () => _muteAuthor(post),
+                    onShare: () {
+                      final postId = (post['_id']?.toString() ?? '');
+                      if (postId.isEmpty) return;
+                      final content = (post['content'] ?? '').toString();
+                      final imageUrl =
+                          (post['image_url'] ?? post['imageUrl'] ?? '')
+                              .toString();
+                      if (postId.isEmpty) return;
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => TikTokShareWidget(
+                          postId: postId,
+                          postContent: content,
+                          postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                        ),
+                      );
+                    },
+                    onCopyLink: () async {
+                      final postId = (post['_id']?.toString() ?? '');
+                      if (postId.isEmpty) return;
+                      final link = 'https://djtrip.com/post/$postId';
+                      await Clipboard.setData(ClipboardData(text: link));
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Link copied to clipboard'),
+                            backgroundColor: Color(0xFF22C55E),
                           ),
                         );
-                      },
-                      onCopyLink: () async {
-                        final postId = (post['_id']?.toString() ?? '');
-                        if (postId.isEmpty) return;
-                        final link = 'https://djtrip.com/post/$postId';
-                        await Clipboard.setData(ClipboardData(text: link));
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Link copied to clipboard'),
-                              backgroundColor: Color(0xFF22C55E),
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  },
-                  childCount: _visiblePosts.length,
-                ),
+                      }
+                    },
+                  );
+                }, childCount: _visiblePosts.length),
               ),
           ],
         ),
@@ -551,7 +556,16 @@ class _ScreenNetworkState extends State<ScreenNetwork> with TickerProviderStateM
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => CreatePostScreen(user: _currentUserId.isNotEmpty ? UserModel(id: _currentUserId, fullname: 'User', email: '', userType: 'Touriste') : null),
+              builder: (context) => CreatePostScreen(
+                user: _currentUserId.isNotEmpty
+                    ? UserModel(
+                        id: _currentUserId,
+                        fullname: 'User',
+                        email: '',
+                        userType: 'Touriste',
+                      )
+                    : null,
+              ),
             ),
           );
         },
@@ -575,7 +589,10 @@ class _LocalBookmarkState {
   final bool bookmarked;
   final int bookmarksCount;
 
-  const _LocalBookmarkState({required this.bookmarked, required this.bookmarksCount});
+  const _LocalBookmarkState({
+    required this.bookmarked,
+    required this.bookmarksCount,
+  });
 }
 
 enum _FeedFilter { allPublications, myPosts }
