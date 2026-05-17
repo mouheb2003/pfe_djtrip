@@ -27,17 +27,17 @@ class _MentionTextWidgetState extends State<MentionTextWidget> {
   }
 
   Future<void> _loadUserFullnames() async {
-    final mentionRegex = RegExp(r'@([a-zA-Z0-9_]{3,30})');
-    final mentions = mentionRegex.allMatches(widget.text).map((m) => m.group(1)!).toSet();
-    
+    final mentionRegex = RegExp(r'@([a-fA-F0-9]{24})');
+    final mentions =
+        mentionRegex.allMatches(widget.text).map((m) => m.group(1)!).toSet();
+
     if (mentions.isEmpty) return;
-    
+
     try {
       final Map<String, String> fullnames = {};
-      
       for (final username in mentions) {
         try {
-          final user = await UserService.getUserByUsername(username);
+          final user = await UserService.getUserByIdSimple(username);
           if (user != null && user['fullname'] != null) {
             fullnames[username] = user['fullname'];
           } else {
@@ -47,7 +47,7 @@ class _MentionTextWidgetState extends State<MentionTextWidget> {
           fullnames[username] = username;
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _userFullnames = fullnames;
@@ -60,8 +60,8 @@ class _MentionTextWidgetState extends State<MentionTextWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Regex pour trouver les mentions @username
-    final mentionRegex = RegExp(r'@([a-zA-Z0-9_]{3,30})');
+    // Regex pour trouver les mentions @userId (24 char hex)
+    final mentionRegex = RegExp(r'@([a-fA-F0-9]{24})');
     final spans = <TextSpan>[];
     int lastEnd = 0;
 

@@ -38,7 +38,7 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
 
   void _onTextChanged() {
     final text = widget.controller.text;
-    final mentionRegex = RegExp(r'@([a-zA-Z0-9_]{1,})$');
+    final mentionRegex = RegExp(r'@([a-zA-Z0-9]{1,})$');
     final match = mentionRegex.firstMatch(text);
     
     if (match != null) {
@@ -66,13 +66,14 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
     if (query.length < 1) return;
 
     try {
-      final users = await UserService.searchUsersByUsername(query);
+      final users = await UserService.searchUsersByName(query);
       
       setState(() {
         _suggestions = users.map((user) => {
-          'username': user['username'],
+          '_id': user['_id'],
           'fullname': user['fullname'],
           'avatar': user['avatar'],
+          'userType': user['userType'],
         }).toList();
       });
     } catch (e) {
@@ -84,24 +85,27 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
   }
 
   void _selectSuggestion(Map<String, dynamic> suggestion) {
-    final username = suggestion['username'] as String;
+    final userId = suggestion['_id'] as String;
+    final fullname = suggestion['fullname'] as String;
     
     // Remplacer la mention dans le texte
     final text = widget.controller.text;
-    final mentionRegex = RegExp(r'@([a-zA-Z0-9_]{1,})$');
+    final mentionRegex = RegExp(r'@([a-zA-Z0-9]{1,})$');
     final match = mentionRegex.firstMatch(text);
     
     if (match != null) {
       final beforeMention = text.substring(0, match.start);
       final afterMention = text.substring(match.end);
-      final newText = '$beforeMention@$username$afterMention';
+      
+      // On utilise @userId en interne pour la détection backend robuste.
+      final newText = '$beforeMention@$userId$afterMention';
       
       widget.controller.text = newText;
       widget.controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: match.start + username.length + 1),
+        TextPosition(offset: match.start + userId.length + 1),
       );
       
-      widget.onMentionAdded(username);
+      widget.onMentionAdded(userId);
     }
     
     setState(() {
@@ -120,77 +124,101 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
         TextField(
           controller: widget.controller,
           focusNode: widget.focusNode,
-          maxLines: 6,
-          minLines: 4,
+          maxLines: 8,
+          minLines: 5,
           style: const TextStyle(
-            fontSize: 16,
-            height: 1.4,
+            fontSize: 15,
+            height: 1.5,
+            color: Color(0xFF1D245D),
           ),
           decoration: InputDecoration(
-            hintText: "Share your Djerba experience...",
+            hintText: "What's on your mind? Mention friends using @...",
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: Colors.grey[200]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: Colors.grey[200]!),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
             ),
             filled: true,
-            fillColor: Colors.grey[50],
-            contentPadding: const EdgeInsets.all(16),
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.all(20),
           ),
         ),
         
         // Suggestions dropdown
         if (_showSuggestions && _suggestions.isNotEmpty)
           Container(
-            margin: const EdgeInsets.only(top: 8),
+            margin: const EdgeInsets.only(top: 10),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE8EAF6)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(8),
-              itemCount: _suggestions.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final suggestion = _suggestions[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: suggestion['avatar'] != null
-                        ? NetworkImage(suggestion['avatar'])
-                        : null,
-                    child: suggestion['avatar'] == null
-                        ? const Icon(Icons.person, size: 20)
-                        : null,
-                  ),
-                  title: Text(
-                    '@${suggestion['username']}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: _suggestions.length,
+                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[100], indent: 64),
+                itemBuilder: (context, index) {
+                  final suggestion = _suggestions[index];
+                  final fullname = suggestion['fullname'] ?? 'User';
+                  final type = suggestion['userType'] ?? 'Touriste';
+                  
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    leading: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary.withOpacity(0.1), width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFFF0F2FF),
+                        backgroundImage: suggestion['avatar'] != null
+                            ? NetworkImage(suggestion['avatar'])
+                            : null,
+                        child: suggestion['avatar'] == null
+                            ? const Icon(Icons.person, size: 20, color: AppColors.primary)
+                            : null,
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    suggestion['fullname'],
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
+                    title: Text(
+                      fullname,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF1D245D),
+                      ),
                     ),
-                  ),
-                  onTap: () => _selectSuggestion(suggestion),
-                );
-              },
+                    subtitle: Text(
+                      type.toString().toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    onTap: () => _selectSuggestion(suggestion),
+                  );
+                },
+              ),
             ),
           ),
       ],

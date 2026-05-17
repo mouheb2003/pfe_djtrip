@@ -57,7 +57,7 @@ class CheckinOfflineService {
 
     final pending = <Map<String, dynamic>>[];
     
-    for (final entry in _queueBox.entries) {
+    for (final entry in _queueBox.toMap().entries) {
       final data = entry.value;
       if (data['status'] == 'pending') {
         pending.add(Map<String, dynamic>.from(data));

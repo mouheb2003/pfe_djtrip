@@ -91,8 +91,8 @@ class InscriptionService {
 
   /// Tourist: get only activities that are not already joined/requested.
   /// Excludes activities with existing inscriptions in statuses:
-  /// - en_attente (join requested)
-  /// - approuvee (already joined)
+  /// - pending (join requested)
+  /// - approved (already joined)
   static Future<List<ActivityModel>> getJoinableActivities({
     Map<String, String>? filters,
   }) async {
@@ -121,7 +121,7 @@ class InscriptionService {
       final rawActivities = _extractActivities(body);
       final allActivities = rawActivities.map(ActivityModel.fromJson).toList();
 
-      final blockedStatuses = {'en_attente', 'approuvee'};
+      final blockedStatuses = {'pending', 'approved', 'verified'};
       final blockedIds = inscriptions
           .where((i) => blockedStatuses.contains(i.statut))
           .map((i) => (i.activite?['_id'] ?? '').toString())
@@ -208,6 +208,7 @@ class InscriptionService {
 
   static Future<Map<String, dynamic>> _get(String path) async {
     final res = await ApiClient.get(path, cacheFirst: false);
+    print('🔍 [SERVICE] GET $path -> Status: ${res.statusCode}');
     return _decodeObject(res.body);
   }
 
@@ -281,6 +282,9 @@ class InscriptionService {
       print(
         '⚠️ [SERVICE] Invalid response: success=${body['success']}, data is ${body['data']}',
       );
+      if (body['message'] != null) {
+        print('❌ [SERVICE] API Error Message: ${body['message']}');
+      }
       return {'pending': [], 'confirmed': [], 'cancelled': [], 'used': []};
     } catch (e) {
       print('❌ [SERVICE] Error in getMyBookings: $e');
@@ -289,8 +293,12 @@ class InscriptionService {
   }
 
   /// Tourist: cancel an inscription.
-  static Future<bool> cancelInscription(String inscriptionId) async {
-    final res = await ApiClient.put('/inscriptions/$inscriptionId/annuler', {});
+  static Future<bool> cancelInscription(String inscriptionId, {String? reason}) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.isNotEmpty) {
+      body['reason'] = reason;
+    }
+    final res = await ApiClient.put('/inscriptions/$inscriptionId/annuler', body);
     return res.statusCode == 200;
   }
 
@@ -569,7 +577,7 @@ class InscriptionService {
   static Future<bool> markInscriptionAsUsed(String inscriptionId) async {
     try {
       final res = await ApiClient.put('/inscriptions/$inscriptionId/verifier', {
-        'statut': 'verifie',
+        'statut': 'verified',
       });
       return res.statusCode == 200;
     } catch (e) {

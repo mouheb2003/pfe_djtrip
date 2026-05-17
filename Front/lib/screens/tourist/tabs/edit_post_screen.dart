@@ -63,6 +63,14 @@ class _EditPostScreenState extends State<EditPostScreen> {
     return [];
   }
 
+  List<String> _readMentions() {
+    final mentions = _effectivePost['mentions'];
+    if (mentions is List) {
+      return mentions.map((e) => e.toString()).toList();
+    }
+    return [];
+  }
+
   List<String> _readImageUrls() {
     final urls = <String>[];
     
@@ -81,14 +89,21 @@ class _EditPostScreenState extends State<EditPostScreen> {
   }
 
   void _applyFetchedPostData(Map<String, dynamic> source) {
-    final content = _readString(['content']);
-    final location = _readString([
+    final content = _readStringFrom(source, ['content']);
+    final location = _readStringFrom(source, [
       'location_label',
       'locationLabel',
       'location',
       'place',
     ]);
-    final tags = _readHashtags();
+    
+    // Read tags and mentions from the source instead of the stale effectivePost
+    final tagsRaw = source['hashtags'] ?? source['tags'] ?? [];
+    final tags = tagsRaw is List ? tagsRaw.map((e) => e.toString()).toList() : <String>[];
+    
+    final mentionsRaw = source['mentions'];
+    final mentions = mentionsRaw is List ? mentionsRaw.map((e) => e.toString()).toList() : <String>[];
+    
     final images = _readImageUrlsFrom(source);
 
     if (!_didEditContent && content.isNotEmpty) {
@@ -104,11 +119,27 @@ class _EditPostScreenState extends State<EditPostScreen> {
       _tagsCtrl.clear();
     }
 
+    if (_mentions.isEmpty && mentions.isNotEmpty) {
+      _mentions
+        ..clear()
+        ..addAll(mentions);
+    }
+
     if (_existingImageUrls.isEmpty && images.isNotEmpty) {
       _existingImageUrls
         ..clear()
         ..addAll(images);
     }
+  }
+
+  String _readStringFrom(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      final value = source[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 
   List<String> _readImageUrlsFrom(Map<String, dynamic> source) {
@@ -170,6 +201,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
       ]),
     );
     _hashtags.addAll(_readHashtags().map(_normalizeTag));
+    _mentions.addAll(_readMentions());
     _tagsCtrl = TextEditingController();
 
     final uniqueImages = _readImageUrls();
@@ -240,7 +272,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
     if (result == null) return;
     setState(() {
-      _locationCtrl.text = result.address;
+      _locationCtrl.text = result.placeName;
       _didEditLocation = true;
     });
   }
@@ -300,6 +332,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
       locationLabel: _locationCtrl.text.trim(),
       hashtags: tags,
       imageUrls: [..._existingImageUrls, ...uploadedUrls],
+      mentions: _mentions,
     );
 
     if (!mounted) return;
@@ -444,99 +477,168 @@ class _EditPostScreenState extends State<EditPostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
+      backgroundColor: const Color(0xFFF9FAFE),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F1FA),
+        backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close, color: AppColors.primary),
+          icon: const Icon(Icons.close_rounded, color: Color(0xFF1D245D)),
         ),
         title: const Text(
           'Edit Post',
           style: TextStyle(
-            color: Color(0xFF1B2458),
-            fontWeight: FontWeight.w700,
+            color: Color(0xFF1D245D),
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            letterSpacing: -0.5,
           ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: FilledButton(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                elevation: 4,
+                shadowColor: AppColors.primary.withOpacity(0.4),
               ),
-              child: Text(_saving ? 'Saving...' : 'Save'),
+              child: Text(
+                _saving ? '...' : 'SAVE',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 1,
+                ),
+              ),
             ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // User Header Info
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
                 children: [
-                  const Text(
-                    'POST CONTENT',
-                    style: TextStyle(
-                      color: Color(0xFF8790BF),
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary.withOpacity(0.1), width: 3),
+                    ),
+                    child: CircleAvatar(
+                      radius: 26,
+                      backgroundColor: const Color(0xFFF0F2FF),
+                      backgroundImage: _effectivePost['author_avatar'] != null
+                          ? NetworkImage(_effectivePost['author_avatar'])
+                          : null,
+                      child: _effectivePost['author_avatar'] == null
+                          ? const Icon(Icons.person, color: AppColors.primary, size: 28)
+                          : null,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  MentionInputWidget(
-                    controller: _contentCtrl,
-                    onMentionAdded: _onMentionAdded,
-                    focusNode: FocusNode(skipTraversal: true),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _effectivePost['author_name'] ?? 'Traveler',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1D245D),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.edit_note, size: 12, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Editing Mode',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.green[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'ORIGINAL POST',
+                              style: TextStyle(
+                                fontSize: 10,
+                                letterSpacing: 1,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            MentionZoneWidget(
-              selectedMentions: _mentions,
-              onMentionsChanged: (newMentions) {
-                setState(() {
-                  _mentions.clear();
-                  _mentions.addAll(newMentions);
-                });
-              },
+
+            // Content Area
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: MentionInputWidget(
+                controller: _contentCtrl,
+                onMentionAdded: _onMentionAdded,
+                focusNode: FocusNode(skipTraversal: true),
+              ),
             ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'MANAGE MEDIA',
+
+            const SizedBox(height: 24),
+
+            // Photos Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Text(
+                    'ATTACHED PHOTOS',
                     style: TextStyle(
-                      color: Color(0xFF555C8F),
+                      fontSize: 11,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      fontSize: 13,
+                      color: Color(0xFF9E9E9E),
+                      letterSpacing: 1.2,
                     ),
                   ),
-                ),
-                Text(
-                  '${_existingImageUrls.length + _newImages.length} Photos Selected',
-                  style: const TextStyle(
-                    color: Color(0xFF2051F2),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  const Spacer(),
+                  Text(
+                    '${_existingImageUrls.length + _newImages.length}/10',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(

@@ -611,10 +611,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
   }
 
   
-  bool _validateCurrentStep() {
-    final step = _steps[_currentStep];
+  bool _validateStep(int index) {
+    final step = _steps[index];
     final stepId = step['id'] as String;
-    final requiredFields = step['fields'] as List<String>;
     
     // Profile picture and cover photo are optional - can skip
     if (stepId == 'profile_picture' || stepId == 'cover_photo') {
@@ -626,9 +625,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       case 'phone':
         if (_phoneController.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enter your phone number'),
-              backgroundColor: Color(0xFFFFA502),
+            SnackBar(
+              content: Text('Please enter your phone number for ${step['title']}'),
+              backgroundColor: const Color(0xFFFFA502),
             ),
           );
           return false;
@@ -753,26 +752,6 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         }
         break;
       case 'organizer_bio':
-        final bio = _bioController.text.trim();
-        if (bio.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please provide your bio'),
-              backgroundColor: Color(0xFFFFA502),
-            ),
-          );
-          return false;
-        }
-        if (bio.length < 50) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please provide at least 50 characters'),
-              backgroundColor: Color(0xFFFFA502),
-            ),
-          );
-          return false;
-        }
-        break;
       case 'tourist_bio':
         final bio = _bioController.text.trim();
         if (bio.isEmpty) {
@@ -784,49 +763,44 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           );
           return false;
         }
-        if (bio.length < 30) {
+        final minLength = stepId == 'organizer_bio' ? 50 : 30;
+        if (bio.length < minLength) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please provide at least 30 characters'),
-              backgroundColor: Color(0xFFFFA502),
+            SnackBar(
+              content: Text('Please provide at least $minLength characters for your bio'),
+              backgroundColor: const Color(0xFFFFA502),
             ),
           );
           return false;
         }
         break;
       case 'reason_to_join':
-        // Reason to join is optional, no validation needed
+        final reason = _reasonToJoinController.text.trim();
+        if (reason.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please provide your reason to join'),
+              backgroundColor: Color(0xFFFFA502),
+            ),
+          );
+          return false;
+        }
         break;
       default:
-        // Generic validation for other steps
-        for (final field in requiredFields) {
-          if (!_onboardingData.containsKey(field) || 
-              _onboardingData[field] == null || 
-              _onboardingData[field].toString().trim().isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Please fill in all required fields'),
-                backgroundColor: Color(0xFFFFA502),
-              ),
-            );
-            return false;
-          }
-        }
+        return true;
     }
     
     return true;
   }
 
-  Future<void> _saveCurrentStep() async {
-    final step = _steps[_currentStep];
+  Future<Map<String, dynamic>> _getStepData(int index) async {
+    final step = _steps[index];
     final stepId = step['id'] as String;
     
-    // Prepare step data based on step type
     Map<String, dynamic> stepData = {};
     
     switch (stepId) {
       case 'phone':
-        // Get selected phone country info
         final phoneCountries = [
           {'name': 'France', 'code': '+33', 'flag': '🇫🇷', 'pattern': r'^\d{9}$', 'example': '612345678'},
           {'name': 'United States', 'code': '+1', 'flag': '🇺🇸', 'pattern': r'^\d{10}$', 'example': '2345678901'},
@@ -880,150 +854,94 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         };
         break;
       case 'profile_picture':
-        stepData = {
-          'avatar': _onboardingData['avatar'],
-        };
+        stepData = {'avatar': _onboardingData['avatar']};
         break;
       case 'cover_photo':
-        stepData = {
-          'cover_photo': _onboardingData['cover_photo'],
-        };
+        stepData = {'cover_photo': _onboardingData['cover_photo']};
         break;
       case 'country':
-        stepData = {
-          'pays_origine': _selectedCountry ?? '',
-        };
+        stepData = {'pays_origine': _selectedCountry ?? ''};
         break;
       case 'language':
-        stepData = {
-          'langue_preferee': _selectedLanguage ?? '',
-        };
+        stepData = {'langue_preferee': _selectedLanguage ?? ''};
         break;
       case 'specialized_activities':
-        stepData = {
-          'specialites_activites': _selectedActivities,
-        };
+        stepData = {'specialites_activites': _selectedActivities};
         break;
       case 'spoken_languages':
-        stepData = {
-          'langues_proposees': _selectedLanguages,
-        };
+        stepData = {'langues_proposees': _selectedLanguages};
         break;
       case 'organizer_bio':
-        stepData = {
-          'bio': _bioController.text.trim(),
-        };
+      case 'tourist_bio':
+        stepData = {'bio': _bioController.text.trim()};
         break;
       case 'reason_to_join':
-        stepData = {
-          'reasonToJoin': _reasonToJoinController.text.trim(),
-        };
+        stepData = {'reasonToJoin': _reasonToJoinController.text.trim()};
         break;
       case 'interests':
-        stepData = {
-          'centres_interet': _selectedInterests,
-        };
-        break;
-      case 'tourist_bio':
-        stepData = {
-          'bio': _bioController.text.trim(),
-        };
+        stepData = {'centres_interet': _selectedInterests};
         break;
     }
-    
-    // Update onboarding data
-    setState(() {
-      _onboardingData.addAll(stepData);
-    });
-    
-    // Send to backend
-    final result = await OnboardingService.updateOnboardingStep(stepData);
-    
-    if (!result['success']) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Failed to save step'),
-          backgroundColor: const Color(0xFFFF4757),
-        ),
-      );
-    }
+    return stepData;
   }
 
-  Future<void> _completeOnboarding() async {
+  Future<void> _submitAll() async {
+    HapticFeedback.heavyImpact();
+    FocusScope.of(context).unfocus();
+
+    // 1. Validate all steps
+    for (int i = 0; i < _steps.length; i++) {
+      if (!_validateStep(i)) return;
+    }
+
     setState(() => _isCompleting = true);
-    
+
     try {
-      final result = await OnboardingService.completeOnboarding();
-      
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Onboarding completed successfully!'),
-            backgroundColor: const Color(0xFF00B894),
-          ),
-        );
-        
-        // Navigate to appropriate screen
-        if (result['requires_approval'] == true) {
-          NavigationService.navigateToWaitingApproval();
-        } else {
-          // Get user type and navigate to appropriate home
-          final user = await AuthService.getUser();
-          if (user != null && user['userType'] != null) {
-            NavigationService.navigateToHome(userType: user['userType']);
-          } else {
-            // Fallback: navigate to user type selection if no user type
-            Navigator.pushReplacementNamed(context, AppRoutes.userTypeSelection);
+      // 2. Save all steps data
+      for (int i = 0; i < _steps.length; i++) {
+        final stepData = await _getStepData(i);
+        if (stepData.isNotEmpty) {
+          final result = await OnboardingService.updateOnboardingStep(stepData);
+          if (!result['success']) {
+            throw Exception(result['message'] ?? 'Failed to save ${ _steps[i]['title']}');
           }
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to complete onboarding'),
-            backgroundColor: const Color(0xFFFF4757),
-          ),
-        );
       }
-    } finally {
+
+      // 3. Complete onboarding
+      await _completeOnboarding();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
       setState(() => _isCompleting = false);
     }
   }
 
-  Future<void> _nextStep() async {
-    HapticFeedback.lightImpact();
-    
-    // Hide keyboard when navigating
-    FocusScope.of(context).unfocus();
-    
-    // Validate current step
-    if (!_validateCurrentStep()) {
-      return;
-    }
-    
-    // Save step data
-    await _saveCurrentStep();
-    
-    if (_currentStep < _steps.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      await _completeOnboarding();
-    }
-  }
+  Future<void> _completeOnboarding() async {
+    try {
+      final result = await OnboardingService.completeOnboarding();
+      if (!mounted) return;
 
-  void _previousStep() {
-    HapticFeedback.lightImpact();
-    
-    // Hide keyboard when navigating
-    FocusScope.of(context).unfocus();
-    
-    if (_currentStep > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      if (result['success'] == true) {
+        // Navigate to the appropriate home screen
+        await OnboardingService.navigateToAppropriateScreen();
+      } else {
+        throw Exception(result['message'] ?? 'Failed to complete onboarding');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCompleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1050,144 +968,95 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Progress Bar
+            // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
-                  AnimatedBuilder(
-                    animation: _progressAnimation,
-                    builder: (context, child) {
-                      return LinearProgressIndicator(
-                        value: (_currentStep + 1) / _steps.length,
-                        backgroundColor: const Color(0xFFE1E4E8),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
-                      );
-                    },
+                  const Text(
+                    'Complete Your Profile',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E225E),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Step ${_currentStep + 1} of ${_steps.length}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6C757D),
-                        ),
-                      ),
-                      Text(
-                        _steps[_currentStep]['title'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E225E),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Please fill in the information below to get started with DJTrip',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
             
-            // Page View
+            // Scrollable Content
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _steps.length,
-                itemBuilder: (context, index) {
-                  return _buildStepPage(_steps[index]);
-                },
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 40),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < _steps.length; i++) ...[
+                      _buildStepPage(_steps[i]),
+                      if (i < _steps.length - 1) 
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30),
+                          child: Divider(color: Colors.grey.shade200, thickness: 1),
+                        ),
+                    ],
+                    const SizedBox(height: 20),
+                    // Bottom Button inside the scroll view or pinned at bottom? 
+                    // User said "dans une screen scrollable", usually includes the button at the end.
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isCompleting ? null : _submitAll,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4B63FF),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: _isCompleting
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Saving Profile...'),
+                                  ],
+                                )
+                              : const Text(
+                                  'Complete Profile',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             
-            // Bottom Buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      if (_currentStep > 0) ...[
-                        Expanded(
-                          child: SizedBox(
-                            height: 56,
-                            child: OutlinedButton(
-                              onPressed: _previousStep,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF4B63FF),
-                                side: const BorderSide(color: Color(0xFF4B63FF)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: const Text(
-                                'Previous',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                      Expanded(
-                        child: SizedBox(
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: (_isCompleting || !_isPhoneNumberValid()) ? null : _nextStep,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4B63FF),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: _isCompleting
-                                ? const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Flexible(
-                                        child: Text(
-                                          'Completing...',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Text(
-                                    _currentStep == _steps.length - 1 ? 'Complete' : 'Next',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -1258,81 +1127,79 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Swimming', 'icon': Icons.pool},
     ];
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
             ),
-            const SizedBox(height: 28),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: interests.map((interest) {
-                final isSelected = _selectedInterests.contains(interest['name'] as String);
-                return FilterChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        interest['icon'] as IconData,
-                        size: 18,
-                        color: isSelected ? Colors.white : const Color(0xFF4B63FF),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(interest['name'] as String),
-                    ],
-                  ),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedInterests.add(interest['name'] as String);
-                      } else {
-                        _selectedInterests.remove(interest['name'] as String);
-                      }
-                    });
-                  },
-                  backgroundColor: Colors.white,
-                  selectedColor: const Color(0xFF4B63FF),
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF1E225E),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
-                  ),
-                );
-              }).toList(),
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: interests.map((interest) {
+              final isSelected = _selectedInterests.contains(interest['name'] as String);
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      interest['icon'] as IconData,
+                      size: 18,
+                      color: isSelected ? Colors.white : const Color(0xFF4B63FF),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(interest['name'] as String),
+                  ],
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedInterests.add(interest['name'] as String);
+                    } else {
+                      _selectedInterests.remove(interest['name'] as String);
+                    }
+                  });
+                },
+                backgroundColor: Colors.white,
+                selectedColor: const Color(0xFF4B63FF),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Selected: ${_selectedInterests.length}',
+            style: const TextStyle(
+              color: Color(0xFF6C757D),
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Selected: ${_selectedInterests.length}',
-              style: const TextStyle(
-                color: Color(0xFF6C757D),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -1380,130 +1247,119 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'New Zealand', 'code': '+64', 'flag': '🇳🇿', 'pattern': r'^\d{9}$', 'example': '212345678'},
     ];
 
-    // Set default country code if not selected
-    if (_selectedPhoneCountry == null && phoneCountries.isNotEmpty) {
-      _selectedPhoneCountry = phoneCountries.first['name'] as String;
-    }
-
     final selectedCountry = phoneCountries.firstWhere(
       (country) => country['name'] == _selectedPhoneCountry,
       orElse: () => phoneCountries.first,
     );
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 24.0,
-          right: 24.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 120 : 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
             ),
-            const SizedBox(height: 30),
-            Row(
-              children: [
-                // Country Code Selector
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedPhoneCountry,
-                    decoration: InputDecoration(
-                      labelText: 'Country',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE1E4E8)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF4B63FF)),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            children: [
+              // Country Code Selector
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedPhoneCountry,
+                  decoration: InputDecoration(
+                    labelText: 'Country',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE1E4E8)),
                     ),
-                    items: phoneCountries.map((country) {
-                      return DropdownMenuItem<String>(
-                        value: country['name'] as String,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              country['flag'] as String,
-                              style: const TextStyle(fontSize: 16),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4B63FF)),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  items: phoneCountries.map((country) {
+                    return DropdownMenuItem<String>(
+                      value: country['name'] as String,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            country['flag'] as String,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              country['code'] as String,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                country['code'] as String,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedPhoneCountry = value);
-                    },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedPhoneCountry = value);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Phone Number Input
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    hintText: selectedCountry['example'] as String,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE1E4E8)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF4B63FF)),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    errorText: _validatePhoneNumber(selectedCountry['pattern'] as String),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Phone Number Input
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Phone Number',
-                      hintText: selectedCountry['example'] as String,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE1E4E8)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF4B63FF)),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      errorText: _validatePhoneNumber(selectedCountry['pattern'] as String),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Format: ${selectedCountry['example']} (${selectedCountry['code']})',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6C757D),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Format: ${selectedCountry['example']} (${selectedCountry['code']})',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6C757D),
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -2095,71 +1951,69 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Hot Air Balloon', 'icon': Icons.air},
     ];
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
             ),
-            const SizedBox(height: 40),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: activities.map((activity) {
-                final isSelected = _selectedActivities.contains(activity['name'] as String);
-                return FilterChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        activity['icon'] as IconData,
-                        size: 18,
-                        color: isSelected ? Colors.white : const Color(0xFF4B63FF),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(activity['name'] as String),
-                    ],
-                  ),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedActivities.add(activity['name'] as String);
-                      } else {
-                        _selectedActivities.remove(activity['name'] as String);
-                      }
-                    });
-                  },
-                  backgroundColor: isSelected ? const Color(0xFF4B63FF) : Colors.white,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF1E225E),
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 40),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: activities.map((activity) {
+              final isSelected = _selectedActivities.contains(activity['name'] as String);
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      activity['icon'] as IconData,
+                      size: 18,
+                      color: isSelected ? Colors.white : const Color(0xFF4B63FF),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(activity['name'] as String),
+                  ],
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedActivities.add(activity['name'] as String);
+                    } else {
+                      _selectedActivities.remove(activity['name'] as String);
+                    }
+                  });
+                },
+                backgroundColor: isSelected ? const Color(0xFF4B63FF) : Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                ),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -2364,287 +2218,267 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Pekal', 'flag': '🇮🇩'},
     ];
     
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
             ),
-            const SizedBox(height: 40),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: languages.map((lang) {
-                final isSelected = _selectedLanguages.contains(lang['name'] as String);
-                return FilterChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        lang['flag'] as String,
-                        style: const TextStyle(fontSize: 18),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(lang['name'] as String),
-                    ],
-                  ),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedLanguages.add(lang['name'] as String);
-                      } else {
-                        _selectedLanguages.remove(lang['name'] as String);
-                      }
-                    });
-                  },
-                  backgroundColor: Colors.white,
-                  selectedColor: const Color(0xFF4B63FF),
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF1E225E),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
-                  ),
-                );
-              }).toList(),
+          ),
+          const SizedBox(height: 40),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: languages.map((lang) {
+              final isSelected = _selectedLanguages.contains(lang['name'] as String);
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      lang['flag'] as String,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(lang['name'] as String),
+                  ],
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedLanguages.add(lang['name'] as String);
+                    } else {
+                      _selectedLanguages.remove(lang['name'] as String);
+                    }
+                  });
+                },
+                backgroundColor: Colors.white,
+                selectedColor: const Color(0xFF4B63FF),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Selected: ${_selectedLanguages.length}',
+            style: const TextStyle(
+              color: Color(0xFF6C757D),
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Selected: ${_selectedLanguages.length}',
-              style: const TextStyle(
-                color: Color(0xFF6C757D),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
 
   Widget _buildOrganizerBioStep(Map<String, dynamic> step) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 24.0,
-          right: 24.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 100 : 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 30),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFE1E4E8),
+                width: 1,
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
+            child: TextField(
+              controller: _bioController,
+              focusNode: _focusNode,
+              maxLines: 5,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                hintText: 'Share your experience, what makes you a great organizer, and why you want to join DJTrip...',
+                hintStyle: TextStyle(
+                  color: Color(0xFF6C757D),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(16),
+              ),
               style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
+                fontSize: 15,
+                color: Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 30),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFE1E4E8),
-                  width: 1,
-                ),
-              ),
-              child: TextField(
-                controller: _bioController,
-                focusNode: _focusNode,
-                maxLines: 5,
-                maxLength: 1000,
-                decoration: InputDecoration(
-                  hintText: 'Share your experience, what makes you a great organizer, and why you want to join DJTrip...',
-                  hintStyle: TextStyle(
-                    color: Color(0xFF6C757D),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                ),
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: Color(0xFF1E225E),
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
 
   Widget _buildTouristBioStep(Map<String, dynamic> step) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 24.0,
-          right: 24.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 100 : 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 30),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFE1E4E8),
+                width: 1,
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
+            child: TextField(
+              controller: _bioController,
+              focusNode: _focusNode,
+              maxLines: 5,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                hintText: 'Tell us about yourself and what you love about traveling...',
+                hintStyle: TextStyle(
+                  color: Color(0xFF6C757D),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(16),
+              ),
               style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
+                fontSize: 15,
+                color: Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 30),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFE1E4E8),
-                  width: 1,
-                ),
-              ),
-              child: TextField(
-                controller: _bioController,
-                focusNode: _focusNode,
-                maxLines: 5,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  hintText: 'Tell us about yourself and what you love about traveling...',
-                  hintStyle: TextStyle(
-                    color: Color(0xFF6C757D),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                ),
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: Color(0xFF1E225E),
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
 
   Widget _buildReasonToJoinStep(Map<String, dynamic> step) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 24.0,
-          right: 24.0,
-          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 100 : 20,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              step['title'] ?? '',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E225E),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E225E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            step['description'] ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6C757D),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 30),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFE1E4E8),
+                width: 1,
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              step['description'] ?? '',
+            child: TextField(
+              controller: _reasonToJoinController,
+              focusNode: _focusNode,
+              maxLines: 5,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                hintText: 'Share why you want to join DJTrip as an organizer... Tell us about your experience, what makes you passionate about tourism, and how you plan to create amazing experiences for travelers.',
+                hintStyle: TextStyle(
+                  color: Color(0xFF6C757D),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(16),
+              ),
               style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF6C757D),
+                fontSize: 15,
+                color: Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 30),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFE1E4E8),
-                  width: 1,
-                ),
-              ),
-              child: TextField(
-                controller: _reasonToJoinController,
-                focusNode: _focusNode,
-                maxLines: 5,
-                maxLength: 1000,
-                decoration: const InputDecoration(
-                  hintText: 'Share why you want to join DJTrip as an organizer... Tell us about your experience, what makes you passionate about tourism, and how you plan to create amazing experiences for travelers.',
-                  hintStyle: TextStyle(
-                    color: Color(0xFF6C757D),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                ),
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: Color(0xFF1E225E),
-                  height: 1.5,
-                ),
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This information will help us understand your motivation and will be reviewed during the approval process.',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6C757D),
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 12),
-            Text(
-              'This information will help us understand your motivation and will be reviewed during the approval process.',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6C757D),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }

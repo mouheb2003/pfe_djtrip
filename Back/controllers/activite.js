@@ -4,6 +4,7 @@ const Inscription = require("../models/inscription");
 const ActiviteService = require("../services/activite");
 const cloudinary = require("../config/cloudinary");
 const notificationEventBus = require("../services/notificationEventBus");
+const emailService = require("../services/email");
 
 // Helper: extract Cloudinary public_id from a URL
 const extractCloudinaryPublicId = (url) => {
@@ -717,10 +718,10 @@ exports.updateActivite = async (req, res) => {
     if (notifyBookedUsers) {
       try {
         const bookings = await Inscription.find({
-          activite: activiteId,
+          activite_id: activiteId,
           statut: "confirmed",
-        }).select("touriste");
-        const bookedUserIds = bookings.map((b) => b.touriste);
+        }).select("touriste_id");
+        const bookedUserIds = bookings.map((b) => b.touriste_id);
 
         if (bookedUserIds.length > 0) {
           notificationEventBus.emitActivityUpdated({
@@ -816,23 +817,27 @@ exports.deleteActivite = async (req, res) => {
       });
     }
 
-    // Check if there are any bookings
-    const bookings = await Inscription.find({
-      activite_id: activiteId,
-      statut: { $ne: "annulee" },
-    });
-
     // Check if it's a Cancel or a permanent Delete
-    const isAlreadyCancelled = activite.statut === 'cancelled' || activite.date_fin < new Date();
+    // Past or already cancelled activities can be permanently deleted
+    const isPast = activite.date_fin < new Date();
+    const isCancelled = activite.statut === 'cancelled';
+    const canBePermanentlyDeleted = isPast || isCancelled;
 
-    if (!isAlreadyCancelled) {
+    if (!canBePermanentlyDeleted) {
       // Logic for CANCELLATION (Soft Delete)
       
-      // If there are bookings, cancellation message is required
-      if (bookings.length > 0 && !cancellationMessage) {
+      // Check for approved or checked-in (used) bookings specifically as per user request
+      const approvedOrUsedBookings = await Inscription.find({
+        activite_id: activiteId,
+        statut: { $in: ["approved", "verified"] },
+      });
+
+      // If there are approved or used bookings, cancellation message is mandatory
+      if (approvedOrUsedBookings.length > 0 && !cancellationMessage) {
         return res.status(400).json({
-          message:
-            "A cancellation message is required to notify tourists before cancelling this activity",
+          success: false,
+          code: "REASON_REQUIRED",
+          message: "A cancellation message is required because this activity has approved or used bookings.",
         });
       }
 
@@ -840,35 +845,65 @@ exports.deleteActivite = async (req, res) => {
       activite.statut = 'cancelled';
       await activite.save();
 
-      // Cancel all related bookings and keep organizer reason visible to tourists
-      await Inscription.updateMany(
-        { activite_id: activiteId, statut: { $ne: "annulee" } },
-        {
-          $set: {
-            statut: "annulee",
-            message_organisateur: cancellationMessage,
-            date_reponse: new Date(),
+      // Cancel all related bookings (pending, approved, and verified/used)
+      // We exclude already cancelled/rejected ones
+      const activeInscriptions = await Inscription.find({
+        activite_id: activiteId,
+        statut: { $in: ["pending", "approved", "verified"] }
+      }).populate("touriste_id", "email fullname");
+
+      if (activeInscriptions.length > 0) {
+        await Inscription.updateMany(
+          { _id: { $in: activeInscriptions.map(i => i._id) } },
+          {
+            $set: {
+              statut: "cancelled",
+              message_organisateur: cancellationMessage || "Activity cancelled by organizer.",
+              date_reponse: new Date(),
+              cancellationPolicy: {
+                canCancel: false,
+                cancellationDeadline: activite.date_debut,
+                cancellationFee: 0,
+                refundAmount: 0,
+                cancelledAt: new Date(),
+                cancellationReason: cancellationMessage || "Activity cancelled by organizer.",
+                refundProcessed: true
+              }
+            },
           },
-        },
-      );
+        );
 
-      // Get booked users for notification
-      const bookedUserIds = bookings.map((b) => b.touriste);
+        // Send emails to all participants
+        for (const ins of activeInscriptions) {
+          if (ins.touriste_id && ins.touriste_id.email) {
+            try {
+              await emailService.sendActivityCancelledEmail({
+                email: ins.touriste_id.email,
+                fullname: ins.touriste_id.fullname || "Traveler",
+                activityTitle: activite.titre,
+                reason: cancellationMessage || "The organizer has cancelled this activity.",
+              });
+            } catch (emailErr) {
+              console.warn(`Failed to send cancellation email to ${ins.touriste_id.email}:`, emailErr.message);
+            }
+          }
+        }
 
-      // Emit activity cancelled event
-      try {
-        if (bookedUserIds.length > 0) {
+        // Emit notifications via bus
+        try {
           notificationEventBus.emitActivityCancelled({
             activityId: activiteId,
             activityTitle: activite.titre,
-            bookedUserIds: bookedUserIds,
+            bookedUserIds: activeInscriptions.map(i => i.touriste_id._id),
+            reason: cancellationMessage,
           });
+        } catch (notifError) {
+          console.warn("Failed to send activity cancelled notification:", notifError.message);
         }
-      } catch (notifError) {
-        console.warn("Failed to send activity cancelled notification:", notifError.message);
       }
 
       return res.status(200).json({
+        success: true,
         message: "Activity cancelled successfully and moved to archive",
       });
     }
@@ -904,6 +939,7 @@ exports.deleteActivite = async (req, res) => {
     await Activite.findByIdAndDelete(activiteId);
 
     res.status(200).json({
+      success: true,
       message: "Activity deleted permanently",
     });
   } catch (error) {

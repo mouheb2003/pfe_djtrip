@@ -8,7 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../models/lieu_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../features/maps/services/google_directions_service.dart';
-import '../place_detail_screen.dart';
+import '../place_detail_screen_v2.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -325,7 +325,7 @@ class _ExploreTabState extends State<ExploreTab> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PlaceDetailScreen(place: _toPlaceMap(l)),
+                  builder: (_) => PlaceDetailScreenV2(place: _toPlaceMap(l)),
                 ),
               ),
             ),
@@ -444,7 +444,7 @@ class _ExploreTabState extends State<ExploreTab> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => PlaceDetailScreen(
+                              builder: (_) => PlaceDetailScreenV2(
                                 place: _toPlaceMap(_selectedLieu!),
                               ),
                             ),
@@ -573,18 +573,20 @@ class _ExploreTabState extends State<ExploreTab> {
   // --- COMPOSANTS DE L'INTERFACE ---
 
   Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8EEF5),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8EEF5),
         borderRadius: BorderRadius.circular(30),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
+        boxShadow: [
+          if (!isDark)
+            const BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
         ],
       ),
       child: Row(
@@ -595,7 +597,7 @@ class _ExploreTabState extends State<ExploreTab> {
             child: Container(
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF121212) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: TextField(
@@ -603,6 +605,10 @@ class _ExploreTabState extends State<ExploreTab> {
                 focusNode: _searchFocusNode,
                 textInputAction: TextInputAction.search,
                 onSubmitted: _onSearchSubmitted,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 14,
+                ),
                 decoration: const InputDecoration(
                   hintText: 'Search destinations...',
                   hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
@@ -621,24 +627,26 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildSearchSuggestions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       constraints: const BoxConstraints(maxHeight: 240),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
+        boxShadow: [
+          if (!isDark)
+            const BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
         ],
       ),
       child: ListView.separated(
         shrinkWrap: true,
         itemCount: _searchSuggestions.length,
         separatorBuilder: (_, __) =>
-            Divider(height: 1, color: Colors.grey.shade200),
+            Divider(height: 1, color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200),
         itemBuilder: (context, index) {
           final lieu = _searchSuggestions[index];
           return ListTile(
@@ -648,12 +656,18 @@ class _ExploreTabState extends State<ExploreTab> {
               lieu.titre,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
             ),
             subtitle: Text(
               lieu.sousTitre.isNotEmpty ? lieu.sousTitre : lieu.categoryLabelEn,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
+              ),
             ),
             onTap: () => _onSelectSearchResult(lieu),
           );
@@ -663,21 +677,23 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildItineraryPanel() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-            spreadRadius: 0,
-          ),
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+              spreadRadius: 0,
+            ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -698,13 +714,13 @@ class _ExploreTabState extends State<ExploreTab> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Itinéraire',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
+                    color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                   ),
                 ),
               ),
@@ -713,12 +729,12 @@ class _ExploreTabState extends State<ExploreTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close,
-                    color: Color(0xFF666666),
+                    color: isDark ? Colors.grey[400] : const Color(0xFF666666),
                     size: 20,
                   ),
                 ),
@@ -823,22 +839,23 @@ class _ExploreTabState extends State<ExploreTab> {
     required TextEditingController controller,
     required bool isOrigin,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.05),
+        color: isDark ? const Color(0xFF121212) : Colors.grey.withOpacity(0.05),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF666666),
+              color: isDark ? Colors.grey[400] : const Color(0xFF666666),
             ),
           ),
           const SizedBox(height: 8),
@@ -860,20 +877,20 @@ class _ExploreTabState extends State<ExploreTab> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.2),
                       width: 1,
                     ),
                   ),
                   child: TextField(
                     controller: controller,
                     readOnly: true,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A1A1A),
+                      color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                     ),
                     decoration: InputDecoration(
                       hintText: isOrigin
@@ -954,6 +971,7 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildFilterList() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       height: 42,
       child: ListView.separated(
@@ -970,14 +988,14 @@ class _ExploreTabState extends State<ExploreTab> {
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF2158F6)
-                    : const Color(0xFFE8EEF5),
+                    : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8EEF5)),
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Center(
                 child: Text(
                   item,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF4D4E7A),
+                    color: isSelected ? Colors.white : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF4D4E7A)),
                     fontWeight: FontWeight.bold,
                   ),
                 ),

@@ -1,9 +1,6 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const geminiKeyPool = require('../utils/geminiKeyPool');
 const axios = require('axios');
 const cloudinary = require('cloudinary').v2;
-
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Configure Cloudinary (using the same env vars as the main config)
 cloudinary.config({
@@ -217,8 +214,6 @@ function scorePromptQuality(prompt) {
  */
 async function generateOptimizedPrompt(title, description, category = 'Other') {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
     const prompt = `
 You are an expert prompt engineer for AI image generation specializing in travel and activity photography.
 
@@ -266,9 +261,8 @@ CRITICAL RULES:
 Return ONLY the structured prompt above, nothing else.
 `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let rawPrompt = response.text().trim();
+    const result = await geminiKeyPool.generateContent('gemini-1.5-flash', prompt);
+    let rawPrompt = result.text;
     
     // Clean up the prompt - remove section headers if present
     rawPrompt = rawPrompt
@@ -526,7 +520,10 @@ async function generateImageWithPollinations(prompt, title, description, count =
         responseType: 'arraybuffer',
         timeout: 90000, // 90 second timeout per image
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Referer': 'https://pollinations.ai/',
+          'Origin': 'https://pollinations.ai'
         }
       }).then(response => {
         console.log(`[AI Image Generator] Image ${i + 1} generated successfully (seed: ${imageSeed})`);
@@ -692,7 +689,9 @@ async function generateActivityImage(req, res) {
   let responseSent = false;
   
   try {
-    const { title, description, category } = req.body;
+    const { title, description, category, count, imageCount: reqImageCount } = req.body;
+    const requestedCount = parseInt(count || reqImageCount);
+    const imageCount = (requestedCount >= 2 && requestedCount <= 4) ? requestedCount : 3;
 
     console.log('[AI Image Generator] ===== START =====');
     console.log('[AI Image Generator] Title:', title);
@@ -737,8 +736,6 @@ async function generateActivityImage(req, res) {
       console.log('[AI Image Generator] Warning: Prompt quality is below optimal threshold');
     }
 
-    // Step 2: Generate images using Pollinations.ai (free, no API key)
-    const imageCount = 3; // Increased to 3 for better variety
     console.log(`[AI Image Generator] Step 2: Generating ${imageCount} images with Pollinations.ai...`);
     
     const generationResult = await generateImageWithPollinations(
@@ -780,16 +777,18 @@ async function generateActivityImage(req, res) {
       throw new Error('No images generated');
     }
     
-    if (!responseSent) {
+    if (!responseSent && !res.headersSent) {
       responseSent = true;
       res.status(200).json({
         success: true,
-        message: `${imageUrls.length} images generated successfully`,
+        message: generationResult.method === 'pollinations' 
+          ? 'Images generated successfully with AI' 
+          : 'Images generated (using placeholder)',
         data: {
           images: imageUrls,
           prompt: promptResult.prompt,
           promptScore: promptResult.score,
-          method: finalMethod,
+          method: generationResult.method === 'pollinations' ? 'ai_generated' : 'placeholder',
           generationMethod: generationResult.method,
           metadata: generationResult.metadata || null,
           processingTime: totalTime
@@ -800,16 +799,20 @@ async function generateActivityImage(req, res) {
   } catch (error) {
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
     console.error('[AI Image Generator] ===== ERROR =====');
-    console.error('[AI Image Generator] Error:', error.message);
+    console.error('[AI Image Generator] Error Message:', error.message);
+    if (error.response) {
+      console.error('[AI Image Generator] API Error Response:', error.response.data);
+      console.error('[AI Image Generator] API Status:', error.response.status);
+    }
     console.error('[AI Image Generator] Error stack:', error.stack);
     console.error(`[AI Image Generator] Failed after ${totalTime}s`);
     
-    // Only send fallback response if no response has been sent yet
-    if (!responseSent) {
+    // Only send fallback response if no response has been sent yet (e.g., by timeout middleware)
+    if (!responseSent && !res.headersSent) {
       // Final fallback: Return category-based placeholder URLs
       console.log('[AI Image Generator] Using final fallback with category-based placeholders');
       const { title, description, category } = req.body;
-      const fallbackResult = await generateCategoryPlaceholderImages(3, title, description);
+      const fallbackResult = await generateCategoryPlaceholderImages(imageCount, title, description);
       
       responseSent = true;
       res.status(200).json({

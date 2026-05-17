@@ -88,33 +88,41 @@ exports.uploadPostImage = async (req, res) => {
   }
 };
 
-// Get posts by user ID (Admin only)
-exports.getUserPosts = async (req, res) => {
+// Get posts for a user profile (Publicly available to authenticated users)
+exports.getPublicUserPosts = async (req, res) => {
   try {
     const { userId } = req.params;
+    const currentUserId = req.user.userId;
 
-    const posts = await Post.find({ author_id: userId })
+    // Find posts where user is author OR mentioned
+    // BUT exclude posts that the USER (profile owner) has hidden from their profile
+    const posts = await Post.find({
+      $or: [
+        { author_id: userId },
+        { mentions: userId }
+      ],
+      hidden_from_profiles: { $ne: userId },
+      is_active: true
+    })
       .populate(basePopulate)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Add isLiked and isBookmarked fields for current viewer
+    const postsWithStatus = posts.map(post => ({
+      ...post,
+      isLiked: post.liked_by ? post.liked_by.some(id => id.toString() === currentUserId.toString()) : false,
+      isBookmarked: post.bookmarked_by ? post.bookmarked_by.some(id => id.toString() === currentUserId.toString()) : false,
+      bookmarks_count: post.bookmarks_count || 0,
+    }));
 
     res.json({
       success: true,
       count: posts.length,
-      posts: posts.map((post) => ({
-        _id: post._id,
-        content: post.content,
-        imageUrl: post.image_url,
-        imageUrls: post.image_urls,
-        createdAt: post.createdAt,
-        author_id: post.author_id,
-        likes_count: post.likes_count || 0,
-        comments_count: post.comments_count || 0,
-        total_reactions: post.total_reactions || 0,
-        reactions: post.reactions || [],
-      })),
+      posts: postsWithStatus
     });
   } catch (error) {
-    console.error("Error fetching user posts:", error);
+    console.error("Error fetching public user posts:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching user posts",
@@ -237,6 +245,25 @@ exports.createPost = async (req, res) => {
       console.warn("Notification failed for createPost:", notifError.message);
     }
 
+    // Notify mentioned users
+    try {
+      const User = require("../models/user");
+      const author = await User.findById(authorId).select("fullname");
+      if (author && allMentions.length > 0) {
+        for (const mentionedId of allMentions) {
+          if (mentionedId.toString() !== authorId.toString()) {
+            notificationEventBus.emitPostMention({
+              mentionedUserId: mentionedId,
+              authorName: author.fullname,
+              postId: post._id,
+            });
+          }
+        }
+      }
+    } catch (mentionNotifError) {
+      console.warn("Mention notification failed for createPost:", mentionNotifError.message);
+    }
+
     return res.status(201).json({
       message: "Post created successfully",
       post: populated,
@@ -278,7 +305,15 @@ exports.getFeedPosts = async (req, res) => {
 exports.getMyPosts = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const posts = await Post.find({ author_id: userId, is_active: true })
+    // My posts + posts I'm mentioned in, but didn't hide
+    const posts = await Post.find({
+      $or: [
+        { author_id: userId },
+        { mentions: userId }
+      ],
+      hidden_from_profiles: { $ne: userId },
+      is_active: true
+    })
       .sort({ createdAt: -1 })
       .limit(100)
       .populate(basePopulate)
@@ -318,7 +353,13 @@ exports.updateMyPost = async (req, res) => {
     const body = req.body || {};
 
     if (Object.prototype.hasOwnProperty.call(body, "content")) {
-      post.content = String(body.content || "").trim();
+      const trimmedContent = String(body.content || "").trim();
+      post.content = trimmedContent;
+
+      // Combiner les mentions du frontend et celles extraites du contenu
+      const frontendMentions = Array.isArray(body.mentions) ? body.mentions : [];
+      const contentMentions = extractMentions(trimmedContent);
+      post.mentions = [...new Set([...frontendMentions, ...contentMentions])];
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "locationLabel")) {
@@ -692,6 +733,44 @@ exports.togglePostLike = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Error updating reaction",
+      error: error.message,
+    });
+  }
+};
+
+// Toggle post visibility on user profile
+exports.togglePostHide = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { postId } = req.params;
+
+    const post = await Post.findOne({ _id: postId, is_active: true });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Check if post is already hidden
+    const hiddenProfiles = post.hidden_from_profiles || [];
+    const isHidden = hiddenProfiles.some(id => id.toString() === userId.toString());
+
+    if (isHidden) {
+      // Unhide
+      post.hidden_from_profiles = hiddenProfiles.filter(id => id.toString() !== userId.toString());
+    } else {
+      // Hide
+      post.hidden_from_profiles = [...hiddenProfiles, userId];
+    }
+
+    await post.save();
+
+    return res.status(200).json({
+      success: true,
+      message: isHidden ? "Post restored to profile" : "Post hidden from profile",
+      isHidden: !isHidden
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error toggling post visibility",
       error: error.message,
     });
   }

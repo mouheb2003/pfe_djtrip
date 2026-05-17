@@ -2,6 +2,25 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const emailService = require("../services/email");
 
+const lastActiveAtMap = new Map();
+
+exports.trackUserActivity = (userId) => {
+  if (!userId) return;
+  const now = Date.now();
+  const lastUpdate = lastActiveAtMap.get(userId.toString()) || 0;
+  if (now - lastUpdate > 15000) {
+    lastActiveAtMap.set(userId.toString(), now);
+    try {
+      User.updateOne(
+        { _id: userId },
+        { lastActiveAt: new Date(now) }
+      ).exec().catch(err => console.error("Error updating lastActiveAt in background:", err));
+    } catch (e) {
+      console.error("Failed to enqueue user activity update:", e);
+    }
+  }
+};
+
 // JWT Secrets — must be defined in .env
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
@@ -94,6 +113,9 @@ exports.verifyToken = async (req, res, next) => {
       userType: user.userType,
       tokenVersion: user.tokenVersion,
     };
+
+    // Track user activity on verified request
+    exports.trackUserActivity(user._id);
 
     console.log('[AUTH verifyToken] req.user set, calling next()');
 
@@ -229,6 +251,9 @@ exports.optionalToken = async (req, res, next) => {
       userType: user.userType,
       tokenVersion: user.tokenVersion,
     };
+
+    // Track user activity on verified request
+    exports.trackUserActivity(user._id);
 
     next();
   } catch (err) {

@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../onboarding/user_type_selection_screen.dart';
 import '../onboarding/dynamic_onboarding_screen.dart';
 import '../../config/app_routes.dart';
+import '../../utils/snackbar_utils.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -106,12 +107,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           Navigator.pushReplacementNamed(context, route);
         }
       } else {
-        setState(
-          () => _errorMsg = result['message'] ?? 'Invalid or expired code.',
-        );
+        SnackbarUtils.showError(context, result['message'] ?? 'Invalid or expired code.');
       }
-    } catch (_) {
-      if (mounted) setState(() => _errorMsg = 'An error occurred.');
+    } catch (e) {
+      if (mounted) SnackbarUtils.showError(context, 'An error occurred: $e');
     } finally {
       if (mounted) setState(() => _isVerifying = false);
     }
@@ -131,8 +130,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         for (final c in _ctrl) c.clear();
         _focus[0].requestFocus();
         _startTimer();
+        SnackbarUtils.showSuccess(context, result['message'] ?? 'Verification code resent.');
       } else {
-        setState(() => _errorMsg = result['message'] ?? 'Failed to resend.');
+        SnackbarUtils.showError(context, result['message'] ?? 'Failed to resend.');
       }
     } finally {
       if (mounted) setState(() => _isResending = false);
@@ -312,21 +312,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
                         const SizedBox(height: 40),
 
-                        // Error message
-                        if (_errorMsg != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Text(
-                              _errorMsg!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.redAccent,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-
+                        const SizedBox(height: 10),
                         // Verify button
                         Container(
                           height: 56,

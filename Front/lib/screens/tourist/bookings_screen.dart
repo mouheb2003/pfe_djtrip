@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme.dart';
 import 'tabs/bookings_tab.dart';
+import 'tourist_main_screen.dart';
 
 class BookingsScreen extends StatelessWidget {
   final int initialTabIndex;
@@ -17,7 +18,16 @@ class BookingsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F235F)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.pop(context);
+            } else {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const TouristMainScreen()),
+                (route) => false,
+              );
+            }
+          },
         ),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,

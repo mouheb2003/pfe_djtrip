@@ -647,6 +647,9 @@ Server calculates status: UPCOMING (startDate > NOW), ONGOING (startDate <= NOW 
 ### Root Directory
 ```
 DJTrip/
+├── DJTrip_Documentation.md  # Main Documentation
+├── DJTrip_Interface_Catalog.md # Detailed UI/Component Catalog
+├── AI_CHATBOT_INTEGRATION_GUIDE.md # AI System & Integration Guide
 ├── Back/                    # Backend API (Node.js/Express)
 ├── Front/                   # Mobile App (Flutter)
 ├── dashbord/                # Admin Dashboard (React/Vite)
@@ -655,6 +658,9 @@ DJTrip/
 ├── node_modules/            # Backend dependencies
 └── uploads/                 # Uploaded files
 ```
+
+### 🎨 Visual & Interface Guide
+For a detailed list of all screens, buttons, and icons, please refer to the [Interface & Component Catalog](DJTrip_Interface_Catalog.md).
 
 ### Backend (Back/)
 ```
@@ -1223,6 +1229,39 @@ if (hoursBeforeActivity >= 48) {
 }
 
 const refundAmount = booking.prix_total * (refundPercentage / 100);
+```
+
+### Real-time Messaging (Socket.io)
+```javascript
+// Backend: Handle message emission
+socket.on('send_message', async (data) => {
+  const message = await Message.create(data);
+  const receiverRoom = `user_${data.receiver_id}`;
+  io.to(receiverRoom).emit('new_message', message);
+  
+  // Also send push notification if receiver is offline
+  if (!isUserOnline(data.receiver_id)) {
+    notificationService.sendPush(data.receiver_id, 'New Message', data.content);
+  }
+});
+```
+
+### AI Model Fallback Logic
+```javascript
+// Backend: tryModels (aiText.js)
+const tryModels = async (prompt, models) => {
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (error) {
+      console.warn(`Model ${modelName} failed, trying next...`);
+      if (error.status === 403) throw error; // Stop if API key is leaked
+    }
+  }
+  throw new Error("All AI models failed.");
+};
 ```
 
 ---

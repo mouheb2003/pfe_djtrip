@@ -214,10 +214,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        content: const Text(
-          "Are you sure you want to log out? You'll need to sign back in to access your Account.",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+        content: const SingleChildScrollView(
+          child: Text(
+            "Are you sure you want to log out? You'll need to sign back in to access your Account.",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+          ),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [

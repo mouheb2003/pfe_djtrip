@@ -61,9 +61,28 @@ module.exports = function responseNormalizer(req, res, next) {
         if (normalizedBody.remainingSeconds !== undefined) restrictionFields.remainingSeconds = normalizedBody.remainingSeconds;
       }
 
+      // Robust message extraction
+      let displayMessage = normalizedBody.message || normalizedBody.reason || "Request failed";
+      
+      // If message is generic but there's a specific error object, try to extract from it
+      const errObj = normalizedBody.error || normalizedBody.errors;
+      if (errObj) {
+        if (typeof errObj === 'string') {
+          displayMessage = errObj;
+        } else if (typeof errObj === 'object') {
+          // Handle Mongoose validation errors (errors: { field: { message: "..." } })
+          const firstErrKey = Object.keys(errObj)[0];
+          if (firstErrKey && errObj[firstErrKey] && errObj[firstErrKey].message) {
+            displayMessage = errObj[firstErrKey].message;
+          } else if (errObj.message) {
+            displayMessage = errObj.message;
+          }
+        }
+      }
+
       return originalJson({
         success: false,
-        message: normalizedBody.message || "Request failed",
+        message: displayMessage,
         ...(normalizedBody.error || normalizedBody.errors
           ? { error: normalizedBody.error || normalizedBody.errors }
           : {}),

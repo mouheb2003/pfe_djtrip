@@ -439,7 +439,7 @@ class AuthService {
         return {'success': false, 'handledRestriction': true, 'message': null};
       }
 
-      return {'success': false, 'message': body['message'] ?? 'Sign-in error'};
+      return {'success': false, 'message': ApiService.extractErrorMessage(res, fallback: 'Sign-in error')};
     } catch (_) {
       return {
         'success': false,
@@ -490,7 +490,7 @@ class AuthService {
         return {'success': true, 'user': user};
       }
 
-      return {'success': false, 'message': body['message'] ?? 'Sign-up error'};
+      return {'success': false, 'message': ApiService.extractErrorMessage(res, fallback: 'Sign-up error')};
     } catch (_) {
       return {
         'success': false,
@@ -509,7 +509,9 @@ class AuthService {
       final body = _safeObject(res.body);
       return {
         'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to send reset code',
+        'message': res.statusCode == 200 
+            ? (body['message'] ?? 'Reset code sent') 
+            : ApiService.extractErrorMessage(res, fallback: 'Unable to send reset code'),
       };
     } catch (_) {
       return {
@@ -547,7 +549,9 @@ class AuthService {
       final body = _safeObject(res.body);
       return {
         'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to verify email',
+        'message': res.statusCode == 200
+            ? (body['message'] ?? 'Email verified')
+            : ApiService.extractErrorMessage(res, fallback: 'Unable to verify email'),
         'requires_onboarding': body['requires_onboarding'] ?? false,
         'skip_user_type_selection': body['skip_user_type_selection'] ?? true,
       };
@@ -565,7 +569,9 @@ class AuthService {
       final body = _safeObject(res.body);
       return {
         'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to resend verification code',
+        'message': res.statusCode == 200
+            ? (body['message'] ?? 'Verification code sent')
+            : ApiService.extractErrorMessage(res, fallback: 'Unable to resend verification code'),
       };
     } catch (_) {
       return {
@@ -590,7 +596,9 @@ class AuthService {
       final body = _safeObject(res.body);
       return {
         'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to reset password',
+        'message': res.statusCode == 200
+            ? (body['message'] ?? 'Password reset successfully')
+            : ApiService.extractErrorMessage(res, fallback: 'Unable to reset password'),
       };
     } catch (_) {
       return {
@@ -613,7 +621,9 @@ class AuthService {
       final body = _safeObject(res.body);
       return {
         'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to change password',
+        'message': res.statusCode == 200
+            ? (body['message'] ?? 'Password changed successfully')
+            : ApiService.extractErrorMessage(res, fallback: 'Unable to change password'),
       };
     } catch (_) {
       return {
@@ -746,7 +756,7 @@ class AuthService {
 
         return {
           'success': false,
-          'message': body['message'] ?? 'Google authentication failed',
+          'message': ApiService.extractErrorMessage(res, fallback: 'Google authentication failed'),
         };
       }
 

@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../config/api_config.dart';
 import '../models/ai_chat_message.dart';
 
 class AiChatService {
-  static const String baseUrl = 'http://localhost:3001/api';
+  // Use the proxy defined in the main server at /chatbot
+  static String get baseUrl => '${ApiConfig.serverBaseUrl}/chatbot/api';
   
   // Get chat endpoint URL
   static String get _chatUrl => '$baseUrl/chat';
@@ -37,14 +39,17 @@ class AiChatService {
         }),
       );
 
+      print('AI Chat Status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return AiChatResponse.fromJson(data);
+        return AiChatResponse.fromJson(data['data']);
       } else {
+        print('AI Chat Error Body: ${response.body}');
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Failed to send message');
       }
     } catch (e) {
+      print('AI Chat Service Exception: $e');
       throw Exception('Error sending message: $e');
     }
   }

@@ -14,6 +14,7 @@ class AIImageService {
     required String title,
     required String description,
     String? category,
+    int? count,
   }) async {
     try {
       final response = await ApiService.instance.post(
@@ -22,6 +23,7 @@ class AIImageService {
           'title': title,
           'description': description,
           if (category != null) 'category': category,
+          if (count != null) 'count': count,
         },
       );
 

@@ -10,7 +10,6 @@ const EventEmitter = require('events');
  * - message.received
  * - review.created, review.reminder
  * - follow.created, follow.accepted
- * - payment.completed, payment.failed, payment.refunded
  * - activity.created, activity.updated, activity.cancelled
  * - profile.updated, profile.verified
  * - appeal.created, appeal.resolved
@@ -72,6 +71,10 @@ class NotificationEventBus extends EventEmitter {
     this.emit('user.mentioned', data);
   }
 
+  emitPostMention(data) {
+    this.emit('post.mentioned', data);
+  }
+
   /**
    * Emit comment reaction events
    */
@@ -108,20 +111,6 @@ class NotificationEventBus extends EventEmitter {
     this.emit('follow.accepted', data);
   }
 
-  /**
-   * Emit payment events
-   */
-  emitPaymentCompleted(data) {
-    this.emit('payment.completed', data);
-  }
-
-  emitPaymentFailed(data) {
-    this.emit('payment.failed', data);
-  }
-
-  emitPaymentRefunded(data) {
-    this.emit('payment.refunded', data);
-  }
 
   /**
    * Emit activity events

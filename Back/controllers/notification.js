@@ -23,7 +23,7 @@ exports.createNotification = async (req, res) => {
     } = req.body;
 
     const notification = await Notification.createNotification({
-      user_id,
+      user_id: user_id || req.user.userId,
       type,
       title,
       message,
@@ -285,7 +285,7 @@ exports.getAllNotifications = async (req, res) => {
 
     const notifications = await Notification.find(query)
       .populate("user_id", "fullname email")
-      .sort({ created_at: -1 })
+      .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip));
 

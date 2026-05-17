@@ -186,6 +186,7 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+            ),
             child: Column(
               children: [
                 SizedBox(

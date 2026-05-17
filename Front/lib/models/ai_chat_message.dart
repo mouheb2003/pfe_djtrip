@@ -85,16 +85,15 @@ class AiChatResponse {
   });
 
   factory AiChatResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'];
     return AiChatResponse(
-      response: data['response'] ?? '',
-      conversationId: data['conversationId'] ?? '',
-      sources: (data['sources'] as List?)
+      response: json['response'] ?? '',
+      conversationId: json['conversationId'] ?? '',
+      sources: (json['sources'] as List?)
               ?.map((e) => AiSource.fromJson(e))
               .toList() ?? [],
-      context: data['context'] ?? {},
-      model: data['model'] ?? '',
-      timestamp: DateTime.parse(data['timestamp'] ?? DateTime.now().toIso8601String()),
+      context: json['context'] ?? {},
+      model: json['model'] ?? '',
+      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
     );
   }
 
@@ -128,16 +127,15 @@ class AiSearchResponse {
   });
 
   factory AiSearchResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'];
     return AiSearchResponse(
-      results: (data['results'] as List?)
+      results: (json['results'] as List?)
               ?.map((e) => AiSearchResult.fromJson(e))
               .toList() ?? [],
-      query: data['query'] ?? '',
-      totalChunks: data['totalChunks'] ?? 0,
-      filteredChunks: data['filteredChunks'] ?? 0,
-      foundResults: data['foundResults'] ?? 0,
-      message: data['message'] ?? '',
+      query: json['query'] ?? '',
+      totalChunks: json['totalChunks'] ?? 0,
+      filteredChunks: json['filteredChunks'] ?? 0,
+      foundResults: json['foundResults'] ?? 0,
+      message: json['message'] ?? '',
     );
   }
 }

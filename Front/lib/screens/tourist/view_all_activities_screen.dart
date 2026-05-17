@@ -476,9 +476,30 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
         ),
         itemCount: _filteredActivities.length,
         itemBuilder: (context, index) {
+          final activity = _filteredActivities[index];
           return ActivityCard(
-            activity: _filteredActivities[index],
+            activity: activity,
             isCompact: true,
+            isFavorite: activity.isBookmarked,
+            onFavorite: () async {
+              final currentState = activity.isBookmarked;
+              setState(() {
+                final idx = _filteredActivities.indexOf(activity);
+                if (idx != -1) {
+                  _filteredActivities[idx] = activity.copyWith(isBookmarked: !currentState);
+                }
+              });
+
+              final result = await ActivityService.toggleActivityBookmark(activity.id);
+              if (result['success'] != true && mounted) {
+                setState(() {
+                  final idx = _filteredActivities.indexOf(activity);
+                  if (idx != -1) {
+                    _filteredActivities[idx] = activity.copyWith(isBookmarked: currentState);
+                  }
+                });
+              }
+            },
           );
         },
       ),
@@ -490,11 +511,32 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       itemCount: _filteredActivities.length,
       itemBuilder: (context, index) {
+        final activity = _filteredActivities[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16.0),
           child: ActivityCard(
-            activity: _filteredActivities[index],
+            activity: activity,
             isCompact: false,
+            isFavorite: activity.isBookmarked,
+            onFavorite: () async {
+              final currentState = activity.isBookmarked;
+              setState(() {
+                final index = _filteredActivities.indexOf(activity);
+                if (index != -1) {
+                  _filteredActivities[index] = activity.copyWith(isBookmarked: !currentState);
+                }
+              });
+
+              final result = await ActivityService.toggleActivityBookmark(activity.id);
+              if (result['success'] != true && mounted) {
+                setState(() {
+                  final idx = _filteredActivities.indexOf(activity);
+                  if (idx != -1) {
+                    _filteredActivities[idx] = activity.copyWith(isBookmarked: currentState);
+                  }
+                });
+              }
+            },
           ),
         );
       },

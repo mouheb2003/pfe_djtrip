@@ -12,6 +12,7 @@ import 'explore_activities_screen.dart';
 import '../../services/activity_service.dart';
 import '../../services/message_service.dart';
 import '../../services/post_service.dart';
+import '../shared/ai_chat_screen.dart';
 import '../../services/novelty_badge_service.dart';
 
 class OrganizerMainScreen extends StatefulWidget {
@@ -192,16 +193,18 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
 
     return Scaffold(
       extendBody: true,
-      body: Stack(
-        children: [
-          IndexedStack(index: _currentIndex, children: _pages),
-          Positioned(
-            bottom: 18,
-            left: 16,
-            right: 16,
-            child: _buildFloatingNavBar(navBg, navActive, navInactive),
-          ),
-        ],
+      body: SafeArea(
+        child: Stack(
+          children: [
+            IndexedStack(index: _currentIndex, children: _pages),
+            Positioned(
+              bottom: 18,
+              left: 16,
+              right: 16,
+              child: _buildFloatingNavBar(navBg, navActive, navInactive),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -220,7 +223,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.15),
+                color: AppColors.primary.withOpacity(0.15),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),

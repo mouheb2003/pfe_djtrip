@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const http = require("http");
+const { spawn } = require("child_process");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
@@ -12,6 +13,7 @@ const requestLogger = require("./middleware/requestLogger");
 const requestTimeout = require("./middleware/requestTimeout");
 const sanitizeInput = require("./middleware/sanitizeInput");
 const responseNormalizer = require("./middleware/responseNormalizer");
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const systemLogStore = require("./services/systemLogStore");
 const {
   notFoundHandler,
@@ -27,7 +29,7 @@ connectDB();
 const notificationServiceV2 = require("./services/notificationServiceV2");
 const { startWorker: startNotificationWorker } = require("./workers/notificationWorkerV2");
 const { closeQueues } = require("./config/bullmq");
-const paymentExpirationCronJob = require("./jobs/paymentExpirationCronJob");
+
 const bookingReminderCronJob = require("./jobs/bookingReminderCronJob");
 
 // Initialize Firebase for push notifications (V2)
@@ -36,11 +38,8 @@ notificationServiceV2.initializeFirebase();
 // Start notification worker (event-driven)
 startNotificationWorker();
 
-// Start payment expiration cron job
-
 // Start booking reminder cron job
 bookingReminderCronJob.start();
-paymentExpirationCronJob.start();
 const userRoutes = require("./routes/user");
 const authRoutes = require("./routes/auth");
 const touristeRoutes = require("./routes/touriste");
@@ -71,7 +70,7 @@ const notificationPreferencesRoutes = require("./routes/notificationPreferences"
 const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
-const paymentRoutes = require("./routes/payment");
+
 const invoiceRoutes = require("./routes/invoice");
 const followRoutes = require("./routes/follow");
 const aiTextRoutes = require("./routes/aiText");
@@ -93,6 +92,18 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 
 const app = express();
 app.disable("x-powered-by");
+
+// 🤖 AI Chatbot Proxy (For Render deployment)
+// Routes all requests from /chatbot/* to the AI service on port 3001
+app.use('/chatbot', createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/chatbot': '', // Remove /chatbot prefix
+  },
+  logLevel: 'debug'
+}));
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -124,7 +135,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(responseNormalizer);
 app.use(requestLogger);
-app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS || 15000)));
+app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS || 120000)));
 
 // ─── Security Headers ─────────────────────────────────────────────────────────
 app.use(helmet());
@@ -262,7 +273,7 @@ app.get("/", (req, res) => {
       activityLogs: "/api/v1/logs",
       appeals: "/api/v1/appeals",
       notifications: "/api/v1/notifications",
-      payments: "/api/payments",
+
       invoices: "/api/v1/invoices",
     },
   });
@@ -295,7 +306,7 @@ app.use("/api/v1/notifications", notificationPreferencesRoutes);
 app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
-app.use("/api/v1/payments", paymentRoutes);
+
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/follow", followRoutes);
 app.use("/api/v1/ai-text", aiTextRoutes);
@@ -564,15 +575,23 @@ io.on("connection", (socket) => {
   socket.join(`user_${userId}`);
   console.log(`📡 Socket connected for user: ${userId}`);
 
-  // 🚀 SIMPLIFIED: Direct online status update
-  UserService.updateOnlineStatus(userId, true)
-    .then(() => {
-      console.log(`✅ User ${userId} marked as online`);
-      emitStatusToPartners(userId, true);
-    })
-    .catch((err) => {
-      console.error(`❌ Error updating online status for ${userId}:`, err);
-    });
+  // 🚀 IMPROVED: Only mark online and notify if it's the first connection
+  const socketsForUser = Array.from(io.sockets.sockets.values()).filter(
+    (s) => s.userId === userId,
+  );
+  
+  if (socketsForUser.length === 1) {
+    UserService.updateOnlineStatus(userId, true)
+      .then(() => {
+        console.log(`✅ User ${userId} marked as online (First connection)`);
+        emitStatusToPartners(userId, true);
+      })
+      .catch((err) => {
+        console.error(`❌ Error updating online status for ${userId}:`, err);
+      });
+  } else {
+    console.log(`ℹ️ User ${userId} already online (${socketsForUser.length} connections)`);
+  }
 
   // 🚀 NEW: Force offline status when client explicitly disconnects
   socket.on("force_logout", async () => {
@@ -689,18 +708,27 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 🚀 SIMPLIFIED: Direct offline status update
+  // 🚀 IMPROVED: Only mark offline if it's the last connection
   socket.on("disconnect", () => {
     console.log(`🔌 Socket disconnected for user: ${userId}`);
+    
+    // Give a small delay to see if they reconnect or if other sockets exist
+    const remainingSockets = Array.from(io.sockets.sockets.values()).filter(
+      (s) => s.userId === userId && s.id !== socket.id
+    );
 
-    UserService.updateOnlineStatus(userId, false)
-      .then(() => {
-        console.log(`✅ User ${userId} marked as offline`);
-        emitStatusToPartners(userId, false);
-      })
-      .catch((err) => {
-        console.error(`❌ Error updating offline status for ${userId}:`, err);
-      });
+    if (remainingSockets.length === 0) {
+      UserService.updateOnlineStatus(userId, false)
+        .then(() => {
+          console.log(`✅ User ${userId} marked as offline (Last connection)`);
+          emitStatusToPartners(userId, false);
+        })
+        .catch((err) => {
+          console.error(`❌ Error updating offline status for ${userId}:`, err);
+        });
+    } else {
+      console.log(`ℹ️ User ${userId} still online (${remainingSockets.length} other connections)`);
+    }
     socket.leave(`user_${userId}`);
   });
 });
@@ -734,8 +762,38 @@ process.on("SIGINT", async () => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS || 20000);
-server.requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT_MS || 15000);
+server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS || 150000);
+server.requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT_MS || 150000);
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} [${NODE_ENV}]`);
+  
+  // 🤖 Auto-launch AI Documentation Chatbot
+  console.log('[AI] Starting AI Documentation Chatbot...');
+  const chatbotCommand = NODE_ENV === 'production' ? 'start' : 'run dev';
+  const chatbotArgs = chatbotCommand.split(' ');
+  
+  // Create environment for chatbot, syncing the API keys from main process
+  const chatbotEnv = { 
+    ...process.env,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY, 
+    GEMINI_API_KEYS: process.env.GEMINI_API_KEYS, // Pass multi-key string
+    PORT: process.env.PORT_CHATBOT || 3001 
+  };
+
+  const chatbot = spawn('npm', chatbotArgs, {
+    cwd: '../ai-docs-chatbot',
+    shell: true,
+    stdio: 'inherit',
+    env: chatbotEnv
+  });
+
+  chatbot.on('error', (err) => {
+    console.error('[AI] Failed to start chatbot:', err.message);
+  });
+
+  chatbot.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`[AI] Chatbot exited with code ${code}`);
+    }
+  });
 });

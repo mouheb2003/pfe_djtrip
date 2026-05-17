@@ -1,30 +1,31 @@
 /**
  * Contrôleur pour la gestion des mentions dans les posts
- * Détection, validation, et gestion des mentions @username
+ * Détection, validation, et gestion des mentions par @userId
  */
 
 const User = require("../models/user");
 const Post = require("../models/post");
+const mongoose = require("mongoose");
 
 /**
- * Extraire les usernames mentionnés d'un texte
+ * Extraire les IDs mentionnés d'un texte
  * @param {string} content - Le contenu du post
- * @returns {array} - Liste des usernames uniques mentionnés
+ * @returns {array} - Liste des IDs uniques mentionnés
  */
 function extractMentions(content) {
   if (!content || typeof content !== 'string') {
     return [];
   }
 
-  // Regex pour trouver les mentions @username
-  const mentionRegex = /@([a-zA-Z0-9_]{3,30})/gi;
+  // Regex pour trouver les mentions @userId (24 caractères hexadécimaux)
+  const mentionRegex = /@([a-fA-F0-9]{24})/gi;
   const mentions = [];
   let match;
 
   while ((match = mentionRegex.exec(content)) !== null) {
-    const username = match[1].toLowerCase();
-    if (!mentions.includes(username)) {
-      mentions.push(username);
+    const userId = match[1];
+    if (!mentions.includes(userId)) {
+      mentions.push(userId);
     }
   }
 
@@ -32,46 +33,36 @@ function extractMentions(content) {
 }
 
 /**
- * Valider un username
- * @param {string} username - Le username à valider
+ * Valider un UserId
+ * @param {string} id - L'ID à valider
  * @returns {boolean} - True si valide
  */
-function isValidUsername(username) {
-  if (!username || typeof username !== 'string') {
-    return false;
-  }
-  
-  // Doit avoir entre 3 et 30 caractères
-  if (username.length < 3 || username.length > 30) {
-    return false;
-  }
-  
-  // Uniquement lettres, chiffres, et underscores
-  return /^[a-zA-Z0-9_]+$/.test(username);
+function isValidUserId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 /**
- * Rechercher des utilisateurs par usernames
- * @param {array} usernames - Liste des usernames à rechercher
+ * Rechercher des utilisateurs par IDs
+ * @param {array} ids - Liste des IDs à rechercher
  * @returns {array} - Liste des utilisateurs trouvés
  */
-async function findUsersByUsernames(usernames) {
-  if (!usernames || usernames.length === 0) {
+async function findUsersByIds(ids) {
+  if (!ids || ids.length === 0) {
     return [];
   }
 
   try {
     const users = await User.find({
-      username: { $in: usernames },
+      _id: { $in: ids },
       accountStatus: 'active'
     })
-    .select('username fullname avatar _id')
+    .select('fullname avatar _id userType')
     .lean()
     .exec();
 
     return users;
   } catch (error) {
-    console.error('[MENTION] Error finding users by usernames:', error);
+    console.error('[MENTION] Error finding users by IDs:', error);
     throw error;
   }
 }
@@ -82,7 +73,7 @@ async function findUsersByUsernames(usernames) {
  * @param {array} mentions - Liste des mentions à sauvegarder
  */
 async function saveMentionsToPost(postId, mentions) {
-  if (!postId || mentions.length === 0) {
+  if (!postId || !mentions) {
     return;
   }
 
@@ -106,7 +97,7 @@ async function saveMentionsToPost(postId, mentions) {
 
 /**
  * GET /api/mentions/search
- * Rechercher des utilisateurs pour l'autocomplétion des mentions
+ * Rechercher des utilisateurs pour l'autocomplétion des mentions par nom
  */
 exports.searchMentions = async (req, res) => {
   try {
@@ -119,15 +110,15 @@ exports.searchMentions = async (req, res) => {
       });
     }
 
-    // Nettoyer le query et enlever le @ s'il est présent
+    // Nettoyer le query
     const cleanQuery = query.trim().replace(/^@/, '');
     
-    // Rechercher les utilisateurs par regex (recherche partielle)
+    // Rechercher les utilisateurs par fullname uniquement (plus de username)
     const users = await User.find({
-      username: { $regex: cleanQuery, $options: 'i' },
+      fullname: { $regex: cleanQuery, $options: 'i' },
       accountStatus: 'active'
     })
-    .select('username fullname avatar _id')
+    .select('fullname avatar userType _id')
     .limit(parseInt(limit))
     .lean()
     .exec();
@@ -135,9 +126,9 @@ exports.searchMentions = async (req, res) => {
     res.status(200).json({
       success: true,
       data: users.map(user => ({
-        username: user.username,
         fullname: user.fullname,
         avatar: user.avatar,
+        userType: user.userType,
         _id: user._id
       })),
       count: users.length
@@ -155,7 +146,7 @@ exports.searchMentions = async (req, res) => {
 
 /**
  * POST /api/mentions/validate
- * Valider et extraire les mentions d'un contenu
+ * Valider et extraire les mentions d'un contenu (par ID)
  */
 exports.validateMentions = async (req, res) => {
   try {
@@ -168,25 +159,25 @@ exports.validateMentions = async (req, res) => {
       });
     }
 
-    // Extraire les mentions
-    const mentions = extractMentions(content);
+    // Extraire les mentions d'IDs
+    const mentionIds = extractMentions(content);
 
-    // Valider chaque mention
-    const validMentions = [];
-    const invalidMentions = [];
+    // Valider chaque ID
+    const validIds = [];
+    const invalidIds = [];
 
-    for (const username of mentions) {
-      if (isValidUsername(username)) {
-        validMentions.push(username);
+    for (const id of mentionIds) {
+      if (isValidUserId(id)) {
+        validIds.push(id);
       } else {
-        invalidMentions.push(username);
+        invalidIds.push(id);
       }
     }
 
-    // Vérifier si les usernames existent
+    // Vérifier si les utilisateurs existent
     let existingUsers = [];
-    if (validMentions.length > 0) {
-      existingUsers = await findUsersByUsernames(validMentions);
+    if (validIds.length > 0) {
+      existingUsers = await findUsersByIds(validIds);
     }
 
     res.status(200).json({
@@ -194,15 +185,15 @@ exports.validateMentions = async (req, res) => {
       data: {
         content: content,
         mentions: {
-          all: mentions,
-          valid: validMentions,
-          invalid: invalidMentions,
-          existing: existingUsers.map(u => u.username)
+          all: mentionIds,
+          valid: validIds,
+          invalid: invalidIds,
+          existing: existingUsers.map(u => u._id.toString())
         },
         users: existingUsers.map(user => ({
-          username: user.username,
           fullname: user.fullname,
           avatar: user.avatar,
+          userType: user.userType,
           _id: user._id
         }))
       }
@@ -308,8 +299,8 @@ exports.getPostMentions = async (req, res) => {
   }
 };
 
-// Exporter les fonctions utilitaires pour utilisation dans d'autres contrôleurs
+// Exporter les fonctions utilitaires
 module.exports.extractMentions = extractMentions;
-module.exports.isValidUsername = isValidUsername;
-module.exports.findUsersByUsernames = findUsersByUsernames;
+module.exports.isValidUserId = isValidUserId;
+module.exports.findUsersByIds = findUsersByIds;
 module.exports.saveMentionsToPost = saveMentionsToPost;

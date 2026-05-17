@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
+import '../../providers/bookmark_provider.dart';
 
 class ActivityCard extends StatefulWidget {
   final ActivityModel activity;
@@ -9,7 +11,7 @@ class ActivityCard extends StatefulWidget {
   final double? width;
   final VoidCallback? onTap;
   final VoidCallback? onFavorite;
-  final bool isFavorite;
+  final bool? isFavorite; // Changed to nullable
 
   const ActivityCard({
     super.key,
@@ -18,7 +20,7 @@ class ActivityCard extends StatefulWidget {
     this.width,
     this.onTap,
     this.onFavorite,
-    this.isFavorite = false,
+    this.isFavorite,
   });
 
   @override
@@ -55,6 +57,19 @@ class _ActivityCardState extends State<ActivityCard>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
+
+    // Seed the provider with the initial state if it's the first time seeing this activity
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = Provider.of<BookmarkProvider>(context, listen: false);
+        // If we have an explicit isFavorite, use it to seed
+        if (widget.isFavorite != null) {
+          provider.updateActivityState(widget.activity.id, widget.isFavorite!);
+        } else {
+          provider.updateActivityState(widget.activity.id, widget.activity.isBookmarked);
+        }
+      }
+    });
   }
 
   @override
@@ -79,6 +94,8 @@ class _ActivityCardState extends State<ActivityCard>
 
   void _toggleFavorite() {
     HapticFeedback.selectionClick();
+    final provider = Provider.of<BookmarkProvider>(context, listen: false);
+    provider.toggleActivityBookmark(widget.activity.id);
     widget.onFavorite?.call();
   }
 
@@ -170,10 +187,15 @@ class _ActivityCardState extends State<ActivityCard>
                                     color: Colors.white.withOpacity(0.9),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  child: Icon(
-                                    widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                                    color: widget.isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
-                                    size: 16,
+                                  child: Consumer<BookmarkProvider>(
+                                    builder: (context, provider, child) {
+                                      final isFavorite = provider.isActivityBookmarked(widget.activity.id);
+                                      return Icon(
+                                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                                        color: isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
+                                        size: 16,
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
@@ -397,11 +419,16 @@ class _ActivityCardState extends State<ActivityCard>
                                 const SizedBox(width: 8),
                                 GestureDetector(
                                   onTap: _toggleFavorite,
-                                  child: Icon(
-                                    widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                                    color: widget.isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
-                                    size: 20,
-                                  ),
+                                child: Consumer<BookmarkProvider>(
+                                  builder: (context, provider, child) {
+                                    final isFavorite = provider.isActivityBookmarked(widget.activity.id);
+                                    return Icon(
+                                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                                      color: isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
+                                      size: 20,
+                                    );
+                                  },
+                                ),
                                 ),
                               ],
                             ),

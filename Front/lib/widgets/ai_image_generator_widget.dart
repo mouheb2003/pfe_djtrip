@@ -47,6 +47,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
   String? _qualityMessage;
   String? _processingTime;
   Map<String, dynamic>? _metadata;
+  int _selectedCount = 3;
 
   @override
   void initState() {
@@ -91,6 +92,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
         title: title,
         description: description,
         category: widget.category,
+        count: _selectedCount,
       );
 
       if (mounted) {
@@ -284,7 +286,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Let AI create 3 stunning images for your activity',
+                      'Let AI create stunning images for your activity',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: Colors.grey[600],
                       ),
@@ -423,6 +425,70 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                   },
                 ),
                 const SizedBox(height: 12),
+              ],
+            ),
+
+          // Image Count Selector
+          if (_generatedImageUrls.isEmpty && !_isGenerating)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.filter_none_rounded,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Number of images to generate:',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [2, 3, 4].map((count) {
+                    final isSelected = _selectedCount == count;
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: count == 2 ? 0 : 4,
+                          right: count == 4 ? 0 : 4,
+                        ),
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedCount = count),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primary : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                count.toString(),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.grey[700],
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
 

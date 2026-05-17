@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/post_service.dart';
 import '../../widgets/publication_card.dart';
+import '../../widgets/tiktok_share_widget.dart';
 import '../../models/post_model.dart';
 
 class BookmarkedPostsScreen extends StatefulWidget {
@@ -87,8 +88,9 @@ class _BookmarkedPostsScreenState extends State<BookmarkedPostsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FC),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FC),
       body: RefreshIndicator(
         onRefresh: _refreshBookmarks,
         color: AppColors.primary,
@@ -113,14 +115,18 @@ class _BookmarkedPostsScreenState extends State<BookmarkedPostsScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFFE8F4FD),
-                          const Color(0xFFF0F4FF),
-                        ],
+                        colors: isDark
+                            ? [const Color(0xFF121212), const Color(0xFF121212)]
+                            : [
+                                const Color(0xFFE8F4FD),
+                                const Color(0xFFF0F4FF),
+                              ],
                       ),
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: isDark
+                              ? Colors.transparent
+                              : Colors.black.withOpacity(0.05),
                           width: 1,
                         ),
                       ),
@@ -166,7 +172,7 @@ class _BookmarkedPostsScreenState extends State<BookmarkedPostsScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -272,49 +278,37 @@ class _BookmarkedPostsScreenState extends State<BookmarkedPostsScreen> {
                         padding: const EdgeInsets.only(bottom: 16),
                         child: PublicationCard(
                           post: postModel,
-                          onLike: () async {
+                          onLikeChanged: (liked, likesCount) async {
                             final postId = (postData['_id'] ?? '').toString();
                             if (postId.isEmpty) return;
-                            final currentLiked = postData['isLiked'] ?? false;
-                            final currentCount = (postData['likes_count'] as num?)?.toInt() ?? 0;
                             setState(() {
-                              postData['isLiked'] = !currentLiked;
-                              postData['likes_count'] = !currentLiked ? currentCount + 1 : currentCount - 1;
+                              postData['isLiked'] = liked;
+                              postData['likes_count'] = likesCount;
                             });
-                            final result = await PostService.togglePostLike(postId);
-                            if (result['success'] == true) {
-                              final liked = result['liked'] == true;
-                              final likesCount = (result['likesCount'] as num?)?.toInt() ?? currentCount;
-                              _onLikeChanged(postId, liked, likesCount);
-                            }
+                            _onLikeChanged(postId, liked, likesCount);
                           },
-                          onBookmark: () async {
+                          onBookmarkChanged: (bookmarked, bookmarksCount) async {
                             final postId = (postData['_id'] ?? '').toString();
                             if (postId.isEmpty) return;
-                            final currentBookmarked = postData['isBookmarked'] ?? true;
-                            final currentCount = (postData['bookmarks_count'] as num?)?.toInt() ?? 0;
                             setState(() {
-                              postData['isBookmarked'] = !currentBookmarked;
-                              postData['bookmarks_count'] = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+                              postData['isBookmarked'] = bookmarked;
+                              postData['bookmarks_count'] = bookmarksCount;
                             });
-                            final result = await PostService.togglePostBookmark(postId);
-                            if (result['success'] == true) {
-                              final bookmarked = result['bookmarked'] == true;
-                              final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
-                              _onBookmarkChanged(postId, bookmarked, bookmarksCount);
-                            }
+                            _onBookmarkChanged(postId, bookmarked, bookmarksCount);
                           },
                           onShare: () {
-                            // Share functionality
-                          },
-                          onReport: () {
-                            // Report functionality
-                          },
-                          onMute: () {
-                            // Mute functionality
-                          },
-                          onCopyLink: () async {
-                            // Copy link functionality
+                            final postId = (postData['_id'] ?? '').toString();
+                            final content = (postData['content'] ?? '').toString();
+                            final imageUrl = (postData['imageUrl'] ?? '').toString();
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => TikTokShareWidget(
+                                postId: postId,
+                                postContent: content,
+                                postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                              ),
+                            );
                           },
                         ),
                       );

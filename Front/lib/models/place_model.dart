@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 
 class PlaceModel {
   final String placeId;
@@ -144,5 +146,50 @@ class PlaceModel {
       'contactInfo': contactInfo,
       'website': website,
     };
+  }
+
+  // ── Computed display getters used by PlaceCard ──────────────────────────────
+
+  /// Best available image URL.
+  String get primaryImage {
+    if (images != null && images!.isNotEmpty) return images!.first;
+    return imageUrl ?? photoReference ?? '';
+  }
+
+  /// Whether the place is currently open (based on openingHours presence).
+  bool get isOpen => openingHours != null && openingHours!.isNotEmpty;
+
+  /// Colour of the open/closed status badge.
+  Color get statusColor => isOpen ? const Color(0xFF00B894) : const Color(0xFFFF4757);
+
+  /// Text for the open/closed status badge.
+  String get statusText => isOpen ? 'Open' : 'Closed';
+
+  /// Whether a rating value is available.
+  bool get hasRating => rating != null && rating! > 0;
+
+  /// Formatted rating string, e.g. "4.5".
+  String get ratingText => rating != null ? rating!.toStringAsFixed(1) : '';
+
+  /// Formatted review count string, e.g. "(128 reviews)".
+  String get reviewCountText {
+    if (reviewCount == null || reviewCount! == 0) return '';
+    return '(${reviewCount!} review${reviewCount! == 1 ? '' : 's'})';
+  }
+
+  /// Whether there is a non-zero entry fee.
+  bool get hasEntryFee => entryFee != null && entryFee! > 0;
+
+  /// Formatted entry fee string.
+  String get entryFeeText => hasEntryFee ? '${entryFee!.toStringAsFixed(0)} DT' : 'Free';
+
+  /// Full location string combining city and location/vicinity.
+  String get fullLocation {
+    final parts = <String>[];
+    if (location != null && location!.isNotEmpty) parts.add(location!);
+    if (city != null && city!.isNotEmpty && !parts.contains(city!)) parts.add(city!);
+    if (parts.isEmpty && vicinity != null) return vicinity!;
+    if (parts.isEmpty && formattedAddress != null) return formattedAddress!;
+    return parts.join(', ');
   }
 }

@@ -8,8 +8,14 @@ import '../../services/auth_service.dart';
 import '../../services/lieu_service.dart';
 import '../../services/review_service.dart';
 import '../../services/place_service.dart';
+import '../../utils/snackbar_utils.dart';
+import 'view_all_places_screen.dart';
 import '../shared/activity_detail_screen.dart';
 import '../shared/bookmarked_items_screen.dart';
+import '../../config/api_config.dart';
+import '../../theme/app_theme.dart';
+import 'package:provider/provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 class PlaceDetailScreenV2 extends StatefulWidget {
   final dynamic place;
@@ -53,7 +59,18 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     _placeData = _normalizePlace(widget.place);
     _pageController = PageController();
     _bootstrapData();
+    _loadInitialBookmarkState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoPlay());
+  }
+
+  void _loadInitialBookmarkState() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final isInitiallySaved = _place['isBookmarked'] == true || _place['isSaved'] == true;
+        Provider.of<BookmarkProvider>(context, listen: false)
+            .updateLieuState(_reviewLieuId, isInitiallySaved);
+      }
+    });
   }
 
   Map<String, dynamic> _normalizePlace(dynamic raw) {
@@ -375,6 +392,42 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     return 'User';
   }
 
+  String _reviewAuthorAvatar(Map<String, dynamic> review) {
+    String pickFromMap(Map<dynamic, dynamic> data, List<String> keys) {
+      for (final key in keys) {
+        final value = data[key];
+        final text = value?.toString().trim() ?? '';
+        if (text.isNotEmpty && text.toLowerCase() != 'null') return text;
+      }
+      return '';
+    }
+
+    final touristeId = review['touriste_id'];
+    if (touristeId is Map) {
+      final avatar = pickFromMap(touristeId, ['avatar', 'photo', 'image']);
+      if (avatar.isNotEmpty) return ApiConfig.getImageUrl(avatar);
+    }
+
+    final touriste = review['touriste'];
+    if (touriste is Map) {
+      final avatar = pickFromMap(touriste, ['avatar', 'photo', 'image']);
+      if (avatar.isNotEmpty) return ApiConfig.getImageUrl(avatar);
+    }
+
+    final user = review['user'];
+    if (user is Map) {
+      final avatar = pickFromMap(user, ['avatar', 'photo', 'image']);
+      if (avatar.isNotEmpty) return ApiConfig.getImageUrl(avatar);
+    }
+
+    final avatar = review['avatar']?.toString().trim() ?? '';
+    if (avatar.isNotEmpty && avatar.toLowerCase() != 'null') {
+      return ApiConfig.getImageUrl(avatar);
+    }
+
+    return '';
+  }
+
   String _reviewSubmittedDate(Map<String, dynamic> review) {
     DateTime? parseDate(dynamic raw) {
       if (raw == null) return null;
@@ -521,9 +574,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
   Future<void> _submitEditReview(Map<String, dynamic> review) async {
     final comment = _reviewController.text.trim();
     if (comment.isEmpty || _selectedRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add a comment and rating')),
-      );
+      SnackbarUtils.showWarning(context, 'Please add a comment and rating');
       return;
     }
 
@@ -546,15 +597,11 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
         Navigator.pop(context);
         _reviewController.clear();
         _selectedRating = 0;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review updated successfully')),
-        );
+        SnackbarUtils.showSuccess(context, 'Review updated successfully');
         await _fetchReviews();
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error updating review: $e')));
+      SnackbarUtils.showError(context, 'Error updating review: $e');
     } finally {
       setState(() => _isSubmittingReview = false);
     }
@@ -598,15 +645,11 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
       );
 
       if (response['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review deleted successfully')),
-        );
+        SnackbarUtils.showSuccess(context, 'Review deleted successfully');
         await _fetchReviews();
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error deleting review: $e')));
+      SnackbarUtils.showError(context, 'Error deleting review: $e');
     } finally {
       setState(() => _isSubmittingReview = false);
     }
@@ -781,137 +824,42 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
   Future<void> _toggleSave() async {
     final placeId = _reviewLieuId;
     if (placeId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible de sauvegarder')),
-      );
+      SnackbarUtils.showError(context, 'Impossible de sauvegarder');
       return;
     }
 
     setState(() => _isSavingState = true);
 
     try {
-      print('DEBUG: Attempting to toggle bookmark for placeId: $placeId');
-      final success = await PlaceService.toggleBookmark(placeId);
-      print('DEBUG: toggleBookmark result: $success');
+      final provider = Provider.of<BookmarkProvider>(context, listen: false);
+      await provider.toggleLieuBookmark(placeId);
+      final isNowSaved = provider.isLieuBookmarked(placeId);
 
       if (mounted) {
-        setState(() {
-          if (success) {
-            _isSaved = !_isSaved;
-
-            if (_isSaved) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.bookmark,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Ajouté aux favoris',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: const Color(0xFF4B63FF),
-                  duration: const Duration(seconds: 5),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 6,
-                  action: SnackBarAction(
-                    label: 'See All',
-                    textColor: Colors.white,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const BookmarkedItemsScreen(),
-                        ),
-                      );
-                    },
-                  ),
+        if (isNowSaved) {
+          SnackbarUtils.showSnackBar(
+            context, 
+            message: 'Ajouté aux favoris', 
+            type: SnackBarType.success,
+            actionLabel: 'See All',
+            onAction: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const BookmarkedItemsScreen(),
                 ),
               );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.bookmark_border,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Retiré des favoris',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: Colors.grey[700],
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 6,
-                ),
-              );
-            }
-          }
-          _isSavingState = false;
-        });
+            },
+          );
+        } else {
+          SnackbarUtils.showInfo(context, 'Retiré des favoris');
+        }
+        setState(() => _isSavingState = false);
       }
     } catch (e) {
       print('DEBUG: Exception during toggleBookmark: $e');
       if (mounted) {
         setState(() => _isSavingState = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$e'),
-            backgroundColor: Colors.red[400],
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        SnackbarUtils.showError(context, '$e');
       }
     }
   }
@@ -1012,12 +960,13 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
 
   @override
   Widget build(BuildContext context) {
-    const pageBackground = Colors.white;
-    const surface = Color(0xFFF8FAFC);
-    const surfaceAlt = Color(0xFFF3F4F6);
-    const textPrimary = Color(0xFF111827);
-    const textSecondary = Color(0xFF6B7280);
-    const borderColor = Color(0xFFE5E7EB);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBackground = isDark ? const Color(0xFF121212) : Colors.white;
+    final surface = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC);
+    final surfaceAlt = isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6);
+    final textPrimary = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827);
+    final textSecondary = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+    final borderColor = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB);
 
     final title = _stringFrom([
       'name',
@@ -1106,14 +1055,19 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: textPrimary),
         actions: [
-          IconButton(
-            onPressed: _isSavingState ? null : _toggleSave,
-            icon: Icon(
-              _isSaved ? Icons.bookmark : Icons.bookmark_border,
-              color: textPrimary,
-            ),
+          Consumer<BookmarkProvider>(
+            builder: (context, provider, child) {
+              final isSaved = provider.isLieuBookmarked(_reviewLieuId);
+              return IconButton(
+                onPressed: _isSavingState ? null : _toggleSave,
+                icon: Icon(
+                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  color: textPrimary,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1151,16 +1105,34 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                         final img = images[index];
                                         return img.isNotEmpty
                                             ? Image.network(
-                                                img,
+                                                ApiConfig.getImageUrl(img),
                                                 fit: BoxFit.cover,
                                                 width: double.infinity,
+                                                loadingBuilder: (context, child, loadingProgress) {
+                                                  if (loadingProgress == null) return child;
+                                                  return Container(
+                                                    color: Colors.white10,
+                                                    child: const Center(
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                                 errorBuilder: (_, __, ___) =>
                                                     Container(
                                                       color: Colors.white12,
+                                                      child: const Center(
+                                                        child: Icon(Icons.image, color: Colors.white54, size: 40),
+                                                      ),
                                                     ),
                                               )
                                             : Container(
                                                 color: Colors.grey[900],
+                                                child: const Center(
+                                                  child: Icon(Icons.image, color: Colors.white24, size: 40),
+                                                ),
                                               );
                                       },
                                     ),
@@ -1585,7 +1557,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                               border: Border.all(color: borderColor),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Text(
+                            child: Text(
                               'No activities found for this place.',
                               style: TextStyle(color: textSecondary),
                             ),
@@ -1638,7 +1610,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                               image: photo.isNotEmpty
                                                   ? DecorationImage(
                                                       image: NetworkImage(
-                                                        photo,
+                                                        ApiConfig.getImageUrl(photo),
                                                       ),
                                                       fit: BoxFit.cover,
                                                     )
@@ -1651,7 +1623,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                           activity.titre,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: textPrimary,
                                             fontWeight: FontWeight.w800,
                                           ),
@@ -1692,7 +1664,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Rate this place',
                                 style: TextStyle(
                                   color: textPrimary,
@@ -1733,27 +1705,27 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                 enabled: !_isSubmittingReview,
                                 minLines: 2,
                                 maxLines: 4,
-                                style: const TextStyle(color: textPrimary),
+                                style: TextStyle(color: textPrimary),
                                 decoration: InputDecoration(
                                   hintText: 'Write your comment...',
-                                  hintStyle: const TextStyle(
+                                  hintStyle: TextStyle(
                                     color: textSecondary,
                                   ),
                                   filled: true,
-                                  fillColor: Colors.white,
+                                  fillColor: pageBackground,
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 14,
                                     vertical: 14,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(
+                                    borderSide: BorderSide(
                                       color: borderColor,
                                     ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(
+                                    borderSide: BorderSide(
                                       color: borderColor,
                                     ),
                                   ),
@@ -1810,7 +1782,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                               border: Border.all(color: borderColor),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Text(
+                            child: Text(
                               'No reviews yet.',
                               style: TextStyle(color: textSecondary),
                             ),
@@ -1844,6 +1816,17 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                 children: [
                                   Row(
                                     children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: const Color(0xFF4B63FF).withOpacity(0.1),
+                                        backgroundImage: _reviewAuthorAvatar(review).isNotEmpty
+                                            ? NetworkImage(_reviewAuthorAvatar(review))
+                                            : null,
+                                        child: _reviewAuthorAvatar(review).isEmpty
+                                            ? const Icon(Icons.person, size: 18, color: Color(0xFF4B63FF))
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -1851,7 +1834,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                           children: [
                                             Text(
                                               author,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: textPrimary,
                                                 fontWeight: FontWeight.w700,
                                               ),
@@ -1863,7 +1846,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                                 ),
                                                 child: Text(
                                                   submittedDate,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     color: textSecondary,
                                                     fontSize: 12,
                                                   ),
@@ -1880,7 +1863,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                       const SizedBox(width: 4),
                                       Text(
                                         note.toStringAsFixed(1),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: textSecondary,
                                         ),
                                       ),
@@ -1915,7 +1898,7 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                     const SizedBox(height: 6),
                                     Text(
                                       text,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textSecondary,
                                         height: 1.3,
                                       ),
@@ -1933,7 +1916,6 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
               ),
             ),
           ),
-          // Bottom action bar (Book Now / Share) removed per user request.
         ],
       ),
     );

@@ -462,7 +462,7 @@ exports.sendBookingConfirmationEmail = async ({
                   <p><strong>Date:</strong> ${bookingDate}</p>
                   <p><strong>Time:</strong> ${bookingTime}</p>
                   <p><strong>Participants:</strong> ${participants}</p>
-                  <p><strong>Total:</strong> ${totalPrice}</p>
+                  <p><strong>Total Price:</strong> ${totalPrice}</p>
                   <p><strong>Booking code:</strong> <span class="code">${bookingCode}</span></p>
                 </div>
                 <p>If you need help, open the Help Center inside the app.</p>
@@ -472,7 +472,7 @@ exports.sendBookingConfirmationEmail = async ({
         </body>
         </html>
       `,
-      text: `Hello ${fullname},\n\nYour booking is confirmed.\n\nActivity: ${activityTitle}\nDate: ${bookingDate}\nTime: ${bookingTime}\nParticipants: ${participants}\nTotal: ${totalPrice}\nBooking code: ${bookingCode}\n\nOpen the app and present your QR code at check-in.`,
+      text: `Hello ${fullname},\n\nYour booking is confirmed.\n\nActivity: ${activityTitle}\nDate: ${bookingDate}\nTime: ${bookingTime}\nParticipants: ${participants}\nBooking code: ${bookingCode}\n\nOpen the app and present your QR code at check-in.`,
     });
 
     const info = await sendMailWithLogging(
@@ -482,6 +482,69 @@ exports.sendBookingConfirmationEmail = async ({
     return { success: true, messageId: info.messageId };
   } catch (error) {
     emailLog("error", "Error sending booking confirmation email", {
+      message: error.message,
+      code: error.code,
+    });
+    return { success: false, error: error.message };
+  }
+};
+
+// Send booking rejection email
+exports.sendBookingRejectionEmail = async ({
+  email,
+  fullname,
+  activityTitle,
+  rejectionReason,
+}) => {
+  try {
+    const mailOptions = getBaseMailOptions({
+      to: email,
+      subject: "Update regarding your booking - DJTrip",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
+            .container { max-width: 680px; margin: 0 auto; padding: 24px; }
+            .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+            .header { background: linear-gradient(135deg, #ef4444, #f87171); color:#fff; padding: 28px; }
+            .content { padding: 28px; }
+            .reason-box { margin: 18px 0; padding: 16px; background:#fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="card">
+              <div class="header">
+                <h1 style="margin:0; font-size:24px;">Booking Update</h1>
+                <p style="margin:8px 0 0; opacity:.92;">Hello ${fullname}, we have an update regarding your request.</p>
+              </div>
+              <div class="content">
+                <p>Unfortunately, your booking for <strong>${activityTitle}</strong> could not be approved at this time.</p>
+                <div class="reason-box">
+                  <p style="margin:0; color:#b91c1c;"><strong>Reason provided:</strong></p>
+                  <p style="margin:8px 0 0; color:#1e293b;">${rejectionReason}</p>
+                </div>
+                <p>Feel free to explore other activities available on DJTrip!</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nUnfortunately, your booking for "${activityTitle}" has been rejected.\n\nReason: ${rejectionReason}\n\nFeel free to explore other activities on DJTrip!`,
+    });
+
+    const info = await sendMailWithLogging(
+      "booking rejection email",
+      mailOptions,
+    );
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    emailLog("error", "Error sending booking rejection email", {
       message: error.message,
       code: error.code,
     });
@@ -874,7 +937,7 @@ exports.sendActivityCancelledEmail = async ({
                 <p style="margin:0;">${reason || "No specific reason provided."}</p>
               </div>
               
-              <p>Any payments made will be handled according to our cancellation policy. You can check your booking status in the app for more details.</p>
+              <p>You can check your booking status in the app for more details.</p>
               
               <p>We apologize for any inconvenience this may cause and hope you find another amazing activity on DJTrip!</p>
             </div>

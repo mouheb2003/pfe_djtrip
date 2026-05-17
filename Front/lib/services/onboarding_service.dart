@@ -200,13 +200,6 @@ class OnboardingService {
   // Tourist onboarding steps
   static const List<Map<String, dynamic>> _touristSteps = [
     {
-      'id': 'phone',
-      'title': 'Phone Number',
-      'description': 'Add your phone number for better communication',
-      'required': true,
-      'fields': ['num_tel', 'pays_telephone'],
-    },
-    {
       'id': 'profile_picture',
       'title': 'Profile Picture',
       'description': 'Add a profile picture to personalize your account',
@@ -248,10 +241,6 @@ class OnboardingService {
       'required': true,
       'fields': ['bio'],
     },
-  ];
-
-  // Organizer onboarding steps
-  static const List<Map<String, dynamic>> _organizerSteps = [
     {
       'id': 'phone',
       'title': 'Phone Number',
@@ -259,6 +248,10 @@ class OnboardingService {
       'required': true,
       'fields': ['num_tel', 'pays_telephone'],
     },
+  ];
+
+  // Organizer onboarding steps
+  static const List<Map<String, dynamic>> _organizerSteps = [
     {
       'id': 'profile_picture',
       'title': 'Profile Picture',
@@ -314,6 +307,13 @@ class OnboardingService {
       'description': 'Tell us why you want to become an organizer on DJTrip',
       'required': true,
       'fields': ['reasonToJoin'],
+    },
+    {
+      'id': 'phone',
+      'title': 'Phone Number',
+      'description': 'Add your phone number for better communication',
+      'required': true,
+      'fields': ['num_tel', 'pays_telephone'],
     },
   ];
 }

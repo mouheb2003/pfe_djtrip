@@ -195,7 +195,7 @@ class InscriptionService {
       await activite.save();
     }
 
-    inscription.statut = "annulée";
+    inscription.statut = "cancelled";
     await inscription.save();
 
     console.log("❌ Inscription cancelled:", inscriptionId);
@@ -239,10 +239,10 @@ class InscriptionService {
 
     const stats = {
       total: inscriptions.length,
-      enAttente: inscriptions.filter((i) => i.statut === "en attente").length,
-      confirmees: inscriptions.filter((i) => i.statut === "confirmée").length,
-      annulees: inscriptions.filter((i) => i.statut === "annulée").length,
-      terminees: inscriptions.filter((i) => i.statut === "terminée").length,
+      pending: inscriptions.filter((i) => i.statut === "pending").length,
+      approved: inscriptions.filter((i) => i.statut === "approved").length,
+      cancelled: inscriptions.filter((i) => i.statut === "cancelled").length,
+      verified: inscriptions.filter((i) => i.statut === "verified").length,
     };
 
     return stats;

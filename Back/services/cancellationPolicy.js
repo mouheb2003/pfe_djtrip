@@ -48,11 +48,11 @@ class CancellationPolicy {
     // - Booking is already checked-in
     // - Booking is no-show
     
-    if (booking.statut === 'annulee') {
+    if (booking.statut === 'cancelled') {
       return { canCancel: false, reason: 'Already cancelled' };
     }
     
-    if (booking.statut === 'verifie') {
+    if (booking.statut === 'verified') {
       return { canCancel: false, reason: 'Already checked-in' };
     }
     
@@ -112,10 +112,10 @@ class CancellationPolicy {
       const refund = { refundAmount: 0, feePercent: 0, refundPercent: 0, feeAmount: 0, policy: "No refund" };
       
       // Check if was approved before changing status (for capacity decrement)
-      const wasApproved = booking.statut === 'approuvee';
+      const wasApproved = booking.statut === 'approved';
       
       // Update booking
-      booking.statut = 'annulee';
+      booking.statut = 'cancelled';
       booking.cancellationPolicy = {
         canCancel: true,
         cancellationDeadline: activity.date_debut,
@@ -139,7 +139,21 @@ class CancellationPolicy {
       
       await session.commitTransaction();
       
-      logger.info('Booking cancelled (No refund)', {
+      // Trigger notification for organizer
+      try {
+        const notificationEventBus = require('./notificationEventBus');
+        notificationEventBus.emitBookingCancelled({
+          organizerId: booking.organisateur_id,
+          activityTitle: activity.titre,
+          bookingId: booking._id.toString(),
+          touristId: touristId,
+          reason: reason || "No reason provided"
+        });
+      } catch (notifError) {
+        console.warn('Failed to emit booking cancelled event:', notifError.message);
+      }
+      
+      logger.info('Booking cancelled', {
         bookingId,
         touristId
       });
@@ -210,7 +224,7 @@ class CancellationPolicy {
       
       const cancelledBookings = await Inscription.countDocuments({
         organisateur_id: organizerId,
-        statut: 'annulee',
+        statut: 'cancelled',
         ...dateFilter
       });
       
@@ -218,7 +232,7 @@ class CancellationPolicy {
         {
           $match: {
             organisateur_id: organizerId,
-            statut: 'annulee',
+            statut: 'cancelled',
             'cancellationPolicy.refundAmount': { $exists: true },
             ...dateFilter
           }

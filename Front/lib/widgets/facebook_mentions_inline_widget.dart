@@ -34,16 +34,16 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
     try {
       final Map<String, String> fullnames = {};
       
-      for (final username in widget.mentions) {
+      for (final userId in widget.mentions) {
         try {
-          final user = await UserService.getUserByUsername(username);
+          final user = await UserService.getUserByIdSimple(userId);
           if (user != null && user['fullname'] != null) {
-            fullnames[username] = user['fullname'];
+            fullnames[userId] = user['fullname'];
           } else {
-            fullnames[username] = username; // Fallback to username
+            fullnames[userId] = 'User'; // Fallback
           }
         } catch (e) {
-          fullnames[username] = username; // Fallback on error
+          fullnames[userId] = 'User'; // Fallback on error
         }
       }
       
@@ -72,9 +72,9 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
 
     // Format: "with X and Y others" - adaptable avec Wrap
     if (mentions.length == 1) {
-      final username = mentions.first;
-      final displayName = _userFullnames[username] ?? username;
-      return _buildMentionTextWrap('with $displayName', [username]);
+      final userId = mentions.first;
+      final displayName = _userFullnames[userId] ?? 'User';
+      return _buildMentionTextWrap('with $displayName', [userId]);
     }
 
     if (mentions.length == 2) {
@@ -145,7 +145,7 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
     );
   }
 
-  Widget _buildMentionTextWrap(String text, List<String> usernames) {
+  Widget _buildMentionTextWrap(String text, List<String> userIds) {
     return Wrap(
       spacing: 2,
       runSpacing: 2,
@@ -160,8 +160,8 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
         ),
         GestureDetector(
           onTap: () {
-            if (usernames.isNotEmpty) {
-              _navigateToProfile(usernames.first);
+            if (userIds.isNotEmpty) {
+              _navigateToProfile(userIds.first);
             }
           },
           child: Text(
@@ -177,11 +177,11 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
     );
   }
 
-  void _navigateToProfile(String username) {
+  void _navigateToProfile(String userId) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PublicProfileScreen(userId: username),
+        builder: (context) => PublicProfileScreen(userId: userId),
       ),
     );
   }
@@ -195,14 +195,14 @@ class _FacebookMentionsInlineWidgetState extends State<FacebookMentionsInlineWid
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.mentions.map((username) {
-              final displayName = _userFullnames[username] ?? username;
+            children: widget.mentions.map((userId) {
+              final displayName = _userFullnames[userId] ?? 'User';
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
-                    _navigateToProfile(username);
+                    _navigateToProfile(userId);
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),

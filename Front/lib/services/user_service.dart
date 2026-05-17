@@ -12,10 +12,10 @@ import 'enhanced_api_service.dart';
 class UserService {
   UserService._();
 
-  /// Get user by username
-  static Future<Map<String, dynamic>?> getUserByUsername(String username) async {
+  /// Get user by ID (Legacy method renamed and refactored)
+  static Future<Map<String, dynamic>?> getUserByIdSimple(String userId) async {
     try {
-      final res = await ApiClient.get('/users/username/$username', cacheFirst: false);
+      final res = await ApiClient.get('/users/$userId', cacheFirst: false);
       if (res.statusCode != 200) return null;
       
       final body = _safeDecode(res.body);
@@ -656,10 +656,10 @@ class UserService {
     }
   }
 
-  /// Search users by username for mentions
-  static Future<List<Map<String, dynamic>>> searchUsersByUsername(String query) async {
+  /// Search users by name for mentions
+  static Future<List<Map<String, dynamic>>> searchUsersByName(String query) async {
     try {
-      _devLog('🔍 [USER] Searching users by username: $query');
+      _devLog('🔍 [USER] Searching users by name: $query');
       
       // Construire l'URL avec les query params
       final uri = Uri.parse('${ApiClient.baseUrl}/mentions/search')

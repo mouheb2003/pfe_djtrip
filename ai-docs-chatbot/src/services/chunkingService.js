@@ -83,7 +83,7 @@ class ChunkingService {
 
   createChunk(text, index, metadata) {
     return {
-      id: `chunk_${index}_${Date.now()}`,
+      id: `chunk_${index}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       text: text.trim(),
       index,
       metadata: {
@@ -192,7 +192,7 @@ class ChunkingService {
       // Update chunk IDs to be globally unique
       const chunksWithGlobalId = chunks.map(chunk => ({
         ...chunk,
-        id: `chunk_${globalChunkIndex}_${Date.now()}`,
+        id: `chunk_${globalChunkIndex}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         metadata: {
           ...chunk.metadata,
           globalChunkIndex: globalChunkIndex,

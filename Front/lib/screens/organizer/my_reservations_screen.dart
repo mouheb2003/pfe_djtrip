@@ -501,7 +501,6 @@ class _MyReservationsTabState extends State<MyReservationsTab>
             : '');
 
     final participantCount = reservation.nombreParticipants;
-    final totalPrice = reservation.prixTotal;
     final requestDate = reservation.dateDemande;
 
     return InkWell(
@@ -648,29 +647,6 @@ class _MyReservationsTabState extends State<MyReservationsTab>
                             ),
                           ],
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'TOTAL PRICE',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${totalPrice.toStringAsFixed(2)} TND',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),

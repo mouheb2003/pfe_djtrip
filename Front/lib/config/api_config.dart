@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 import 'env_config.dart';
 
@@ -33,7 +33,7 @@ class ApiConfig {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://10.0.2.2:3000';
+        return 'http://192.168.148.99:3000';
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.windows:
@@ -75,4 +75,18 @@ class ApiConfig {
   // ── Timeouts ──────────────────────────────────────────────────────────────
   static const Duration connectionTimeout = Duration(seconds: 15);
   static const Duration receiveTimeout = Duration(seconds: 15);
+
+  /// Ensures an image URL is absolute by prepending the server base URL if necessary.
+  static String getImageUrl(String? path) {
+    if (path == null) return '';
+    final trimmedPath = path.trim();
+    if (trimmedPath.isEmpty || trimmedPath.toLowerCase() == 'null') return '';
+    
+    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+      return trimmedPath;
+    }
+    // Handle relative paths (e.g., /uploads/image.jpg or uploads/image.jpg)
+    final cleanPath = trimmedPath.startsWith('/') ? trimmedPath : '/$trimmedPath';
+    return '$serverBaseUrl$cleanPath';
+  }
 }

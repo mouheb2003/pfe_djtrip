@@ -76,10 +76,15 @@ class LieuModel {
       return null;
     }
 
-    final coords =
-        (json['coordonnees'] ?? json['coordinates'] ?? json['location'])
-            as Map<String, dynamic>?;
-    final position = json['position'] as Map<String, dynamic>?;
+    Map<String, dynamic>? toMap(dynamic value) {
+      if (value is Map) {
+        return value.map((k, v) => MapEntry(k.toString(), v));
+      }
+      return null;
+    }
+
+    final coords = toMap(json['coordonnees'] ?? json['coordinates'] ?? json['location']);
+    final position = toMap(json['position']);
     final activiteLiee = json['activiteLiee'] ?? json['activity_id'];
     String? activiteId;
     if (activiteLiee is String) activiteId = activiteLiee;

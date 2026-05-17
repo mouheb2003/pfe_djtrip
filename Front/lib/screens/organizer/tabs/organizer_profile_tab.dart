@@ -18,6 +18,7 @@ import '../organizer_main_screen.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/edit_profile_screen.dart';
 import '../../shared/settings_screen.dart';
+import '../../../services/post_service.dart';
 
 class OrganizerProfileTab extends StatefulWidget {
   const OrganizerProfileTab({super.key});
@@ -31,6 +32,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   int _activitiesCount = 0;
   double _avgRating = 0.0;
   int _reviewsCount = 0;
+  int _postsCount = 0;
   List<ActivityModel> _myActivities = [];
   List<String> _spokenLanguages = []; // 🚀 NEW: Organizer languages
   List<String> _specialties = []; // 🚀 NEW: Organizer specialties
@@ -129,17 +131,6 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   }
 
 
-  void _copyUsername(String username) {
-    Clipboard.setData(ClipboardData(text: '@$username'));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Username @$username copied to clipboard!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   void _showAvatarFullScreen(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return;
@@ -215,12 +206,13 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
       final user = userData != null ? UserModel.fromJson(userData) : null;
       final targetId = (userData?['_id'] ?? '').toString();
 
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         InscriptionService.getOrganizerStats(),
         ActivityService.getMyActivities(),
         ActivityService.getArchivedActivities(),
         ReviewService.getOrganizerReviews(targetId),
         ActivityService.getActivitiesByTimeline(),
+        PostService.getMyPosts(),
       ]);
 
       if (!mounted) return;
@@ -230,6 +222,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
       final archivedActivities = results[2] as List<ActivityModel>;
       final reviews = results[3] as List<Map<String, dynamic>>;
       final timeline = results[4] as Map<String, List<ActivityModel>>;
+      final myPosts = results[5] as List<Map<String, dynamic>>;
       final primaryActivities = <ActivityModel>[
         ...activeActivities,
         ...archivedActivities,
@@ -279,6 +272,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
             (stats['activitiesCount'] as num?)?.toInt() ?? mine.length;
         _avgRating = computedAverage;
         _reviewsCount = computedReviews;
+        _postsCount = myPosts.length;
         _myActivities = mine;
 
         // 🚀 NEW: Load languages and specialties
@@ -628,6 +622,18 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     return 'Passionate activity organizer sharing memorable experiences.';
   }
 
+  Future<void> _copyUsername(String username) async {
+    await Clipboard.setData(ClipboardData(text: '@$username'));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Username copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   // ─── Cover Photo URL ──────────────────────────────────────────────
   String _getCoverPhotoUrl() {
     final coverPhoto = _user?.coverPhoto;
@@ -706,6 +712,15 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       },
                       icon: const Icon(Icons.share),
                       color: AppColors.primary,
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.settings, color: AppColors.primary),
                     ),
                   ],
                 ),
@@ -866,7 +881,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     color: const Color(0xFFE8EDFF),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       width: 1,
                     ),
                   ),
@@ -894,7 +909,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
+                            color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
@@ -979,50 +994,11 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
               _OrganizerStatsRow(
                 activities: _activitiesCount,
                 rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
-                reviews: _reviewsCount,
+                posts: _postsCount,
               ),
               const SizedBox(height: 20),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Action Buttons ────────────
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())).then((_) => _loadAll()),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                            ),
-                            child: const Text('Edit Profile'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE8E8F6),
-                              side: BorderSide.none,
-                              foregroundColor: const Color(0xFF46508A),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                            ),
-                            child: const Text('Settings'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
+
             ],
           ),
         ),
@@ -1208,12 +1184,12 @@ class _OrganizerLanguagesCard extends StatelessWidget {
 }
 
 class _OrganizerStatsRow extends StatelessWidget {
-  final int activities, reviews;
+  final int activities, posts;
   final String rate;
   const _OrganizerStatsRow({
     required this.activities,
     required this.rate,
-    required this.reviews,
+    required this.posts,
   });
 
   @override
@@ -1230,7 +1206,7 @@ class _OrganizerStatsRow extends StatelessWidget {
           Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
           _StatCardItem(label: 'RATE', value: rate),
           Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
-          _StatCardItem(label: 'REVIEWS', value: reviews.toString()),
+          _StatCardItem(label: 'POSTS', value: posts.toString()),
         ],
       ),
     );

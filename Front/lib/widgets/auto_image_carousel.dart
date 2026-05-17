@@ -82,20 +82,17 @@ class _AutoImageCarouselState extends State<AutoImageCarousel> {
         ),
       );
     } else if (urls.length == 1) {
-      body = Image.network(
-        urls.first,
-        fit: widget.fit,
-        errorBuilder: (_, __, ___) => Container(
-          color: const Color(0xFFE8E8F6),
-          child: const Center(
-            child: Icon(
-              Icons.image_not_supported,
-              color: Color(0xFF8C93BE),
-              size: 38,
-            ),
-          ),
-        ),
-      );
+      body = urls.first.startsWith('http')
+          ? Image.network(
+              urls.first,
+              fit: widget.fit,
+              errorBuilder: (_, __, ___) => _buildErrorPlaceholder(),
+            )
+          : Image.asset(
+              urls.first,
+              fit: widget.fit,
+              errorBuilder: (_, __, ___) => _buildErrorPlaceholder(),
+            );
     } else {
       body = Stack(
         fit: StackFit.expand,
@@ -104,20 +101,17 @@ class _AutoImageCarouselState extends State<AutoImageCarousel> {
             controller: _controller,
             itemCount: urls.length,
             onPageChanged: (value) => setState(() => _index = value),
-            itemBuilder: (_, i) => Image.network(
-              urls[i],
-              fit: widget.fit,
-              errorBuilder: (_, __, ___) => Container(
-                color: const Color(0xFFE8E8F6),
-                child: const Center(
-                  child: Icon(
-                    Icons.image_not_supported,
-                    color: Color(0xFF8C93BE),
-                    size: 38,
+            itemBuilder: (_, i) => urls[i].startsWith('http')
+                ? Image.network(
+                    urls[i],
+                    fit: widget.fit,
+                    errorBuilder: (_, __, ___) => _buildErrorPlaceholder(),
+                  )
+                : Image.asset(
+                    urls[i],
+                    fit: widget.fit,
+                    errorBuilder: (_, __, ___) => _buildErrorPlaceholder(),
                   ),
-                ),
-              ),
-            ),
           ),
           if (widget.showIndicators)
             Positioned(
@@ -164,5 +158,18 @@ class _AutoImageCarouselState extends State<AutoImageCarousel> {
     }
 
     return body;
+  }
+
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      color: const Color(0xFFE8E8F6),
+      child: const Center(
+        child: Icon(
+          Icons.image_not_supported,
+          color: Color(0xFF8C93BE),
+          size: 38,
+        ),
+      ),
+    );
   }
 }

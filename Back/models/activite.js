@@ -226,7 +226,7 @@ const activiteSchema = new mongoose.Schema(
     // Activity status
     statut: {
       type: String,
-      enum: ["active", "inactive", "archived", "completed"],
+      enum: ["active", "inactive", "archived", "completed", "cancelled"],
       default: "active",
     },
     // Rating system

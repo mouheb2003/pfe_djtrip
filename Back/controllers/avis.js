@@ -89,7 +89,7 @@ exports.submitActivityReview = async (req, res) => {
     const inscription = await Inscription.findOne({
       touriste_id: touristeId,
       activite_id: activiteId,
-      statut: "approuvee",
+      statut: { $in: ["approved", "verified"] },
     });
     if (!inscription) {
       return res.status(403).json({
@@ -190,7 +190,7 @@ exports.submitOrganisateurRating = async (req, res) => {
     const inscription = await Inscription.findOne({
       touriste_id: touristeId,
       organisateur_id: organisateurId,
-      statut: "approuvee",
+      statut: { $in: ["approved", "verified"] },
     });
     if (!inscription) {
       return res.status(403).json({
@@ -345,7 +345,7 @@ exports.updateAvis = async (req, res) => {
       const inscription = await Inscription.findOne({
         touriste_id: touristeId,
         activite_id: avis.activite_id,
-        statut: "approuvee",
+        statut: { $in: ["approved", "verified"] },
       });
       if (inscription) {
         const organizer = await User.findById(inscription.organisateur_id);

@@ -69,56 +69,29 @@ class BookingReminderCronJob {
     // Find approved bookings for activities starting soon
     // that haven't been reminded yet
     const bookings = await Inscription.find({
-      statut: 'confirmed',
+      statut: 'approved',
       'bookingReminder.sent': { $ne: true },
     })
-      .populate('activite')
-      .populate('touriste');
+      .populate('activite_id')
+      .populate('touriste_id', 'fullname email reminderPreferences');
 
     let reminderCount = 0;
 
     for (const booking of bookings) {
-      const activity = booking.activite;
-      const tourist = booking.touriste;
+      const activity = booking.activite_id;
+      const tourist = booking.touriste_id;
       
-      if (!activity || !activity.startDate) continue;
-      if (!tourist || !tourist.reminderPreferences) continue;
+      if (!activity || !activity.date_debut) continue;
+      if (!tourist) continue;
 
-      // Check if user has enabled booking reminders
-      if (!tourist.reminderPreferences.bookingReminder) {
-        continue;
-      }
-
-      const activityStart = new Date(activity.startDate);
+      const activityStart = new Date(activity.date_debut);
       const timeUntilStart = activityStart.getTime() - now.getTime();
-      const reminderTiming = tourist.reminderPreferences.reminderTiming || '1h';
 
-      let shouldSendReminder = false;
-
-      // Check timing based on user preference
-      if (reminderTiming === '1h') {
-        // Send reminder if activity starts within 1 hour (between 30-60 minutes)
-        shouldSendReminder = timeUntilStart > 30 * 60 * 1000 && timeUntilStart <= 60 * 60 * 1000;
-      } else if (reminderTiming === '24h') {
-        // Send reminder if activity starts within 24 hours (between 23-24 hours)
-        shouldSendReminder = timeUntilStart > 23 * 60 * 60 * 1000 && timeUntilStart <= 24 * 60 * 60 * 1000;
-      } else if (reminderTiming === 'both') {
-        // Send reminder at both 24h and 1h
-        // Check if we need to send 24h reminder
-        if (timeUntilStart > 23 * 60 * 60 * 1000 && timeUntilStart <= 24 * 60 * 60 * 1000) {
-          shouldSendReminder = true;
-        }
-        // Check if we need to send 1h reminder (only if 24h was already sent)
-        else if (timeUntilStart > 30 * 60 * 1000 && timeUntilStart <= 60 * 60 * 1000) {
-          // For 'both' option, we need to track if 24h reminder was sent
-          // For now, we'll send 1h reminder regardless (simplified logic)
-          shouldSendReminder = true;
-        }
-      }
+      // Send if within 1-hour window and not already sent
+      const shouldSendReminder = timeUntilStart > 30 * 60 * 1000 && timeUntilStart <= 60 * 60 * 1000;
 
       if (shouldSendReminder) {
         try {
-          // Emit booking reminder event
           notificationEventBus.emitBookingReminder({
             touristId: tourist._id,
             activityTitle: activity.titre,
@@ -126,15 +99,11 @@ class BookingReminderCronJob {
             activityId: activity._id,
           });
 
-          // Mark reminder as sent
-          booking.bookingReminder = {
-            sent: true,
-            sentAt: now,
-          };
+          booking.bookingReminder = { sent: true, sentAt: now };
           await booking.save();
 
           reminderCount++;
-          logger.info(`Reminder sent for booking ${booking._id} (activity: ${activity.titre}, timing: ${reminderTiming})`);
+          logger.info(`Reminder sent for booking ${booking._id} (activity: ${activity.titre})`);
         } catch (error) {
           logger.error(`Failed to send reminder for booking ${booking._id}:`, error);
         }

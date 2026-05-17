@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/lieu_service.dart';
-import 'place_detail_screen.dart';
+import 'place_detail_screen_v2.dart';
+import '../../../config/api_config.dart';
 
 class AllPlacesScreen extends StatefulWidget {
   const AllPlacesScreen({super.key});
@@ -65,7 +66,7 @@ class _AllPlacesScreenState extends State<AllPlacesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PlaceDetailScreen(place: place),
+        builder: (_) => PlaceDetailScreenV2(place: place),
       ),
     );
   }
@@ -258,26 +259,38 @@ class _PlaceCard extends StatelessWidget {
                 borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
                 child: _image.isNotEmpty
                     ? Image.network(
-                        _image,
+                        ApiConfig.getImageUrl(_image),
                         fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFFF8FAFC),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          );
+                        },
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFE8E8F6),
+                          color: const Color(0xFFF1F5F9),
                           child: const Center(
                             child: Icon(
                               Icons.location_on,
                               size: 40,
-                              color: Color(0xFFB8BCC8),
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFFE8E8F6),
+                        color: const Color(0xFFF1F5F9),
                         child: const Center(
                           child: Icon(
                             Icons.location_on,
                             size: 40,
-                            color: Color(0xFFB8BCC8),
+                            color: Color(0xFF94A3B8),
                           ),
                         ),
                       ),

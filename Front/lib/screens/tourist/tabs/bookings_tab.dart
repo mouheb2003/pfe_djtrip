@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/inscription_model.dart';
 import '../../../services/inscription_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../config/api_config.dart';
 import '../../tourist/booking_confirmation_screen.dart';
 
 class BookingsTab extends StatefulWidget {
@@ -373,7 +374,7 @@ class _BookingsTabState extends State<BookingsTab> {
                             date: _formatDate(_activityDate(inscription)),
                             time: _formatTime(_activityDate(inscription)),
                             imageUrl: _imageUrlFor(inscription),
-                            primary: inscription.statut == 'approuvee',
+                            primary: inscription.isApproved,
                             onTap: () => _openDetails(inscription),
                           ),
                         ),
@@ -567,7 +568,34 @@ class _BookingCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (imageUrl.isNotEmpty)
-                Image.network(imageUrl, fit: BoxFit.cover)
+                Image.network(
+                  ApiConfig.getImageUrl(imageUrl),
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (_, __, ___) => Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.image, color: Colors.white24, size: 40),
+                    ),
+                  ),
+                )
               else
                 Container(
                   decoration: const BoxDecoration(

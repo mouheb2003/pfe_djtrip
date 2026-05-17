@@ -98,7 +98,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       }
 
       // Map frontend keys to backend structure
-      Map<String, dynamic> updates = {};
+      Map<String, bool> updates = {};
       
       if (key == 'push_notif_enabled') {
         updates['push_notif_enabled'] = value;
@@ -194,7 +194,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             _buildSectionHeader('Notification Methods'),
             const SizedBox(height: 12),
             _buildNotificationCard(
-              icon: Icons.push_notification,
+              icon: Icons.notifications,
               title: 'FCM Push Notifications',
               subtitle: 'Control Firebase Cloud Messaging notifications',
               value: _pushNotifEnabled,

@@ -16,6 +16,7 @@ import '../../widgets/ai_text_widgets.dart';
 import 'activity_preview_screen.dart';
 import 'map_picker_screen.dart';
 import 'interactive_djerba_map_screen.dart' as djerba_map;
+import '../../theme/app_theme.dart';
 
 class _DurOption {
   final String label;
@@ -118,14 +119,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        controller.text = result['result'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Text rewritten successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        _showAiPreview(controller, text, result['result'], 'rewrite');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -166,14 +160,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        controller.text = result['result'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Text improved successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        _showAiPreview(controller, text, result['result'], 'improve');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -193,6 +180,34 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         ),
       );
     }
+  }
+
+  void _showAiPreview(TextEditingController controller, String original, String processed, String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AiTextPreviewDialog(
+        originalText: original,
+        processedText: processed,
+        action: action,
+        onAccept: () {
+          Navigator.pop(context);
+          setState(() {
+            controller.text = processed;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                action == 'rewrite' ? 'Text rewritten' : 'Text improved',
+              ),
+              backgroundColor: const Color(0xFF4CAF50),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
+        onCancel: () => Navigator.pop(context),
+      ),
+    );
   }
 
   Future<void> _translateFieldText(TextEditingController controller, String fieldType) async {
@@ -358,11 +373,11 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       ),
     );
     
-    if (result != null) {
+    if (result is djerba_map.MapPickerResult) {
       _updateItineraryLocation(index, {
         'lat': result.latLng.latitude,
         'lng': result.latLng.longitude,
-        'address': result.address.isNotEmpty ? result.address : 'Location ${index + 1}',
+        'address': result.placeName.isNotEmpty ? result.placeName : result.address,
       });
     }
   }
@@ -377,6 +392,32 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     'Sport',
     'Other',
   ];
+
+  static const List<String> _fixedLocations = [
+    'Djerba Explore Park',
+    'Houmt Souk Medina',
+    'Guellala Museum',
+    'Djerba Heritage Museum',
+    'Borj Ghazi Mustapha Fort',
+    'Midoun Beach',
+    'Sidi Mahrsi Beach',
+    'Djerba Golf Club',
+    'Crocodile Farm',
+    'Djerba Aqua Park',
+  ];
+
+  static const Map<String, LatLng> _fixedLocationCoords = {
+    'Djerba Explore Park': LatLng(33.8217, 11.0456),
+    'Houmt Souk Medina': LatLng(33.8767, 10.8583),
+    'Guellala Museum': LatLng(33.7317, 10.8583),
+    'Djerba Heritage Museum': LatLng(33.8753, 10.8547),
+    'Borj Ghazi Mustapha Fort': LatLng(33.8828, 10.8597),
+    'Midoun Beach': LatLng(33.8167, 11.0167),
+    'Sidi Mahrsi Beach': LatLng(33.8344, 10.9886),
+    'Djerba Golf Club': LatLng(33.8239, 11.0261),
+    'Crocodile Farm': LatLng(33.8217, 11.0456),
+    'Djerba Aqua Park': LatLng(33.8258, 11.0381),
+  };
 
   @override
   void initState() {
@@ -1799,33 +1840,69 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E9FF)),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedFixedLocation,
-                isExpanded: true,
-                hint: const Text(
-                  'Select a fixed location',
-                  style: TextStyle(color: Color(0xFF717BBC)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedFixedLocation,
+                      isExpanded: true,
+                      hint: const Text(
+                        'Select a fixed location',
+                        style: TextStyle(color: Color(0xFF717BBC)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Djerba Explore Park', child: Text('Djerba Explore Park')),
+                        DropdownMenuItem(value: 'Houmt Souk Medina', child: Text('Houmt Souk Medina')),
+                        DropdownMenuItem(value: 'Guellala Museum', child: Text('Guellala Museum')),
+                        DropdownMenuItem(value: 'Djerba Heritage Museum', child: Text('Djerba Heritage Museum')),
+                        DropdownMenuItem(value: 'Borj Ghazi Mustapha Fort', child: Text('Borj Ghazi Mustapha Fort')),
+                        DropdownMenuItem(value: 'Midoun Beach', child: Text('Midoun Beach')),
+                        DropdownMenuItem(value: 'Sidi Mahrsi Beach', child: Text('Sidi Mahrsi Beach')),
+                        DropdownMenuItem(value: 'Djerba Golf Club', child: Text('Djerba Golf Club')),
+                        DropdownMenuItem(value: 'Crocodile Farm', child: Text('Crocodile Farm')),
+                        DropdownMenuItem(value: 'Djerba Aqua Park', child: Text('Djerba Aqua Park')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedFixedLocation = value;
+                          _locationCtrl.text = value ?? '';
+                          if (value != null && _fixedLocationCoords.containsKey(value)) {
+                            _pickedLatLng = _fixedLocationCoords[value];
+                            print('📍 Set coordinates for fixed location: $value -> $_pickedLatLng');
+                          }
+                        });
+                      },
+                    ),
+                  ),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'Djerba Explore Park', child: Text('Djerba Explore Park')),
-                  DropdownMenuItem(value: 'Houmt Souk Medina', child: Text('Houmt Souk Medina')),
-                  DropdownMenuItem(value: 'Guellala Museum', child: Text('Guellala Museum')),
-                  DropdownMenuItem(value: 'Djerba Heritage Museum', child: Text('Djerba Heritage Museum')),
-                  DropdownMenuItem(value: 'Borj Ghazi Mustapha Fort', child: Text('Borj Ghazi Mustapha Fort')),
-                  DropdownMenuItem(value: 'Midoun Beach', child: Text('Midoun Beach')),
-                  DropdownMenuItem(value: 'Sidi Mahrsi Beach', child: Text('Sidi Mahrsi Beach')),
-                  DropdownMenuItem(value: 'Djerba Golf Club', child: Text('Djerba Golf Club')),
-                  DropdownMenuItem(value: 'Crocodile Farm', child: Text('Crocodile Farm')),
-                  DropdownMenuItem(value: 'Djerba Aqua Park', child: Text('Djerba Aqua Park')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedFixedLocation = value;
-                    _locationCtrl.text = value ?? '';
-                  });
-                },
-              ),
+                IconButton(
+                  icon: Icon(Icons.map_outlined, color: AppColors.primary),
+                  onPressed: () async {
+                    final result = await Navigator.push<djerba_map.MapPickerResult>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => djerba_map.InteractiveDjerbaMapScreen(
+                          initialPosition: _pickedLatLng,
+                        ),
+                      ),
+                    );
+                    if (result is djerba_map.MapPickerResult && mounted) {
+                      setState(() {
+                        _locationCtrl.text = result.placeName;
+                        _pickedLatLng = result.latLng;
+                        if (_fixedLocations.contains(result.placeName)) {
+                          _selectedFixedLocation = result.placeName;
+                        } else {
+                          // If picked from map and not in fixed, switch to custom? 
+                          // Or just set it. 
+                          _selectedFixedLocation = null;
+                        }
+                      });
+                    }
+                  },
+                ),
+              ],
             ),
           ),
         ],
@@ -1855,9 +1932,9 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   builder: (_) => djerba_map.InteractiveDjerbaMapScreen(initialPosition: _pickedLatLng),
                 ),
               );
-              if (result != null) {
+              if (result is djerba_map.MapPickerResult && mounted) {
                 setState(() {
-                  _locationCtrl.text = result.address;
+                  _locationCtrl.text = result.placeName;
                   _pickedLatLng = result.latLng;
                 });
               }

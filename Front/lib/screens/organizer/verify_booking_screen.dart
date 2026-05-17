@@ -501,7 +501,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
 
       final updated = InscriptionModel.fromJson({
         ...booking.toJson(),
-        'statut': 'verifie',
+        'statut': 'verified',
         'qr_used_at': DateTime.now().toIso8601String(),
       });
 
@@ -842,7 +842,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
@@ -955,7 +955,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                 icon: const Icon(Icons.qr_code_scanner_rounded),
                 label: const Text('Switch to Scanner'),
               ),
-              const Spacer(),
+              const SizedBox(height: 40),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),

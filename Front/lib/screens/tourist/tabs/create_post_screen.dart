@@ -15,10 +15,13 @@ import '../../../widgets/ai_text_widgets.dart';
 import '../../../screens/organizer/interactive_djerba_map_screen.dart';
 import '../lieux_map_screen.dart';
 
+import '../../../models/post_model.dart';
+
 class CreatePostScreen extends StatefulWidget {
   final UserModel? user;
+  final PostModel? postToEdit;
 
-  const CreatePostScreen({super.key, this.user});
+  const CreatePostScreen({super.key, this.user, this.postToEdit});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -30,9 +33,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final List<XFile> _images = [];
   final List<String> _hashtags = [];
   final List<String> _mentions = [];
+  final List<String> _existingImageUrls = [];
 
   bool _publishing = false;
   bool _isProcessingAi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.postToEdit != null) {
+      _contentCtrl.text = widget.postToEdit!.content;
+      _locationCtrl.text = widget.postToEdit!.locationLabel ?? '';
+      _hashtags.addAll(widget.postToEdit!.hashtags);
+      _mentions.addAll(widget.postToEdit!.mentions);
+      _existingImageUrls.addAll(widget.postToEdit!.imageUrls);
+    }
+  }
 
   Future<void> _pickImages() async {
     final picked = await ImagePicker().pickMultiImage(
@@ -78,7 +94,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
 
     if (result == null) return;
-    setState(() => _locationCtrl.text = result.address);
+    setState(() => _locationCtrl.text = result.placeName);
   }
 
   Future<void> _mentionPlace() async {
@@ -191,7 +207,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _publish() async {
     if (_publishing) return;
     final content = _contentCtrl.text.trim();
-    if (content.isEmpty && _images.isEmpty) {
+    if (content.isEmpty && _images.isEmpty && _existingImageUrls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add text or at least one image.')),
       );
@@ -200,7 +216,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     setState(() => _publishing = true);
 
-    final imageUrls = <String>[];
+    final imageUrls = List<String>.from(_existingImageUrls);
     for (final img in _images) {
       final url = await PostService.uploadPostImage(File(img.path));
       if (url != null && url.isNotEmpty) imageUrls.add(url);
@@ -211,13 +227,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     print('[CreatePost] Publishing with hashtags: $_hashtags');
     print('[CreatePost] Content: $content');
     
-    final result = await PostService.createPost(
-      content: content,
-      imageUrls: imageUrls,
-      locationLabel: _locationCtrl.text.trim(),
-      hashtags: _hashtags,
-      mentions: _mentions,
-    );
+    final result = widget.postToEdit != null
+        ? await PostService.updatePost(
+            postId: widget.postToEdit!.id,
+            content: content,
+            locationLabel: _locationCtrl.text.trim(),
+            hashtags: _hashtags,
+            imageUrls: imageUrls,
+            mentions: _mentions,
+          )
+        : await PostService.createPost(
+            content: content,
+            imageUrls: imageUrls,
+            locationLabel: _locationCtrl.text.trim(),
+            hashtags: _hashtags,
+            mentions: _mentions,
+          );
 
     if (!mounted) return;
     setState(() => _publishing = false);
@@ -253,6 +278,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           tooltip: 'Improve',
           onPressed: _isProcessingAi ? null : () => _improveFieldText(controller, fieldType),
         ),
+        const SizedBox(width: 4),
+        // Translate button
+        AiActionButton(
+          icon: Icons.translate,
+          tooltip: 'Translate',
+          onPressed: _isProcessingAi ? null : () => _showLanguageSelector(controller, fieldType),
+        ),
       ],
     );
   }
@@ -276,14 +308,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        controller.text = result['result'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post rewritten successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        _showAiPreview(controller, text, result['result'], 'rewrite');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -324,14 +349,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        controller.text = result['result'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post improved successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        _showAiPreview(controller, text, result['result'], 'improve');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -353,6 +371,91 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  void _showLanguageSelector(TextEditingController controller, String fieldType) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) => _translateFieldText(controller, lang, fieldType),
+      ),
+    );
+  }
+
+  Future<void> _translateFieldText(TextEditingController controller, String lang, String fieldType) async {
+    final text = controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isProcessingAi = true);
+
+    try {
+      final result = await AiTextService.translateText(
+        text,
+        lang,
+        contextText: AiTextService.buildContext(
+          type: 'post',
+          title: fieldType == 'post' ? _locationCtrl.text.trim() : null,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() => _isProcessingAi = false);
+
+      if (result['success'] == true) {
+        _showAiPreview(controller, text, result['result'], 'translate', lang: lang);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Translation failed'),
+            backgroundColor: const Color(0xFFFF4757),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isProcessingAi = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Translation failed. Please try again.'),
+          backgroundColor: Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  void _showAiPreview(TextEditingController controller, String original, String processed, String action, {String? lang}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AiTextPreviewDialog(
+        originalText: original,
+        processedText: processed,
+        action: action,
+        onAccept: () {
+          Navigator.pop(context);
+          setState(() {
+            controller.text = processed;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                action == 'rewrite' ? 'Post rewritten' : (action == 'improve' ? 'Post improved' : 'Post translated'),
+              ),
+              backgroundColor: const Color(0xFF4CAF50),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
+        onCancel: () => Navigator.pop(context),
+        onReturn: action == 'translate' ? () {
+          Navigator.pop(context);
+          _showLanguageSelector(controller, 'post');
+        } : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -363,143 +466,377 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     print('CreatePostScreen - UserType: ${user?.userType}');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
+      backgroundColor: const Color(0xFFF9FAFE),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F1FA),
+        backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close, color: AppColors.primary),
+          icon: const Icon(Icons.close_rounded, color: Color(0xFF1D245D)),
         ),
-        title: const Text(
-          'Create Post',
-          style: TextStyle(
-            color: Color(0xFF1B2458),
-            fontWeight: FontWeight.w700,
+        title: Text(
+          widget.postToEdit != null ? 'Edit Post' : 'Create New Post',
+          style: const TextStyle(
+            color: Color(0xFF1D245D),
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            letterSpacing: -0.5,
           ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: FilledButton(
               onPressed: _publishing ? null : _publish,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                elevation: 4,
+                shadowColor: AppColors.primary.withOpacity(0.4),
               ),
-              child: Text(_publishing ? 'Publishing...' : 'Publish'),
+              child: Text(
+                _publishing ? '...' : (widget.postToEdit != null ? 'UPDATE' : 'PUBLISH'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 1,
+                ),
+              ),
             ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundImage: user?.avatar != null
-                      ? NetworkImage(user!.avatar!)
-                      : null,
-                  child: user?.avatar == null
-                      ? const Icon(Icons.person, color: Colors.grey)
-                      : null,
+            // User Header Info
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary.withOpacity(0.1), width: 3),
+                    ),
+                    child: CircleAvatar(
+                      radius: 26,
+                      backgroundColor: const Color(0xFFF0F2FF),
+                      backgroundImage: user?.avatar != null
+                          ? NetworkImage(user!.avatar!)
+                          : null,
+                      child: user?.avatar == null
+                          ? const Icon(Icons.person, color: AppColors.primary, size: 28)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.fullname ?? 'Traveler',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1D245D),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.public, size: 12, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Public Post',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.green[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              (user?.userType ?? 'Touriste').toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                letterSpacing: 1,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Content Area
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: MentionInputWidget(
+                controller: _contentCtrl,
+                onMentionAdded: _onMentionAdded,
+                focusNode: FocusNode(skipTraversal: true),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Images Preview
+            if (_images.isNotEmpty || _existingImageUrls.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Text(
+                      'ATTACHED PHOTOS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF9E9E9E),
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_images.length + _existingImageUrls.length}/10',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 120,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _existingImageUrls.length + _images.length,
+                  itemBuilder: (context, i) {
+                    if (i < _existingImageUrls.length) {
+                      final url = _existingImageUrls[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                url,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () => setState(() => _existingImageUrls.removeAt(i)),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      final localIdx = i - _existingImageUrls.length;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: _ImagePreviewChip(
+                          file: _images[localIdx],
+                          onRemove: () => setState(() => _images.removeAt(localIdx)),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Mention Zone
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: MentionZoneWidget(
+                selectedMentions: _mentions,
+                onMentionsChanged: (newMentions) {
+                  setState(() {
+                    _mentions.clear();
+                    _mentions.addAll(newMentions);
+                  });
+                },
+              ),
+            ),
+
+            // Actions Section
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ADD TO YOUR POST',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF9E9E9E),
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      Text(
-                        user?.fullname ?? 'Traveler',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1B2458),
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.add_a_photo_rounded,
+                          label: 'Photos',
+                          color: const Color(0xFF4B63FF),
+                          onTap: _pickImages,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        (user?.userType ?? 'Touriste').toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF6D739A),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ActionTile(
+                          icon: Icons.location_on_rounded,
+                          label: 'Place',
+                          color: const Color(0xFFFF4757),
+                          onTap: _mentionPlace,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            MentionInputWidget(
-              controller: _contentCtrl,
-              onMentionAdded: _onMentionAdded,
-              focusNode: FocusNode(skipTraversal: true),
-            ),
-            const SizedBox(height: 20),
-            MentionZoneWidget(
-              selectedMentions: _mentions,
-              onMentionsChanged: (newMentions) {
-                setState(() {
-                  _mentions.clear();
-                  _mentions.addAll(newMentions);
-                  
-                  // Ajouter les mentions au contenu du texte
-                  final currentContent = _contentCtrl.text;
-                  final mentionsText = newMentions.map((m) => '@$m').join(' ');
-                  final newContent = '$currentContent $mentionsText'.trim();
-                  _contentCtrl.text = newContent;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            _UploadButton(onTap: _pickImages, count: _images.length),
-            if (_images.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 92,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _images.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => _ImagePreviewChip(
-                    file: _images[i],
-                    onRemove: () => setState(() => _images.removeAt(i)),
+                  const SizedBox(height: 12),
+                  _ActionTile(
+                    icon: Icons.tag_rounded,
+                    label: _hashtags.isEmpty ? 'Hashtags' : _hashtags.join(' '),
+                    color: const Color(0xFF00D2D3),
+                    onTap: _addHashtag,
+                    isFullWidth: true,
                   ),
+                  
+                  if (_locationCtrl.text.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F4FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on, color: AppColors.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _locationCtrl.text,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1D245D),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => setState(() => _locationCtrl.clear()),
+                            icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool isFullWidth;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.isFullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: isFullWidth ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Row(
+            mainAxisAlignment: isFullWidth ? MainAxisAlignment.start : MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1D245D),
+                  fontSize: 14,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionCard(
-                    icon: Icons.location_on,
-                    label: _locationCtrl.text.isEmpty
-                        ? 'Mention place'
-                        : _locationCtrl.text,
-                    onTap: _mentionPlace,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ActionCard(
-                    icon: Icons.tag,
-                    label: _hashtags.isEmpty
-                        ? 'Add hashtag'
-                        : _hashtags.join(' '),
-                    onTap: _addHashtag,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

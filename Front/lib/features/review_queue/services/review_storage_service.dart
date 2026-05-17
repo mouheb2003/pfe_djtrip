@@ -124,7 +124,7 @@ class ReviewStorageService {
     final cutoff = now.subtract(const Duration(hours: 24));
     
     final keysToDelete = <String>[];
-    for (final entry in _shownBookingsBox.entries) {
+    for (final entry in _shownBookingsBox.toMap().entries) {
       final shownTime = DateTime.parse(entry.value);
       if (shownTime.isBefore(cutoff)) {
         keysToDelete.add(entry.key);

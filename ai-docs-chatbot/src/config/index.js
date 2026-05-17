@@ -9,6 +9,7 @@ export const config = {
   
   // Gemini API
   geminiApiKey: process.env.GEMINI_API_KEY,
+  geminiApiKeys: process.env.GEMINI_API_KEYS, // Added for rotation
   modelName: process.env.MODEL_NAME || 'gemini-1.5-flash',
   temperature: parseFloat(process.env.TEMPERATURE || '0.7'),
   maxTokens: parseInt(process.env.MAX_TOKENS || '2048', 10),

@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const geminiKeyPool = require('../utils/geminiKeyPool');
 
 // Supported languages
 const SUPPORTED_LANGUAGES = {
@@ -12,66 +12,53 @@ const SUPPORTED_LANGUAGES = {
 
 // Available Gemini models - prioritize fastest for instant responses
 const AVAILABLE_MODELS = [
-  'gemini-2.5-flash-lite', // Fastest model
-  'gemini-3.1-flash-lite', // Fast and lightweight
-  'gemini-2.5-flash',     // Good balance
-  'gemini-3-flash'        // High quality (fallback)
+  'gemini-2.0-flash',         // Top priority since images work with it
+  'gemini-1.5-flash',         // Standard flash
+  'gemini-1.5-flash-001',     // Specific version
+  'gemini-1.5-pro',           // Standard pro
+  'gemini-1.5-pro-001',       // Specific version
+  'gemini-pro',               // Legacy alias
+  'gemini-1.0-pro',           // Legacy pro
+  'gemini-2.0-flash-lite',    // New lite
 ];
 
-// Get default model - prioritize speed
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+// Get default model - prioritize stability and success
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
 // Generate prompt based on action - optimized for speed
 function generatePrompt(action, text, lang) {
+  // If the text already looks like a structured prompt from the frontend, use it directly
+  if (text.includes('=== TASK ===') || text.includes('=== TRANSLATION TASK ===')) {
+    return text;
+  }
+
   switch (action) {
     case 'translate':
-      return `Translate to ${SUPPORTED_LANGUAGES[lang] || lang}. Keep meaning exactly:\n\n${text}`;
+      return `Translate the following text to ${SUPPORTED_LANGUAGES[lang] || lang}. Return ONLY the translated text without any introductions or explanations:\n\n${text}`;
     
     case 'rewrite':
-      return `Rewrite this text naturally and engagingly. Keep meaning exactly:\n\n${text}`;
+      return `Rewrite the following text naturally and engagingly. Return ONLY the rewritten text without any introductions or explanations:\n\n${text}`;
     
     case 'improve':
-      return `Fix grammar and clarity. Keep meaning exactly:\n\n${text}`;
+      return `Fix grammar and clarity in the following text. Return ONLY the improved text without any introductions or explanations:\n\n${text}`;
     
     default:
       return text;
   }
 }
 
-// Try models with fallback system
-async function tryModels(apiKey, prompt, preferredModels = null) {
-  const modelsToTry = preferredModels || [DEFAULT_MODEL, ...AVAILABLE_MODELS.filter(m => m !== DEFAULT_MODEL)];
-  let lastError = null;
-
-  for (const modelName of modelsToTry) {
-    try {
-      console.log(`[AI] Trying model: ${modelName}`);
-      
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const processedText = response.text().trim();
-      
-      console.log(`[AI] Success with model: ${modelName}`);
-      return {
-        success: true,
-        text: processedText,
-        model: modelName
-      };
-      
-    } catch (error) {
-      lastError = error;
-      console.warn(`[AI] Model ${modelName} failed:`, error.message);
-      
-      // Continue to next model if this one fails
-      continue;
-    }
-  }
+// Process text with Gemini 2.5 Flash directly
+async function processWithGemini(prompt) {
+  const modelName = 'gemini-2.5-flash';
+  console.log(`[AI] Processing with model: ${modelName}`);
   
-  // All models failed
-  throw lastError || new Error('All AI models failed');
+  const result = await geminiKeyPool.generateContent(modelName, prompt);
+  
+  return {
+    success: true,
+    text: result.text,
+    model: modelName
+  };
 }
 
 // Process text with Gemini AI
@@ -101,21 +88,12 @@ exports.processText = async (req, res) => {
       });
     }
 
-    // Check for API key
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'GEMINI_API_KEY not configured in environment' 
-      });
-    }
-
     // Generate prompt
     const prompt = generatePrompt(action, text, lang);
 
-    // Try models with fallback system
+    // Try models with key pool fallback system
     try {
-      const result = await tryModels(apiKey, prompt);
+      const result = await processWithGemini(prompt);
       
       return res.json({
         success: true,
@@ -126,7 +104,7 @@ exports.processText = async (req, res) => {
       });
       
     } catch (modelError) {
-      console.error('[AI] All models failed:', modelError.message);
+      console.error('[AI] Gemini 2.0 Flash failed:', modelError.message);
       
       return res.status(503).json({
         success: false,
@@ -149,16 +127,17 @@ exports.processText = async (req, res) => {
 // Health check for AI service
 exports.healthCheck = async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const poolStatus = geminiKeyPool.getStatus();
     
     res.json({
       success: true,
       service: 'AI Text Processing',
-      status: apiKey ? 'configured' : 'not configured',
+      status: poolStatus.totalKeys > 0 ? 'configured' : 'not configured',
       supportedLanguages: Object.keys(SUPPORTED_LANGUAGES),
       supportedActions: ['translate', 'rewrite', 'improve'],
       availableModels: AVAILABLE_MODELS,
-      defaultModel: DEFAULT_MODEL
+      defaultModel: DEFAULT_MODEL,
+      keyPool: poolStatus
     });
   } catch (error) {
     res.status(500).json({

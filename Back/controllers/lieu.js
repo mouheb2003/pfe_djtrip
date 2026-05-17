@@ -1,6 +1,23 @@
 const Lieu = require("../models/lieu");
 const LieuService = require("../services/lieu");
 const User = require("../models/user");
+const cloudinary = require("../config/cloudinary");
+
+async function uploadToCloudinary(url, folder = "lieux") {
+  if (!url || !url.startsWith("http")) return url;
+  if (url.includes("cloudinary.com")) return url;
+  
+  try {
+    const result = await cloudinary.uploader.upload(url, {
+      folder: folder,
+      resource_type: "auto",
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.error("[CLOUDINARY] Upload error:", error);
+    return url; 
+  }
+}
 
 async function enrichLieuReviewsWithUsers(lieuObj) {
   if (!lieuObj || !Array.isArray(lieuObj.reviews) || lieuObj.reviews.length === 0) {
@@ -75,11 +92,23 @@ exports.createLieu = async (req, res) => {
         .replace(/^-|-$/g, '') + '-' + Date.now();
     }
 
+    // Persist external images to Cloudinary (Google Maps API limitations bypass)
+    if (req.body.main_image) {
+      req.body.main_image = await uploadToCloudinary(req.body.main_image);
+    }
+    
+    if (req.body.gallery && Array.isArray(req.body.gallery)) {
+      const uploadedGallery = await Promise.all(
+        req.body.gallery.map(img => uploadToCloudinary(img))
+      );
+      req.body.gallery = uploadedGallery;
+    }
+
     const lieu = new Lieu(req.body);
     await lieu.save();
     res.status(201).json({
       success: true,
-      message: "Place created successfully",
+      message: "Place created successfully and images persisted to Cloudinary",
       lieu,
     });
   } catch (error) {

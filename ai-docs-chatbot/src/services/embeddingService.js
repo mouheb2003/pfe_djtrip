@@ -1,25 +1,16 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import geminiKeyPool from './geminiKeyPool.js';
 import { config } from '../config/index.js';
 
 class EmbeddingService {
   constructor() {
-    this.genAI = null;
-    this.embeddingModel = null;
     this.initialized = false;
   }
 
   initialize() {
     if (this.initialized) return;
-
-    try {
-      this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-      this.embeddingModel = this.genAI.getEmbeddingModel('text-embedding-004');
-      this.initialized = true;
-      console.log('Embedding service initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize embedding service:', error.message);
-      throw new Error(`Embedding service initialization failed: ${error.message}`);
-    }
+    geminiKeyPool.initialize();
+    this.initialized = true;
+    console.log('Embedding service initialized with key pool');
   }
 
   async generateEmbedding(text) {
@@ -28,7 +19,7 @@ class EmbeddingService {
     }
 
     try {
-      const result = await this.embeddingModel.embedContent(text);
+      const result = await geminiKeyPool.embedContent('gemini-embedding-2', text);
       return result.embedding.values;
     } catch (error) {
       console.error('Error generating embedding:', error.message);
@@ -36,22 +27,75 @@ class EmbeddingService {
     }
   }
 
-  async generateBatchEmbeddings(texts, batchSize = 100) {
+  async generateBatchEmbeddings(texts, batchSize = 20) {
+    if (!this.initialized) {
+      this.initialize();
+    }
     const embeddings = [];
     
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
       console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(texts.length / batchSize)}`);
       
-      const batchEmbeddings = await Promise.all(
-        batch.map(text => this.generateEmbedding(text))
-      );
+      let success = false;
+      let retries = 0;
+      const maxRetries = 5;
+
+      while (!success && retries < maxRetries) {
+        try {
+          const genAI = geminiKeyPool.getClient();
+          const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-2' });
+
+          const result = await embeddingModel.batchEmbedContents({
+            requests: batch.map(text => ({
+              content: { role: 'user', parts: [{ text }] },
+              model: 'models/gemini-embedding-2'
+            }))
+          });
+          
+          const batchValues = result.embeddings.map(e => e.values);
+          embeddings.push(...batchValues);
+          success = true;
+        } catch (error) {
+          if (error.message.includes('429')) {
+            retries++;
+            const waitTime = Math.pow(2, retries) * 60000; // 60s, 120s, 240s...
+            console.warn(`⚠️ Rate limit hit. Retry ${retries}/${maxRetries} in ${waitTime/1000}s...`);
+            await this.sleep(waitTime);
+          } else {
+            console.error(`❌ Non-quota error in batch ${i}:`, error.message);
+            // Fallback to individual
+            console.log('Falling back to individual embeddings with strict delay...');
+            for (const text of batch) {
+              let indSuccess = false;
+              let indRetries = 0;
+              while (!indSuccess && indRetries < 5) {
+                try {
+                  embeddings.push(await this.generateEmbedding(text));
+                  await this.sleep(6000); // 6s between individual
+                  indSuccess = true;
+                } catch (indErr) {
+                  indRetries++;
+                  console.warn(`⚠️ Individual retry ${indRetries}...`);
+                  await this.sleep(15000 * indRetries);
+                }
+              }
+              if (!indSuccess) throw new Error('Failed to generate individual embedding after retries');
+            }
+            success = true;
+          }
+        }
+      }
+
+      if (!success) {
+        throw new Error(`Failed to process batch ${i} after ${maxRetries} retries`);
+      }
       
-      embeddings.push(...batchEmbeddings);
-      
-      // Small delay to avoid rate limiting
+      // Steady delay to stay under 15 RPM (approx 1 request per 4s)
+      // Since a batch of 5 might count as 5 requests, we wait 65s.
       if (i + batchSize < texts.length) {
-        await this.sleep(100);
+        console.log('Waiting 20 seconds for next batch to respect RPM quota...');
+        await this.sleep(20000);
       }
     }
     

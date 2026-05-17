@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +14,7 @@ import '../services/google_places_service.dart';
 import '../../../models/lieu_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../theme/app_theme.dart';
-import '../../../screens/tourist/place_detail_screen.dart';
+import '../../../screens/tourist/place_detail_screen_v2.dart';
 
 // A small widget that attempts to fetch the image bytes via http
 // and displays them with Image.memory. This helps when Image.network
@@ -178,6 +178,7 @@ class MapExplorerScreen extends StatefulWidget {
   final double? initialLongitude;
   final String? initialPlaceName;
   final String? initialPlaceAddress;
+  final Function(bool)? onToggleNavbar;
 
   const MapExplorerScreen({
     super.key,
@@ -185,6 +186,7 @@ class MapExplorerScreen extends StatefulWidget {
     this.initialLongitude,
     this.initialPlaceName,
     this.initialPlaceAddress,
+    this.onToggleNavbar,
   });
 
   @override
@@ -457,6 +459,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       setState(() {
         _isLoadingPlaceDetails = false;
       });
+      widget.onToggleNavbar?.call(false);
 
       _autocompleteSessionToken = _createSessionToken();
     } on PlacesApiException catch (error) {
@@ -671,6 +674,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
       final latLng = LatLng(position.latitude, position.longitude);
       _currentLocation = latLng;
       _selectedPlace = null;
+      widget.onToggleNavbar?.call(true);
       _currentCenter = latLng;
       _clearItinerary();
 
@@ -789,6 +793,10 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                             return PlaceListItem(
                               place: place,
                               onTap: () {
+                                setState(() {
+                                  _selectedPlace = place;
+                                });
+                                widget.onToggleNavbar?.call(false);
                                 _mapController?.animateCamera(
                                   CameraUpdate.newLatLng(place.position),
                                 );
@@ -898,7 +906,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                                   end: Alignment.bottomCenter,
                                   colors: [
                                     Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.6),
+                                    Colors.black.withOpacity(0.6),
                                   ],
                                 ),
                               ),
@@ -937,7 +945,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                                   decoration: BoxDecoration(
                                     color: const Color(
                                       0xFF2158F6,
-                                    ).withValues(alpha: 0.15),
+                                    ).withOpacity(0.15),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
@@ -1019,7 +1027,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFF2158F6,
-                                ).withValues(alpha: 0.1),
+                                ).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(
@@ -1117,7 +1125,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => PlaceDetailScreen(
+                                    builder: (_) => PlaceDetailScreenV2(
                                       place: {
                                         '_id': place.placeId,
                                         'title': place.name,
@@ -1165,7 +1173,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                                     BoxShadow(
                                       color: const Color(
                                         0xFF2158F6,
-                                      ).withValues(alpha: 0.3),
+                                      ).withOpacity(0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1664,6 +1672,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             setState(() {
               _selectedPlace = mapPlace;
             });
+            widget.onToggleNavbar?.call(false);
           },
         ),
       );
@@ -1691,6 +1700,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
             setState(() {
               _selectedPlace = place;
             });
+            widget.onToggleNavbar?.call(false);
           },
         ),
       );
@@ -1874,6 +1884,7 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
                   _selectedPlace = null;
                   _showManualItineraryPanel = false;
                 });
+                widget.onToggleNavbar?.call(true);
               },
               onCameraIdle: () async {
                 final controller = _mapController;

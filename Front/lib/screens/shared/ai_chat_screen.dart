@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../theme/app_theme.dart';
 import '../../models/ai_chat_message.dart';
 import '../../services/ai_chat_service.dart';
 
@@ -154,8 +155,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Assistant'),
-        backgroundColor: Colors.orange,
+        title: const Text('DJTrip AI Assistant'),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -197,7 +198,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           Icon(
             Icons.smart_toy_outlined,
             size: 80,
-            color: Colors.orange.shade200,
+            color: AppColors.primary.withOpacity(0.2),
           ),
           const SizedBox(height: 16),
           Text(
@@ -242,10 +243,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
             _messageController.text = suggestion;
             _sendMessage();
           },
-          backgroundColor: Colors.orange.shade50,
-          labelStyle: TextStyle(
-            color: Colors.orange.shade800,
+          backgroundColor: AppColors.primary.withOpacity(0.05),
+          labelStyle: const TextStyle(
+            color: AppColors.primary,
             fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         );
       }).toList(),
@@ -282,7 +284,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               if (!isUser) ...[
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: Colors.orange,
+                  backgroundColor: AppColors.primary,
                   child: const Icon(
                     Icons.smart_toy,
                     size: 18,
@@ -301,11 +303,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       ),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isUser ? Colors.orange : Colors.grey.shade100,
+                        color: isUser ? AppColors.primary : Colors.white,
                         borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          if (!isUser)
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                        ],
                         border: isUser
                             ? null
-                            : Border.all(color: Colors.grey.shade300),
+                            : Border.all(color: AppColors.outline),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +428,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.primary,
             child: const Icon(
               Icons.smart_toy,
               size: 18,
@@ -441,8 +451,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                 );
@@ -496,7 +506,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             const SizedBox(width: 12),
             Container(
               decoration: BoxDecoration(
-                color: _isLoading ? Colors.grey.shade300 : Colors.orange,
+                color: _isLoading ? Colors.grey.shade300 : AppColors.primary,
                 shape: BoxShape.circle,
               ),
               child: IconButton(

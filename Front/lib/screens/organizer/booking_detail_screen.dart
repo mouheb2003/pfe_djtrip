@@ -33,10 +33,12 @@ class _OrganizerBookingDetailScreenState
 
   String _normalizeStatus(String rawStatus) {
     final s = rawStatus.trim().toLowerCase();
-    if (s == 'approved') return 'approuvee';
+    if (s == 'approved') return 'approved';
     if (s == 'pending' || s.endsWith('pending_confirmation'))
-      return 'en_attente';
-    if (s == 'cancelled' || s == 'canceled') return 'annulee';
+      return 'pending';
+    if (s == 'cancelled' || s == 'canceled' || s == 'annulee') return 'cancelled';
+    if (s == 'rejected' || s == 'refusee') return 'rejected';
+    if (s == 'verified' || s == 'verifie') return 'verified';
     return s;
   }
 
@@ -50,10 +52,6 @@ class _OrganizerBookingDetailScreenState
     final lieu = activityModel?.formattedLieu ?? (act['lieu'] ?? act['location'] ?? 'Location').toString();
     
     final placeCount = _inscription.nombreParticipants;
-    final unitPrice = activityModel?.prix ?? (act['prix'] as num?)?.toDouble() ?? 0.0;
-    final subtotal = _inscription.prixTotal > 0 ? _inscription.prixTotal : (unitPrice * placeCount);
-    const serviceFee = 4.50;
-    final total = subtotal + serviceFee;
 
     // Tourist (not organizer)
     final tourist = _inscription.touriste ?? {};
@@ -71,7 +69,7 @@ class _OrganizerBookingDetailScreenState
     }
 
     final status = _normalizeStatus(_inscription.statut);
-    final isPending = status == 'en_attente';
+    final isPending = status == 'pending';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -469,100 +467,45 @@ class _OrganizerBookingDetailScreenState
                       ),
                     ),
                   ],
+                  if (status == 'cancelled' &&
+                      (_inscription.cancellationReason != null || _inscription.messageOrganisateur != null)) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3CD),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFFEBAA)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Cancellation Reason',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF856404),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _inscription.cancellationReason ?? _inscription.messageOrganisateur!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF856404),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // Price Details
-            const Text(
-              'Price Details',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Adult x $placeCount',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        '${subtotal.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Service Fee',
-                        style: TextStyle(color: Colors.black54, fontSize: 14),
-                      ),
-                      Text(
-                        '${serviceFee.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        '${total.toStringAsFixed(2)} TND',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -573,13 +516,26 @@ class _OrganizerBookingDetailScreenState
   void _handleAction(String type) async {
     setState(() => _isUpdating = true);
     try {
+      String? rejectionReason;
+      if (type == 'reject') {
+        rejectionReason = await _showRejectionDialog();
+        if (rejectionReason == null) {
+          setState(() => _isUpdating = false);
+          return;
+        }
+      }
+
       final success = type == 'approve'
           ? await InscriptionService.approveReservation(_inscription.id)
-          : await InscriptionService.rejectReservation(_inscription.id);
+          : await InscriptionService.rejectReservation(_inscription.id,
+              messageOrganisateur: rejectionReason);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reservation ${type}ed successfully')),
+          SnackBar(
+            content: Text('Reservation ${type}ed successfully'),
+            backgroundColor: const Color(0xFF22C55E),
+          ),
         );
         Navigator.pop(context, true);
       }
@@ -594,13 +550,62 @@ class _OrganizerBookingDetailScreenState
     }
   }
 
+  Future<String?> _showRejectionDialog() async {
+    final reasonController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Reject Reservation',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Please provide a reason for rejection:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Reason for rejection...',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
+            child: const Text(
+              'Reject',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'en_attente':
+      case 'pending':
         return const Color(0xFFF59E0B);
-      case 'approuvee':
+      case 'approved':
         return const Color(0xFF22C55E);
-      case 'annulee':
+      case 'verified':
+        return const Color(0xFF3B82F6);
+      case 'cancelled':
+      case 'rejected':
         return const Color(0xFFEF4444);
       default:
         return Colors.grey;
@@ -609,12 +614,16 @@ class _OrganizerBookingDetailScreenState
 
   String _getStatusLabel(String status) {
     switch (status) {
-      case 'en_attente':
+      case 'pending':
         return 'PENDING';
-      case 'approuvee':
+      case 'approved':
         return 'CONFIRMED';
-      case 'annulee':
+      case 'verified':
+        return 'CHECKED IN';
+      case 'cancelled':
         return 'CANCELLED';
+      case 'rejected':
+        return 'REJECTED';
       default:
         return status.toUpperCase();
     }

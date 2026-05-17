@@ -63,12 +63,9 @@ class _AccountStatusPopupState extends State<AccountStatusPopup> {
   }
 
   Future<void> _refreshUserStatus() async {
-    try {
-      await AuthService.refreshUserProfile();
-      // The popup should disappear automatically when user status is checked again
-    } catch (e) {
-      print('Error refreshing user status: $e');
-    }
+    // Suspension expired — user will be re-authenticated on next action.
+    // No further action needed here; the app handles status on navigation.
+    if (mounted) setState(() {});
   }
 
   String _formatDuration(Duration duration) {
@@ -289,7 +286,7 @@ class _AccountStatusPopupState extends State<AccountStatusPopup> {
                                 suspensionReason: widget.suspensionReason,
                               ),
                             ),
-                          ),
+                          );
                         },
                         icon: const Icon(Icons.support_agent, size: 20),
                         label: const Text(

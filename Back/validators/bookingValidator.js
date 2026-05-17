@@ -151,7 +151,7 @@ const validateQuery = (schema) => {
 const bookingListQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
-  statut: Joi.string().valid('en_attente', 'approuvee', 'refusee', 'annulee', 'verifie').optional(),
+  statut: Joi.string().valid('pending', 'approved', 'rejected', 'cancelled', 'verified').optional(),
   startDate: Joi.date().iso().optional(),
   endDate: Joi.date().iso().optional()
 });

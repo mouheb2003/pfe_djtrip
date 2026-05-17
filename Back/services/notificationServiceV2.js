@@ -479,16 +479,44 @@ async function sendCheckInConfirmation({ touristId, activityTitle, bookingId, ac
   });
 }
 
+async function sendCheckInFailedNotification({ touristId, activityTitle, bookingId, reason }) {
+  return sendPushNotificationQueued({
+    userId: touristId,
+    title: 'Check-in Failed ❌',
+    body: `Your check-in for "${activityTitle}" failed: ${reason || 'Invalid QR code or already used'}`,
+    data: {
+      type: 'checkin_failed',
+      bookingId,
+    },
+    notificationType: 'booking',
+    priority: 'high',
+  });
+}
+
 async function sendNewBookingNotification({ organizerId, touristName, activityTitle, bookingId }) {
   return sendPushNotificationQueued({
     userId: organizerId,
     title: 'New Booking 🎫',
-    body: `${touristName} booked "${activityTitle}" - Waiting for payment`,
+    body: `${touristName} has sent a new booking request for "${activityTitle}"`,
     data: {
       type: 'new_booking',
       bookingId,
       screen: 'requests_tab',
       action: 'view_pending',
+    },
+    notificationType: 'booking',
+    priority: 'high',
+  });
+}
+
+async function sendBookingRequestSentNotification({ touristId, activityTitle, bookingId }) {
+  return sendPushNotificationQueued({
+    userId: touristId,
+    title: 'Booking Request Sent ✅',
+    body: `Your booking for "${activityTitle}" is pending organizer approval`,
+    data: {
+      type: 'booking_created',
+      bookingId,
     },
     notificationType: 'booking',
     priority: 'high',
@@ -516,6 +544,20 @@ async function sendBookingRejectedNotification({ touristId, activityTitle, booki
     body: `Your booking for "${activityTitle}" has been rejected`,
     data: {
       type: 'booking_rejected',
+      bookingId,
+    },
+    notificationType: 'booking',
+    priority: 'high',
+  });
+}
+
+async function sendBookingCancelledNotification({ organizerId, activityTitle, bookingId, reason }) {
+  return sendPushNotificationQueued({
+    userId: organizerId,
+    title: 'Booking Cancelled ⚠️',
+    body: `A booking for "${activityTitle}" was cancelled by the tourist. Reason: ${reason || 'Not provided'}`,
+    data: {
+      type: 'booking_cancelled',
       bookingId,
     },
     notificationType: 'booking',
@@ -833,8 +875,10 @@ module.exports = {
   // Booking notifications
   sendCheckInConfirmation,
   sendNewBookingNotification,
+  sendBookingRequestSentNotification,
   sendBookingApprovedNotification,
   sendBookingRejectedNotification,
+  sendBookingCancelledNotification,
   sendBookingReminder,
   // Review notifications
   sendReviewReminder,

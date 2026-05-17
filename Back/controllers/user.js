@@ -24,9 +24,8 @@ async function restoreExpiredSuspensions({ userId } = {}) {
       suspendedUntil: { $ne: null, $lte: now },
     };
 
-    // Handle userId as username string, not ObjectId
     if (userId) {
-      query.username = userId;
+      query._id = userId;
     }
 
     const users = await User.find(query).select(
@@ -404,29 +403,6 @@ exports.signIn = async (req, res) => {
   }
 };
 
-// Get user by username
-exports.getUserByUsername = async (req, res) => {
-  try {
-    const { username } = req.params;
-    
-    if (!username) {
-      return res.status(400).json({ message: "Username is required" });
-    }
-
-    const user = await UserService.getUserByUsername(username);
-
-    return res.json({
-      user: {
-        ...user,
-        username: user.username,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    console.error('[UserController] Error getting user by username:', error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
 
 // Google Sign-In - Authenticate with Google ID token
 exports.googleAuth = async (req, res) => {
@@ -577,24 +553,10 @@ exports.googleAuth = async (req, res) => {
       user.accountStatus = "active";
       await user.save();
     } else {
-      // Generate username for new Google users if not already set
-      let username = user?.username;
-      if (!username) {
-        console.log(`🔧 Generating username for Google user: ${fullname} (${email})`);
-        username = await createUsernameForUser(fullname, async (testUsername) => {
-          const existingUser = await User.findOne({ username: testUsername });
-          return !!existingUser;
-        });
-        console.log(`✅ Generated username: ${username}`);
-      } else {
-        console.log(`📝 Using existing username: ${username}`);
-      }
-
       user = new User({
         fullname,
         email,
         googleId,
-        username, // Add generated or existing username
         avatar,
         emailVerified: isEmailVerified,
         userType: null, // No default type for Google signup - user selects via UserTypeSelectionScreen

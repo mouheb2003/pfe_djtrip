@@ -91,15 +91,10 @@ class ReviewNotificationService {
   /// Configure les écouteurs de messages FCM
   void _setupMessageListeners() {
     // Message reçu quand l'app est en foreground
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    _messageSubscription = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
     // Message reçu quand l'app est en background mais ouverte
     FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-
-    // Message reçu quand l'app est terminée
-    _messageSubscription = _messaging.onMessage.listen((message) {
-      _handleForegroundMessage(message);
-    });
   }
 
   /// Écoute les changements de token FCM

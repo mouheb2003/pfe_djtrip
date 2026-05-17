@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
     fullname: String,
+    /*
     username: { 
       type: String, 
       unique: true, 
@@ -13,6 +14,7 @@ const userSchema = new mongoose.Schema(
       match: /^[a-z0-9_]+$/, // Lettres, chiffres, underscores seulement
       index: true
     },
+    */
     age: Number,
     num_tel: String,
     email: { type: String, required: true, unique: true },
@@ -186,7 +188,7 @@ userSchema.index({ is_onboarded: 1 });
 userSchema.index({ is_approved: 1, userType: 1 });
 userSchema.index({ signup_method: 1 });
 userSchema.index({ submitted_for_approval: 1 });
-// NEW: Username index for search and uniqueness
-userSchema.index({ username: 1 });
+// REMOVED: Username index for search and uniqueness
+// userSchema.index({ username: 1 });
 
 module.exports = User;

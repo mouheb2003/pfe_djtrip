@@ -18,7 +18,7 @@ import '../../../services/post_service.dart';
 import '../../../widgets/facebook_mentions_inline_widget.dart';
 import '../../../widgets/tiktok_share_widget.dart';
 import '../../../utils/time_ago.dart';
-import '../../tourist/place_detail_screen.dart';
+import '../place_detail_screen_v2.dart';
 import '../../tourist/my_activities_screen.dart';
 import '../../shared/comments_screen.dart';
 import '../../shared/public_profile_screen.dart';
@@ -54,19 +54,55 @@ class _ScreenNetworkState extends State<ScreenNetwork>
   bool _isScrolled = false;
   final Map<String, _LocalLikeState> _localLikeStateByPost = {};
   final Map<String, _LocalBookmarkState> _localBookmarkStateByPost = {};
-  _FeedFilter _activeFilter = _FeedFilter.allPublications;
+  _FeedFilter _activeFilter = _FeedFilter.allPosts;
 
   List<Map<String, dynamic>> get _visiblePosts {
-    var result = _posts;
+    var result = List<Map<String, dynamic>>.from(_posts);
 
     switch (_activeFilter) {
-      case _FeedFilter.allPublications:
+      case _FeedFilter.allPosts:
         return result;
       case _FeedFilter.myPosts:
         return result.where((post) {
-          final authorId = post['author_id']?.toString() ?? '';
+          final authorId = _extractAuthorId(post);
           return authorId == _currentUserId;
         }).toList();
+      case _FeedFilter.trending:
+        result.sort((a, b) {
+          final aLikes = (a['likes_count'] as num?)?.toInt() ?? 0;
+          final aComments = (a['comments_count'] as num?)?.toInt() ?? 0;
+          final bLikes = (b['likes_count'] as num?)?.toInt() ?? 0;
+          final bComments = (b['comments_count'] as num?)?.toInt() ?? 0;
+          return (bLikes + bComments * 2).compareTo(aLikes + aComments * 2);
+        });
+        return result;
+      case _FeedFilter.media:
+        return result.where((post) => _hasPhotos(post)).toList();
+      case _FeedFilter.organizers:
+        return result.where((post) {
+          final authorType = (post['author_id'] is Map) 
+              ? (post['author_id']['userType']?.toString() ?? '').toLowerCase() 
+              : '';
+          return authorType == 'organisateur' || authorType == 'organizer';
+        }).toList();
+      case _FeedFilter.locations:
+        return result.where((post) => (post['location_label']?.toString() ?? '').isNotEmpty).toList();
+      case _FeedFilter.mostLiked:
+        result.sort((a, b) {
+          final aLikes = (a['likes_count'] as num?)?.toInt() ?? 0;
+          final bLikes = (b['likes_count'] as num?)?.toInt() ?? 0;
+          return bLikes.compareTo(aLikes);
+        });
+        return result;
+      case _FeedFilter.likedByMe:
+        return result.where((post) => post['is_liked'] == true).toList();
+      case _FeedFilter.recent:
+        result.sort((a, b) {
+          final aTime = DateTime.tryParse(a['createdAt']?.toString() ?? a['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = DateTime.tryParse(b['createdAt']?.toString() ?? b['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bTime.compareTo(aTime);
+        });
+        return result;
     }
   }
 
@@ -92,19 +128,47 @@ class _ScreenNetworkState extends State<ScreenNetwork>
 
   IconData _getFilterIcon(_FeedFilter filter) {
     switch (filter) {
-      case _FeedFilter.allPublications:
+      case _FeedFilter.allPosts:
         return Icons.public_rounded;
       case _FeedFilter.myPosts:
         return Icons.person_rounded;
+      case _FeedFilter.trending:
+        return Icons.local_fire_department_rounded;
+      case _FeedFilter.media:
+        return Icons.image_rounded;
+      case _FeedFilter.organizers:
+        return Icons.business_center_rounded;
+      case _FeedFilter.locations:
+        return Icons.location_on_rounded;
+      case _FeedFilter.mostLiked:
+        return Icons.thumb_up_alt_rounded;
+      case _FeedFilter.likedByMe:
+        return Icons.favorite_rounded;
+      case _FeedFilter.recent:
+        return Icons.schedule_rounded;
     }
   }
 
   String _feedFilterLabel(_FeedFilter filter) {
     switch (filter) {
-      case _FeedFilter.allPublications:
-        return 'All Publications';
+      case _FeedFilter.allPosts:
+        return 'All Posts';
       case _FeedFilter.myPosts:
         return 'My Posts';
+      case _FeedFilter.trending:
+        return 'Trending';
+      case _FeedFilter.media:
+        return 'Photos';
+      case _FeedFilter.organizers:
+        return 'Organizers';
+      case _FeedFilter.locations:
+        return 'Places';
+      case _FeedFilter.mostLiked:
+        return 'Most Liked';
+      case _FeedFilter.likedByMe:
+        return 'Liked by Me';
+      case _FeedFilter.recent:
+        return 'Recent';
     }
   }
 
@@ -142,8 +206,100 @@ class _ScreenNetworkState extends State<ScreenNetwork>
     );
   }
 
-  void _onLikeChanged(String postId, bool liked, int likesCount) {
+  void _showFilterBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Filter Posts',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1D245D),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              
+              // Filter Items List
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  children: _FeedFilter.values.map((filter) {
+                    final isSelected = _activeFilter == filter;
+                    return ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSelected 
+                              ? AppColors.primary.withOpacity(0.1) 
+                              : (isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF3F4F6)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _getFilterIcon(filter),
+                          color: isSelected ? AppColors.primary : (isDark ? Colors.grey[400] : const Color(0xFF4B5563)),
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        _feedFilterLabel(filter),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isSelected ? AppColors.primary : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937)),
+                        ),
+                      ),
+                      trailing: isSelected 
+                          ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _activeFilter = filter;
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onLikeChanged(String postId, bool liked, int likesCount) async {
     if (!mounted) return;
+    
+    // Optimistic state update
     setState(() {
       final postIndex = _posts.indexWhere(
         (p) => (p['_id']?.toString() ?? '') == postId,
@@ -153,10 +309,28 @@ class _ScreenNetworkState extends State<ScreenNetwork>
         _posts[postIndex]['likes_count'] = likesCount;
       }
     });
+
+    try {
+      final result = await PostService.togglePostLike(postId);
+      if (result['success'] == true && mounted) {
+        setState(() {
+          final postIndex = _posts.indexWhere(
+            (p) => (p['_id']?.toString() ?? '') == postId,
+          );
+          if (postIndex != -1) {
+            _posts[postIndex]['is_liked'] = result['liked'] == true;
+            _posts[postIndex]['likes_count'] = result['likesCount'] ?? likesCount;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+    }
   }
 
   void _onBookmarkChanged(String postId, bool bookmarked, int bookmarksCount) {
     if (!mounted) return;
+
     setState(() {
       final postIndex = _posts.indexWhere(
         (p) => (p['_id']?.toString() ?? '') == postId,
@@ -165,6 +339,19 @@ class _ScreenNetworkState extends State<ScreenNetwork>
         _posts[postIndex]['is_bookmarked'] = bookmarked;
       }
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          bookmarked
+              ? 'Post saved to bookmarks'
+              : 'Post removed from bookmarks',
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _loadFeed({bool showLoader = true}) async {
@@ -246,9 +433,12 @@ class _ScreenNetworkState extends State<ScreenNetwork>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FC),
-      body: RefreshIndicator(
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FC),
+      body: Stack(
+        children: [
+          RefreshIndicator(
         onRefresh: _refreshFeed,
         color: AppColors.primary,
         child: CustomScrollView(
@@ -278,25 +468,29 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: _isScrolled
-                            ? [Colors.white, Colors.white]
-                            : [
-                                const Color(0xFFE8F4FD),
-                                const Color(0xFFF0F4FF),
-                              ],
+                        colors: isDark
+                            ? [const Color(0xFF121212), const Color(0xFF121212)]
+                            : _isScrolled
+                                ? [Colors.white, Colors.white]
+                                : [
+                                    const Color(0xFFE8F4FD),
+                                    const Color(0xFFF0F4FF),
+                                  ],
                       ),
                       border: Border(
                         bottom: BorderSide(
-                          color: _isScrolled
-                              ? Colors.black.withValues(alpha: 0.05)
-                              : Colors.transparent,
+                          color: isDark
+                              ? Colors.transparent
+                              : _isScrolled
+                                  ? Colors.black.withOpacity(0.05)
+                                  : Colors.transparent,
                           width: 1,
                         ),
                       ),
-                      boxShadow: _isScrolled
+                      boxShadow: _isScrolled && !isDark
                           ? [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08),
                                 blurRadius: 20,
                                 offset: const Offset(0, 4),
                               ),
@@ -338,16 +532,40 @@ class _ScreenNetworkState extends State<ScreenNetwork>
               ),
               actions: [
                 Container(
-                  margin: const EdgeInsets.only(right: 16),
+                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
+                      if (!isDark)
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.primary,
+                    ),
+                    onPressed: _showFilterBottomSheet,
+                    tooltip: 'Filter',
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      if (!isDark)
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
                     ],
                   ),
                   child: IconButton(
@@ -376,7 +594,13 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _FeedFilter.values.map((filter) {
+                    children: () {
+                      final mainFilters = [_FeedFilter.allPosts, _FeedFilter.myPosts];
+                      if (!mainFilters.contains(_activeFilter)) {
+                        mainFilters.add(_activeFilter);
+                      }
+                      return mainFilters;
+                    }().map((filter) {
                       final isSelected = _activeFilter == filter;
                       return Padding(
                         padding: const EdgeInsets.only(right: 10),
@@ -391,20 +615,18 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.primary
-                                  : Colors.white,
+                                  : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 if (isSelected)
                                   BoxShadow(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.3,
-                                    ),
+                                    color: AppColors.primary.withOpacity(0.3),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   )
-                                else
+                                else if (!isDark)
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
+                                    color: Colors.black.withOpacity(0.04),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
@@ -412,7 +634,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                               border: Border.all(
                                 color: isSelected
                                     ? AppColors.primary
-                                    : Colors.grey.withValues(alpha: 0.1),
+                                    : (isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1)),
                                 width: 1.5,
                               ),
                             ),
@@ -424,7 +646,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                                   size: 18,
                                   color: isSelected
                                       ? Colors.white
-                                      : const Color(0xFF6B7280),
+                                      : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF6B7280)),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
@@ -432,7 +654,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                                   style: TextStyle(
                                     color: isSelected
                                         ? Colors.white
-                                        : const Color(0xFF4B5563),
+                                        : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF4B5563)),
                                     fontSize: 14,
                                     fontWeight: isSelected
                                         ? FontWeight.w700
@@ -469,17 +691,17 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                       Icon(
                         Icons.feed_outlined,
                         size: 64,
-                        color: Colors.black.withValues(alpha: 0.15),
+                        color: Colors.black.withOpacity(0.15),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        _activeFilter == _FeedFilter.allPublications
-                            ? 'No publications yet'
-                            : 'No posts yet',
+                        _activeFilter == _FeedFilter.allPosts
+                            ? 'No posts yet'
+                            : 'No results for this filter',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black.withValues(alpha: 0.4),
+                          color: Colors.black.withOpacity(0.4),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -487,7 +709,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                         'Be the first to share something amazing!',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.black.withValues(alpha: 0.3),
+                          color: Colors.black.withOpacity(0.3),
                         ),
                       ),
                     ],
@@ -512,6 +734,67 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                     },
                     onReport: () => _reportPost(post),
                     onMute: () => _muteAuthor(post),
+                    onModified: () {
+                      _refreshFeed();
+                    },
+                    onDelete: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text(
+                            'Delete Post',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1D245D),
+                            ),
+                          ),
+                          content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF4757),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        final postId = (post['_id']?.toString() ?? '');
+                        if (postId.isEmpty) return;
+                        final result = await PostService.deletePost(postId);
+                        if (result['success'] == true && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Post deleted successfully'),
+                              backgroundColor: Color(0xFF22C55E),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          _refreshFeed();
+                        } else if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] ?? 'Failed to delete post'),
+                              backgroundColor: const Color(0xFFFF4757),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
                     onShare: () {
                       final postId = (post['_id']?.toString() ?? '');
                       if (postId.isEmpty) return;
@@ -545,32 +828,63 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                         );
                       }
                     },
+                    onToggleHide: () async {
+                      final postId = (post['_id']?.toString() ?? '');
+                      if (postId.isEmpty) return;
+                      
+                      final result = await PostService.togglePostHide(postId);
+                      if (result['success'] == true && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(result['message'] ?? 'Post hidden from profile'),
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                        // Refresh to reflect changes if we are in "My Posts" filter
+                        if (_activeFilter == _FeedFilter.myPosts) {
+                          _refreshFeed();
+                        }
+                      }
+                    },
                   );
                 }, childCount: _visiblePosts.length),
               ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CreatePostScreen(
-                user: _currentUserId.isNotEmpty
+          Positioned(
+            top: 100,
+            right: 16,
+            child: FloatingActionButton(
+              onPressed: () async {
+                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                final userModel = userProvider.user is Map
                     ? UserModel(
-                        id: _currentUserId,
-                        fullname: 'User',
-                        email: '',
-                        userType: 'Touriste',
+                        id: (userProvider.user as Map)['_id']?.toString() ?? '',
+                        fullname: (userProvider.user as Map)['fullname']?.toString() ?? 'User',
+                        email: (userProvider.user as Map)['email']?.toString() ?? '',
+                        avatar: (userProvider.user as Map)['avatar']?.toString(),
+                        userType: (userProvider.user as Map)['userType']?.toString() ?? 'Touriste',
                       )
-                    : null,
-              ),
+                    : (userProvider.user as UserModel?);
+
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CreatePostScreen(
+                      user: userModel,
+                    ),
+                  ),
+                );
+                if (result == true) {
+                  _refreshFeed();
+                }
+              },
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add, color: Colors.white),
             ),
-          );
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ],
       ),
     );
   }
@@ -595,4 +909,14 @@ class _LocalBookmarkState {
   });
 }
 
-enum _FeedFilter { allPublications, myPosts }
+enum _FeedFilter { 
+  allPosts, 
+  myPosts, 
+  trending, 
+  media, 
+  organizers, 
+  locations,
+  mostLiked,
+  likedByMe,
+  recent
+}

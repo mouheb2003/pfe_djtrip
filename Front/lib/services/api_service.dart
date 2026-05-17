@@ -750,7 +750,65 @@ class ApiService {
       preferences,
     );
     if (response.statusCode != 200) {
-      throw Exception('Failed to update reminder preferences');
+      throw Exception(extractErrorMessage(response, fallback: 'Failed to save preferences'));
+    }
+  }
+
+  /// Extracts the most descriptive user-facing error message from an HTTP response.
+  /// Checks multiple fields in priority order and falls back to status-code hints.
+  static String extractErrorMessage(
+    http.Response response, {
+    String fallback = 'An unexpected error occurred',
+  }) {
+    try {
+      final body = safeDecodeObject(response.body);
+
+      // Priority 1: Direct 'message' or 'reason' field (Standard in our backend)
+      final msg = body['message']?.toString() ?? '';
+      if (msg.isNotEmpty && msg.toLowerCase() != 'request failed') return msg;
+
+      final reason = body['reason']?.toString() ?? '';
+      if (reason.isNotEmpty) return reason;
+
+      // Priority 2: 'error' or 'errors' field
+      final err = body['error'] ?? body['errors'];
+      if (err is String && err.isNotEmpty) return err;
+      
+      if (err is Map && err.isNotEmpty) {
+        // Look for nested message fields
+        final firstVal = err.values.first;
+        if (firstVal is Map && firstVal['message'] != null) {
+          return firstVal['message'].toString();
+        }
+        if (firstVal is String && firstVal.isNotEmpty) return firstVal;
+      }
+      
+      if (err is List && err.isNotEmpty) {
+        final firstItem = err.first;
+        if (firstItem is Map && firstItem['message'] != null) {
+          return firstItem['message'].toString();
+        }
+        if (firstItem is String) return firstItem;
+      }
+
+      // Priority 3: Status-code-based user-friendly fallbacks
+      switch (response.statusCode) {
+        case 400: return 'Invalid request. Please check your data.';
+        case 401: return 'Session expired. Please log in again.';
+        case 403: return 'You do not have permission to perform this action.';
+        case 404: return 'The requested resource was not found.';
+        case 409: return 'A conflict occurred. This item may already exist.';
+        case 422: return 'Validation failed. Please correct the highlighted errors.';
+        case 429: return 'Too many requests. Please wait a moment and try again.';
+      }
+      
+      if (response.statusCode >= 500) {
+        return 'Server error (Code: ${response.statusCode}). Please try again later.';
+      }
+
+      return fallback;
+    } catch (_) {
+      return fallback;
     }
   }
 }

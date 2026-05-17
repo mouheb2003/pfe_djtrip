@@ -306,8 +306,8 @@ router.put(
   userController.updateAdvancedSettings,
 );
 
-// GET /username/:username - Get user by username
-router.get("/username/:username", cacheGet("users:by-username", 60), userController.getUserByUsername);
+// REMOVED: Get user by username
+// router.get("/username/:username", cacheGet("users:by-username", 60), userController.getUserByUsername);
 
 // GET /:id - Get user by ID
 router.get("/:id", cacheGet("users:by-id", 60), userController.getUserById);

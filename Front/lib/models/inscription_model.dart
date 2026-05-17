@@ -17,6 +17,7 @@ class InscriptionModel {
   final DateTime? qrTokenGeneratedAt;
   final DateTime? qrTokenExpiresAt;
   final DateTime? qrUsedAt;
+  final String? cancellationReason;
 
   const InscriptionModel({
     required this.id,
@@ -33,6 +34,7 @@ class InscriptionModel {
     this.qrTokenGeneratedAt,
     this.qrTokenExpiresAt,
     this.qrUsedAt,
+    this.cancellationReason,
   });
 
   static Map<String, dynamic>? _safeMap(dynamic raw) {
@@ -95,9 +97,9 @@ class InscriptionModel {
           : null,
       messageTouriste: json['message_touriste'] as String?,
       messageOrganisateur: json['message_organisateur'] as String?,
-      activite: _safeMap(json['activite']),
-      touriste: _safeMap(json['touriste']),
-      organisateur: _safeMap(json['organisateur']),
+      activite: _safeMap(json['activite'] ?? json['activite_id']),
+      touriste: _safeMap(json['touriste'] ?? json['touriste_id']),
+      organisateur: _safeMap(json['organisateur'] ?? json['organisateur_id']),
       qrToken: json['qr_token'] as String?,
       qrTokenGeneratedAt: json['qr_token_generated_at'] != null
           ? DateTime.tryParse(json['qr_token_generated_at'].toString())
@@ -108,6 +110,9 @@ class InscriptionModel {
       qrUsedAt: json['qr_used_at'] != null
           ? DateTime.tryParse(json['qr_used_at'].toString())
           : null,
+      cancellationReason: (json['cancellationPolicy'] != null && json['cancellationPolicy'] is Map)
+          ? (json['cancellationPolicy']['cancellationReason'] as String?)
+          : (json['cancellationReason'] as String?),
     );
   }
 
@@ -141,12 +146,16 @@ class InscriptionModel {
     }
   }
 
-  bool get isUpcoming => statut == 'approuvee' || statut == 'en_attente';
-  bool get isPending => statut == 'en_attente';
-  bool get isApproved => statut == 'approuvee';
-  bool get isUsed => statut == 'verifie';
-  bool get isRejected => statut == 'refusee';
-  bool get isCancelled => statut == 'annulee';
+  bool get isUpcoming =>
+      statut == 'approuvee' ||
+      statut == 'approved' ||
+      statut == 'en_attente' ||
+      statut == 'pending';
+  bool get isPending => statut == 'en_attente' || statut == 'pending';
+  bool get isApproved => statut == 'approuvee' || statut == 'approved';
+  bool get isUsed => statut == 'verifie' || statut == 'verified';
+  bool get isRejected => statut == 'refusee' || statut == 'rejected';
+  bool get isCancelled => statut == 'annulee' || statut == 'cancelled';
   bool get isPaymentFailed => false;
 
   bool get canBeCancelled => isApproved || isPending;
@@ -211,6 +220,7 @@ class InscriptionModel {
       'qr_token_generated_at': qrTokenGeneratedAt?.toIso8601String(),
       'qr_token_expires_at': qrTokenExpiresAt?.toIso8601String(),
       'qr_used_at': qrUsedAt?.toIso8601String(),
+      'cancellationReason': cancellationReason,
     };
   }
 }

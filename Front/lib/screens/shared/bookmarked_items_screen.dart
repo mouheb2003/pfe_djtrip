@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
@@ -6,10 +6,13 @@ import '../../services/post_service.dart';
 import '../../services/activity_service.dart';
 import '../../services/lieu_service.dart';
 import '../../widgets/publication_card.dart';
+import '../../widgets/tiktok_share_widget.dart';
 import '../../models/post_model.dart';
-import '../../models/activity_model.dart';
-import '../../models/lieu_model.dart';
 import '../tourist/place_detail_screen_v2.dart';
+import '../../config/api_config.dart';
+import '../shared/activity_detail_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/bookmark_provider.dart';
 
 enum BookmarkType { all, posts, activities, places }
 
@@ -45,6 +48,17 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
         LieuService.getBookmarkedLieux(),
       ]);
       if (mounted) {
+        final provider = Provider.of<BookmarkProvider>(context, listen: false);
+        for (var p in results[0]) {
+          provider.updatePostState((p['_id'] ?? '').toString(), true);
+        }
+        for (var a in results[1]) {
+          provider.updateActivityState((a['_id'] ?? '').toString(), true);
+        }
+        for (var l in results[2]) {
+          provider.updateLieuState((l['_id'] ?? '').toString(), true);
+        }
+
         setState(() {
           _posts = results[0];
           _activities = results[1];
@@ -185,8 +199,9 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FC),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FC),
       body: RefreshIndicator(
         onRefresh: _refreshBookmarks,
         color: AppColors.primary,
@@ -211,14 +226,18 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFFE8F4FD),
-                          const Color(0xFFF0F4FF),
-                        ],
+                        colors: isDark
+                            ? [const Color(0xFF121212), const Color(0xFF121212)]
+                            : [
+                                const Color(0xFFE8F4FD),
+                                const Color(0xFFF0F4FF),
+                              ],
                       ),
                       border: Border(
                         bottom: BorderSide(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: isDark
+                              ? Colors.transparent
+                              : Colors.black.withOpacity(0.05),
                           width: 1,
                         ),
                       ),
@@ -266,7 +285,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -396,84 +415,130 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final item = _filteredItems[index];
-                    final itemType = _getItemType(item);
+                    try {
+                      final item = _filteredItems[index];
+                      final itemType = _getItemType(item);
 
-                    if (itemType == 'post') {
-                      final postModel = PostModel.fromJson(item);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: PublicationCard(
-                          post: postModel,
-                          onLikeChanged: (liked, likesCount) async {
-                            final postId = (item['_id'] ?? '').toString();
-                            if (postId.isEmpty) return;
-                            final currentLiked = item['isLiked'] ?? false;
-                            final currentCount =
-                                (item['likes_count'] as num?)?.toInt() ?? 0;
-                            setState(() {
-                              item['isLiked'] = !currentLiked;
-                              item['likes_count'] = !currentLiked
-                                  ? currentCount + 1
-                                  : currentCount - 1;
-                            });
-                            final result = await PostService.togglePostLike(
-                              postId,
-                            );
-                            if (result['success'] == true) {
-                              final liked = result['liked'] == true;
-                              final likesCount =
-                                  (result['likesCount'] as num?)?.toInt() ??
-                                  currentCount;
-                              _onPostLikeChanged(postId, liked, likesCount);
-                            }
-                          },
-                          onBookmarkChanged:
-                              (bookmarked, bookmarksCount) async {
-                                final postId = (item['_id'] ?? '').toString();
-                                if (postId.isEmpty) return;
-                                final currentBookmarked =
-                                    item['isBookmarked'] ?? true;
-                                final currentCount =
-                                    (item['bookmarks_count'] as num?)
-                                        ?.toInt() ??
-                                    0;
-                                setState(() {
-                                  item['isBookmarked'] = !currentBookmarked;
-                                  item['bookmarks_count'] = !currentBookmarked
-                                      ? currentCount + 1
-                                      : currentCount - 1;
-                                });
-                                final result =
-                                    await PostService.togglePostBookmark(
-                                      postId,
-                                    );
-                                if (result['success'] == true) {
-                                  final bookmarked =
-                                      result['bookmarked'] == true;
-                                  final bookmarksCount =
-                                      (result['bookmarksCount'] as num?)
+                      if (itemType == 'post') {
+                        final postModel = PostModel.fromJson(item);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: PublicationCard(
+                            post: postModel,
+                            onLikeChanged: (liked, likesCount) async {
+                              final postId = (item['_id'] ?? '').toString();
+                              if (postId.isEmpty) return;
+                              final currentLiked = item['isLiked'] ?? false;
+                              final currentCount =
+                                  (item['likes_count'] as num?)?.toInt() ?? 0;
+                              setState(() {
+                                item['isLiked'] = !currentLiked;
+                                item['likes_count'] = !currentLiked
+                                    ? currentCount + 1
+                                    : currentCount - 1;
+                              });
+                              final result = await PostService.togglePostLike(
+                                postId,
+                              );
+                              if (result['success'] == true) {
+                                final liked = result['liked'] == true;
+                                final likesCount =
+                                    (result['likesCount'] as num?)?.toInt() ??
+                                    currentCount;
+                                _onPostLikeChanged(postId, liked, likesCount);
+                              }
+                            },
+                            onBookmarkChanged:
+                                (bookmarked, bookmarksCount) async {
+                                  final postId = (item['_id'] ?? '').toString();
+                                  if (postId.isEmpty) return;
+                                  final currentBookmarked =
+                                      item['isBookmarked'] ?? true;
+                                  final currentCount =
+                                      (item['bookmarks_count'] as num?)
                                           ?.toInt() ??
-                                      currentCount;
-                                  _onPostBookmarkChanged(
-                                    postId,
-                                    bookmarked,
-                                    bookmarksCount,
-                                  );
-                                }
-                              },
-                          onShare: () {},
-                          onReport: () {},
-                          onMute: () {},
-                          onCopyLink: () async {},
+                                      0;
+                                  setState(() {
+                                    item['isBookmarked'] = !currentBookmarked;
+                                    item['bookmarks_count'] = !currentBookmarked
+                                        ? currentCount + 1
+                                        : currentCount - 1;
+                                  });
+                                  final result =
+                                      await PostService.togglePostBookmark(
+                                        postId,
+                                      );
+                                  if (result['success'] == true) {
+                                    final bookmarked =
+                                        result['bookmarked'] == true;
+                                    final bookmarksCount =
+                                        (result['bookmarksCount'] as num?)
+                                            ?.toInt() ??
+                                        currentCount;
+                                    _onPostBookmarkChanged(
+                                      postId,
+                                      bookmarked,
+                                      bookmarksCount,
+                                    );
+                                  }
+                                },
+                            onShare: () {
+                              final postId = (item['_id'] ?? '').toString();
+                              final content = (item['content'] ?? '').toString();
+                              final imageUrl = (item['imageUrl'] ?? '').toString();
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => TikTokShareWidget(
+                                  postId: postId,
+                                  postContent: content,
+                                  postImageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      } else if (itemType == 'activity') {
+                        return _buildActivityCard(item);
+                      } else if (itemType == 'place') {
+                        return _buildPlaceCard(item);
+                      }
+                      return const SizedBox.shrink();
+                    } catch (e, stack) {
+                      debugPrint('❌ Error rendering bookmarked item at index $index: $e\n$stack');
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.red.shade100),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: Colors.red.shade400, size: 28),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Failed to render saved item (malformed data)',
+                                style: TextStyle(
+                                  color: Color(0xFF1E293B),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
-                    } else if (itemType == 'activity') {
-                      return _buildActivityCard(item);
-                    } else if (itemType == 'place') {
-                      return _buildPlaceCard(item);
                     }
-                    return const SizedBox.shrink();
                   }, childCount: _filteredItems.length),
                 ),
               ),
@@ -569,6 +634,31 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
     return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
   }
 
+  String _getActivityImageUrl(Map<String, dynamic> activityData) {
+    final photos = activityData['photos'];
+    if (photos is List && photos.isNotEmpty) {
+      final first = photos.first;
+      if (first != null &&
+          first.toString().toLowerCase() != 'null' &&
+          first.toString().isNotEmpty) {
+        return first.toString();
+      }
+    }
+
+    final mainImage = activityData['main_image'] ??
+        activityData['image'] ??
+        activityData['displayImage'] ??
+        activityData['imagePortrait'];
+
+    if (mainImage != null &&
+        mainImage.toString().toLowerCase() != 'null' &&
+        mainImage.toString().isNotEmpty) {
+      return mainImage.toString();
+    }
+
+    return '';
+  }
+
   Widget _buildActivityCard(Map<String, dynamic> activityData) {
     final activityId = (activityData['_id'] ?? '').toString();
     final isBookmarked = activityData['isBookmarked'] ?? true;
@@ -590,72 +680,98 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
         activityData['organisateur_id']?['name']?.toString() ??
         'Organizer';
 
+    final imageUrl = _getActivityImageUrl(activityData);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ActivityDetailScreen(
+                activityId: activityId,
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image section with status badge
-            Stack(
-              children: [
-                if (activityData['photos'] != null &&
-                    (activityData['photos'] as List).isNotEmpty)
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section with status badge
+              Stack(
+                children: [
+                  // Use a unified image rendering logic
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
-                    child: Image.network(
-                      (activityData['photos'] as List).first.toString(),
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 180,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            ApiConfig.getImageUrl(imageUrl),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                height: 180,
+                                color: const Color(0xFFF8FAFC),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF4B63FF),
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  height: 180,
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFFF8FAFC),
+                                        Color(0xFFF1F5F9),
+                                      ],
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 40,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                          )
+                        : Container(
+                            height: 180,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              size: 50,
+                              color: Color(0xFF4B63FF),
+                            ),
                           ),
-                        ),
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          size: 50,
-                          color: Color(0xFF4B63FF),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    height: 180,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
-                      ),
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      size: 50,
-                      color: Color(0xFF4B63FF),
-                    ),
                   ),
 
                 // Status badge
@@ -672,7 +788,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
+                          color: Colors.black.withOpacity(0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -696,11 +812,11 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                   right: 12,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: Colors.white.withOpacity(0.9),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
+                          color: Colors.black.withOpacity(0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -851,7 +967,7 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4B63FF).withValues(alpha: 0.1),
+                          color: const Color(0xFF4B63FF).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -886,13 +1002,47 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
+}
+
+String _getPlaceImageUrl(Map<String, dynamic> placeData) {
+  // Try various common image fields
+  final mainImage = placeData['main_image'] ?? 
+                    placeData['imagePortrait'] ?? 
+                    placeData['image'] ?? 
+                    placeData['displayImage'];
+  
+  if (mainImage != null && mainImage.toString().toLowerCase() != 'null' && mainImage.toString().isNotEmpty) {
+    return mainImage.toString();
   }
+  
+  // Try gallery
+  final gallery = placeData['gallery'];
+  if (gallery is List && gallery.isNotEmpty) {
+    final first = gallery.first;
+    if (first != null && first.toString().toLowerCase() != 'null' && first.toString().isNotEmpty) {
+      return first.toString();
+    }
+  }
+
+  final images = placeData['images'];
+  if (images is List && images.isNotEmpty) {
+    final first = images.first;
+    if (first != null && first.toString().toLowerCase() != 'null' && first.toString().isNotEmpty) {
+      return first.toString();
+    }
+  }
+  
+  return '';
+}
 
   Widget _buildPlaceCard(Map<String, dynamic> placeData) {
     final lieuId = (placeData['_id'] ?? '').toString();
     final isBookmarked = placeData['isBookmarked'] ?? true;
     final bookmarksCount = (placeData['bookmarks_count'] as num?)?.toInt() ?? 0;
+
+    final imageUrl = _getPlaceImageUrl(placeData);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -907,37 +1057,72 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (placeData['main_image'] != null)
+              if (imageUrl.isNotEmpty)
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+                    top: Radius.circular(20),
                   ),
                   child: Image.network(
-                    placeData['main_image'].toString(),
-                    height: 150,
+                    ApiConfig.getImageUrl(imageUrl),
+                    height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 180,
+                        color: const Color(0xFFF8FAFC),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF4B63FF),
+                          ),
+                        ),
+                      );
+                    },
                     errorBuilder: (context, error, stackTrace) => Container(
-                      height: 150,
-                      color: const Color(0xFFF0F4FF),
+                      height: 180,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)],
+                        ),
+                      ),
                       child: const Icon(
-                        Icons.image_not_supported,
+                        Icons.broken_image_outlined,
                         size: 40,
-                        color: Color(0xFF4B63FF),
+                        color: Color(0xFF94A3B8),
                       ),
                     ),
+                  ),
+                )
+              else
+                Container(
+                  height: 180,
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.image_outlined,
+                    size: 40,
+                    color: Color(0xFF94A3B8),
                   ),
                 ),
               Padding(
@@ -1051,25 +1236,27 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4B63FF) : Colors.white,
+          color: isSelected ? const Color(0xFF4B63FF) : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF4B63FF)
-                : Colors.black.withValues(alpha: 0.08),
+                : (isDark ? const Color(0xFF2E2E2E) : Colors.black.withOpacity(0.08)),
             width: 1.5,
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
           ],
         ),
         child: Row(
@@ -1078,7 +1265,7 @@ class _FilterChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFF6B7280),
+                color: isSelected ? Colors.white : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF6B7280)),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1089,14 +1276,14 @@ class _FilterChip extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : const Color(0xFFF0F4FF),
+                      ? Colors.white.withOpacity(0.2)
+                      : (isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '$count',
                   style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF4B63FF),
+                    color: isSelected ? Colors.white : (isDark ? const Color(0xFF6B88FF) : const Color(0xFF4B63FF)),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),

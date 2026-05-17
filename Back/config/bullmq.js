@@ -1,5 +1,5 @@
 const { Queue, Worker, QueueScheduler } = require('bullmq');
-const { redisClient } = require('./redis');
+const { redisClient, redisEnabled } = require('./redis');
 
 /**
  * BullMQ Configuration for Notification System
@@ -21,31 +21,38 @@ function enableFallback(reason) {
   redisAvailable = false;
 }
 
-try {
-  redisClient.on('connect', () => {
-    if (!redisAvailable) {
-      console.log('✅ Redis connected - Queue system enabled');
-    }
-    fallbackModeLogged = false;
-    redisAvailable = true;
-  });
+if (redisClient && redisEnabled) {
+  try {
+    redisClient.on('connect', () => {
+      if (!redisAvailable) {
+        console.log('✅ Redis connected - Queue system enabled');
+      }
+      fallbackModeLogged = false;
+      redisAvailable = true;
+    });
 
-  redisClient.on('error', () => {
-    enableFallback('Redis connection error');
-  });
+    redisClient.on('error', (err) => {
+      // Don't log full error if connection is closed to avoid noise
+      if (err.message && err.message.includes('Connection is closed')) {
+        enableFallback('Redis connection closed');
+      } else {
+        enableFallback('Redis connection error');
+      }
+    });
 
-  // Test connection
-  redisClient.ping((err) => {
-    if (err) {
-      enableFallback('Redis not available');
-    } else {
+    // Test connection only if enabled
+    redisClient.ping().then(() => {
       console.log('✅ Redis available - Queue system enabled');
       fallbackModeLogged = false;
       redisAvailable = true;
-    }
-  });
-} catch (error) {
-  enableFallback('Redis initialization failed');
+    }).catch((err) => {
+      enableFallback('Redis not available');
+    });
+  } catch (error) {
+    enableFallback('Redis initialization failed');
+  }
+} else {
+  enableFallback('Redis is disabled');
 }
 
 // Queue options
@@ -253,9 +260,18 @@ async function closeQueues() {
     console.log('✅ Notification queue closed');
   }
   
-  if (redisClient) {
-    await redisClient.quit();
-    console.log('✅ Redis connection closed');
+  if (redisClient && redisEnabled) {
+    try {
+      if (redisClient.status !== 'end') {
+        await redisClient.quit();
+        console.log('✅ Redis connection closed');
+      }
+    } catch (error) {
+      // Ignore "Connection is closed" errors during shutdown
+      if (!error.message.includes('Connection is closed')) {
+        console.error('❌ Error closing Redis connection:', error.message);
+      }
+    }
   }
   
   console.log('🔒 BullMQ shutdown complete');

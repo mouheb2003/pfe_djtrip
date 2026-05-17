@@ -215,7 +215,7 @@ class _TermsOfUseScreenState extends State<TermsOfUseScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -342,6 +342,7 @@ class _TermsOfUseScreenState extends State<TermsOfUseScreen> {
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+            ),
             child: Column(
               children: [
                 SizedBox(

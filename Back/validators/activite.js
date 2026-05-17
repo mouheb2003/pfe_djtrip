@@ -104,7 +104,7 @@ const createActiviteSchema = Joi.object({
     )
     .optional(),
   statut: Joi.string()
-    .valid("active", "inactive", "archived", "completed")
+    .valid("active", "inactive", "archived", "completed", "cancelled")
     .optional(),
   keepExistingPhotos: Joi.alternatives()
     .try(Joi.boolean(), Joi.string())
@@ -174,7 +174,7 @@ const updateActiviteSchema = Joi.object({
     )
     .optional(),
   statut: Joi.string()
-    .valid("active", "inactive", "archived", "completed")
+    .valid("active", "inactive", "archived", "completed", "cancelled")
     .optional(),
   keepExistingPhotos: Joi.alternatives()
     .try(Joi.boolean(), Joi.string())

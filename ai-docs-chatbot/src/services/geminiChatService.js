@@ -1,31 +1,16 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import geminiKeyPool from './geminiKeyPool.js';
 import { config } from '../config/index.js';
 
 class GeminiChatService {
   constructor() {
-    this.genAI = null;
-    this.chatModel = null;
     this.initialized = false;
   }
 
   initialize() {
     if (this.initialized) return;
-
-    try {
-      this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-      this.chatModel = this.genAI.getGenerativeModel({
-        model: config.modelName,
-        generationConfig: {
-          temperature: config.temperature,
-          maxOutputTokens: config.maxTokens,
-        },
-      });
-      this.initialized = true;
-      console.log('Gemini chat service initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize Gemini chat service:', error.message);
-      throw new Error(`Gemini chat service initialization failed: ${error.message}`);
-    }
+    geminiKeyPool.initialize();
+    this.initialized = true;
+    console.log('Gemini chat service initialized with key pool');
   }
 
   async generateResponse(query, context, conversationHistory = []) {
@@ -36,11 +21,15 @@ class GeminiChatService {
     try {
       const prompt = this.buildPrompt(query, context, conversationHistory);
       
-      const result = await this.chatModel.generateContent(prompt);
-      const response = result.response.text();
+      const result = await geminiKeyPool.generateContent(config.modelName, prompt, {
+        generationConfig: {
+          temperature: config.temperature,
+          maxOutputTokens: config.maxTokens,
+        },
+      });
       
       return {
-        response: this.cleanResponse(response),
+        response: this.cleanResponse(result.text),
         sources: context.sources || [],
         model: config.modelName,
         timestamp: new Date().toISOString(),
@@ -51,25 +40,31 @@ class GeminiChatService {
     }
   }
 
-  buildPrompt(query, context, conversationHistory) {
-    let prompt = `You are a helpful AI documentation assistant for a software project. Your role is to answer questions about the project based ONLY on the provided documentation context.
+  buildPrompt(query, context, conversationHistory = []) {
+    let prompt = `You are the Expert AI Assistant for DJTrip (Djerba Trip Application). Your mission is to provide precise, helpful, and technically accurate information based on the provided documentation.
+
+You have deep knowledge of:
+- The project structure (Back, Front, Dashboard).
+- Every screen, button, and icon described in the docs.
+- The business logic (Booking flows, Check-in, Payments, Social interactions).
+- The technology stack (Node.js, Flutter, MongoDB, Socket.io, Stripe).
 
 ## Important Rules:
-1. Answer questions using ONLY the provided documentation context
-2. If the information is not available in the context, say: "This information is not available in the documentation"
-3. Do not invent or hallucinate information
-4. Be concise but informative
-5. Use bullet points and formatting for clarity
-6. If you're unsure, say you don't have enough information
-7. Provide step-by-step instructions when relevant
-8. Be beginner-friendly but also accurate for technical users
+1. Answer using ONLY the provided documentation context.
+2. If the info is not in the context, say: "I'm sorry, I don't find this specific information in the current documentation. Could you please clarify or check the relevant files?"
+3. Be EXTREMELY precise about UI elements (e.g., "Tap the '+' floating action button in the Activities tab").
+4. Maintain a professional, expert, and helpful tone.
+5. Use markdown formatting (bullet points, bold text, code snippets) to make answers scannable.
+6. When explaining a process, use numbered steps.
+7. Always provide context-aware answers based on the user's role (Tourist, Organizer, or Admin) if mentioned.
+8. If the user asks about the code structure, refer to the project directories (Back/, Front/, dashbord/).
 
 `;
 
     // Add conversation history if available
     if (conversationHistory.length > 0) {
       prompt += `\n## Previous Conversation:\n`;
-      conversationHistory.forEach((msg, index) => {
+      conversationHistory.forEach((msg) => {
         if (msg.role === 'user') {
           prompt += `User: ${msg.content}\n`;
         } else {
@@ -117,7 +112,12 @@ class GeminiChatService {
 
     try {
       const prompt = this.buildPrompt(query, context, conversationHistory);
-      const result = await this.chatModel.generateContentStream(prompt);
+      const result = await geminiKeyPool.generateContentStream(config.modelName, prompt, {
+        generationConfig: {
+          temperature: config.temperature,
+          maxOutputTokens: config.maxTokens,
+        },
+      });
       
       return {
         stream: result.stream,
@@ -137,8 +137,18 @@ class GeminiChatService {
     }
 
     try {
+      // Get a client from the pool
+      const genAI = geminiKeyPool.getClient();
+      const model = genAI.getGenerativeModel({
+        model: config.modelName,
+        generationConfig: {
+          temperature: config.temperature,
+          maxOutputTokens: config.maxTokens,
+        },
+      });
+
       // Start a chat session with history
-      const chat = this.chatModel.startChat({
+      const chat = model.startChat({
         history: this.formatHistoryForGemini(messages),
       });
 
@@ -197,8 +207,8 @@ class GeminiChatService {
 
       const prompt = `Summarize the following conversation in 2-3 sentences:\n\n${conversationText}`;
 
-      const result = await this.chatModel.generateContent(prompt);
-      return result.response.text();
+      const result = await geminiKeyPool.generateContent(config.modelName, prompt);
+      return result.text;
     } catch (error) {
       console.error('Error summarizing conversation:', error.message);
       return '';

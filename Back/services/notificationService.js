@@ -233,7 +233,7 @@ async function sendNewBookingNotification({ organizerId, touristName, activityTi
   return sendPushNotification({
     userId: organizerId,
     title: 'New Booking 🎫',
-    body: `${touristName} booked "${activityTitle}" - Waiting for payment`,
+    body: `${touristName} has sent a new booking request for "${activityTitle}"`,
     data: {
       type: 'new_booking',
       bookingId,
@@ -276,6 +276,21 @@ async function sendBookingRejectedNotification({ touristId, activityTitle, booki
     body: `Your booking for "${activityTitle}" has been rejected`,
     data: {
       type: 'booking_rejected',
+      bookingId,
+    },
+  });
+}
+
+/**
+ * Notification pour booking annulé (envoyé à l'organisateur)
+ */
+async function sendBookingCancelledNotification({ organizerId, activityTitle, bookingId, reason }) {
+  return sendPushNotification({
+    userId: organizerId,
+    title: 'Booking Cancelled ⚠️',
+    body: `A booking for "${activityTitle}" was cancelled by the tourist. Reason: ${reason || 'Not provided'}`,
+    data: {
+      type: 'booking_cancelled',
       bookingId,
     },
   });

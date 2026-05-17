@@ -389,7 +389,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        _showAiConfirmationDialog(text, result['result'], 'rewrite');
+        _showAiPreview(text, result['result'], 'rewrite');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -414,54 +414,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   Future<void> _quickTranslateMessage() async {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
-
-    setState(() => _isProcessingAi = true);
-
-    try {
-      // Detect language and translate to the other language
-      final isFrench = text.contains(
-        RegExp(r'[àâäéèêëïîôöùûüÿç]', caseSensitive: false),
-      );
-      final targetLang = isFrench ? 'en' : 'fr';
-
-      final result = await AiTextService.translateText(text, targetLang);
-
-      if (!mounted) return;
-
-      setState(() => _isProcessingAi = false);
-
-      if (result['success'] == true) {
-        setState(() {
-          _msgCtrl.text = result['result'];
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Message translated to ${targetLang == 'en' ? 'English' : 'French'}',
-            ),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['error'] ?? 'Failed to translate message'),
-            backgroundColor: const Color(0xFFFF4757),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => _isProcessingAi = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to translate message. Please try again.'),
-          backgroundColor: Color(0xFFFF4757),
-        ),
-      );
-    }
+    _showLanguageSelector();
   }
 
   Future<void> _improveMessage() async {
@@ -478,7 +431,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       setState(() => _isProcessingAi = false);
 
       if (result['success'] == true) {
-        _showAiConfirmationDialog(text, result['result'], 'improve');
+        _showAiPreview(text, result['result'], 'improve');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -535,192 +488,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     }
   }
 
-  void _showAiConfirmationDialog(
-    String original,
-    String processed,
-    String action,
-  ) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        final screenSize = MediaQuery.of(context).size;
-        final maxWidth = screenSize.width * 0.85;
-        final maxHeight = screenSize.height * 0.7;
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxWidth > 400 ? 400 : maxWidth,
-              maxHeight: maxHeight > 600 ? 600 : maxHeight,
-            ),
-            child: AlertDialog(
-              title: Text(
-                action == 'rewrite' ? 'Rewrite Message' : 'Improve Message',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1B2352),
-                ),
-              ),
-              content: SizedBox(
-                width: double.infinity,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Original message:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          original,
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: null, // Allow multiple lines
-                          overflow: TextOverflow
-                              .visible, // Show overflow indicator if needed
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        action == 'rewrite'
-                            ? 'Rewritten message:'
-                            : 'Improved message:',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E8),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          processed,
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: null, // Allow multiple lines
-                          overflow: TextOverflow
-                              .visible, // Show overflow indicator if needed
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    setState(() {
-                      _msgCtrl.text = processed;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Message ${action == 'rewrite' ? 'rewritten' : 'improved'} successfully',
-                        ),
-                        backgroundColor: const Color(0xFF4CAF50),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4B63FF),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text('Confirm', style: TextStyle(fontSize: 16)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   void _showAiPreview(String original, String processed, String action) {
-    // Instant apply - no preview dialog for rewrite/improve
-    if (action == 'rewrite' || action == 'improve') {
-      setState(() {
-        _msgCtrl.text = processed;
-      });
-    } else {
-      // For translation, show language selection dialog
-      _showLanguageSelector();
-    }
-    return;
-
-    // Only translate shows preview dialog
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.translate, color: Color(0xFF4B63FF)),
-            const SizedBox(width: 8),
-            Text('Translation Preview'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Original:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+      barrierDismissible: false,
+      builder: (context) => AiTextPreviewDialog(
+        originalText: original,
+        processedText: processed,
+        action: action,
+        onAccept: () {
+          Navigator.pop(context);
+          setState(() {
+            _msgCtrl.text = processed;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                action == 'translate'
+                    ? 'Translation applied'
+                    : (action == 'rewrite' ? 'Text rewritten' : 'Text improved'),
+              ),
+              backgroundColor: const Color(0xFF4CAF50),
+              duration: const Duration(seconds: 1),
             ),
-            Text(original, style: const TextStyle(color: Color(0xFF64748B))),
-            const SizedBox(height: 12),
-            const Text(
-              'Translation:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(processed, style: const TextStyle(color: Color(0xFF1E293B))),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _msgCtrl.text = processed;
-              });
-            },
-            child: const Text('Use Translation'),
-          ),
-        ],
+          );
+        },
+        onCancel: () => Navigator.pop(context),
+        onReturn: action == 'translate' ? () {
+          Navigator.pop(context);
+          _showLanguageSelector();
+        } : null,
       ),
     );
   }

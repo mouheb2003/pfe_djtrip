@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../models/lieu_model.dart';
 import '../../services/lieu_service.dart';
-import 'place_detail_screen.dart';
+import 'place_detail_screen_v2.dart';
 import '../../widgets/place_card.dart';
+import '../../config/api_config.dart';
 
 class ViewAllPlacesScreen extends StatefulWidget {
   const ViewAllPlacesScreen({super.key});
@@ -500,39 +501,36 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
         ),
         itemCount: _filteredPlaces.length,
         itemBuilder: (context, index) {
-          return SizedBox(
-            height: 280,
-            child: _CustomPlaceCard(
-              place: _filteredPlaces[index],
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PlaceDetailScreen(
-                    place: {
-                      'titre': _filteredPlaces[index].titre,
-                      'name': _filteredPlaces[index].titre,
-                      'description': _filteredPlaces[index].description,
-                      'short_description': _filteredPlaces[index].description,
-                      'imagePortrait': _filteredPlaces[index].imagePortrait,
-                      'main_image': _filteredPlaces[index].imagePortrait,
-                      'image': _filteredPlaces[index].imagePortrait,
-                      'topDestination': _filteredPlaces[index].topDestination,
-                      'noteMoyenne': _filteredPlaces[index].noteMoyenne,
-                      'nombreAvis': _filteredPlaces[index].nombreAvis,
-                      'city': _filteredPlaces[index].city,
-                      'country': _filteredPlaces[index].country,
-                      'opening_hours':
-                          _filteredPlaces[index].openingHours ?? '',
-                      'closing_hours':
-                          _filteredPlaces[index].closingHours ?? '',
-                      'prix': _filteredPlaces[index].prix,
-                      'price': _filteredPlaces[index].prix,
-                      'amenities': _filteredPlaces[index].amenities,
-                      'reviews': _filteredPlaces[index].reviews,
-                      'booking_required':
-                          _filteredPlaces[index].bookingRequired,
-                    },
-                  ),
+          return _CustomPlaceCard(
+            place: _filteredPlaces[index],
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PlaceDetailScreenV2(
+                  place: {
+                    'titre': _filteredPlaces[index].titre,
+                    'name': _filteredPlaces[index].titre,
+                    'description': _filteredPlaces[index].description,
+                    'short_description': _filteredPlaces[index].description,
+                    'imagePortrait': _filteredPlaces[index].imagePortrait,
+                    'main_image': _filteredPlaces[index].imagePortrait,
+                    'image': _filteredPlaces[index].imagePortrait,
+                    'topDestination': _filteredPlaces[index].topDestination,
+                    'noteMoyenne': _filteredPlaces[index].noteMoyenne,
+                    'nombreAvis': _filteredPlaces[index].nombreAvis,
+                    'city': _filteredPlaces[index].city,
+                    'country': _filteredPlaces[index].country,
+                    'opening_hours':
+                        _filteredPlaces[index].openingHours ?? '',
+                    'closing_hours':
+                        _filteredPlaces[index].closingHours ?? '',
+                    'prix': _filteredPlaces[index].prix,
+                    'price': _filteredPlaces[index].prix,
+                    'amenities': _filteredPlaces[index].amenities,
+                    'reviews': _filteredPlaces[index].reviews,
+                    'booking_required':
+                        _filteredPlaces[index].bookingRequired,
+                  },
                 ),
               ),
             ),
@@ -554,7 +552,7 @@ class _ViewAllPlacesScreenState extends State<ViewAllPlacesScreen>
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => PlaceDetailScreen(
+                builder: (_) => PlaceDetailScreenV2(
                   place: {
                     'titre': _filteredPlaces[index].titre,
                     'name': _filteredPlaces[index].titre,
@@ -662,7 +660,6 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
             children: [
               // Image section
               Expanded(
-                flex: 3,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(20),
@@ -670,14 +667,26 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                   child: Stack(
                     children: [
                       Image.network(
-                        imageUrl,
+                        ApiConfig.getImageUrl(imageUrl),
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFFF8FAFC),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          );
+                        },
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFD0D9E8),
+                          color: const Color(0xFFF1F5F9),
                           child: const Center(
-                            child: Icon(Icons.image, color: Color(0xFF7A8BA6)),
+                            child: Icon(Icons.image, color: Color(0xFF94A3B8)),
                           ),
                         ),
                       ),
@@ -720,71 +729,68 @@ class _CustomPlaceCardState extends State<_CustomPlaceCard>
                 ),
               ),
               // Content section
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.place.titre,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
-                        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.place.titre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.place.sousTitre.isNotEmpty
-                            ? widget.place.sousTitre
-                            : 'Djerba',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w400,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.place.sousTitre.isNotEmpty
+                          ? widget.place.sousTitre
+                          : 'Djerba',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w400,
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.place.prix == 'FREE'
-                                  ? 'Free'
-                                  : '${widget.place.prix}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF167BFF),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 16,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.place.prix == 'FREE'
+                                ? 'Free'
+                                : '${widget.place.prix}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: Color(0xFF167BFF),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: Color(0xFF167BFF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],

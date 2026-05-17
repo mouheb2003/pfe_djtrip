@@ -13,6 +13,7 @@ import '../edit_activity_screen.dart';
 import '../verify_booking_screen.dart';
 import '../my_reservations_screen.dart';
 import '../../shared/ai_chat_screen.dart';
+import '../../../services/booking_service.dart';
 
 class MyActivitiesTab extends StatefulWidget {
   const MyActivitiesTab({super.key});
@@ -34,6 +35,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _unreadNotificationCount = 0;
+  int _pendingReservationsCount = 0;
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
     _tabController.addListener(_handleTabChange);
     _loadActivities();
     _loadUnreadCount();
+    _fetchPendingCount();
   }
 
   @override
@@ -113,6 +116,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         builder: (ctx) => StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              scrollable: true,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: const Text('Cancel Selected Activities?', style: TextStyle(fontWeight: FontWeight.w700)),
               content: Column(
@@ -210,6 +214,11 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
 
     try {
       final allActivities = await ActivityService.getAllMyActivities(refresh: refresh);
+      allActivities.sort((a, b) {
+        final aTime = a.createdAt ?? a.dateDebut ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTime = b.createdAt ?? b.dateDebut ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTime.compareTo(aTime);
+      });
       
       if (!mounted) return;
       
@@ -218,6 +227,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         _isLoading = false;
         _isRefreshing = false;
       });
+      _fetchPendingCount();
     } catch (e) {
       debugPrint('❌ Error loading activities: $e');
       if (!mounted) return;
@@ -246,6 +256,19 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       }
     } catch (e) {
       debugPrint('Error loading unread count: $e');
+    }
+  }
+  
+  Future<void> _fetchPendingCount() async {
+    try {
+      final count = await BookingService.getPendingBookingsCount();
+      if (mounted) {
+        setState(() {
+          _pendingReservationsCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching pending count: $e');
     }
   }
 
@@ -350,6 +373,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
+            scrollable: true,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -738,6 +762,31 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                                   color: AppColors.primary,
                                   size: 22,
                                 ),
+                                if (_pendingReservationsCount > 0)
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 14,
+                                        minHeight: 14,
+                                      ),
+                                      child: Text(
+                                        '$_pendingReservationsCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -747,64 +796,106 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                     ),
                   ),
                 ),
-              // Search Bar
+              // Search Bar & QR Scanner
               if (!_isSelectionMode)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (val) {
-                          setState(() {
-                            _searchQuery = val.trim();
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Search your activities...',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            color: Color(0xFF6B7280),
-                            size: 22,
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Icons.clear,
-                                    color: Color(0xFF9CA3AF),
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      _searchQuery = '';
-                                    });
-                                  },
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val.trim();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Search activities...',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  color: Color(0xFF6B7280),
+                                  size: 22,
+                                ),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(
+                                          Icons.clear,
+                                          color: Color(0xFF9CA3AF),
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _searchController.clear();
+                                            _searchQuery = '';
+                                          });
+                                        },
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        // Verify Booking QR Button next to Search
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VerifyBookingScreen(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF2E9D45).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -868,7 +959,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         ),
       ),
       floatingActionButton: _buildFloatingButtons(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -1070,135 +1161,100 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   }
 
   Widget _buildFloatingButtons() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 100, left: 190),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Chatbot FAB
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: Hero(
-              tag: 'ai_chat_fab_organizer',
-              child: Material(
-                color: const Color(0xFFFF6B1A),
-                elevation: 8,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(28),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AiChatScreen(),
-                      ),
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Icon(Icons.smart_toy, color: Colors.white, size: 22),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Verify Booking Button
-          Material(
-            color: Colors.transparent,
-            elevation: 8,
-            borderRadius: BorderRadius.circular(24),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(24),
+    return Transform.translate(
+      offset: const Offset(25, 0),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 120, right: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // AI Chatbot Button
+            GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const VerifyBookingScreen(),
+                    builder: (_) => const AiChatScreen(),
                   ),
                 );
               },
               child: Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  shape: BoxShape.circle,
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF43B95B), Color(0xFF2E9D45)],
+                    colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2E9D45).withOpacity(0.38),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+                      color: const Color(0xFF4B63FF).withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      'Verify Booking',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                child: const Icon(
+                  Icons.smart_toy_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Create Activity FAB
+            Hero(
+              tag: 'organizer_fab',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    final created = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const CreateActivityScreen(),
                       ),
+                    );
+                    if (created == true) _loadActivities(refresh: true);
+                  },
+                  borderRadius: BorderRadius.circular(26),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.primary, AppColors.primaryDark],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Create Activity FAB
-          Hero(
-            tag: 'organizer_fab',
-            child: Material(
-              color: AppColors.primary,
-              shape: const CircleBorder(),
-              elevation: 6,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () async {
-                  final created = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateActivityScreen(),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 30,
                     ),
-                  );
-                  if (created == true) _loadActivities(refresh: true);
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.primary, AppColors.primaryDark],
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 28,
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+
 }
 
 // Modern Airbnb-style Activity Card with CRUD actions
@@ -1322,6 +1378,42 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                               );
                             },
                           ),
+
+                    // Status Badge (Top Left)
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.activity.statut == 'cancelled' 
+                              ? Colors.red 
+                              : widget.statusColor,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          widget.activity.statut == 'cancelled' 
+                              ? 'CANCELLED' 
+                              : widget.activity.timelineStatus,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
 
                     // Selection Indicator (Top Right Overlays)
                     if (widget.isSelected)

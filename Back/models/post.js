@@ -71,6 +71,17 @@ const postSchema = new mongoose.Schema(
     mentions: {
       type: [String],
       default: [],
+      index: true,
+    },
+    hidden_from_profiles: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      ],
+      default: [],
+      index: true,
     },
     created_at: {
       type: Date,

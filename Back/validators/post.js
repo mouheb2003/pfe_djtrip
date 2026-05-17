@@ -10,6 +10,7 @@ exports.createPostSchema = Joi.object({
   locationLabel: Joi.string().max(200).allow("", null),
   tripLink: Joi.string().uri().allow("", null),
   hashtags: Joi.array().items(Joi.string().max(60)).max(10),
+  mentions: Joi.array().items(Joi.string().hex().length(24)).max(20),
 });
 
 exports.commentSchema = Joi.object({
@@ -24,4 +25,5 @@ exports.updatePostSchema = Joi.object({
   audience: Joi.string().valid("public", "followers"),
   locationLabel: Joi.string().max(200).allow("", null),
   hashtags: Joi.array().items(Joi.string().max(60)).max(10),
+  mentions: Joi.array().items(Joi.string().hex().length(24)).max(20),
 });

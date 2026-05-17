@@ -177,7 +177,7 @@ class OnboardingMiddleware {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: 'Access Restricted',
+          title: const Text('Access Restricted'),
           content: Text(message),
           actions: [
             TextButton(
@@ -204,7 +204,7 @@ class OnboardingMiddleware {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: 'Account Under Review',
+          title: const Text('Account Under Review'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

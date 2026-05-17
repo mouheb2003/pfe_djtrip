@@ -12,6 +12,7 @@ import 'forgot_password_screen.dart';
 import '../onboarding/user_type_selection_screen.dart';
 import '../onboarding/dynamic_onboarding_screen.dart';
 import '../organizer/waiting_approval_screen.dart';
+import '../../utils/snackbar_utils.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -268,12 +269,12 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (result['locked'] == true) {
         _startLockoutTimer(result['remainingSeconds'] as int? ?? 60);
       } else if (result['handledRestriction'] == true) {
-        setState(() => _errorMsg = null);
+        // Handled by AuthService
       } else {
-        setState(() => _errorMsg = result['message'] as String?);
+        SnackbarUtils.showError(context, result['message'] as String? ?? 'Login failed');
       }
-    } catch (_) {
-      if (mounted) setState(() => _errorMsg = 'An error occurred.');
+    } catch (e) {
+      if (mounted) SnackbarUtils.showError(context, 'An error occurred: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -419,21 +420,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Error Message
-                    if (_errorMsg != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: Text(
-                          _errorMsg!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-
+                    const SizedBox(height: 10),
                     // Login Button
                     Container(
                       height: 56,

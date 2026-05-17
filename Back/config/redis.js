@@ -100,6 +100,7 @@ process.on('SIGTERM', closeConnection);
 
 module.exports = {
   redisClient,
+  redisEnabled,
   testConnection,
   closeConnection
 };

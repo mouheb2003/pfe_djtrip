@@ -125,7 +125,7 @@ class InscriptionServiceImproved {
       try {
         final res = await ApiClient.put(
           '/inscriptions/$inscriptionId/verifier',
-          {'statut': 'verifie'},
+          {'statut': 'verified'},
         );
 
         if (res.statusCode == 200) {

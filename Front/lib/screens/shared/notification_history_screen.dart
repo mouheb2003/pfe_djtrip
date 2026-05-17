@@ -38,6 +38,14 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
                   ?.map((e) => e as Map<String, dynamic>)
                   .toList() ??
               [];
+          // Client-side descending sort by createdAt to guarantee newest is on top
+          _notifications.sort((a, b) {
+            final aTimeStr = a['createdAt'] ?? a['created_at'];
+            final bTimeStr = b['createdAt'] ?? b['created_at'];
+            final aTime = DateTime.tryParse(aTimeStr?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = DateTime.tryParse(bTimeStr?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
           _unreadCount = unreadResult['unread_count'] as int? ?? 0;
           _isLoading = false;
         });

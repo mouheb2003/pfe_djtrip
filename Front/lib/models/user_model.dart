@@ -3,7 +3,7 @@ enum UserStatus { active, suspended, banned, inactive }
 class UserModel {
   final String id;
   final String fullname;
-  final String? username;
+  // final String? username; // Deprecated
   final String email;
   final String userType; // 'Touriste' | 'Organisator'
   final String? avatar;
@@ -19,10 +19,13 @@ class UserModel {
   final bool pushNotifEnabled;
   final bool notificationsEmail;
 
+  /// Always null — username was deprecated and removed from backend schema.
+  String? get username => null;
+
   const UserModel({
     required this.id,
     required this.fullname,
-    this.username,
+    // this.username,
     required this.email,
     required this.userType,
     this.avatar,
@@ -50,7 +53,8 @@ class UserModel {
     return UserModel(
       id: json['_id'] ?? '',
       fullname: json['fullname'] ?? '',
-      username: json['username'] as String?,
+      // username: json['username'] as String?,
+      // username is deprecated — field removed from backend
       email: json['email'] ?? '',
       userType: json['userType'] ?? '',
       avatar: json['avatar'] as String?,
@@ -72,7 +76,7 @@ class UserModel {
     return {
       '_id': id,
       'fullname': fullname,
-      'username': username,
+      // 'username': username,
       'email': email,
       'userType': userType,
       'avatar': avatar,

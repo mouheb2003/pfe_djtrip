@@ -57,6 +57,22 @@ class UserProvider extends ChangeNotifier {
 
   /// Check if user is organizer
   bool get isOrganizer => hasRole('organisator');
+
+  /// Refresh user data from API
+  Future<void> refreshUser() async {
+    try {
+      final res = await ApiClient.get('/users/profile', auth: true, cacheFirst: false);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        final userData = body['user'] ?? body['data'] ?? body;
+        if (userData is Map<String, dynamic>) {
+          updateUser(userData);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing user: $e');
+    }
+  }
 }
 
 /// Generic list provider for paginated data

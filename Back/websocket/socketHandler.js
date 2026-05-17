@@ -69,6 +69,25 @@ class SocketHandler {
    */
   setupEvents() {
     this.io.on('connection', (socket) => {
+      // Intercept all incoming packets on this socket to track user activity
+      socket.use((packet, next) => {
+        try {
+          const { trackUserActivity } = require('../middleware/auth');
+          trackUserActivity(socket.userId);
+        } catch (err) {
+          logger.error('Error tracking socket activity', { error: err.message });
+        }
+        next();
+      });
+
+      // Track user activity immediately on connection
+      try {
+        const { trackUserActivity } = require('../middleware/auth');
+        trackUserActivity(socket.userId);
+      } catch (err) {
+        logger.error('Error tracking socket connection activity', { error: err.message });
+      }
+
       const timestamp = new Date().toISOString();
       const connectionSentence = `L'utilisateur ${socket.user?.fullname || socket.userId} (${socket.userType}) s'est connecté à la plateforme à ${timestamp}`;
       

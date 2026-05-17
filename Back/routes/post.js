@@ -89,11 +89,17 @@ router.get(
   postController.getAdminPosts,
 );
 router.get(
+  "/public/user/:userId",
+  verifyToken,
+  cacheGet("posts:user", 60),
+  postController.getPublicUserPosts,
+);
+router.get(
   "/user/:userId",
   verifyToken,
   verifyAdmin,
-  cacheGet("posts:user", 60),
-  postController.getUserPosts,
+  cacheGet("posts:user:admin", 60),
+  postController.getPublicUserPosts,
 );
 router.post(
   "/admin",
@@ -123,6 +129,12 @@ router.patch(
   verifyToken,
   invalidateCache(["posts:feed", "posts:me"]),
   postController.archivePost,
+);
+router.post(
+  "/:postId/hide",
+  verifyToken,
+  invalidateCache(["posts:feed", "posts:me"]),
+  postController.togglePostHide,
 );
 
 module.exports = wrapRouter(router);

@@ -18,6 +18,9 @@ import 'chat_conversation_screen.dart';
 import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
 import 'add_review_modal.dart';
+import '../../widgets/ai_text_widgets.dart';
+import '../../services/ai_text_service.dart';
+import '../../config/api_config.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final String activityId;
@@ -50,12 +53,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   List<Map<String, dynamic>> _reviews = [];
   bool _loadingReviews = false;
   String? _errorMsg;
+  String _description = '';
+  bool _isTranslating = false;
+  String? _originalDescription;
+  String? _currentLang;
 
   // Ongoing review state
   int _activityRating = 0;
   int _organizerRating = 0;
   bool _isSubmittingReview = false;
   final _reviewController = TextEditingController();
+
+  // Bookmark state
+  bool _isBookmarked = false;
+  int _bookmarksCount = 0;
+  bool _isSavingBookmark = false;
 
   final _images = const [
     // Djerba beach images - using reliable URLs
@@ -75,15 +87,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     final urlRegExp = RegExp(r'https?://[^"\\]+');
 
     for (final p in photos) {
-      final matches = urlRegExp.allMatches(p);
-      for (final m in matches) {
-        final url = m.group(0)!.replaceAll('\\/', '/');
-        if (url.contains('cloudinary.com') ||
-            url.contains('.jpg') ||
-            url.contains('.png') ||
-            url.contains('.jpeg')) {
-          extractedUrls.add(url);
-        }
+      if (p.startsWith('http')) {
+        extractedUrls.add(p);
+      } else if (p.isNotEmpty && p.toLowerCase() != 'null') {
+        extractedUrls.add(p); // ApiConfig will handle the prefix
       }
     }
     // Only use default images if NO images are provided
@@ -91,9 +98,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     return extractedUrls;
   }
 
-  String get _description => (_activity?.description ?? '').trim().isNotEmpty
-      ? _activity!.description
-      : 'No description available.';
+
 
   LatLng? get _meetingPoint {
     final coords = _activity?.coordonnees;
@@ -148,7 +153,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
       'Activity details:',
       '• Date: $date',
       '• Location: ${location.isNotEmpty ? location : 'Not specified'}',
-      '• Price: $price',
     ].join('\n');
   }
 
@@ -164,8 +168,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   bool get _hasBookingForActivity {
     final booking = _bookingForActivity;
     if (booking == null) return false;
-    // If cancelled, allow rebooking (Participate button)
-    return !booking.isCancelled;
+    // Only count as active booking if it's pending or approved
+    return booking.isPending || booking.isApproved;
   }
 
   bool get _canCancelBooking {
@@ -443,6 +447,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         );
         if (!isRefresh || newActivity != null) {
           _activity = newActivity;
+          _description = _activity?.description ?? '';
+          _originalDescription = _description;
+          _currentLang = null;
+          _showFullDesc = false;
           print('✅ Updated activity to: ${_activity?.titre ?? 'null'}');
         } else {
           print('🔒 Preserving existing activity data during refresh');
@@ -450,6 +458,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         _currentUserId = (results[1] as String? ?? '').trim();
         _currentUserType = userType;
         _bookingForActivity = booking;
+        _isBookmarked = _activity?.isBookmarked ?? false;
+        _bookmarksCount = _activity?.bookmarksCount ?? 0;
         _loadingActivity = false;
       });
 
@@ -563,10 +573,112 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     }
   }
 
+  void _showTranslationSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) => _translateDescription(lang),
+      ),
+    );
+  }
+
+  Future<void> _translateDescription(String lang) async {
+    if (_activity == null || _isTranslating) return;
+
+    setState(() => _isTranslating = true);
+
+    try {
+      final result = await AiTextService.translateText(
+        _originalDescription ?? _description,
+        lang,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        setState(() {
+          _description = result['result'];
+          _currentLang = lang;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Translation failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTranslating = false);
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_activity == null || _isSavingBookmark) return;
+
+    final activityId = widget.activityId;
+    final currentBookmarked = _isBookmarked;
+    final currentCount = _bookmarksCount;
+
+    // Optimistic UI update
+    setState(() {
+      _isBookmarked = !currentBookmarked;
+      _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+      _isSavingBookmark = true;
+    });
+
+    try {
+      final result = await ActivityService.toggleActivityBookmark(activityId);
+      if (result['success'] == true) {
+        if (mounted) {
+          setState(() {
+            _isBookmarked = result['bookmarked'] == true;
+            _bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? _bookmarksCount;
+          });
+        }
+      } else {
+        // Revert on failure
+        if (mounted) {
+          setState(() {
+            _isBookmarked = currentBookmarked;
+            _bookmarksCount = currentCount;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update bookmark')),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error toggling bookmark: $e');
+      if (mounted) {
+        setState(() {
+          _isBookmarked = currentBookmarked;
+          _bookmarksCount = currentCount;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingBookmark = false);
+      }
+    }
+  }
+
+
+
+  void _resetDescription() {
+    setState(() {
+      _description = _originalDescription ?? _description;
+      _currentLang = null;
+      _showFullDesc = false;
+    });
+  }
+
   Future<void> _loadParticipants() async {
     if (_activity == null) return;
-    // Allow all users to see participants, but apply privacy filtering
-    if (!(_activity!.isOngoing || _activity!.isPast)) {
+    // Allow the activity organizer to always load participants
+    if (!_isActivityOrganizer && !(_activity!.isOngoing || _activity!.isPast)) {
       print(
         '🔍 [PARTICIPANTS] Activity not ongoing/past, skipping participants load',
       );
@@ -826,8 +938,26 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                               setState(() => _currentImage = i),
                           itemCount: _displayImages.length,
                           itemBuilder: (ctx, i) => Image.network(
-                            _displayImages[i],
+                            ApiConfig.getImageUrl(_displayImages[i]),
                             fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: const Color(0xFFF1F5F9),
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFFF1F5F9),
+                              child: const Center(
+                                child: Icon(Icons.image, color: Color(0xFF94A3B8), size: 40),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -837,6 +967,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                         child: _TopIconButton(
                           icon: Icons.arrow_back,
                           onTap: () => Navigator.pop(context),
+                        ),
+                      ),
+                      Positioned(
+                        top: 40,
+                        right: 16,
+                        child: _TopIconButton(
+                          icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                          iconColor: _isBookmarked ? AppColors.primary : null,
+                          onTap: _toggleBookmark,
                         ),
                       ),
                     ],
@@ -851,16 +990,73 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                         const SizedBox(height: 20),
                         _HeroSummaryCard(activity: activity),
                         const SizedBox(height: 20),
-                        _SectionTitle('Description'),
-                        Text(
-                          _description,
-                          style: TextStyle(
-                            fontSize: 15,
-                            height: 1.6,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _SectionTitle('Description'),
+                            if (_isTranslating)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else if (_currentLang != null)
+                              TextButton.icon(
+                                onPressed: _resetDescription,
+                                icon: const Icon(Icons.undo, size: 16),
+                                label: const Text('Original'),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                                ),
+                              )
+                            else
+                              TextButton.icon(
+                                onPressed: _showTranslationSelector,
+                                icon: const Icon(Icons.translate, size: 16),
+                                label: const Text('Translate'),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (_description.length > 150 && !_showFullDesc)
+                                  ? '${_description.substring(0, 150)}...'
+                                  : _description,
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.6,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (_description.length > 150)
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _showFullDesc = !_showFullDesc;
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 6.0),
+                                  child: Text(
+                                    _showFullDesc ? 'Show less' : 'Show more',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         _SectionTitle('Included Equipment'),
                         _TagListSection(
@@ -947,9 +1143,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                             );
                           },
                         ),
-                        // Participants section (visible to all users for ongoing/past activities)
-                        if ((_activity?.isOngoing == true ||
-                            _activity?.isPast == true)) ...[
+                        // Participants section (visible to all users for ongoing/past activities, always visible to organizer)
+                        if (_isActivityOrganizer ||
+                            _activity?.isOngoing == true ||
+                            _activity?.isPast == true) ...[
                           _SectionTitle('Participants'),
                           if (_loadingParticipants)
                             const Center(
@@ -1340,20 +1537,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
               bottom: 0,
               child: _StickyBottomBar(
                 price: activity.prixFormatted,
-                showPrice: !_hasBookingForActivity,
+                showPrice: !_hasBookingForActivity && activity.prix > 0,
                 buttonLabel: _hasBookingForActivity
-                    ? 'Check reservation status'
+                    ? 'Cancel Reservation'
                     : 'Participate',
-                isCancel: false,
+                isCancel: _hasBookingForActivity,
                 onBook: _isBooking
                     ? null
                     : (_hasBookingForActivity
-                          ? _checkReservationStatus
+                          ? _deletePendingBooking
                           : _bookActivity),
                 isLoading: _isBooking,
                 showDeleteButton: _hasBookingForActivity,
-                deleteIcon: Icons.cancel_outlined,
-                onDelete: _deletePendingBooking,
+                deleteIcon: Icons.info_outline,
+                onDelete: _openBookingStatus,
               ),
             ),
         ],
@@ -1365,7 +1562,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 class _TopIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _TopIconButton({required this.icon, required this.onTap});
+  final Color? iconColor;
+  const _TopIconButton({required this.icon, required this.onTap, this.iconColor});
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -1376,7 +1574,7 @@ class _TopIconButton extends StatelessWidget {
           color: Colors.white,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.black87, size: 20),
+        child: Icon(icon, color: iconColor ?? Colors.black87, size: 20),
       ),
     );
   }
@@ -1617,12 +1815,6 @@ class _HeroSummaryCard extends StatelessWidget {
                     width: itemWidth,
                   ),
                   _infoTile(
-                    icon: Icons.payments_outlined,
-                    label: 'Prix / personne',
-                    value: activity.prixFormatted,
-                    width: itemWidth,
-                  ),
-                  _infoTile(
                     icon: Icons.language,
                     label: 'Langues',
                     value: languages,
@@ -1750,7 +1942,9 @@ class _ParticipantCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+              backgroundImage: avatar.isNotEmpty
+                  ? NetworkImage(ApiConfig.getImageUrl(avatar))
+                  : null,
               child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
             ),
             const SizedBox(width: 16),
@@ -2334,7 +2528,7 @@ class _OrganizerCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundImage: avatar.isNotEmpty
-                      ? NetworkImage(avatar)
+                      ? NetworkImage(ApiConfig.getImageUrl(avatar))
                       : null,
                   child: avatar.isEmpty ? const Icon(Icons.person) : null,
                 ),

@@ -95,6 +95,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               result['notifications'].map((n) => NotificationModel.fromJson(n)),
             ));
           }
+          // Client-side descending sort by createdAt to guarantee newest is on top
+          _notifications.sort((a, b) {
+            final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
           _hasMore = result['pagination']['hasMore'] ?? false;
           _isLoading = false;
           _isLoadingMore = false;
@@ -132,6 +138,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _notifications.addAll(List<NotificationModel>.from(
             result['notifications'].map((n) => NotificationModel.fromJson(n)),
           ));
+          // Client-side descending sort by createdAt to guarantee newest is on top
+          _notifications.sort((a, b) {
+            final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
           _hasMore = result['pagination']['hasMore'] ?? false;
           _isLoadingMore = false;
         });

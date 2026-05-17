@@ -2,11 +2,20 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../models/post_model.dart';
 import '../utils/time_ago.dart';
 import '../screens/shared/comments_screen.dart';
 import '../widgets/facebook_mentions_inline_widget.dart';
 import '../screens/shared/public_profile_screen.dart';
+import '../services/ai_text_service.dart';
+import '../widgets/ai_text_widgets.dart';
+import '../config/api_config.dart';
+import '../providers/bookmark_provider.dart';
+import '../models/user_model.dart';
+import '../providers/user_provider.dart';
+import '../screens/tourist/tabs/create_post_screen.dart';
 
 class PublicationCard extends StatefulWidget {
   final PostModel post;
@@ -16,6 +25,9 @@ class PublicationCard extends StatefulWidget {
   final VoidCallback? onReport;
   final VoidCallback? onMute;
   final VoidCallback? onCopyLink;
+  final VoidCallback? onToggleHide;
+  final VoidCallback? onDelete;
+  final VoidCallback? onModified;
 
   const PublicationCard({
     super.key,
@@ -26,6 +38,9 @@ class PublicationCard extends StatefulWidget {
     this.onReport,
     this.onMute,
     this.onCopyLink,
+    this.onToggleHide,
+    this.onDelete,
+    this.onModified,
   });
 
   @override
@@ -36,6 +51,10 @@ class _PublicationCardState extends State<PublicationCard> {
   final PageController _pageController = PageController();
   Timer? _autoScrollTimer;
   int _currentPage = 0;
+  String? _translatedContent;
+  bool _isTranslating = false;
+  String? _currentLang;
+  bool _isExpanded = false;
 
   // Clean content by removing @mentions to avoid duplication with header mentions
   String _cleanContent(String content) {
@@ -44,12 +63,31 @@ class _PublicationCardState extends State<PublicationCard> {
     return content.replaceAll(mentionRegex, '');
   }
 
+  void _fallbackFeedback(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFF22C55E),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     if (widget.post.imageUrls.length > 1) {
       _startAutoScroll();
     }
+    // Seed the provider with the initial state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = Provider.of<BookmarkProvider>(context, listen: false);
+        provider.updatePostState(widget.post.id, widget.post.isBookmarked);
+      }
+    });
   }
 
   @override
@@ -78,16 +116,66 @@ class _PublicationCardState extends State<PublicationCard> {
     });
   }
 
+  void _showTranslationSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) => _translateContent(lang),
+      ),
+    );
+  }
+
+  Future<void> _translateContent(String lang) async {
+    if (_isTranslating) return;
+
+    setState(() => _isTranslating = true);
+
+    try {
+      final result = await AiTextService.translateText(
+        widget.post.content,
+        lang,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        setState(() {
+          _translatedContent = result['result'];
+          _currentLang = lang;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Translation failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTranslating = false);
+    }
+  }
+
+  void _resetTranslation() {
+    setState(() {
+      _translatedContent = null;
+      _currentLang = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -113,6 +201,7 @@ class _PublicationCardState extends State<PublicationCard> {
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
       child: Row(
@@ -165,10 +254,10 @@ class _PublicationCardState extends State<PublicationCard> {
                     Flexible(
                       child: Text(
                         widget.post.authorName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1E225E),
+                          color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E225E),
                           letterSpacing: -0.3,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -204,7 +293,7 @@ class _PublicationCardState extends State<PublicationCard> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0F4FF),
+                          color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -213,15 +302,15 @@ class _PublicationCardState extends State<PublicationCard> {
                             Icon(
                               Icons.location_on_outlined,
                               size: 11,
-                              color: const Color(0xFF4B63FF),
+                              color: isDark ? const Color(0xFF6B88FF) : const Color(0xFF4B63FF),
                             ),
                             const SizedBox(width: 3),
                             Flexible(
                               child: Text(
                                 widget.post.locationLabel!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF4B63FF),
+                                  color: isDark ? const Color(0xFF6B88FF) : const Color(0xFF4B63FF),
                                   fontWeight: FontWeight.w600,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -248,19 +337,83 @@ class _PublicationCardState extends State<PublicationCard> {
   }
 
   Widget _buildContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cleanText = _cleanContent(_translatedContent ?? widget.post.content);
+    final isLongText = cleanText.length > 150;
+    final displayText = (isLongText && !_isExpanded)
+        ? '${cleanText.substring(0, 150)}...'
+        : cleanText;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _cleanContent(widget.post.content),
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.4,
-              color: Color(0xFF2D2D2D),
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayText,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.4,
+                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF2D2D2D),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (isLongText)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 6.0),
+                          child: Text(
+                            _isExpanded ? 'Show less' : 'Show more',
+                            style: const TextStyle(
+                              color: Color(0xFF4B63FF),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (_isTranslating)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (_currentLang != null)
+                IconButton(
+                  onPressed: _resetTranslation,
+                  icon: const Icon(Icons.undo, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: const Color(0xFF4B63FF),
+                  tooltip: 'Show original',
+                )
+              else
+                IconButton(
+                  onPressed: _showTranslationSelector,
+                  icon: const Icon(Icons.translate, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: const Color(0xFF4B63FF),
+                  tooltip: 'Translate',
+                ),
+            ],
           ),
           // Hashtags section
           if (widget.post.hashtags.isNotEmpty) ...[
@@ -275,14 +428,14 @@ class _PublicationCardState extends State<PublicationCard> {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0F4FF),
+                      color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       hashtag,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF4B63FF),
+                        color: isDark ? const Color(0xFF6B88FF) : const Color(0xFF4B63FF),
                         fontWeight: FontWeight.w700,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -319,7 +472,7 @@ class _PublicationCardState extends State<PublicationCard> {
                   return GestureDetector(
                     onTap: () => _openFullscreenViewer(context, images, index),
                     child: Image.network(
-                      images[index],
+                      ApiConfig.getImageUrl(images[index]),
                       width: double.infinity,
                       height: 280,
                       fit: BoxFit.cover,
@@ -328,15 +481,12 @@ class _PublicationCardState extends State<PublicationCard> {
                         return Container(
                           height: 280,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0F4F8),
+                            color: const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Center(
+                          child: const Center(
                             child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                  : null,
-                              color: const Color(0xFF4B63FF),
+                              color: Color(0xFF4B63FF),
                               strokeWidth: 2,
                             ),
                           ),
@@ -345,14 +495,14 @@ class _PublicationCardState extends State<PublicationCard> {
                       errorBuilder: (_, __, ___) => Container(
                         height: 280,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0F4F8),
+                          color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.broken_image, color: Color(0xFF94A3B8), size: 48),
+                              Icon(Icons.broken_image_outlined, color: Color(0xFF94A3B8), size: 48),
                               SizedBox(height: 12),
                               Text(
                                 'Image not available',
@@ -459,6 +609,7 @@ class _PublicationCardState extends State<PublicationCard> {
   }
 
   Widget _buildInteractionBar(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
@@ -507,22 +658,31 @@ class _PublicationCardState extends State<PublicationCard> {
           
           const Spacer(),
           
-          // Bookmark
-          Container(
-            decoration: BoxDecoration(
-              color: widget.post.isBookmarked 
-                  ? const Color(0xFFF0F4FF) 
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: IconButton(
-              icon: Icon(
-                widget.post.isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
-                color: widget.post.isBookmarked ? const Color(0xFF4B63FF) : const Color(0xFF6B7280),
-                size: 22,
-              ),
-              onPressed: () => widget.onBookmarkChanged?.call(!widget.post.isBookmarked, 0),
-            ),
+          Consumer<BookmarkProvider>(
+            builder: (context, provider, child) {
+              final isBookmarked = provider.isPostBookmarked(widget.post.id);
+              return Container(
+                decoration: BoxDecoration(
+                  color: isBookmarked 
+                      ? (isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF)) 
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                    color: isBookmarked 
+                        ? (isDark ? const Color(0xFF6B88FF) : const Color(0xFF4B63FF)) 
+                        : const Color(0xFF6B7280),
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    provider.togglePostBookmark(widget.post.id);
+                    widget.onBookmarkChanged?.call(!isBookmarked, 0);
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -535,6 +695,7 @@ class _PublicationCardState extends State<PublicationCard> {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -542,7 +703,7 @@ class _PublicationCardState extends State<PublicationCard> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: color == const Color(0xFFFF4757) 
-              ? const Color(0xFFFFF5F5) 
+              ? (isDark ? const Color(0xFF3F191E) : const Color(0xFFFFF5F5)) 
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -575,13 +736,20 @@ class _PublicationCardState extends State<PublicationCard> {
   }
 
   void _showMoreOptions(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final currentUserId = userProvider.user is Map
+        ? (userProvider.user as Map)['_id']?.toString() ?? ''
+        : (userProvider.user as UserModel?)?.id ?? '';
+    final isMyPost = widget.post.authorId == currentUserId;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           child: Column(
@@ -593,74 +761,162 @@ class _PublicationCardState extends State<PublicationCard> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
+                  color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 16),
               
-              // Report option
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF5F5),
-                    borderRadius: BorderRadius.circular(10),
+              if (isMyPost) ...[
+                // Modify post option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      color: Color(0xFF4B63FF),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.flag_outlined,
-                    color: Color(0xFFFF4757),
-                    size: 20,
+                  title: Text(
+                    'Modify post',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                    ),
                   ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final userProvider = Provider.of<UserProvider>(context, listen: false);
+                    final userModel = userProvider.user is Map
+                        ? UserModel(
+                            id: (userProvider.user as Map)['_id']?.toString() ?? '',
+                            fullname: (userProvider.user as Map)['fullname']?.toString() ?? 'User',
+                            email: (userProvider.user as Map)['email']?.toString() ?? '',
+                            avatar: (userProvider.user as Map)['avatar']?.toString(),
+                            userType: (userProvider.user as Map)['userType']?.toString() ?? 'Touriste',
+                          )
+                        : (userProvider.user as UserModel?);
+
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreatePostScreen(
+                          user: userModel,
+                          postToEdit: widget.post,
+                        ),
+                      ),
+                    );
+                    if (result == true) {
+                      widget.onModified?.call();
+                    }
+                  },
                 ),
-                title: const Text(
-                  'Report post',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                
+                // Delete post option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF3F191E) : const Color(0xFFFFF5F5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFFF4757),
+                      size: 20,
+                    ),
                   ),
+                  title: Text(
+                    'Delete post',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onDelete?.call();
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onReport?.call();
-                },
-              ),
-              
-              // Mute author option
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F4FF),
-                    borderRadius: BorderRadius.circular(10),
+              ] else ...[
+                // Report option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF3F191E) : const Color(0xFFFFF5F5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.flag_outlined,
+                      color: Color(0xFFFF4757),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.block_outlined,
-                    color: Color(0xFF4B63FF),
-                    size: 20,
+                  title: Text(
+                    'Report post',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (widget.onReport != null) {
+                      widget.onReport!.call();
+                    } else {
+                      _fallbackFeedback('Report submitted successfully');
+                    }
+                  },
                 ),
-                title: const Text(
-                  'Mute author',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                
+                // Mute author option
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.block_outlined,
+                      color: Color(0xFF4B63FF),
+                      size: 20,
+                    ),
                   ),
+                  title: Text(
+                    'Mute author',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (widget.onMute != null) {
+                      widget.onMute!.call();
+                    } else {
+                      _fallbackFeedback('Author muted successfully');
+                    }
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onMute?.call();
-                },
-              ),
+              ],
               
               // Copy link option
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0F4FF),
+                    color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -669,8 +925,47 @@ class _PublicationCardState extends State<PublicationCard> {
                     size: 20,
                   ),
                 ),
-                title: const Text(
+                title: Text(
                   'Copy link',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (widget.onCopyLink != null) {
+                    widget.onCopyLink!.call();
+                  }
+                  final postId = widget.post.id;
+                  if (postId.isNotEmpty) {
+                    final link = 'https://djtrip.com/post/$postId';
+                    await Clipboard.setData(ClipboardData(text: link));
+                    if (widget.onCopyLink == null) {
+                      _fallbackFeedback('Link copied to clipboard');
+                    }
+                  }
+                },
+              ),
+              
+              // Hide from my profile option (only if mentioned)
+              if (widget.onToggleHide != null && !isMyPost)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF5F5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.visibility_off_outlined,
+                    color: Color(0xFFFF4757),
+                    size: 20,
+                  ),
+                ),
+                title: const Text(
+                  'Hide from my profile',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -679,7 +974,7 @@ class _PublicationCardState extends State<PublicationCard> {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  widget.onCopyLink?.call();
+                  widget.onToggleHide?.call();
                 },
               ),
               

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../models/lieu_model.dart';
 import '../../../models/place_model.dart';
@@ -6,14 +6,16 @@ import '../../../models/activity_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../services/place_service.dart';
 import '../../../services/activity_service.dart';
-import '../place_detail_screen.dart';
+import '../place_detail_screen_v2.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/ai_chat_screen.dart';
 import '../view_all_activities_screen.dart';
 import '../view_all_places_screen.dart';
 import '../../shared/activity_card.dart';
 import '../../../widgets/place_card.dart';
+import '../../../widgets/auto_image_carousel.dart';
 import '../../../theme/app_theme.dart';
+import '../../../config/api_config.dart';
 
 class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
@@ -54,6 +56,19 @@ class _HomeTabState extends State<HomeTab> {
   List<Map<String, dynamic>> _searchSuggestions = [];
 
   static const String _heroImage = 'assets/Pics/Djerba.png';
+
+  final List<String> _djerbaImages = [
+    'assets/Djerba/gettyimages-101567860-612x612.jpg',
+    'assets/Djerba/gettyimages-1269508745-612x612.jpg',
+    'assets/Djerba/gettyimages-1371715227-612x612.jpg',
+    'assets/Djerba/gettyimages-1453337090-612x612.jpg',
+    'assets/Djerba/gettyimages-152414916-612x612.jpg',
+    'assets/Djerba/gettyimages-152414928-612x612.jpg',
+    'assets/Djerba/gettyimages-157642812-612x612.jpg',
+    'assets/Djerba/gettyimages-1742628854-612x612.jpg',
+    'assets/Djerba/gettyimages-2150829217-612x612.jpg',
+    'assets/Djerba/gettyimages-2263668070-612x612.jpg',
+  ];
 
   static const String _djerbaHeroImage =
       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1500&q=80';
@@ -298,7 +313,7 @@ class _HomeTabState extends State<HomeTab> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => PlaceDetailScreen(
+          builder: (context) => PlaceDetailScreenV2(
             place: {
               'titre': lieu.titre,
               'name': lieu.titre,
@@ -373,8 +388,9 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F3),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF3F3F3),
       body: RefreshIndicator(
         onRefresh: _loadLieux,
         child: ListView(
@@ -391,9 +407,9 @@ class _HomeTabState extends State<HomeTab> {
             Transform.translate(
               offset: const Offset(0, -32),
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF3F3F3),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF121212) : const Color(0xFFF3F3F3),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                 child: Column(
@@ -409,19 +425,21 @@ class _HomeTabState extends State<HomeTab> {
                           Container(
                             height: 50,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                               borderRadius: BorderRadius.circular(25),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
                               ],
                             ),
                             child: TextField(
                               controller: _searchController,
                               focusNode: _searchFocusNode,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                               onChanged: (value) {
                                 setState(() {
                                   _searchQuery = value.toLowerCase();
@@ -477,7 +495,7 @@ class _HomeTabState extends State<HomeTab> {
                               right: 0,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
@@ -495,15 +513,29 @@ class _HomeTabState extends State<HomeTab> {
                                     final suggestion =
                                         _searchSuggestions[index];
                                     return ListTile(
+                                      tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                                       leading: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: Image.network(
-                                          suggestion['image'] ?? '',
+                                          ApiConfig.getImageUrl(suggestion['image'] ?? ''),
                                           width: 48,
                                           height: 48,
                                           fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Container(
+                                              width: 48,
+                                              height: 48,
+                                              color: const Color(0xFFF1F5F9),
+                                              child: const Center(
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
                                                 return Container(
                                                   width: 48,
                                                   height: 48,
@@ -563,55 +595,67 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Djerba Hero Section
+                    // Djerba Hero Section with Carousel
                     Container(
                       height: 200,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        image: DecorationImage(
-                          image: NetworkImage(_djerbaHeroImage),
-                          fit: BoxFit.cover,
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.6),
-                            ],
+                      child: Stack(
+                        children: [
+                          AutoImageCarousel(
+                            imageUrls: _djerbaImages,
+                            borderRadius: BorderRadius.circular(16),
+                            interval: const Duration(seconds: 4),
                           ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              const Text(
-                                'Djerba',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: -1,
-                                ),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.6),
+                                ],
                               ),
-                              const Text(
-                                'The Pearl of the Mediterranean',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  'Djerba',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -1,
+                                  ),
+                                ),
+                                const Text(
+                                  'The Pearl of the Mediterranean',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -620,13 +664,13 @@ class _HomeTabState extends State<HomeTab> {
                     // Top Rated Places Section
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Top Rated Places',
                             style: TextStyle(
                               fontSize: 44 / 2,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF111827),
+                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                             ),
                           ),
                         ),
@@ -677,7 +721,7 @@ class _HomeTabState extends State<HomeTab> {
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => PlaceDetailScreen(
+                                      builder: (_) => PlaceDetailScreenV2(
                                         place: _toPlaceMap(lieu),
                                       ),
                                     ),
@@ -706,10 +750,10 @@ class _HomeTabState extends State<HomeTab> {
                               Expanded(
                                 child: Text(
                                   _formatCategoryName(category),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 44 / 2,
                                     fontWeight: FontWeight.w900,
-                                    color: Color(0xFF111827),
+                                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                                   ),
                                 ),
                               ),
@@ -753,7 +797,7 @@ class _HomeTabState extends State<HomeTab> {
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => PlaceDetailScreen(
+                                      builder: (_) => PlaceDetailScreenV2(
                                         place: _toPlaceMap(lieu),
                                       ),
                                     ),
@@ -770,13 +814,13 @@ class _HomeTabState extends State<HomeTab> {
                     // Top Activities Section
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Top Activities',
                             style: TextStyle(
                               fontSize: 44 / 2,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF111827),
+                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                             ),
                           ),
                         ),
@@ -805,10 +849,10 @@ class _HomeTabState extends State<HomeTab> {
                         ? Container(
                             height: 180,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: const Color(0xFFE5E7EB),
+                                color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB),
                               ),
                             ),
                             child: const Center(
@@ -844,139 +888,15 @@ class _HomeTabState extends State<HomeTab> {
                                   const SizedBox(width: 12),
                               itemBuilder: (context, index) {
                                 final activity = _topActivities[index];
-                                return Container(
-                                  width: 160,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
+                                return _HomeActivityCard(
+                                  activity: activity,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ActivityDetailScreen(
+                                        activityId: activity.id,
                                       ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        flex: 3,
-                                        child: ClipRRect(
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(16),
-                                              ),
-                                          child: Stack(
-                                            children: [
-                                              Container(
-                                                width: double.infinity,
-                                                height: double.infinity,
-                                                color: const Color(0xFFF3F4F6),
-                                                child:
-                                                    activity.imageUrl.isNotEmpty
-                                                    ? Image.network(
-                                                        activity.imageUrl,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (
-                                                              _,
-                                                              __,
-                                                              ___,
-                                                            ) => const Center(
-                                                              child: Icon(
-                                                                Icons.event,
-                                                                color: Color(
-                                                                  0xFF9CA3AF,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                      )
-                                                    : const Center(
-                                                        child: Icon(
-                                                          Icons.event,
-                                                          color: Color(
-                                                            0xFF9CA3AF,
-                                                          ),
-                                                        ),
-                                                      ),
-                                              ),
-                                              Positioned(
-                                                top: 8,
-                                                right: 8,
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withOpacity(0.7),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    '${activity.noteMoyenne.toStringAsFixed(1)}',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(10),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                activity.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF1E293B),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                activity.organisateur?['name'] ??
-                                                    'Unknown',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                  color: Color(0xFF64748B),
-                                                ),
-                                              ),
-                                              const Spacer(),
-                                              Text(
-                                                activity.prixFormatted,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Color(0xFF167BFF),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 );
                               },
@@ -1221,6 +1141,7 @@ class _CategoryAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -1251,7 +1172,6 @@ class _CategoryAvatar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
           SizedBox(
             width: 72,
             child: Text(
@@ -1259,9 +1179,9 @@ class _CategoryAvatar extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF0F172A),
+                color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1280,6 +1200,7 @@ class _TopDestinationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final imageUrl = lieu.displayImage.isNotEmpty
         ? lieu.displayImage
         : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80';
@@ -1289,14 +1210,15 @@ class _TopDestinationCard extends StatelessWidget {
       child: Container(
         width: 200,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
           ],
         ),
         child: Column(
@@ -1312,13 +1234,25 @@ class _TopDestinationCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Image.network(
-                      imageUrl,
+                      ApiConfig.getImageUrl(imageUrl),
                       fit: BoxFit.cover,
                       width: double.infinity,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: const Color(0xFFF8FAFC),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        );
+                      },
                       errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFD0D9E8),
+                        color: const Color(0xFFF1F5F9),
                         child: const Center(
-                          child: Icon(Icons.image, color: Color(0xFF7A8BA6)),
+                          child: Icon(Icons.image, color: Color(0xFF94A3B8)),
                         ),
                       ),
                     ),
@@ -1372,10 +1306,10 @@ class _TopDestinationCard extends StatelessWidget {
                       lieu.titre,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1383,9 +1317,9 @@ class _TopDestinationCard extends StatelessWidget {
                       lieu.sousTitre.isNotEmpty ? lieu.sousTitre : 'Djerba',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF64748B),
+                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -1407,7 +1341,7 @@ class _TopDestinationCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -1434,13 +1368,14 @@ class _PlanTripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 226,
       padding: const EdgeInsets.fromLTRB(22, 20, 16, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFFDDE9F3),
+        color: isDark ? const Color(0xFF1E2530) : const Color(0xFFDDE9F3),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFCFE0EE)),
+        border: Border.all(color: isDark ? const Color(0xFF2E3B4E) : const Color(0xFFCFE0EE)),
       ),
       child: Row(
         children: [
@@ -1448,19 +1383,19 @@ class _PlanTripCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Plan Your Perfect Trip',
                   style: TextStyle(
-                    color: Color(0xFF0F172A),
+                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Discover & Book in one place!',
                   style: TextStyle(
-                    color: Color(0xFF475569),
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF475569),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1495,14 +1430,14 @@ class _PlanTripCard extends StatelessWidget {
           Container(
             width: 126,
             height: 126,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFFB9DDED),
+              color: isDark ? const Color(0xFF2D4B5E) : const Color(0xFFB9DDED),
             ),
-            child: const Center(
+            child: Center(
               child: Icon(
                 Icons.beach_access,
-                color: Color(0xFF2A6388),
+                color: isDark ? const Color(0xFF68A5CE) : const Color(0xFF2A6388),
                 size: 48,
               ),
             ),
@@ -1520,10 +1455,11 @@ class _EmptyDestinations extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 220,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Center(
@@ -1538,6 +1474,219 @@ class _EmptyDestinations extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextButton(onPressed: onRetry, child: const Text('Refresh')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeActivityCard extends StatefulWidget {
+  final ActivityModel activity;
+  final VoidCallback onTap;
+
+  const _HomeActivityCard({required this.activity, required this.onTap});
+
+  @override
+  State<_HomeActivityCard> createState() => _HomeActivityCardState();
+}
+
+class _HomeActivityCardState extends State<_HomeActivityCard> {
+  late bool _isBookmarked;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isBookmarked = widget.activity.isBookmarked;
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isSaving) return;
+    final prev = _isBookmarked;
+    setState(() {
+      _isBookmarked = !prev;
+      _isSaving = true;
+    });
+    try {
+      final result = await ActivityService.toggleActivityBookmark(widget.activity.id);
+      if (mounted) {
+        setState(() {
+          _isBookmarked = result['success'] == true
+              ? result['bookmarked'] == true
+              : prev;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isBookmarked = prev);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activity = widget.activity;
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        width: 160,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      color: const Color(0xFFF3F4F6),
+                      child: activity.imageUrl.isNotEmpty
+                          ? Image.network(
+                              ApiConfig.getImageUrl(activity.imageUrl),
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: const Color(0xFFF8FAFC),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.event, color: Color(0xFF94A3B8)),
+                              ),
+                            )
+                          : const Center(
+                              child: Icon(Icons.event, color: Color(0xFF94A3B8)),
+                            ),
+                    ),
+                    // Rating badge (top-left)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.65),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star, color: Color(0xFFFFC529), size: 10),
+                            const SizedBox(width: 2),
+                            Text(
+                              activity.noteMoyenne.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Bookmark button (top-right)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: _toggleBookmark,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _isBookmarked
+                                ? Icons.bookmark
+                                : Icons.bookmark_border_rounded,
+                            size: 16,
+                            color: _isBookmarked
+                                ? const Color(0xFF167BFF)
+                                : const Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      activity.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      activity.organisateur?['fullname'] ??
+                          activity.organisateur?['nom_organisation'] ??
+                          activity.organisateur?['name'] ??
+                          'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      activity.prixFormatted,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF167BFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

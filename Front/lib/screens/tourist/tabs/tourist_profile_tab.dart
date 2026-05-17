@@ -18,10 +18,11 @@ import '../../shared/edit_profile_screen.dart';
 import '../../shared/settings_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
-import '../place_detail_screen.dart';
+import '../place_detail_screen_v2.dart';
 import '../all_places_simple.dart';
 import '../../../widgets/mention_text_widget.dart';
 import 'screen_network.dart';
+import '../../../utils/snackbar_utils.dart';
 
 class TouristProfileTab extends StatefulWidget {
   final ValueChanged<int>? onNavigateToTab;
@@ -158,17 +159,6 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     return 'Just now';
   }
 
-  void _copyUsername(String username) {
-    Clipboard.setData(ClipboardData(text: '@$username'));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Username @$username copied to clipboard!'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   void _showAvatarFullScreen(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return;
@@ -249,20 +239,22 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       barrierLabel: 'Delete post',
       barrierColor: Colors.black.withOpacity(0.5),
       pageBuilder: (context, _, __) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return SafeArea(
           child: Center(
             child: Container(
               width: 320,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
+                  if (!isDark)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
                 ],
               ),
               child: Column(
@@ -273,7 +265,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF2F0),
+                      color: isDark ? const Color(0xFF2D1616) : const Color(0xFFFFF2F0),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -285,24 +277,24 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   const SizedBox(height: 20),
 
                   // Title
-                  const Text(
+                  Text(
                     'Delete Post',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // Description
-                  const Text(
+                  Text(
                     'This post will be permanently deleted.\nYou won\'t be able to recover it later.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
-                      color: Color(0xFF6B7280),
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                       height: 1.5,
                       letterSpacing: 0.2,
                     ),
@@ -375,22 +367,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
 
     if (result['success'] == true) {
       await _loadAll();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Post deleted successfully'),
-          backgroundColor: Color(0xFF22C55E),
-        ),
-      );
+      SnackbarUtils.showSuccess(context, 'Post deleted successfully');
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result['message']?.toString() ?? 'Unable to delete post.',
-        ),
-        backgroundColor: const Color(0xFFDC2626),
-      ),
+    SnackbarUtils.showError(
+      context, 
+      result['message']?.toString() ?? 'Unable to delete post.'
     );
   }
 
@@ -403,9 +386,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     if (!mounted || updated != true) return;
     await _loadAll();
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Post updated.')));
+    SnackbarUtils.showSuccess(context, 'Post updated.');
   }
 
   Future<void> _showPostActions(Map<String, dynamic> post) async {
@@ -418,6 +399,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       barrierColor: Colors.black.withOpacity(0.22),
       isScrollControlled: true,
       builder: (sheetContext) {
+        final isDark = Theme.of(sheetContext).brightness == Brightness.dark;
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: SafeArea(
@@ -425,9 +407,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
               padding: const EdgeInsets.only(top: 30),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF4F4FB),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF4F4FB),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -436,7 +418,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       width: 54,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFB6B6CC),
+                        color: isDark ? const Color(0xFF3E3E4A) : const Color(0xFFB6B6CC),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -462,7 +444,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         await Share.share(content);
                       },
                     ),
-                    const Divider(height: 26, color: Color(0xFFE0E1EF)),
+                    Divider(height: 26, color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE0E1EF)),
                     _ActionRow(
                       icon: Icons.delete_rounded,
                       label: 'Delete Post',
@@ -503,11 +485,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF6F6FD),
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : const Color(0xFFF6F6FD),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setModalState) {
             final byParent = <String, List<Map<String, dynamic>>>{};
@@ -531,13 +514,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
               );
               if (result['success'] != true) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      result['message']?.toString() ?? 'Unable to add comment.',
-                    ),
-                  ),
-                );
+                SnackbarUtils.showError(context, result['message']?.toString() ?? 'Unable to add comment.');
                 return;
               }
 
@@ -649,11 +626,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           Expanded(
                             child: TextField(
                               controller: inputCtrl,
-                              decoration: const InputDecoration(
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                              decoration: InputDecoration(
                                 hintText: 'Write a comment...',
                                 filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
+                                fillColor: isDark ? const Color(0xFF2E2E2E) : Colors.white,
+                                border: const OutlineInputBorder(
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(18),
                                   ),
@@ -688,7 +666,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
   void _navigateToPlaceDetails(Map<String, dynamic> place) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => PlaceDetailScreen(place: place)),
+      MaterialPageRoute(builder: (_) => PlaceDetailScreenV2(place: place)),
     );
   }
 
@@ -744,6 +722,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         }
 
         final maxHeight = MediaQuery.of(dialogContext).size.height * 0.84;
+        final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
 
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
@@ -763,7 +742,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2FA),
+                        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2FA),
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: Column(
@@ -787,10 +766,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                   children: [
                                     Text(
                                       name,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 16,
-                                        color: Color(0xFF2C3360),
+                                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF2C3360),
                                       ),
                                     ),
                                     Text(
@@ -815,7 +794,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE6E1FA),
+                                color: isDark ? const Color(0xFF2B2545) : const Color(0xFFE6E1FA),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Row(
@@ -829,10 +808,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                   const SizedBox(width: 4),
                                   Text(
                                     locationLabel,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF5F53BA),
+                                      color: isDark ? const Color(0xFFAFA3E8) : const Color(0xFF5F53BA),
                                     ),
                                   ),
                                 ],
@@ -843,11 +822,11 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             const SizedBox(height: 14),
                             Text(
                               content,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 height: 1.4,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF263165),
+                                color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF263165),
                               ),
                             ),
                           ],
@@ -860,8 +839,8 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                   .map(
                                     (tag) => Text(
                                       tag,
-                                      style: const TextStyle(
-                                        color: Color(0xFF1B66E5),
+                                      style: TextStyle(
+                                        color: isDark ? const Color(0xFF6B9CFF) : const Color(0xFF1B66E5),
                                         fontWeight: FontWeight.w800,
                                         fontSize: 14,
                                       ),
@@ -1151,9 +1130,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
 
     final user = _user;
     final interests = _profileInterests();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F1FA),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
@@ -1259,13 +1239,14 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             height: 100,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
+                              border: Border.all(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, width: 3),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
                               ],
                             ),
                             child: Hero(
@@ -1298,7 +1279,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8EDFF),
+                      color: isDark ? const Color(0xFF1A264F) : const Color(0xFFE8EDFF),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: AppColors.primary.withOpacity(0.3),
@@ -1332,80 +1313,14 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
               Text(
                 user?.fullname ?? 'Traveler',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1B2458),
+                  color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1B2458),
                 ),
               ),
               const SizedBox(height: 2),
 
-              // ── Username ───────────────────────────────────
-              if (user?.username != null && user!.username!.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FA),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFE9ECEF),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.alternate_email,
-                        size: 16,
-                        color: const Color(0xFF6C757D),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '@${user!.username}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF495057),
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () {
-                          _copyUsername(user!.username!);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0D6EFD),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.copy, size: 14, color: Colors.white),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'Copy',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (user?.username != null && user!.username!.isNotEmpty)
-                const SizedBox(height: 8),
               Text(
                 _displayLocation(),
                 textAlign: TextAlign.center,
@@ -1422,10 +1337,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 child: Text(
                   _safeBio(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.35,
-                    color: Color(0xFF56608B),
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF56608B),
                   ),
                 ),
               ),
@@ -1444,8 +1359,8 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                               horizontal: 12,
                               vertical: 6,
                             ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8EDFF),
+                           decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1A264F) : const Color(0xFFE8EDFF),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
                                 color: AppColors.primary.withOpacity(0.2),
@@ -1453,10 +1368,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             ),
                             child: Text(
                               interest,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF3B4A8F),
+                                color: isDark ? const Color(0xFFA2B4FF) : const Color(0xFF3B4A8F),
                               ),
                             ),
                           ),
@@ -1472,7 +1387,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   horizontal: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8E8F6),
+                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -1486,7 +1401,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     Container(
                       width: 1,
                       height: 34,
-                      color: const Color(0xFFD8D9EC),
+                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
                     ),
                     Expanded(
                       child: _StatItem(value: '$_postsCount', label: 'Posts'),
@@ -1494,7 +1409,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     Container(
                       width: 1,
                       height: 34,
-                      color: const Color(0xFFD8D9EC),
+                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
                     ),
                     Expanded(
                       child: _StatItem(
@@ -1537,9 +1452,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE8E8F6),
+                        backgroundColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
                         side: BorderSide.none,
-                        foregroundColor: const Color(0xFF46508A),
+                        foregroundColor: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF46508A),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999),
@@ -1693,6 +1608,7 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final author = comment['author_id'] is Map<String, dynamic>
         ? comment['author_id'] as Map<String, dynamic>
         : <String, dynamic>{};
@@ -1710,7 +1626,7 @@ class _CommentTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
@@ -1735,17 +1651,17 @@ class _CommentTile extends StatelessWidget {
                           Expanded(
                             child: Text(
                               authorId == currentUserId ? 'You' : authorName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1D245D),
+                                color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1D245D),
                               ),
                             ),
                           ),
                           Text(
                             timeAgo(created),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF8A8FBA),
+                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF8A8FBA),
                             ),
                           ),
                         ],
@@ -1753,7 +1669,7 @@ class _CommentTile extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         content,
-                        style: const TextStyle(color: Color(0xFF40497C)),
+                        style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF40497C)),
                       ),
                       const SizedBox(height: 6),
                       GestureDetector(

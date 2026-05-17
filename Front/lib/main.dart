@@ -18,6 +18,7 @@ import 'services/fcm_notification_service.dart';
 import 'services/auth_service.dart';
 import 'services/heartbeat_service.dart';
 import 'providers/user_provider.dart';
+import 'providers/bookmark_provider.dart';
 import 'theme/app_theme.dart';
 
 // GLOBAL SNACKBAR KEY
@@ -38,10 +39,21 @@ void _showGlobalError(String message) {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔒 Show status bar and navigation bar (edge to edge mode)
-  // Status bar and navigation bar will always be visible
+  // 🔒 Force both top and bottom bars to be visible
   SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.edgeToEdge,
+    SystemUiMode.manual,
+    overlays: SystemUiOverlay.values,
+  );
+
+  // 🎨 Set default overlay style (Dark icons for light backgrounds)
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
   );
 
   try {
@@ -217,6 +229,9 @@ class _MyAppState extends State<MyApp> {
         providers: [
           ChangeNotifierProvider<UserProvider>(
             create: (_) => UserProvider()..loadUser(),
+          ),
+          ChangeNotifierProvider<BookmarkProvider>(
+            create: (_) => BookmarkProvider()..initialize(),
           ),
         ],
         child: MaterialApp(

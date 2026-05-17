@@ -7,6 +7,11 @@ function toSafeMessage(error) {
   if (error.name === "JsonWebTokenError") return "Invalid authentication token";
   if (error.name === "TokenExpiredError") return "Authentication token expired";
   if (error.name === "ValidationError") return "Validation failed";
+  if (error.name === "MongoServerError" && error.code === 11000) {
+    const field = Object.keys(error.keyPattern || {})[0] || "field";
+    return `This ${field} is already in use. Please try another one.`;
+  }
+  if (error.name === "CastError") return `Invalid ${error.path}: ${error.value}`;
 
   return error.message || "Internal server error";
 }

@@ -141,7 +141,7 @@ class _PlaceCardState extends State<PlaceCard>
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  widget.place.category,
+                                  widget.place.category ?? '',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
@@ -223,7 +223,7 @@ class _PlaceCardState extends State<PlaceCard>
                             
                             // Location
                             Text(
-                              widget.place.location,
+                              widget.place.location ?? '',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF6C757D),
@@ -333,7 +333,7 @@ class _PlaceCardState extends State<PlaceCard>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                widget.place.category,
+                                widget.place.category ?? '',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 10,
@@ -432,7 +432,7 @@ class _PlaceCardState extends State<PlaceCard>
                             // Description
                             Expanded(
                               child: Text(
-                                widget.place.description,
+                                widget.place.description ?? '',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF6C757D),

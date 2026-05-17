@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../theme/app_theme.dart';
 import 'my_activities_screen.dart';
@@ -42,6 +42,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
   final String _sectionActivities = 'activities';
   final String _sectionNetwork = 'network';
   final String _sectionMessages = 'messages';
+  bool _isNavbarVisible = true;
 
   @override
   void initState() {
@@ -56,7 +57,13 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       ),
-      const MapExplorerScreen(),
+      MapExplorerScreen(
+        onToggleNavbar: (visible) {
+          setState(() {
+            _isNavbarVisible = visible;
+          });
+        },
+      ),
       const MyActivitiesScreen(),
       const ScreenNetwork(),
       TouristProfileTab(onNavigateToTab: _goToTab),
@@ -254,6 +261,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
         onNotificationsTap: () => _openNotifications(),
         showMessagesDot: _showMessagesDot,
       );
+      _isNavbarVisible = true; // Show navbar when switching tabs
     });
     _refreshNoveltyBadges();
   }
@@ -277,8 +285,10 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
       body: Stack(
         children: [
           IndexedStack(index: _currentIndex, children: _pages),
-          Positioned(
-            bottom: 18,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            bottom: _isNavbarVisible ? 18 : -100,
             left: 16,
             right: 16,
             child: _buildFloatingNavBar(navBg, navActive, navInactive),
@@ -302,7 +312,7 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.15),
+                color: AppColors.primary.withOpacity(0.15),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),

@@ -3,6 +3,8 @@ import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
+import '../../services/navigation_service.dart';
+import '../../utils/snackbar_utils.dart';
 import 'booking_confirmation_screen.dart';
 import 'booking_detail_screen.dart';
 
@@ -17,17 +19,14 @@ class BookingSelectionScreen extends StatefulWidget {
 
 class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   int _adults = 1;
-  int _children = 0;
   bool _isLoading = false;
   int _currentImage = 0;
   late final PageController _imagePageController;
 
-  int get _totalParticipants => _adults + _children;
+  int get _totalParticipants => _adults;
   int get _maxParticipants => widget.activity.placesDisponibles;
   bool get _canAddParticipant => _totalParticipants < _maxParticipants;
 
-  double get _subtotal => (_adults + _children) * widget.activity.prix;
-  String get _currency => 'TND';
 
   List<String> get _activityImages {
     final images = <String>[];
@@ -90,7 +89,6 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
             _buildActivityHeader(),
             const SizedBox(height: 14),
             _buildParticipantsCounter(),
-            _buildPriceSummary(),
           ],
         ),
       ),
@@ -99,11 +97,6 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   }
 
   Widget _buildActivityHeader() {
-    final imageUrl = widget.activity.thumbnailUrl.isNotEmpty
-        ? widget.activity.thumbnailUrl
-        : (widget.activity.photos.isNotEmpty
-              ? widget.activity.photos.first
-              : '');
     final images = _activityImages;
 
     return Container(
@@ -138,28 +131,6 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text:
-                            '${widget.activity.prix.toStringAsFixed(widget.activity.prix.truncateToDouble() == widget.activity.prix ? 0 : 2)} TND',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const TextSpan(
-                        text: ' / person',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -231,23 +202,13 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
         ),
         const SizedBox(height: 10),
         _CounterCard(
-          label: 'Adults',
-          sublabel: '12 years and above',
+          label: 'Participants',
+          sublabel: 'Number of people attending',
           count: _adults,
           canDecrease: _adults > 1,
           canIncrease: _canAddParticipant,
           onChanged: (val) =>
               setState(() => _adults = (_adults + val).clamp(1, 99)),
-        ),
-        const SizedBox(height: 12),
-        _CounterCard(
-          label: 'Children',
-          sublabel: '2 to 11 years',
-          count: _children,
-          canDecrease: _children > 0,
-          canIncrease: _canAddParticipant,
-          onChanged: (val) =>
-              setState(() => _children = (_children + val).clamp(0, 99)),
         ),
         const SizedBox(height: 10),
         Text(
@@ -264,48 +225,6 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     );
   }
 
-  Widget _buildPriceSummary() {
-    final participants = _adults + _children;
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(
-        children: [
-          Divider(color: const Color(0xFFC8D0DD)),
-          const SizedBox(height: 14),
-          _PriceRow(
-            label:
-                'Subtotal (${participants}x ${participants > 1 ? 'Adults' : 'Adult'})',
-            value: '${_subtotal.toStringAsFixed(0)} $_currency',
-          ),
-          const SizedBox(height: 8),
-          const SizedBox(height: 12),
-          Divider(color: const Color(0xFFD8DEE8), endIndent: 0),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              Text(
-                '${_subtotal.toStringAsFixed(0)} $_currency',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildBottomBar() {
     return Container(
@@ -352,67 +271,45 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   Future<void> _submitBooking() async {
     final requested = _totalParticipants;
     if (_maxParticipants <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This activity is no longer available'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('This activity has no available seats at the moment.');
       return;
     }
 
     if (requested > _maxParticipants) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Maximum $_maxParticipants participant${_maxParticipants > 1 ? 's' : ''} allowed for this activity.',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      _showError(
+        'Only $_maxParticipants seat${_maxParticipants > 1 ? 's' : ''} available. Please reduce the number of participants.',
       );
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Step 1: Create inscription with the normal booking flow
     try {
-      final inscriptionResult = await InscriptionService.createInscription(
+      final result = await InscriptionService.createInscription(
         activiteId: widget.activity.id,
         nombreParticipants: requested,
       );
 
       if (!mounted) return;
+      setState(() => _isLoading = false);
 
-      final inscriptionId =
-          inscriptionResult['inscription']?['_id']?.toString() ??
-          inscriptionResult['inscription']?['id']?.toString();
-
-      if (inscriptionId == null || inscriptionId.isEmpty) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to create booking'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      if (result['success'] != true) {
+        // Show the exact message from the server
+        final msg = result['message']?.toString() ?? 'Booking could not be completed.';
+        _showError(msg);
         return;
       }
 
-      // Step 2: Navigate directly to the booking confirmation screen.
-      final inscriptionJson = inscriptionResult['inscription'];
+      final inscriptionJson = result['inscription'];
+      if (inscriptionJson == null) {
+        _showError('Booking created but confirmation data is missing. Please check your bookings.');
+        return;
+      }
+
       final inscription = InscriptionModel.fromJson(inscriptionJson);
 
       if (!mounted) return;
-
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Booking submitted successfully.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackbarUtils.showSuccess(context, 'Booking submitted successfully.');
 
       await Navigator.push(
         context,
@@ -423,47 +320,42 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-
-      // Handle booking overlap errors
-      String errorMessage = 'Error: $e';
-      Color backgroundColor = Colors.red;
-
-      if (e.toString().contains('status code 409') ||
-          e.toString().contains(
-            'already have a booking during this time period',
-          ) ||
-          RegExp(
-            r'already\s+registered',
-            caseSensitive: false,
-          ).hasMatch(e.toString()) ||
-          e.toString().toLowerCase().contains('user already registered')) {
-        // Extract conflict details if available
-        String conflictDetails = '';
-        try {
-          // Try to parse the error response for conflict details
-          if (e.toString().contains('conflict:')) {
-            final conflictMatch = RegExp(
-              r'conflict:\s*({.*?})',
-            ).firstMatch(e.toString());
-            if (conflictMatch != null) {
-              conflictDetails =
-                  '\n\nConflicting activity: ${conflictMatch.group(1)}';
-            }
-          }
-        } catch (_) {}
-        // Normalize to a clear message the user requested.
-        errorMessage = 'User already registered';
-        backgroundColor = Colors.orange;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: backgroundColor,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      SnackbarUtils.showError(context, msg.isNotEmpty ? msg : 'An unexpected error occurred. Please try again.');
     }
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 26),
+            SizedBox(width: 10),
+            Text(
+              'Booking Failed',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 15, color: Color(0xFF374151), height: 1.5),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -585,30 +477,3 @@ class _CircleCounterButton extends StatelessWidget {
   }
 }
 
-class _PriceRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _PriceRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1E293B),
-            fontSize: 15,
-          ),
-        ),
-      ],
-    );
-  }
-}

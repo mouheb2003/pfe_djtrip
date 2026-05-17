@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/cache_manager.dart';
+import '../../utils/snackbar_utils.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -449,18 +450,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Invalidate cache to ensure fresh data on next load
       CacheManager.instance.remove('GET:/users/me');
       CacheManager.instance.removeByPattern('GET:/users/me*');
+      SnackbarUtils.showSuccess(context, 'Profile updated successfully');
       Navigator.pop(context);
     } else {
       // 🚀 FIX: Use post-frame callback to avoid build phase error
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                result['message'] as String? ?? 'Error saving profile',
-              ),
-              backgroundColor: Colors.red,
-            ),
+          SnackbarUtils.showError(
+            context, 
+            result['message'] as String? ?? 'Error saving profile'
           );
         }
       });

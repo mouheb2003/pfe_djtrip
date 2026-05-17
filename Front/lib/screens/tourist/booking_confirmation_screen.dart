@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../models/inscription_model.dart';
 import '../../services/inscription_service.dart';
 import 'tourist_main_screen.dart';
+import '../../config/api_config.dart';
 import 'bookings_screen.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
@@ -22,31 +23,14 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
 
   String _normalizeStatus(String rawStatus) {
     final status = rawStatus.trim().toLowerCase();
-    if (status == 'approved' ||
-        status == 'confirmée' ||
-        status == 'confirmed') {
-      return 'approuvee';
-    }
-    if (status == 'pending' || status == 'en attente') {
-      return 'en_attente';
-    }
-    if (status == 'rejected' || status == 'refusée') {
-      return 'refusee';
-    }
-    if (status == 'cancelled' || status == 'canceled' || status == 'annulée') {
-      return 'annulee';
-    }
+    if (status == 'approved' || status == 'approuvee' || status == 'confirmée') return 'approved';
+    if (status == 'pending' || status == 'en_attente') return 'pending';
+    if (status == 'rejected' || status == 'refusee' || status == 'refusée') return 'rejected';
+    if (status == 'cancelled' || status == 'annulee' || status == 'annulée' || status == 'canceled') return 'cancelled';
+    if (status == 'verified' || status == 'verifie') return 'verified';
     return status;
   }
 
-  double _bookingTotal(Map<String, dynamic>? activity) {
-    final unitPrice = (activity?['prix'] as num?)?.toDouble() ?? 0.0;
-    final computed = unitPrice * widget.inscription.nombreParticipants;
-    if (widget.inscription.prixTotal > 0) {
-      return widget.inscription.prixTotal;
-    }
-    return computed;
-  }
 
   List<String> _activityPhotoUrls(Map<String, dynamic>? activity) {
     final raw = activity?['photos'];
@@ -55,7 +39,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     final urls = <String>[];
     for (final item in raw) {
       final value = item?.toString().trim() ?? '';
-      if (value.startsWith('http://') || value.startsWith('https://')) {
+      if (value.isNotEmpty && value.toLowerCase() != 'null') {
         urls.add(value);
       }
     }
@@ -143,12 +127,11 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
     final dateStr = DateFormat('MMM dd, yyyy').format(date);
     final timeStr = activity?['heure'] as String? ?? '10:00 AM';
     final status = _normalizeStatus(widget.inscription.statut);
-    final isApproved = status == 'approuvee';
-    final isPending = status == 'en_attente';
-    final isRejected = status == 'refusee';
-    final isCancelled = status == 'annulee';
-    final isUsed = status == 'verifie';
-    final totalPrice = _bookingTotal(activity);
+    final isApproved = status == 'approved';
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
+    final isCancelled = status == 'cancelled';
+    final isUsed = status == 'verified';
     final qrData = widget.inscription.qrData;
     final hasQrData = qrData.trim().isNotEmpty;
     final reason = widget.inscription.organizerReason;
@@ -366,27 +349,6 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                       ],
                     ),
                     const Divider(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Price',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        Text(
-                          '${totalPrice.toStringAsFixed(2)} TND',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -709,8 +671,20 @@ class _BookingMediaPanelState extends State<_BookingMediaPanel> {
           onPageChanged: (value) => setState(() => _index = value),
           itemBuilder: (context, index) {
             return Image.network(
-              widget.photoUrls[index],
+              ApiConfig.getImageUrl(widget.photoUrls[index]),
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: const Color(0xFFF1F5F9),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                );
+              },
               errorBuilder: (_, __, ___) => Container(
                 color: const Color(0xFFE2E8F0),
                 alignment: Alignment.center,

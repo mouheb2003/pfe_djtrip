@@ -85,14 +85,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   int _bookingsTabIndexForStatus(String status) {
     switch (status.trim().toLowerCase()) {
-      case 'en_attente':
+      case 'pending':
         return 1;
-      case 'approuvee':
+      case 'approved':
+      case 'verified':
         return 2;
-      case 'annulee':
+      case 'cancelled':
+      case 'rejected':
         return 3;
-      case 'verifie':
-        return 4;
       default:
         return 0;
     }
@@ -164,22 +164,76 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       return;
     }
 
+    final TextEditingController reasonController = TextEditingController();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel Reservation'),
-        content: const Text(
-          'Are you sure you want to cancel this reservation? This action cannot be undone.',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Cancel Reservation',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to cancel this reservation? This action cannot be undone.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Reason for Cancellation',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Enter your reason here...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFFF6B1A)),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a cancellation reason';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep Reservation'),
+            child: const Text('Keep Booking', style: TextStyle(color: Colors.grey)),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Cancel Reservation'),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Confirm Cancel'),
           ),
         ],
       ),
@@ -187,25 +241,30 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
     if (confirmed != true) return;
 
+    final reason = reasonController.text.trim();
+
     setState(() => _isCancelling = true);
 
     try {
       final success = await InscriptionService.cancelInscription(
         _inscription.id,
+        reason: reason,
       );
 
       if (success) {
         setState(() {
           _inscription = InscriptionModel(
             id: _inscription.id,
-            statut: 'annulee',
+            statut: 'cancelled',
             nombreParticipants: _inscription.nombreParticipants,
             prixTotal: _inscription.prixTotal,
             dateDemande: _inscription.dateDemande,
             messageTouriste: _inscription.messageTouriste,
+            messageOrganisateur: _inscription.messageOrganisateur,
             activite: _inscription.activite,
             touriste: _inscription.touriste,
             organisateur: _inscription.organisateur,
+            cancellationReason: reason,
           );
         });
 
@@ -248,10 +307,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final title = act['titre'] as String? ?? 'Activity';
     final lieu = act['lieu'] as String? ?? 'Location';
     final placeCount = _inscription.nombreParticipants;
-    final unitPrice = (act['prix'] as num?)?.toDouble() ?? 0.0;
-    final subtotal = unitPrice * placeCount;
-    const serviceFee = 4.50;
-    final total = subtotal + serviceFee;
 
     final orgaRaw =
         _fullOrganizerData ??
@@ -316,16 +371,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (_) => BookingsScreen(
-                  initialTabIndex: _bookingsTabIndexForStatus(
-                    _inscription.statut,
+            if (Navigator.of(context).canPop()) {
+              Navigator.pop(context);
+            } else {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => BookingsScreen(
+                    initialTabIndex: _bookingsTabIndexForStatus(
+                      _inscription.statut,
+                    ),
                   ),
                 ),
-              ),
-              (route) => false,
-            );
+                (route) => false,
+              );
+            }
           },
         ),
         actions: [
@@ -363,6 +422,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           ? Icons.hourglass_top_rounded
                           : _inscription.isCancelled
                           ? Icons.info_outline_rounded
+                          : _inscription.isRejected
+                          ? Icons.cancel_presentation_rounded
                           : Icons.verified_rounded,
                       color: Colors.white,
                       size: 32,
@@ -378,6 +439,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ? 'Waiting for approval'
                     : _inscription.isCancelled
                     ? 'Booking Cancelled'
+                    : _inscription.isRejected
+                    ? 'Booking Rejected'
                     : 'Booking Details',
                 style: const TextStyle(
                   fontSize: 32,
@@ -393,6 +456,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ? 'Your request has been sent. The organizer will review it soon.'
                     : _inscription.isCancelled
                     ? 'This booking was cancelled.'
+                    : _inscription.isRejected
+                    ? 'This booking was rejected by the organizer.'
                     : 'View your booking details',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
@@ -518,28 +583,49 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         ),
                       ],
                     ),
-                    const Divider(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Price',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                          ),
+                    if (_inscription.isCancelled &&
+                        (_inscription.cancellationReason != null || _inscription.messageOrganisateur != null)) ...[
+                      const Divider(height: 32),
+                      const Text(
+                        'CANCELLATION REASON',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                          letterSpacing: 0.5,
                         ),
-                        Text(
-                          '${total.toStringAsFixed(2)} TND',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _inscription.cancellationReason ?? _inscription.messageOrganisateur!,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF1E293B),
+                          fontStyle: FontStyle.italic,
                         ),
-                      ],
-                    ),
+                      ),
+                    ] else if (_inscription.isRejected &&
+                        _inscription.messageOrganisateur != null) ...[
+                      const Divider(height: 32),
+                      const Text(
+                        'REJECTION REASON',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _inscription.messageOrganisateur!,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF1E293B),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -762,9 +848,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: (_inscription.isPending ||
-                        (_inscription.isApproved &&
-                            _inscription.canBeCancelledWithTime))
+                child: (_inscription.isPending || _inscription.isApproved)
                     ? ElevatedButton.icon(
                         onPressed: _isCancelling ? null : _cancelBooking,
                         icon: _isCancelling

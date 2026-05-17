@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/lieu_service.dart';
 import '../../../widgets/guide_arrow_button.dart';
-import 'place_detail_screen.dart';
+import 'place_detail_screen_v2.dart';
 
 class AllPlacesSimpleScreen extends StatefulWidget {
   const AllPlacesSimpleScreen({super.key});
@@ -51,7 +51,7 @@ class _AllPlacesSimpleScreenState extends State<AllPlacesSimpleScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PlaceDetailScreen(place: place),
+        builder: (_) => PlaceDetailScreenV2(place: place),
       ),
     );
   }

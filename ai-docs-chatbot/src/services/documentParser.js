@@ -8,11 +8,11 @@ const md = new MarkdownIt({
 
 class DocumentParser {
   constructor() {
-    this.supportedExtensions = ['.md', '.txt', '.MD', '.TXT'];
+    this.supportedExtensions = ['.md', '.txt', '.dart', '.js', '.json', '.MD', '.TXT'];
   }
 
   isSupportedFile(filename) {
-    const ext = filename.split('.').pop();
+    const ext = filename.toLowerCase().split('.').pop();
     return this.supportedExtensions.includes(`.${ext}`);
   }
 
@@ -75,7 +75,12 @@ class DocumentParser {
     return metadata;
   }
 
-  cleanContent(content) {
+  cleanContent(content, isCode = false) {
+    if (isCode) {
+      // For code files, we want to keep the content but maybe normalize whitespace slightly
+      return content.replace(/\s+/g, ' ').trim();
+    }
+
     // Remove code blocks
     let cleaned = content.replace(/```[\s\S]*?```/g, '[CODE BLOCK]');
     
@@ -97,6 +102,7 @@ class DocumentParser {
   parse(file) {
     const { name, path, content } = file;
     const ext = name.split('.').pop().toLowerCase();
+    const isCode = ['dart', 'js', 'json'].includes(ext);
 
     let parsedContent;
     
@@ -107,7 +113,7 @@ class DocumentParser {
     }
 
     const metadata = this.extractMetadata(content, name);
-    const cleanedContent = this.cleanContent(parsedContent);
+    const cleanedContent = this.cleanContent(parsedContent, isCode);
 
     return {
       path,

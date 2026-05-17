@@ -420,13 +420,11 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       ),
     );
 
-    if (result != null) {
+    if (result is djerba_map.MapPickerResult && mounted) {
       _updateItineraryLocation(index, {
         'lat': result.latLng.latitude,
         'lng': result.latLng.longitude,
-        'address': result.address.isNotEmpty
-            ? result.address
-            : 'Location ${index + 1}',
+        'address': result.placeName.isNotEmpty ? result.placeName : result.address,
       });
     }
   }
@@ -1450,63 +1448,57 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: const Color(0xFFE2E9FF)),
                               ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _selectedFixedLocation,
-                                  isExpanded: true,
-                                  hint: const Text(
-                                    'Select a fixed location',
-                                    style: TextStyle(color: Color(0xFF717BBC)),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        value: _selectedFixedLocation,
+                                        isExpanded: true,
+                                        hint: const Text(
+                                          'Select a fixed location',
+                                          style: TextStyle(color: Color(0xFF717BBC)),
+                                        ),
+                                        items: _fixedLocations.map((loc) {
+                                          return DropdownMenuItem(
+                                            value: loc,
+                                            child: Text(loc, style: const TextStyle(fontSize: 14)),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedFixedLocation = value;
+                                            _locationCtrl.text = value ?? '';
+                                          });
+                                        },
+                                      ),
+                                    ),
                                   ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'Djerba Explore Park',
-                                      child: Text('Djerba Explore Park'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Houmt Souk Medina',
-                                      child: Text('Houmt Souk Medina'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Guellala Museum',
-                                      child: Text('Guellala Museum'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Djerba Heritage Museum',
-                                      child: Text('Djerba Heritage Museum'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Borj Ghazi Mustapha Fort',
-                                      child: Text('Borj Ghazi Mustapha Fort'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Midoun Beach',
-                                      child: Text('Midoun Beach'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Sidi Mahrsi Beach',
-                                      child: Text('Sidi Mahrsi Beach'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Djerba Golf Club',
-                                      child: Text('Djerba Golf Club'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Crocodile Farm',
-                                      child: Text('Crocodile Farm'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Djerba Aqua Park',
-                                      child: Text('Djerba Aqua Park'),
-                                    ),
-                                  ],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedFixedLocation = value;
-                                      _locationCtrl.text = value ?? '';
-                                    });
-                                  },
-                                ),
+                                  IconButton(
+                                    icon: const Icon(Icons.map_outlined, color: Color(0xFF4B63FF)),
+                                    onPressed: () async {
+                                      final result = await Navigator.push<djerba_map.MapPickerResult>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => djerba_map.InteractiveDjerbaMapScreen(
+                                            initialPosition: _pickedLatLng,
+                                          ),
+                                        ),
+                                      );
+                                      if (result is djerba_map.MapPickerResult && mounted) {
+                                        setState(() {
+                                          _locationCtrl.text = result.placeName;
+                                          _pickedLatLng = result.latLng;
+                                          if (_fixedLocations.contains(result.placeName)) {
+                                            _selectedFixedLocation = result.placeName;
+                                          } else {
+                                            _selectedFixedLocation = null;
+                                          }
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                           ] else if (!_useFixedLocation && !_useItinerary) ...[
@@ -2195,9 +2187,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               ),
             );
 
-            if (result is MapPickerResult && mounted) {
+            if (result is djerba_map.MapPickerResult && mounted) {
               setState(() {
-                _locationCtrl.text = result.address;
+                _locationCtrl.text = result.placeName;
                 _pickedLatLng = result.latLng;
               });
             }

@@ -21,10 +21,15 @@ const inscriptionSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Organizer is required"],
     },
-    // Registration status
     statut: {
       type: String,
-      enum: ["pending", "approved", "cancelled", "verified"],
+      enum: [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "verified",
+      ],
       default: "pending",
     },
     // Number of participants (if the tourist registers multiple people)
@@ -104,6 +109,34 @@ const inscriptionSchema = new mongoose.Schema(
         type: Date,
       },
     },
+    // Cancellation details
+    cancellationPolicy: {
+      canCancel: {
+        type: Boolean,
+        default: true
+      },
+      cancellationDeadline: {
+        type: Date
+      },
+      cancellationFee: {
+        type: Number,
+        default: 0
+      },
+      refundAmount: {
+        type: Number,
+        default: 0
+      },
+      cancelledAt: {
+        type: Date
+      },
+      cancellationReason: {
+        type: String
+      },
+      refundProcessed: {
+        type: Boolean,
+        default: false
+      }
+    },
   },
   {
     timestamps: true,
@@ -128,7 +161,7 @@ inscriptionSchema.methods.approve = function (messageOrganisateur) {
 
 // Method to reject a registration
 inscriptionSchema.methods.reject = function (messageOrganisateur) {
-  this.statut = "cancelled";
+  this.statut = "rejected";
   this.date_reponse = new Date();
   if (messageOrganisateur) {
     this.message_organisateur = messageOrganisateur;
@@ -142,9 +175,9 @@ inscriptionSchema.methods.cancel = function () {
   return this.save();
 };
 
-// Method to mark a booking as used after check-in
+// Method to mark a booking as verified after check-in
 inscriptionSchema.methods.marquerCommeUtilise = function () {
-  this.statut = "verifie";
+  this.statut = "verified";
   this.qr_used_at = new Date();
   return this.save();
 };
@@ -169,6 +202,7 @@ inscriptionSchema.methods.setReviewReminder = function (remindAt) {
 // Method to check if review reminder should be shown
 inscriptionSchema.methods.shouldShowReviewReminder = async function () {
   if (this.hasReviewed) return false;
+  // Accept both legacy French and new English status
   if (this.statut !== "approved") return false;
   if (!this.qr_used_at) return false; // Not checked in
 

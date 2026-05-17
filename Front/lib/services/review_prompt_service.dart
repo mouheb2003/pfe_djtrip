@@ -84,7 +84,7 @@ class ReviewPromptService {
       final now = DateTime.now();
 
       // 1. Activité terminée
-      if (now.isBefore(activity.dateFin)) {
+      if (activity.dateFin == null || now.isBefore(activity.dateFin!)) {
         return false;
       }
 
@@ -106,7 +106,8 @@ class ReviewPromptService {
       // 5. User est le propriétaire du booking (vérifié par l'API)
 
       // 6. Délai valide (7 jours après la fin)
-      final deadline = activity.dateFin.add(const Duration(days: 7));
+      if (activity.dateFin == null) return false;
+      final deadline = activity.dateFin!.add(const Duration(days: 7));
       if (now.isAfter(deadline)) {
         return false;
       }
@@ -186,9 +187,11 @@ class ReviewPromptService {
     }
 
     // Arrêter si le délai global est dépassé
-    final deadline = activity.dateFin.add(const Duration(days: 7));
-    if (now.isAfter(deadline)) {
-      return true;
+    if (activity.dateFin != null) {
+      final deadline = activity.dateFin!.add(const Duration(days: 7));
+      if (now.isAfter(deadline)) {
+        return true;
+      }
     }
 
     // Arrêter si le booking devient invalide

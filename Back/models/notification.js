@@ -22,14 +22,12 @@ const notificationSchema = new mongoose.Schema(
         "activity",        // Organizer: activity updates
         "reminder",        // Tourist: activity reminders
         "follow",          // Both: new follower
-        "payment",         // Tourist: payment confirmations
         "profile",         // Both: profile updates
         "publication",     // Both: new publication/post from followed user
         "reaction",        // Both: someone reacted to user's post/comment
         "comment",         // Both: someone commented on user's post
         "reply",           // Both: someone replied to user's comment
-        "group_invitation", // Both: group invitation received
-        "group_update",    // Both: group updates (member joined/left, etc.)
+        "push",             // Fallback for notifications received on device
       ],
       index: true,
     },
@@ -106,9 +104,9 @@ const notificationSchema = new mongoose.Schema(
 );
 
 // Indexes for performance
-notificationSchema.index({ user_id: 1, is_read: 1, created_at: -1 });
-notificationSchema.index({ type: 1, created_at: -1 });
-notificationSchema.index({ target_role: 1, created_at: -1 });
+notificationSchema.index({ user_id: 1, is_read: 1, createdAt: -1 });
+notificationSchema.index({ type: 1, createdAt: -1 });
+notificationSchema.index({ target_role: 1, createdAt: -1 });
 notificationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
 // Virtual for formatted creation date
@@ -124,20 +122,22 @@ notificationSchema.statics.createNotification = async function (notificationData
 
     console.log('📝 Notification created in DB:', notification._id, 'for user:', notification.user_id, 'type:', notification.type, 'title:', notification.title);
 
-    // Send FCM push notification
-    try {
-      const notificationService = require("../services/notificationService");
-      console.log('🔔 Attempting to send FCM push notification to user:', notification.user_id.toString(), 'type:', notification.type);
-      const result = await notificationService.sendPushNotification({
-        userId: notification.user_id.toString(),
-        title: notification.title,
-        body: notification.message,
-        data: notification.data || {},
-      });
-      console.log('✅ FCM push notification result:', result);
-    } catch (fcmError) {
-      console.error("❌ Error sending FCM notification:", fcmError);
-      // Don't throw - notification is already saved in DB
+    // Send FCM push notification (unless skipped)
+    if (!notificationData.skipPush) {
+      try {
+        const notificationService = require("../services/notificationServiceV2");
+        console.log('🔔 Attempting to send FCM push notification to user:', notification.user_id.toString(), 'type:', notification.type);
+        const result = await notificationService.sendPushNotification({
+          userId: notification.user_id.toString(),
+          title: notification.title,
+          body: notification.message,
+          data: notification.data || {},
+        });
+        console.log('✅ FCM push notification result:', result);
+      } catch (fcmError) {
+        console.error("❌ Error sending FCM notification:", fcmError);
+        // Don't throw - notification is already saved in DB
+      }
     }
 
     // Emit real-time event
@@ -175,7 +175,7 @@ notificationSchema.statics.getUserNotifications = function (userId, options = {}
   }
 
   return this.find(query)
-    .sort({ created_at: -1 })
+    .sort({ createdAt: -1 })
     .limit(options.limit || 50)
     .skip(options.skip || 0);
 };

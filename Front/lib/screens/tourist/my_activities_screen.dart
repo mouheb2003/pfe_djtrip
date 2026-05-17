@@ -7,6 +7,8 @@ import '../../models/inscription_model.dart';
 import '../../services/activity_service.dart';
 import '../../services/inscription_service.dart';
 import '../../theme/app_theme.dart';
+import '../../config/api_config.dart';
+import 'place_detail_screen_v2.dart';
 import 'booking_detail_screen.dart';
 import '../shared/activity_detail_screen.dart';
 import 'booking_selection_screen.dart';
@@ -230,7 +232,11 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     final latestByActivityId = _buildLatestBookingMap(bookings);
 
     return latestByActivityId.map((key, value) {
-      // Return the status even if cancelled so the button shows "Check reservation status"
+      // If booking is cancelled or rejected, don't show "Check reservation status"
+      // Instead, allow re-participation by returning an empty status
+      if (value.isCancelled || value.isRejected) {
+        return MapEntry(key, '');
+      }
       return MapEntry(key, value.statut);
     });
   }
@@ -305,12 +311,13 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   int _bookingsTabIndexForStatus(String statut) {
     switch (statut) {
-      case 'en_attente':
+      case 'pending':
         return 0;
-      case 'approuvee':
+      case 'approved':
+      case 'verified':
         return 1;
-      case 'refusee':
-      case 'annulee':
+      case 'rejected':
+      case 'cancelled':
       default:
         return 2;
     }
@@ -318,6 +325,18 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   String _buttonLabelFor(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
+    final normalizedStatus = status?.trim().toLowerCase() ?? '';
+
+    // Check for approved or verified status (handling various possible languages/formats)
+    if (normalizedStatus == 'approuvee' ||
+        normalizedStatus == 'verifie' ||
+        normalizedStatus == 'approved' ||
+        normalizedStatus == 'verified' ||
+        normalizedStatus == 'used' ||
+        normalizedStatus == 'confirmée') {
+      return 'View Details';
+    }
+
     if (status != null && status.isNotEmpty) {
       return 'Check reservation status';
     }
@@ -326,6 +345,19 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
 
   void _onPrimaryAction(ActivityModel activity) {
     final status = _bookingStatusByActivityId[activity.id];
+    final normalizedStatus = status?.trim().toLowerCase() ?? '';
+
+    // If the status means the activity is fully approved/verified/used, route to activity details
+    if (normalizedStatus == 'approuvee' ||
+        normalizedStatus == 'verifie' ||
+        normalizedStatus == 'approved' ||
+        normalizedStatus == 'verified' ||
+        normalizedStatus == 'used' ||
+        normalizedStatus == 'confirmée') {
+      _openDetails(activity);
+      return;
+    }
+
     if (status != null && status.isNotEmpty) {
       final booking = _latestBookingByActivityId[activity.id];
       if (booking == null) return;
@@ -337,6 +369,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
       );
       return;
     }
+    
     if (activity.isUpcoming) {
       Navigator.push(
         context,
@@ -1477,8 +1510,20 @@ class _CardImageCarouselState extends State<_CardImageCarousel> {
           onPageChanged: (index) => setState(() => _currentIndex = index),
           itemBuilder: (_, index) {
             return Image.network(
-              images[index],
+              ApiConfig.getImageUrl(images[index]),
               fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: const Color(0xFFF1F5F9),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                );
+              },
               errorBuilder: (_, __, ___) => Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -1486,6 +1531,9 @@ class _CardImageCarouselState extends State<_CardImageCarousel> {
                     end: Alignment.bottomRight,
                     colors: [Color(0xFF0F5A7A), Color(0xFF10163F)],
                   ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.image, color: Colors.white24, size: 40),
                 ),
               ),
             );

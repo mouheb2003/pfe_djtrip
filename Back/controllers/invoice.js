@@ -1,5 +1,4 @@
 const Invoice = require("../models/invoice");
-const Payment = require("../models/payment");
 const Inscription = require("../models/inscription");
 const Activite = require("../models/activite");
 const User = require("../models/user");
@@ -9,142 +8,13 @@ const emailService = require("../services/email");
 /**
  * Generate invoice from payment
  * POST /api/invoice/generate/:paymentId
+ * NOTE: Payment system has been removed. This endpoint is no longer available.
  */
 exports.generateInvoice = async (req, res) => {
-  try {
-    const { paymentId } = req.params;
-    const userId = req.user.userId;
-
-    // Find payment by Stripe payment intent ID, session ID, or order ID
-    const payment = await Payment.findOne({
-      $or: [
-        { stripe_payment_intent_id: paymentId },
-        { stripe_session_id: paymentId },
-        { order_id: paymentId }
-      ]
-    })
-      .populate("inscription_id")
-      .populate("user_id")
-      .populate("activity_id");
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment not found",
-      });
-    }
-
-    // Security: User can only generate invoice for their own payment
-    const paymentUserId = payment.user_id._id ? payment.user_id._id.toString() : payment.user_id.toString();
-    const userIdString = userId.toString();
-    console.log(`Authorization check: paymentUserId=${paymentUserId} (type: ${typeof paymentUserId}), userId=${userIdString} (type: ${typeof userIdString}), match: ${paymentUserId === userIdString}`);
-    if (paymentUserId !== userIdString) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized: You can only generate invoices for your own payments",
-      });
-    }
-
-    // Check if payment is successful
-    if (payment.status !== "paid") {
-      return res.status(400).json({
-        success: false,
-        message: "Invoice can only be generated for successful payments",
-      });
-    }
-
-    // Check if invoice already exists (use payment's MongoDB _id, not Stripe ID)
-    const existingInvoice = await Invoice.findByPaymentId(payment._id);
-    if (existingInvoice) {
-      return res.status(200).json({
-        success: true,
-        message: "Invoice already exists",
-        invoice: existingInvoice,
-      });
-    }
-
-    // Get inscription details
-    const inscription = payment.inscription_id || await Inscription.findById(payment.inscription_id);
-    
-    // Get activity details
-    const activity = payment.activity_id || await Activite.findById(payment.activity_id);
-    
-    // Get user details
-    const user = payment.user_id || await User.findById(payment.user_id);
-
-    // Generate invoice number
-    const invoiceNumber = await Invoice.generateInvoiceNumber();
-
-    // Calculate totals
-    const subtotal = payment.amount;
-    const taxRate = 0.19; // 19% VAT
-    const taxAmount = subtotal * taxRate;
-    const total = subtotal + taxAmount;
-    const currency = payment.currency || 'TND';
-
-    // Create invoice items
-    const items = [];
-    if (activity) {
-      items.push({
-        description: activity.titre || "Activity Booking",
-        quantity: payment.nombre_participants || 1,
-        unit_price: activity.prix || payment.amount,
-        total: payment.amount,
-      });
-    } else {
-      items.push({
-        description: payment.description || "Activity Booking",
-        quantity: payment.nombre_participants || 1,
-        unit_price: payment.amount,
-        total: payment.amount,
-      });
-    }
-
-    // Create invoice
-    const invoice = new Invoice({
-      invoice_number: invoiceNumber,
-      payment_id: payment._id,
-      inscription_id: payment.inscription_id,
-      user_id: userId,
-      invoice_details: {
-        customer: {
-          name: user.fullname || user.name || user.nom || "Customer",
-          email: user.email,
-          phone: user.num_tel || user.phone || user.telephone,
-          address: user.adresse || user.address,
-        },
-        payment: {
-          transaction_id: payment.order_id || payment.stripe_payment_intent_id,
-          payment_method: payment.payment_method || "Card",
-          payment_date: payment.paid_at || payment.createdAt,
-          currency: currency,
-        },
-        items: items,
-        totals: {
-          subtotal: subtotal,
-          tax_rate: taxRate,
-          tax_amount: taxAmount,
-          total: total,
-          currency: currency,
-        },
-      },
-    });
-
-    await invoice.save();
-
-    res.status(201).json({
-      success: true,
-      message: "Invoice generated successfully",
-      invoice: invoice,
-    });
-  } catch (error) {
-    console.error("Error generating invoice:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error generating invoice",
-      error: error.message,
-    });
-  }
+  return res.status(410).json({
+    success: false,
+    message: "Invoice generation from payments is no longer supported.",
+  });
 };
 
 /**
@@ -199,64 +69,13 @@ exports.getInvoice = async (req, res) => {
 /**
  * Get invoice by payment ID
  * GET /api/invoice/payment/:paymentId
+ * NOTE: Payment system has been removed.
  */
 exports.getInvoiceByPaymentId = async (req, res) => {
-  try {
-    const { paymentId } = req.params;
-    const userId = req.user.userId;
-
-    // First, find the payment by Stripe ID (stripe_payment_intent_id, stripe_session_id, or order_id)
-    const payment = await Payment.findOne({
-      $or: [
-        { stripe_payment_intent_id: paymentId },
-        { stripe_session_id: paymentId },
-        { order_id: paymentId }
-      ]
-    });
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment not found",
-      });
-    }
-
-    // Now find the invoice using the payment's MongoDB _id
-    const invoice = await Invoice.findByPaymentId(payment._id);
-
-    if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found for this payment",
-      });
-    }
-
-    // Security: User can only view their own invoices
-    const invoiceUserId = invoice.user_id._id ? invoice.user_id._id.toString() : invoice.user_id.toString();
-    const userIdString = userId.toString();
-    if (invoiceUserId !== userIdString) {
-      console.log(`Invoice authorization failed: invoiceUserId=${invoiceUserId}, userId=${userIdString}`);
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized: You can only view your own invoices",
-      });
-    }
-
-    // Mark as viewed
-    await invoice.markAsViewed();
-
-    res.status(200).json({
-      success: true,
-      invoice: invoice,
-    });
-  } catch (error) {
-    console.error("Error fetching invoice by payment ID:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching invoice",
-      error: error.message,
-    });
-  }
+  return res.status(410).json({
+    success: false,
+    message: "Payment-based invoice lookup is no longer supported.",
+  });
 };
 
 /**

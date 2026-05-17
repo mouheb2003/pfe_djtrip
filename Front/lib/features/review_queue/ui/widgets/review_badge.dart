@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/review_queue_provider.dart';
+import '../../providers/review_queue_provider.dart';
 
 /// Badge indicateur de reviews en attente
 /// Peut être affiché sur différents écrans (home, bookings, etc.)

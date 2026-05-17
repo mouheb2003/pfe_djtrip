@@ -5,7 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/lieu_model.dart';
 import '../../services/place_name_resolver_service.dart';
 import '../../theme/app_theme.dart';
-import 'place_detail_screen.dart';
+import '../../config/api_config.dart';
+import 'place_detail_screen_v2.dart';
 
 class LieuxMapScreen extends StatefulWidget {
   final List<LieuModel> lieux;
@@ -116,7 +117,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PlaceDetailScreen(
+        builder: (_) => PlaceDetailScreenV2(
           place: {
             '_id': l.id,
             'title': l.titre,
@@ -586,10 +587,25 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                                 child: l.displayImage.isEmpty
                                     ? Container(color: Colors.grey.shade300)
                                     : Image.network(
-                                        l.displayImage,
+                                        ApiConfig.getImageUrl(l.displayImage),
                                         fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Container(
+                                            color: const Color(0xFFF1F5F9),
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          );
+                                        },
                                         errorBuilder: (_, __, ___) => Container(
-                                          color: Colors.grey.shade300,
+                                          color: const Color(0xFFF1F5F9),
+                                          child: const Center(
+                                            child: Icon(Icons.image, color: Color(0xFF94A3B8), size: 20),
+                                          ),
                                         ),
                                       ),
                               ),

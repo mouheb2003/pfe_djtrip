@@ -3,6 +3,7 @@ import '../../config/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'email_verification_screen.dart';
+import '../../utils/snackbar_utils.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -93,10 +94,10 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         );
       } else {
-        setState(() => _errorMsg = result['message'] as String?);
+        SnackbarUtils.showError(context, result['message'] as String? ?? 'Sign-up failed');
       }
-    } catch (_) {
-      if (mounted) setState(() => _errorMsg = 'An error occurred.');
+    } catch (e) {
+      if (mounted) SnackbarUtils.showError(context, 'An error occurred: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -252,21 +253,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   const SizedBox(height: 30),
 
-                  // Error Message
-                  if (_errorMsg != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Text(
-                        _errorMsg!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-
+                        const SizedBox(height: 10),
                   // Sign Up Button
                   Container(
                     height: 56,

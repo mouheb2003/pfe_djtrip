@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../models/review_queue_item.dart';
-import '../providers/review_queue_provider.dart';
+import '../../models/review_queue_item.dart';
+import '../../providers/review_queue_provider.dart';
 
 /// Modal popup pour soumettre un review
 /// Design inspiré d'Uber/Airbnb

@@ -7,9 +7,10 @@ class AppConfig {
   static const String apiPath = '/api/$apiVersion';
 
   // AI Chat Configuration
-  static const String aiChatUrl = 'http://localhost:3001';
-  static const String aiChatEndpoint = '$aiChatUrl/api/chat';
-  static const String aiSearchEndpoint = '$aiChatUrl/api/search';
+  static String get aiChatUrl => '$apiBaseUrl/chatbot';
+  
+  static String get aiChatEndpoint => '$aiChatUrl/api/chat';
+  static String get aiSearchEndpoint => '$aiChatUrl/api/search';
 
   // App Configuration
   static const String appName = 'DJTrip';

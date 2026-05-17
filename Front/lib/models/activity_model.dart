@@ -294,6 +294,10 @@ class ActivityModel {
 
   // Activity timeline status logic
   String get timelineStatus {
+    if (statut == 'cancelled') {
+      return 'PAST';
+    }
+
     final now = DateTime.now();
 
     if (dateDebut == null) {

@@ -104,13 +104,16 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 201) {
+        return {'success': true, 'message': body['message'] ?? 'Post published.', 'post': body['post']};
+      }
       return {
-        'success': res.statusCode == 201,
-        'message': body['message'] ?? 'Unable to create post',
-        'post': body['post'],
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to publish post.'),
+        'post': null,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to create post right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -120,6 +123,7 @@ class PostService {
     String locationLabel = '',
     List<String> hashtags = const [],
     List<String> imageUrls = const [],
+    List<String> mentions = const [],
   }) async {
     try {
       final res = await ApiClient.put('/posts/$postId', {
@@ -127,6 +131,7 @@ class PostService {
         'locationLabel': locationLabel,
         'hashtags': hashtags,
         'imageUrls': imageUrls,
+        'mentions': mentions,
       });
 
       Map<String, dynamic> body = {};
@@ -136,13 +141,16 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 200) {
+        return {'success': true, 'message': body['message'] ?? 'Post updated.', 'post': body['post']};
+      }
       return {
-        'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to update post',
-        'post': body['post'],
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to update post.'),
+        'post': null,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to update post right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -156,12 +164,15 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 200) {
+        return {'success': true, 'message': body['message'] ?? 'Post deleted.'};
+      }
       return {
-        'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to delete post',
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to delete post.'),
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to delete post right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -206,14 +217,22 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 201) {
+        return {
+          'success': true,
+          'message': body['message'] ?? 'Comment added.',
+          'comments': body['comments'] ?? const <dynamic>[],
+          'commentsCount': body['commentsCount'] ?? 0,
+        };
+      }
       return {
-        'success': res.statusCode == 201,
-        'message': body['message'] ?? 'Unable to add comment',
-        'comments': body['comments'] ?? const <dynamic>[],
-        'commentsCount': body['commentsCount'] ?? 0,
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to add comment.'),
+        'comments': const <dynamic>[],
+        'commentsCount': 0,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to add comment right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -320,13 +339,16 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 200) {
+        return {'success': true, 'message': body['message'] ?? 'Comment updated.', 'comment': body['comment']};
+      }
       return {
-        'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to update comment',
-        'comment': body['comment'],
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to update comment.'),
+        'comment': null,
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to update comment right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -341,12 +363,15 @@ class PostService {
         body = {};
       }
 
+      if (res.statusCode == 200) {
+        return {'success': true, 'message': body['message'] ?? 'Comment deleted.'};
+      }
       return {
-        'success': res.statusCode == 200,
-        'message': body['message'] ?? 'Unable to delete comment',
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to delete comment.'),
       };
     } catch (_) {
-      return {'success': false, 'message': 'Unable to delete comment right now.'};
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
     }
   }
 
@@ -418,4 +443,42 @@ class PostService {
     }
   }
 
+  // ✅ NEW: Get public posts for a user profile (including mentions)
+  static Future<List<Map<String, dynamic>>> getPublicUserPosts(String userId) async {
+    try {
+      final res = await ApiClient.get('/posts/public/user/$userId', cacheFirst: false);
+      if (res.statusCode != 200) return [];
+      final body = _safeObject(res.body);
+      if (body['posts'] is List) {
+        return _safeMapList(body['posts']);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
   }
+
+  // ✅ NEW: Hide/Unhide post from profile (for mentioned users)
+  static Future<Map<String, dynamic>> togglePostHide(String postId) async {
+    try {
+      final res = await ApiClient.post('/posts/$postId/hide', {});
+      Map<String, dynamic> body = {};
+      try {
+        body = _safeObject(res.body);
+      } catch (_) {
+        body = {};
+      }
+
+      if (res.statusCode == 200) {
+        return {'success': true, 'message': body['message'] ?? 'Visibility updated.', 'isHidden': body['isHidden'] == true};
+      }
+      return {
+        'success': false,
+        'message': ApiService.extractErrorMessage(res, fallback: 'Unable to update visibility.'),
+        'isHidden': false,
+      };
+    } catch (_) {
+      return {'success': false, 'message': 'Could not connect. Please check your connection.'};
+    }
+  }
+}

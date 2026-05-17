@@ -6,22 +6,27 @@ class AiTextService {
 
   // Supported languages
   static const Map<String, String> supportedLanguages = {
-    'en': 'English',
-    'fr': 'French',
-    'es': 'Spanish',
-    'de': 'German',
     'ar': 'Arabic',
+    'fr': 'French',
+    'de': 'German',
     'ru': 'Russian',
+    'es': 'Spanish',
+    'en': 'English',
   };
 
+  // Build context text for AI processing
+  static String buildContext({String? type, String? title, String? category, String? description, String? text}) {
+    return _buildContextText(type, title, category, description, text ?? '');
+  }
+
   // Translate text to target language
-  static Future<Map<String, dynamic>> translateText(String text, String lang) async {
+  static Future<Map<String, dynamic>> translateText(String text, String lang, {String? contextText}) async {
     try {
-      final contextText = _buildTranslationContext(text, lang);
+      final finalContext = contextText ?? _buildTranslationContext(text, lang);
       final response = await ApiClient.post(
         '/ai-text/process',
         {
-          'text': contextText,
+          'text': finalContext,
           'action': 'translate',
           'lang': lang,
         },
@@ -54,9 +59,9 @@ class AiTextService {
   }
 
   // Rewrite text to be more engaging
-  static Future<Map<String, dynamic>> rewriteText(String text, {String? type, String? title, String? description}) async {
+  static Future<Map<String, dynamic>> rewriteText(String text, {String? type, String? title, String? category, String? description}) async {
     try {
-      final contextText = _buildContextText(type, title, description, text);
+      final contextText = _buildContextText(type, title, category, description, text);
       final response = await ApiClient.post(
         '/ai-text/process',
         {
@@ -93,9 +98,9 @@ class AiTextService {
   }
 
   // Improve text (grammar, clarity, tone)
-  static Future<Map<String, dynamic>> improveText(String text, {String? type, String? title, String? description}) async {
+  static Future<Map<String, dynamic>> improveText(String text, {String? type, String? title, String? category, String? description}) async {
     try {
-      final contextText = _buildContextText(type, title, description, text);
+      final contextText = _buildContextText(type, title, category, description, text);
       final response = await ApiClient.post(
         '/ai-text/process',
         {
@@ -158,43 +163,59 @@ class AiTextService {
 
   // Extract pure response without any introductions or explanations
   static String _extractPureResponse(String result) {
-    if (result.contains('\n')) {
-      final lines = result.split('\n');
-      for (final line in lines) {
-        final trimmedLine = line.trim();
-        if (trimmedLine.isNotEmpty && 
-            !trimmedLine.toLowerCase().contains('translation') &&
-            !trimmedLine.toLowerCase().contains('translated') &&
-            !trimmedLine.toLowerCase().contains('here is') &&
-            !trimmedLine.toLowerCase().contains('voici') &&
-            !trimmedLine.toLowerCase().contains('traduction') &&
-            !trimmedLine.toLowerCase().contains('original') &&
-            !trimmedLine.toLowerCase().contains('suggestion') &&
-            !trimmedLine.toLowerCase().contains('option') &&
-            !trimmedLine.toLowerCase().contains('here are') &&
-            !trimmedLine.toLowerCase().contains('suggestion') &&
-            !trimmedLine.toLowerCase().contains('improved') &&
-            !trimmedLine.toLowerCase().contains('rewritten') &&
-            !trimmedLine.toLowerCase().contains('better') &&
-            !trimmedLine.toLowerCase().contains('version') &&
-            !trimmedLine.toLowerCase().contains('alternative') &&
-            !trimmedLine.toLowerCase().contains('recommend') &&
-            !trimmedLine.toLowerCase().contains('i can') &&
-            !trimmedLine.toLowerCase().contains('i will') &&
-            !trimmedLine.toLowerCase().contains('let me') &&
-            !trimmedLine.toLowerCase().contains('here\'s') &&
-            !trimmedLine.toLowerCase().contains('the following') &&
-            !trimmedLine.toLowerCase().contains('below is') &&
-            !trimmedLine.toLowerCase().contains('above is')) {
-          return trimmedLine;
-        }
+    if (!result.contains('\n')) return result.trim();
+    
+    final lines = result.split('\n');
+    final filteredLines = <String>[];
+    bool contentStarted = false;
+
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+      if (trimmedLine.isEmpty) {
+        if (contentStarted) filteredLines.add('');
+        continue;
+      }
+
+      final lowerLine = trimmedLine.toLowerCase();
+      bool isBlacklisted = 
+          lowerLine.contains('translation') ||
+          lowerLine.contains('translated') ||
+          lowerLine.contains('here is') ||
+          lowerLine.contains('voici') ||
+          lowerLine.contains('traduction') ||
+          lowerLine.contains('original') ||
+          lowerLine.contains('suggestion') ||
+          lowerLine.contains('option') ||
+          lowerLine.contains('improved version') ||
+          lowerLine.contains('rewritten version') ||
+          lowerLine.contains('alternative') ||
+          lowerLine.contains('i recommend') ||
+          lowerLine.contains('i suggest') ||
+          lowerLine.contains('here are') ||
+          lowerLine.contains('let me') ||
+          lowerLine.contains('the following') ||
+          lowerLine.contains('below is') ||
+          lowerLine.contains('above is') ||
+          lowerLine.startsWith('result:') ||
+          lowerLine.startsWith('output:') ||
+          (lowerLine.startsWith('task') && lowerLine.contains(':'));
+
+      if (!isBlacklisted) {
+        contentStarted = true;
+        filteredLines.add(trimmedLine);
       }
     }
-    return result.trim();
+    
+    // Remove trailing empty lines
+    while (filteredLines.isNotEmpty && filteredLines.last.isEmpty) {
+      filteredLines.removeLast();
+    }
+    
+    return filteredLines.join('\n').trim();
   }
 
   // Build context text for AI processing with clear distinction between content types
-  static String _buildContextText(String? type, String? title, String? description, String currentText) {
+  static String _buildContextText(String? type, String? title, String? category, String? description, String currentText) {
     final buffer = StringBuffer();
     
     // Determine content type and build appropriate context
@@ -221,6 +242,9 @@ class AiTextService {
       buffer.writeln('Style: Professional, detailed, persuasive, longer content');
       if (title != null) {
         buffer.writeln('Activity Title: $title');
+      }
+      if (category != null && category.isNotEmpty) {
+        buffer.writeln('Activity Category: $category');
       }
       if (description != null && description.isNotEmpty) {
         buffer.writeln('Current Activity Description: $description');

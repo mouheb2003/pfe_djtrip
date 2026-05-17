@@ -97,8 +97,6 @@ class VectorStorage {
       // Add new chunk
       this.vectors.push(chunk);
     }
-
-    await this.saveVectors(this.vectors);
     
     // Update index
     if (!this.index) {
@@ -112,8 +110,6 @@ class VectorStorage {
       chunkIndex: chunk.metadata.chunkIndex,
       storedAt: new Date().toISOString(),
     };
-    
-    await this.saveIndex(this.index);
   }
 
   async storeChunks(chunks) {
@@ -122,6 +118,10 @@ class VectorStorage {
     for (const chunk of chunks) {
       await this.storeChunk(chunk);
     }
+
+    // Save once at the end for better performance
+    await this.saveVectors(this.vectors);
+    await this.saveIndex(this.index);
     
     console.log('Chunks stored successfully');
   }
@@ -141,6 +141,32 @@ class VectorStorage {
   async searchByPath(path) {
     const vectors = await this.getAllVectors();
     return vectors.filter(v => v.metadata.path === path);
+  }
+
+  async deleteByPath(filePath) {
+    if (!this.vectors) {
+      await this.loadVectors();
+    }
+
+    const initialCount = this.vectors.length;
+    this.vectors = this.vectors.filter(v => v.metadata.path !== filePath);
+    
+    if (this.vectors.length !== initialCount) {
+      await this.saveVectors(this.vectors);
+      
+      if (!this.index) {
+        await this.loadIndex();
+      }
+      
+      Object.keys(this.index).forEach(chunkId => {
+        if (this.index[chunkId].path === filePath) {
+          delete this.index[chunkId];
+        }
+      });
+      
+      await this.saveIndex(this.index);
+      console.log(`🗑️ Removed ${initialCount - this.vectors.length} chunks for: ${filePath}`);
+    }
   }
 
   async deleteChunk(chunkId) {
@@ -205,9 +231,12 @@ class VectorStorage {
     const index = await this.loadIndex();
     const metadata = await this.loadMetadata();
 
+    // Count unique file paths in the index
+    const uniqueFiles = new Set(Object.values(index).map(item => item.path));
+
     return {
       totalChunks: vectors.length,
-      totalFiles: Object.keys(index).length,
+      totalFiles: uniqueFiles.size,
       lastUpdated: metadata.lastIndexed || null,
       storagePath: this.storagePath,
       indexSize: JSON.stringify(index).length,
