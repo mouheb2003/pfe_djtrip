@@ -2239,7 +2239,36 @@ class _MapExplorerScreenState extends State<MapExplorerScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => _showPlaceDetailsModal(place),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PlaceDetailScreenV2(
+                      place: {
+                        '_id': place.placeId,
+                        'title': place.name,
+                        'subtitle': place.primaryType ?? '',
+                        'description': place.address ?? '',
+                        'image': place.photoUrl ?? '',
+                        'images': [
+                          if ((place.photoUrl ?? '').isNotEmpty)
+                            place.photoUrl!,
+                        ],
+                        'rating': (place.rating?.toStringAsFixed(1)) ?? '0.0',
+                        'nombreAvis': 0,
+                        'top_destination': false,
+                        'activity_id': null,
+                        'coordonnees': {
+                          'latitude': place.position.latitude,
+                          'longitude': place.position.longitude,
+                        },
+                        'price': 0,
+                        'categorie': place.primaryType ?? 'Place',
+                      },
+                    ),
+                  ),
+                );
+              },
               icon: const Icon(Icons.info_outline),
               label: const Text('Plus de détails'),
             ),
