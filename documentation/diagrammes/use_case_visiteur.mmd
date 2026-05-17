@@ -1,0 +1,18 @@
+flowchart LR
+    Visiteur["Visiteur"]
+
+    subgraph DJTrip["Systeme DJTrip"]
+        A(("Creer un compte"))
+        B(("Se connecter"))
+        C(("Consulter les lieux touristiques"))
+        D(("Rechercher une activite"))
+        E(("Consulter detail activite"))
+        F(("Utiliser chatbot IA"))
+    end
+
+    Visiteur --> A
+    Visiteur --> B
+    Visiteur --> C
+    Visiteur --> D
+    Visiteur --> E
+    Visiteur --> F

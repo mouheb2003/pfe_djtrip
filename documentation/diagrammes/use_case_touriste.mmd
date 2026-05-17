@@ -1,0 +1,32 @@
+flowchart LR
+    Touriste["Touriste"]
+
+    subgraph DJTrip["Systeme DJTrip"]
+        A(("Completer profil"))
+        B(("Consulter lieux"))
+        C(("Rechercher activite"))
+        D(("Reserver activite"))
+        E(("Annuler reservation"))
+        F(("Consulter mes reservations"))
+        G(("Donner un avis"))
+        H(("Publier post"))
+        I(("Commenter / reagir"))
+        J(("Suivre utilisateur"))
+        K(("Envoyer message"))
+        L(("Recevoir notifications"))
+        M(("Gerer preferences notifications"))
+    end
+
+    Touriste --> A
+    Touriste --> B
+    Touriste --> C
+    Touriste --> D
+    Touriste --> E
+    Touriste --> F
+    Touriste --> G
+    Touriste --> H
+    Touriste --> I
+    Touriste --> J
+    Touriste --> K
+    Touriste --> L
+    Touriste --> M

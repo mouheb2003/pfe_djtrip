@@ -1,0 +1,34 @@
+flowchart LR
+    Organisateur["Organisateur"]
+
+    subgraph DJTrip["Systeme DJTrip"]
+        A(("Completer profil organisateur"))
+        B(("Soumettre compte pour validation"))
+        C(("Creer activite"))
+        D(("Modifier activite"))
+        E(("Archiver activite"))
+        F(("Gerer demandes reservation"))
+        G(("Approuver reservation"))
+        H(("Refuser reservation"))
+        I(("Verifier QR Code"))
+        J(("Consulter avis recus"))
+        K(("Publier post"))
+        L(("Commenter / reagir"))
+        M(("Envoyer message"))
+        N(("Recevoir notifications"))
+    end
+
+    Organisateur --> A
+    Organisateur --> B
+    Organisateur --> C
+    Organisateur --> D
+    Organisateur --> E
+    Organisateur --> F
+    Organisateur --> G
+    Organisateur --> H
+    Organisateur --> I
+    Organisateur --> J
+    Organisateur --> K
+    Organisateur --> L
+    Organisateur --> M
+    Organisateur --> N

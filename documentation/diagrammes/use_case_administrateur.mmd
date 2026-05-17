@@ -1,0 +1,24 @@
+flowchart LR
+    Admin["Administrateur"]
+
+    subgraph DJTrip["Systeme DJTrip"]
+        A(("Se connecter au dashboard"))
+        B(("Gerer utilisateurs"))
+        C(("Valider organisateurs"))
+        D(("Suspendre utilisateur"))
+        E(("Bannir utilisateur"))
+        F(("Traiter reclamations"))
+        G(("Consulter logs systeme"))
+        H(("Consulter statistiques"))
+        I(("Envoyer notifications systeme"))
+    end
+
+    Admin --> A
+    Admin --> B
+    Admin --> C
+    Admin --> D
+    Admin --> E
+    Admin --> F
+    Admin --> G
+    Admin --> H
+    Admin --> I
