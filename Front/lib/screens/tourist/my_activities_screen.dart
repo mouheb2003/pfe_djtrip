@@ -92,6 +92,8 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
           ongoing.add(activity);
           break;
         case 'PAST':
+        case 'COMPLETED':
+        case 'CANCELLED':
           past.add(activity);
           break;
         default:
@@ -177,19 +179,23 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
     final title = activity.titre.toLowerCase();
     if (title.contains(query)) return 0;
 
+    final category = activity.categorie.toLowerCase();
+    if (category.contains(query)) return 1;
+
+    final description = activity.description.toLowerCase();
+    if (description.contains(query)) return 2;
+
     final otherFields = <String>[
-      activity.description,
       activity.lieu,
-      activity.categorie,
       activity.typeActivite,
       activity.formattedLieu,
     ];
 
     if (otherFields.any((value) => value.toLowerCase().contains(query))) {
-      return 1;
+      return 3;
     }
 
-    return 2;
+    return 4;
   }
 
   List<ActivityModel> _activitiesForCurrentTab() {
@@ -424,17 +430,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   List<String> _imageUrlsFor(ActivityModel activity) {
-    final urls = <String>[];
-    if (activity.thumbnailUrl.isNotEmpty) {
-      urls.add(activity.thumbnailUrl);
-    }
-    for (final photo in activity.photos) {
-      final value = photo.trim();
-      if (value.startsWith('http://') || value.startsWith('https://')) {
-        urls.add(value);
-      }
-    }
-    return urls.toSet().toList(growable: false);
+    return activity.displayPhotos;
   }
 
   String _typeFor(ActivityModel activity) {
@@ -454,12 +450,14 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   String _statusBadgeFor(ActivityModel activity) {
-    switch (activity.timelineStatus) {
+    switch (activity.timelineStatus.toUpperCase()) {
       case 'UPCOMING':
         return 'Upcoming';
       case 'ONGOING':
         return 'Ongoing';
-      case 'PAST':
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'COMPLETED':
         return 'Completed';
       default:
         return 'Active';
@@ -467,15 +465,17 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   }
 
   Color _statusColorFor(ActivityModel activity) {
-    switch (_tabIndex) {
-      case 0:
-        return const Color(0xFF5D71FF); // blue for upcoming
-      case 1:
-        return const Color(0xFF22C55E); // green for ongoing
-      case 2:
-        return const Color(0xFF94A3B8); // grey for completed
+    switch (activity.timelineStatus.toUpperCase()) {
+      case 'UPCOMING':
+        return const Color(0xFF10B981); // Green
+      case 'ONGOING':
+        return const Color(0xFFF59E0B); // Orange
+      case 'CANCELLED':
+        return const Color(0xFFEF4444); // Red
+      case 'COMPLETED':
+        return const Color(0xFF6B7280); // Grey
       default:
-        return const Color(0xFF22C55E);
+        return const Color(0xFF6B7280);
     }
   }
 
@@ -1020,13 +1020,13 @@ class _FeaturedActivityCard extends StatelessWidget {
                             children: [
                               Text(
                                 title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                maxLines: 3,
+                                overflow: TextOverflow.visible,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 31,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w900,
-                                  height: 0.86,
+                                  height: 1.1,
                                   shadows: [
                                     Shadow(
                                       color: Color(0x99000000),
@@ -1052,14 +1052,14 @@ class _FeaturedActivityCard extends StatelessWidget {
                         FilledButton(
                           onPressed: onButtonTap,
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF5D71FF),
+                            backgroundColor: const Color(0xFFFF6B1A),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 18,
+                              horizontal: 16,
+                              vertical: 10,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                           child: Text(
@@ -1347,13 +1347,13 @@ class _ActivityCard extends StatelessWidget {
                             children: [
                               Text(
                                 title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                maxLines: 3,
+                                overflow: TextOverflow.visible,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 31,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w900,
-                                  height: 0.86,
+                                  height: 1.1,
                                   shadows: [
                                     Shadow(
                                       color: Color(0x99000000),
@@ -1384,14 +1384,14 @@ class _ActivityCard extends StatelessWidget {
                         FilledButton(
                           onPressed: onButtonTap,
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF5D71FF),
+                            backgroundColor: const Color(0xFFFF6B1A),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 18,
+                              horizontal: 16,
+                              vertical: 10,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                           child: Text(

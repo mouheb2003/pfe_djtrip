@@ -245,7 +245,7 @@ class OnboardingService {
       'id': 'phone',
       'title': 'Phone Number',
       'description': 'Add your phone number for better communication',
-      'required': true,
+      'required': false,
       'fields': ['num_tel', 'pays_telephone'],
     },
   ];
@@ -312,7 +312,7 @@ class OnboardingService {
       'id': 'phone',
       'title': 'Phone Number',
       'description': 'Add your phone number for better communication',
-      'required': true,
+      'required': false,
       'fields': ['num_tel', 'pays_telephone'],
     },
   ];

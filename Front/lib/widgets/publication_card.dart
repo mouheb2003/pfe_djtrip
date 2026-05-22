@@ -28,6 +28,7 @@ class PublicationCard extends StatefulWidget {
   final VoidCallback? onToggleHide;
   final VoidCallback? onDelete;
   final VoidCallback? onModified;
+  final VoidCallback? onCommentsUpdated;
 
   const PublicationCard({
     super.key,
@@ -41,6 +42,7 @@ class PublicationCard extends StatefulWidget {
     this.onToggleHide,
     this.onDelete,
     this.onModified,
+    this.onCommentsUpdated,
   });
 
   @override
@@ -61,6 +63,45 @@ class _PublicationCardState extends State<PublicationCard> {
     // Remove @mentions from content to avoid duplication with header mentions
     final mentionRegex = RegExp(r'@[a-zA-Z0-9_]{3,30}');
     return content.replaceAll(mentionRegex, '');
+  }
+
+  Widget _buildUserTypeBadge(String? userType, bool isDark) {
+    if (userType == null || userType.isEmpty) return const SizedBox.shrink();
+    
+    final normalized = userType.trim().toLowerCase();
+    final bool isOrganizer = normalized.contains('organis') || normalized.contains('organiz');
+    final String label = isOrganizer ? 'Organizer' : 'Tourist';
+    
+    final Color badgeBg = isOrganizer
+        ? (isDark ? const Color(0xFF1E3A8A).withOpacity(0.4) : const Color(0xFFEFF6FF))
+        : (isDark ? const Color(0xFF065F46).withOpacity(0.4) : const Color(0xFFECFDF5));
+        
+    final Color badgeText = isOrganizer
+        ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
+        : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669));
+        
+    final Color badgeBorder = isOrganizer
+        ? (isDark ? const Color(0xFF3B82F6).withOpacity(0.4) : const Color(0xFFBFDBFE))
+        : (isDark ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFA7F3D0));
+
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: badgeBorder, width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: badgeText,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
   }
 
   void _fallbackFeedback(String message) {
@@ -272,6 +313,7 @@ class _PublicationCardState extends State<PublicationCard> {
                         size: 18,
                       ),
                     ],
+                    _buildUserTypeBadge(widget.post.authorUserType, isDark),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -388,31 +430,66 @@ class _PublicationCardState extends State<PublicationCard> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              if (_isTranslating)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else if (_currentLang != null)
-                IconButton(
-                  onPressed: _resetTranslation,
-                  icon: const Icon(Icons.undo, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  color: const Color(0xFF4B63FF),
-                  tooltip: 'Show original',
-                )
-              else
-                IconButton(
-                  onPressed: _showTranslationSelector,
-                  icon: const Icon(Icons.translate, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  color: const Color(0xFF4B63FF),
-                  tooltip: 'Translate',
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isTranslating)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else ...[
+                    if (_translatedContent != null) ...[
+                      IconButton(
+                        onPressed: _resetTranslation,
+                        icon: const Icon(Icons.undo, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        color: const Color(0xFF4B63FF),
+                        tooltip: 'Show original',
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    IconButton(
+                      onPressed: () {
+                        String targetLang = 'en';
+                        try {
+                          final userProvider = Provider.of<UserProvider>(context, listen: false);
+                          final user = userProvider.user;
+                          if (user != null) {
+                            final String? userLang = user is Map
+                                ? user['langue_preferee']?.toString()
+                                : (user as UserModel).languePreferee;
+                            if (userLang != null && userLang.isNotEmpty) {
+                              final match = AiTextService.supportedLanguages.entries.firstWhere(
+                                (e) => e.value.toLowerCase() == userLang.toLowerCase() || e.key.toLowerCase() == userLang.toLowerCase(),
+                                orElse: () => const MapEntry('en', 'English'),
+                              );
+                              targetLang = match.key;
+                            }
+                          }
+                        } catch (_) {}
+                        _translateContent(targetLang);
+                      },
+                      icon: const Icon(Icons.translate, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      color: const Color(0xFF4B63FF),
+                      tooltip: 'Translate',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _showTranslationSelector,
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      color: const Color(0xFF4B63FF),
+                      tooltip: 'Choose language',
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           // Hashtags section
@@ -628,12 +705,12 @@ class _PublicationCardState extends State<PublicationCard> {
             icon: Icons.chat_bubble_outline_rounded,
             count: widget.post.commentsCount,
             color: const Color(0xFF6B7280),
-            onTap: () {
+            onTap: () async {
               print('[PUBLICATION CARD] Opening comments - postId: ${widget.post.id}');
               if (widget.post.id.isEmpty) {
                 print('[PUBLICATION CARD] ERROR: post.id is empty!');
               }
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => CommentsScreen(
@@ -644,17 +721,13 @@ class _PublicationCardState extends State<PublicationCard> {
                   ),
                 ),
               );
+              // Trigger callback when returning to refresh comments count
+              widget.onCommentsUpdated?.call();
             },
           ),
           const SizedBox(width: 20),
           
-          // Share
-          _buildActionButton(
-            icon: Icons.share_rounded,
-            count: widget.post.sharesCount,
-            color: const Color(0xFF6B7280),
-            onTap: widget.onShare,
-          ),
+
           
           const Spacer(),
           
@@ -846,38 +919,6 @@ class _PublicationCardState extends State<PublicationCard> {
                   },
                 ),
               ] else ...[
-                // Report option
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF3F191E) : const Color(0xFFFFF5F5),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.flag_outlined,
-                      color: Color(0xFFFF4757),
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    'Report post',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (widget.onReport != null) {
-                      widget.onReport!.call();
-                    } else {
-                      _fallbackFeedback('Report submitted successfully');
-                    }
-                  },
-                ),
-                
                 // Mute author option
                 ListTile(
                   leading: Container(
@@ -911,72 +952,45 @@ class _PublicationCardState extends State<PublicationCard> {
                 ),
               ],
               
-              // Copy link option
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E2D4A) : const Color(0xFFF0F4FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.link_outlined,
-                    color: Color(0xFF4B63FF),
-                    size: 20,
-                  ),
-                ),
-                title: Text(
-                  'Copy link',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-                  if (widget.onCopyLink != null) {
-                    widget.onCopyLink!.call();
-                  }
-                  final postId = widget.post.id;
-                  if (postId.isNotEmpty) {
-                    final link = 'https://djtrip.com/post/$postId';
-                    await Clipboard.setData(ClipboardData(text: link));
-                    if (widget.onCopyLink == null) {
-                      _fallbackFeedback('Link copied to clipboard');
-                    }
-                  }
-                },
-              ),
+
               
               // Hide from my profile option (only if mentioned)
-              if (widget.onToggleHide != null && !isMyPost)
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF5F5),
-                    borderRadius: BorderRadius.circular(10),
+              if (widget.onToggleHide != null && !isMyPost && widget.post.mentions.contains(currentUserId)) ...[
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: widget.post.hiddenFromProfiles.contains(currentUserId)
+                          ? (isDark ? const Color(0xFF1E3A2F) : const Color(0xFFEFF6FF))
+                          : (isDark ? const Color(0xFF3F191E) : const Color(0xFFFFF5F5)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      widget.post.hiddenFromProfiles.contains(currentUserId)
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: widget.post.hiddenFromProfiles.contains(currentUserId)
+                          ? const Color(0xFF3B82F6)
+                          : const Color(0xFFFF4757),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.visibility_off_outlined,
-                    color: Color(0xFFFF4757),
-                    size: 20,
+                  title: Text(
+                    widget.post.hiddenFromProfiles.contains(currentUserId)
+                        ? 'Unhide from my profile'
+                        : 'Hide from my profile',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onToggleHide?.call();
+                  },
                 ),
-                title: const Text(
-                  'Hide from my profile',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onToggleHide?.call();
-                },
-              ),
+              ],
               
               const SizedBox(height: 8),
             ],

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
 import '../shared/activity_card.dart';
@@ -106,12 +105,46 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
     }
   }
 
+  int _searchRank(ActivityModel activity, String query) {
+    if (query.isEmpty) return 0;
+    final title = activity.title.toLowerCase();
+    if (title.contains(query)) return 0;
+
+    final category = activity.category.toLowerCase();
+    if (category.contains(query)) return 1;
+
+    final description = activity.description.toLowerCase();
+    if (description.contains(query)) return 2;
+
+    final location = activity.location.toLowerCase();
+    if (location.contains(query)) return 3;
+
+    return 4;
+  }
+
+  int _compareBySelectedSort(ActivityModel a, ActivityModel b) {
+    switch (_selectedSort) {
+      case 'Popular':
+      case 'Rating':
+        return (b.rating ?? 0).compareTo(a.rating ?? 0);
+      case 'Newest':
+        return b.createdDate.compareTo(a.createdDate);
+      case 'Price: Low to High':
+        return (a.price ?? 0).compareTo(b.price ?? 0);
+      case 'Price: High to Low':
+        return (b.price ?? 0).compareTo(a.price ?? 0);
+      default:
+        return 0;
+    }
+  }
+
   void _filterActivities() {
     setState(() {
       _filteredActivities = _activities.where((activity) {
         // Search filter
         final matchesSearch = _searchQuery.isEmpty ||
             activity.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            activity.category.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             activity.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             activity.location.toLowerCase().contains(_searchQuery.toLowerCase());
         
@@ -123,7 +156,16 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
       }).toList();
       
       // Apply sorting
-      _sortActivities();
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        _filteredActivities.sort((a, b) {
+          final rankCompare = _searchRank(a, query).compareTo(_searchRank(b, query));
+          if (rankCompare != 0) return rankCompare;
+          return _compareBySelectedSort(a, b);
+        });
+      } else {
+        _sortActivities();
+      }
     });
   }
 
@@ -481,7 +523,7 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
             activity: activity,
             isCompact: true,
             isFavorite: activity.isBookmarked,
-            onFavorite: () async {
+            onFavorite: () {
               final currentState = activity.isBookmarked;
               setState(() {
                 final idx = _filteredActivities.indexOf(activity);
@@ -489,16 +531,6 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                   _filteredActivities[idx] = activity.copyWith(isBookmarked: !currentState);
                 }
               });
-
-              final result = await ActivityService.toggleActivityBookmark(activity.id);
-              if (result['success'] != true && mounted) {
-                setState(() {
-                  final idx = _filteredActivities.indexOf(activity);
-                  if (idx != -1) {
-                    _filteredActivities[idx] = activity.copyWith(isBookmarked: currentState);
-                  }
-                });
-              }
             },
           );
         },
@@ -518,24 +550,14 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
             activity: activity,
             isCompact: false,
             isFavorite: activity.isBookmarked,
-            onFavorite: () async {
+            onFavorite: () {
               final currentState = activity.isBookmarked;
               setState(() {
-                final index = _filteredActivities.indexOf(activity);
-                if (index != -1) {
-                  _filteredActivities[index] = activity.copyWith(isBookmarked: !currentState);
+                final idx = _filteredActivities.indexOf(activity);
+                if (idx != -1) {
+                  _filteredActivities[idx] = activity.copyWith(isBookmarked: !currentState);
                 }
               });
-
-              final result = await ActivityService.toggleActivityBookmark(activity.id);
-              if (result['success'] != true && mounted) {
-                setState(() {
-                  final idx = _filteredActivities.indexOf(activity);
-                  if (idx != -1) {
-                    _filteredActivities[idx] = activity.copyWith(isBookmarked: currentState);
-                  }
-                });
-              }
             },
           ),
         );

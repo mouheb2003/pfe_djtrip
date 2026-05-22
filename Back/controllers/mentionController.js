@@ -113,9 +113,13 @@ exports.searchMentions = async (req, res) => {
     // Nettoyer le query
     const cleanQuery = query.trim().replace(/^@/, '');
     
-    // Rechercher les utilisateurs par fullname uniquement (plus de username)
+    // Rechercher les utilisateurs par fullname, email, ou userType (plus flexible pour trouver les admins)
     const users = await User.find({
-      fullname: { $regex: cleanQuery, $options: 'i' },
+      $or: [
+        { fullname: { $regex: cleanQuery, $options: 'i' } },
+        { email: { $regex: cleanQuery, $options: 'i' } },
+        { userType: { $regex: cleanQuery, $options: 'i' } }
+      ],
       accountStatus: 'active'
     })
     .select('fullname avatar userType _id')

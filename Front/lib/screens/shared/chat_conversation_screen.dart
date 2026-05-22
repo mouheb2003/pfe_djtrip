@@ -13,6 +13,7 @@ import '../../services/api_client.dart';
 import '../../services/message_service.dart';
 import '../../services/navigation_service.dart';
 import '../../services/ai_text_service.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/ai_text_widgets.dart';
 import 'public_profile_screen.dart';
@@ -128,32 +129,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
   Future<void> _loadPartnerPrivacySettings() async {
     try {
-      // Get partner user data to check privacy settings
-      final response = await ApiClient.get('/users/${widget.partnerId}');
-      if (!mounted) return;
+      // Get partner user data to check privacy settings and presence
+      final user = await UserService.getUserById(widget.partnerId, forceRefresh: true);
+      if (!mounted || user == null) return;
 
-      if (response.statusCode == 200) {
-        final userData = response.body as Map<String, dynamic>;
-        final privacySettings =
-            userData['privacy_settings'] as Map<String, dynamic>? ?? {};
+      final privacySettings =
+          user['privacy_settings'] as Map<String, dynamic>? ??
+          user['privacySettings'] as Map<String, dynamic>? ?? {};
 
-        setState(() {
-          _partnerPrivacySettings = privacySettings;
-          // Handle both camelCase (backend) and snake_case (cache) keys
-          _allowDirectMessages =
-              privacySettings['allowDirectMessages'] ??
-              privacySettings['allow_direct_messages'] ??
-              true;
-          _allowPhoneCalls =
-              privacySettings['allowPhoneCalls'] ??
-              privacySettings['allow_phone_calls'] ??
-              true;
-        });
+      setState(() {
+        _partnerPrivacySettings = privacySettings;
+        // Handle both camelCase (backend) and snake_case (cache) keys
+        _allowDirectMessages =
+            privacySettings['allowDirectMessages'] ??
+            privacySettings['allow_direct_messages'] ??
+            true;
+        _allowPhoneCalls =
+            privacySettings['allowPhoneCalls'] ??
+            privacySettings['allow_phone_calls'] ??
+            true;
+        _partnerOnline = user['isReallyOnline'] == true || user['isOnline'] == true;
+      });
 
-        print(
-          'DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings',
-        );
-      }
+      print(
+        'DEBUG: Partner privacy settings loaded: $_partnerPrivacySettings, online: $_partnerOnline',
+      );
     } catch (e) {
       print('DEBUG: Error loading partner privacy settings: $e');
       // Default to enabled if we can't load settings
@@ -631,6 +631,96 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         onLanguageSelected: (lang) => _translateReceivedMessage(msg, lang),
       ),
     );
+  }
+
+  // Called from translate button under received messages
+  void _showMessageTranslationSelector(_UiMessage msg) =>
+      _showLanguageSelectorForMessage(msg);
+
+  Future<void> _translateReceivedMessage(_UiMessage msg, String lang) async {
+    final text = msg.text.trim();
+    if (text.isEmpty) return;
+
+    // Show loading snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Translating to ${AiTextService.supportedLanguages[lang] ?? lang}...',
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 3),
+        backgroundColor: const Color(0xFF4B63FF),
+      ),
+    );
+
+    final result = await AiTextService.translateText(text, lang);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (result['success'] == true) {
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == msg.id);
+        if (idx != -1) {
+          _messages[idx] = _messages[idx].copyWith(
+            translatedText: result['result'],
+            translatedLanguage: lang,
+          );
+        }
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['error'] ?? 'Translation failed'),
+          backgroundColor: const Color(0xFFFF4757),
+        ),
+      );
+    }
+  }
+
+  Future<void> _autoTranslateIfNeeded(_UiMessage msg) async {
+    if (msg.isMine || msg.type != 'text') return;
+    try {
+      final user = await AuthService.getUser();
+      if (user == null) return;
+      final String? preferredLang = user['langue_preferee']?.toString();
+      if (preferredLang == null || preferredLang.isEmpty) return;
+
+      final match = AiTextService.supportedLanguages.entries.firstWhere(
+        (e) => e.value.toLowerCase() == preferredLang.toLowerCase() || e.key.toLowerCase() == preferredLang.toLowerCase(),
+        orElse: () => const MapEntry('', ''),
+      );
+      if (match.key.isEmpty) return;
+
+      final targetLangCode = match.key;
+      final result = await AiTextService.translateText(msg.text, targetLangCode);
+      if (result['success'] == true && mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == msg.id);
+          if (idx != -1) {
+            _messages[idx] = _messages[idx].copyWith(
+              translatedText: result['result'],
+              translatedLanguage: targetLangCode,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      print('Auto-translation failed: $e');
+    }
   }
 
   void _showTranslationPreview(
@@ -1247,6 +1337,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         curve: Curves.easeOut,
       );
     }
+
+    if (!msg.isMine && msg.type == 'text') {
+      _autoTranslateIfNeeded(msg);
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -1321,6 +1415,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
       _loading = false;
     });
+
+    // Trigger auto-translation for received text messages that don't already have translation
+    for (final m in visibleMessages) {
+      if (!m.isMine && m.type == 'text' && m.translatedText == null) {
+        _autoTranslateIfNeeded(m);
+      }
+    }
 
     // 🚀 Don't auto-scroll on load - let user control scroll
     _socket?.emit('mark_read', {'partnerId': widget.partnerId});
@@ -3325,184 +3426,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     );
   }
 
-  void _showMessageTranslationSelector(_UiMessage msg) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 48,
-              height: 5,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: Column(
-                children: [
-                  const Text(
-                    'Translate Message',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E225E),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Select language to translate to:',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: AiTextService.supportedLanguages.length,
-                    itemBuilder: (context, index) {
-                      final langCode = AiTextService.supportedLanguages.keys
-                          .elementAt(index);
-                      final langName = AiTextService.supportedLanguages.values
-                          .elementAt(index);
 
-                      return ListTile(
-                        leading: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          child: Text(
-                            _getLanguageFlag(langCode),
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ),
-                        title: Text(
-                          langName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E225E),
-                          ),
-                        ),
-                        trailing: Text(
-                          langCode.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6C757D),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _translateReceivedMessage(msg, langCode);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getLanguageFlag(String langCode) {
-    switch (langCode) {
-      case 'en':
-        return '🇬🇧';
-      case 'fr':
-        return '🇫🇷';
-      case 'es':
-        return '🇪🇸';
-      case 'de':
-        return '🇩🇪';
-      case 'ar':
-        return '🇸🇦';
-      case 'ru':
-        return '🇷🇺';
-      default:
-        return '🌐';
-    }
-  }
-
-  Future<void> _translateReceivedMessage(
-    _UiMessage msg,
-    String langCode,
-  ) async {
-    // Show loading indicator
-    setState(() {
-      final index = _messages.indexWhere((m) => m.id == msg.id);
-      if (index >= 0) {
-        // Temporarily show loading state
-        _messages[index] = _messages[index].copyWith(
-          translatedText: 'Translating...',
-          translatedLanguage: langCode,
-        );
-      }
-    });
-
-    try {
-      final result = await AiTextService.translateText(msg.text, langCode);
-
-      if (!mounted) return;
-
-      setState(() {
-        final index = _messages.indexWhere((m) => m.id == msg.id);
-        if (index >= 0) {
-          if (result['success'] == true) {
-            _messages[index] = _messages[index].copyWith(
-              translatedText: result['result'],
-              translatedLanguage: langCode,
-            );
-          } else {
-            // Show error and reset translation
-            _messages[index] = _messages[index].copyWith(
-              translatedText: null,
-              translatedLanguage: null,
-            );
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['error'] ?? 'Translation failed'),
-                backgroundColor: const Color(0xFFFF4757),
-              ),
-            );
-          }
-        }
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        final index = _messages.indexWhere((m) => m.id == msg.id);
-        if (index >= 0) {
-          _messages[index] = _messages[index].copyWith(
-            translatedText: null,
-            translatedLanguage: null,
-          );
-        }
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Translation failed. Please try again.'),
-          backgroundColor: const Color(0xFFFF4757),
-        ),
-      );
-    }
-  }
 
   void _showBlockDialog() {
     showDialog(

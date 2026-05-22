@@ -16,7 +16,6 @@ import '../../../services/inscription_service.dart';
 import '../create_activity_screen.dart';
 import '../organizer_main_screen.dart';
 import '../../shared/activity_detail_screen.dart';
-import '../../shared/edit_profile_screen.dart';
 import '../../shared/settings_screen.dart';
 import '../../../services/post_service.dart';
 
@@ -670,27 +669,19 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(0, 6, 0, 100),
             children: [
-              // ── Header Row ──────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () {
-                        final nav = Navigator.of(context);
-                        if (nav.canPop()) nav.pop();
-                      },
-                      icon: const Icon(Icons.arrow_back),
-                      color: AppColors.primary,
-                    ),
+                    const SizedBox(width: 48), // spacer to center the title
                     Expanded(
                       child: ShaderMask(
-                        shaderCallback: (bounds) => LinearGradient(
+                        shaderCallback: (bounds) => const LinearGradient(
                           colors: [Color(0xFF4B63FF), Color(0xFF7B93FF)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ).createShader(bounds),
-                        child: Text(
+                        child: const Text(
                           'Profile',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -703,24 +694,16 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () async {
-                        final user = _user;
-                        if (user == null) return;
-                        final profileUrl = 'https://djtrip.com/profile/${user.id}';
-                        final text = 'Check out ${user.fullname ?? 'this organizer'} on DJTrip!';
-                        await Share.share('$text\n$profileUrl');
-                      },
-                      icon: const Icon(Icons.share),
-                      color: AppColors.primary,
-                    ),
-                    IconButton(
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
                         );
                       },
-                      icon: const Icon(Icons.settings, color: AppColors.primary),
+                      icon: const Icon(Icons.settings_rounded),
+                      color: AppColors.primary,
                     ),
                   ],
                 ),

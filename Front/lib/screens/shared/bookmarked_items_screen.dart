@@ -49,20 +49,36 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
       ]);
       if (mounted) {
         final provider = Provider.of<BookmarkProvider>(context, listen: false);
-        for (var p in results[0]) {
-          provider.updatePostState((p['_id'] ?? '').toString(), true);
+        
+        final List<Map<String, dynamic>> validPosts = (results[0] as List)
+            .where((p) => p != null && p['_id'] != null && (p['content'] != null || p['imageUrl'] != null))
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+            
+        final List<Map<String, dynamic>> validActivities = (results[1] as List)
+            .where((a) => a != null && a['_id'] != null && a['titre'] != null)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+            
+        final List<Map<String, dynamic>> validPlaces = (results[2] as List)
+            .where((l) => l != null && l['_id'] != null && l['name'] != null)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+
+        for (var p in validPosts) {
+          provider.updatePostState((p['_id'] ?? '').toString(), true, force: true);
         }
-        for (var a in results[1]) {
-          provider.updateActivityState((a['_id'] ?? '').toString(), true);
+        for (var a in validActivities) {
+          provider.updateActivityState((a['_id'] ?? '').toString(), true, force: true);
         }
-        for (var l in results[2]) {
-          provider.updateLieuState((l['_id'] ?? '').toString(), true);
+        for (var l in validPlaces) {
+          provider.updateLieuState((l['_id'] ?? '').toString(), true, force: true);
         }
 
         setState(() {
-          _posts = results[0];
-          _activities = results[1];
-          _places = results[2];
+          _posts = validPosts;
+          _activities = validActivities;
+          _places = validPlaces;
           _loading = false;
         });
       }
@@ -448,40 +464,15 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                                 _onPostLikeChanged(postId, liked, likesCount);
                               }
                             },
-                            onBookmarkChanged:
-                                (bookmarked, bookmarksCount) async {
-                                  final postId = (item['_id'] ?? '').toString();
-                                  if (postId.isEmpty) return;
-                                  final currentBookmarked =
-                                      item['isBookmarked'] ?? true;
-                                  final currentCount =
-                                      (item['bookmarks_count'] as num?)
-                                          ?.toInt() ??
-                                      0;
-                                  setState(() {
-                                    item['isBookmarked'] = !currentBookmarked;
-                                    item['bookmarks_count'] = !currentBookmarked
-                                        ? currentCount + 1
-                                        : currentCount - 1;
-                                  });
-                                  final result =
-                                      await PostService.togglePostBookmark(
-                                        postId,
-                                      );
-                                  if (result['success'] == true) {
-                                    final bookmarked =
-                                        result['bookmarked'] == true;
-                                    final bookmarksCount =
-                                        (result['bookmarksCount'] as num?)
-                                            ?.toInt() ??
-                                        currentCount;
-                                    _onPostBookmarkChanged(
-                                      postId,
-                                      bookmarked,
-                                      bookmarksCount,
-                                    );
-                                  }
-                                },
+                            onBookmarkChanged: (bookmarked, bookmarksCount) {
+                              final postId = (item['_id'] ?? '').toString();
+                              if (postId.isEmpty) return;
+                              _onPostBookmarkChanged(
+                                postId,
+                                bookmarked,
+                                bookmarksCount,
+                              );
+                            },
                             onShare: () {
                               final postId = (item['_id'] ?? '').toString();
                               final content = (item['content'] ?? '').toString();
@@ -568,9 +559,13 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
 
   // Helper method to get timeline status
   String _getTimelineStatus(Map<String, dynamic> activityData) {
+    if (activityData['statut'] == 'cancelled') {
+      return 'CANCELLED';
+    }
+
     final now = DateTime.now();
-    final startDate = _parseDateTime(activityData['startDate']);
-    final endDate = _parseDateTime(activityData['endDate']);
+    final startDate = _parseDateTime(activityData['startDate'] ?? activityData['date_debut']);
+    final endDate = _parseDateTime(activityData['endDate'] ?? activityData['date_fin']);
 
     if (startDate.isAfter(now)) {
       return 'UPCOMING';
@@ -605,6 +600,8 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
         return const Color(0xFF10B981); // Green
       case 'ONGOING':
         return const Color(0xFFF59E0B); // Orange
+      case 'CANCELLED':
+        return const Color(0xFFEF4444); // Red
       case 'COMPLETED':
         return const Color(0xFF6B7280); // Grey
       default:
@@ -616,9 +613,11 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
   String _getStatusText(String status) {
     switch (status) {
       case 'UPCOMING':
-        return 'ACTIVE';
+        return 'UPCOMING';
       case 'ONGOING':
         return 'ONGOING';
+      case 'CANCELLED':
+        return 'CANCELLED';
       case 'COMPLETED':
         return 'COMPLETED';
       default:
@@ -745,15 +744,15 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFFF8FAFC),
-                                        Color(0xFFF1F5F9),
+                                        Color(0xFF8E9EFF),
+                                        Color(0xFFA5B4FC),
                                       ],
                                     ),
                                   ),
                                   child: const Icon(
-                                    Icons.broken_image_outlined,
+                                    Icons.broken_image_rounded,
                                     size: 40,
-                                    color: Color(0xFF94A3B8),
+                                    color: Colors.white70,
                                   ),
                                 ),
                           )
@@ -763,13 +762,13 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [Color(0xFFF0F4FF), Color(0xFFE8F4FD)],
+                                colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
                               ),
                             ),
                             child: const Icon(
-                              Icons.image_not_supported,
-                              size: 50,
-                              color: Color(0xFF4B63FF),
+                              Icons.image_not_supported_rounded,
+                              size: 40,
+                              color: Colors.white70,
                             ),
                           ),
                   ),
@@ -810,58 +809,53 @@ class _BookmarkedItemsScreenState extends State<BookmarkedItemsScreen> {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                  child: Consumer<BookmarkProvider>(
+                    builder: (context, provider, child) {
+                      final isProviderBookmarked = provider.isActivityBookmarked(activityId);
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: IconButton(
-                      onPressed: () async {
-                        final currentBookmarked =
-                            activityData['isBookmarked'] ?? true;
-                        final currentCount =
-                            (activityData['bookmarks_count'] as num?)
-                                ?.toInt() ??
-                            0;
-                        setState(() {
-                          activityData['isBookmarked'] = !currentBookmarked;
-                          activityData['bookmarks_count'] = !currentBookmarked
-                              ? currentCount + 1
-                              : currentCount - 1;
-                        });
-                        final result =
-                            await ActivityService.toggleActivityBookmark(
-                              activityId,
-                            );
-                        if (result['success'] == true) {
-                          final bookmarked = result['bookmarked'] == true;
-                          final bookmarksCount =
-                              (result['bookmarksCount'] as num?)?.toInt() ??
-                              currentCount;
-                          _onActivityBookmarkChanged(
-                            activityId,
-                            bookmarked,
-                            bookmarksCount,
-                          );
-                        }
-                      },
-                      icon: Icon(
-                        isBookmarked
-                            ? Icons.bookmark
-                            : Icons.bookmark_border_rounded,
-                        color: isBookmarked
-                            ? const Color(0xFF4B63FF)
-                            : const Color(0xFF6B7280),
-                        size: 20,
-                      ),
-                    ),
+                        child: IconButton(
+                          onPressed: () async {
+                            final currentBookmarked = isProviderBookmarked;
+                            final currentCount =
+                                (activityData['bookmarks_count'] as num?)
+                                    ?.toInt() ??
+                                0;
+                            
+                            // Call provider to toggle state, which invokes the backend service
+                            await provider.toggleActivityBookmark(activityId);
+                            
+                            // Trigger local removal logic since we are on the Saved tab
+                            if (mounted) {
+                              _onActivityBookmarkChanged(
+                                activityId,
+                                !currentBookmarked,
+                                !currentBookmarked ? currentCount + 1 : currentCount - 1,
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            isProviderBookmarked
+                                ? Icons.bookmark
+                                : Icons.bookmark_border_rounded,
+                            color: isProviderBookmarked
+                                ? const Color(0xFF4B63FF)
+                                : const Color(0xFF6B7280),
+                            size: 20,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1098,13 +1092,13 @@ String _getPlaceImageUrl(Map<String, dynamic> placeData) {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)],
+                          colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
                         ),
                       ),
                       child: const Icon(
-                        Icons.broken_image_outlined,
+                        Icons.broken_image_rounded,
                         size: 40,
-                        color: Color(0xFF94A3B8),
+                        color: Colors.white70,
                       ),
                     ),
                   ),
@@ -1114,7 +1108,11 @@ String _getPlaceImageUrl(Map<String, dynamic> placeData) {
                   height: 180,
                   width: double.infinity,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
+                    ),
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -1122,7 +1120,7 @@ String _getPlaceImageUrl(Map<String, dynamic> placeData) {
                   child: const Icon(
                     Icons.image_outlined,
                     size: 40,
-                    color: Color(0xFF94A3B8),
+                    color: Colors.white70,
                   ),
                 ),
               Padding(
@@ -1142,43 +1140,39 @@ String _getPlaceImageUrl(Map<String, dynamic> placeData) {
                             ),
                           ),
                         ),
-                        IconButton(
-                          onPressed: () async {
-                            final currentBookmarked =
-                                placeData['isBookmarked'] ?? true;
-                            final currentCount =
-                                (placeData['bookmarks_count'] as num?)
-                                    ?.toInt() ??
-                                0;
-                            setState(() {
-                              placeData['isBookmarked'] = !currentBookmarked;
-                              placeData['bookmarks_count'] = !currentBookmarked
-                                  ? currentCount + 1
-                                  : currentCount - 1;
-                            });
-                            final result = await LieuService.toggleLieuBookmark(
-                              lieuId,
+                        Consumer<BookmarkProvider>(
+                          builder: (context, provider, child) {
+                            final isProviderBookmarked = provider.isLieuBookmarked(lieuId);
+                            return IconButton(
+                              onPressed: () async {
+                                final currentBookmarked = isProviderBookmarked;
+                                final currentCount =
+                                    (placeData['bookmarks_count'] as num?)
+                                        ?.toInt() ??
+                                    0;
+                                
+                                // Call provider to toggle state, which invokes the backend service
+                                await provider.toggleLieuBookmark(lieuId);
+                                
+                                // Trigger local removal logic since we are on the Saved tab
+                                if (mounted) {
+                                  _onPlaceBookmarkChanged(
+                                    lieuId,
+                                    !currentBookmarked,
+                                    !currentBookmarked ? currentCount + 1 : currentCount - 1,
+                                  );
+                                }
+                              },
+                              icon: Icon(
+                                isProviderBookmarked
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_border_rounded,
+                                color: isProviderBookmarked
+                                    ? const Color(0xFF4B63FF)
+                                    : const Color(0xFF6B7280),
+                              ),
                             );
-                            if (result['success'] == true) {
-                              final bookmarked = result['bookmarked'] == true;
-                              final bookmarksCount =
-                                  (result['bookmarksCount'] as num?)?.toInt() ??
-                                  currentCount;
-                              _onPlaceBookmarkChanged(
-                                lieuId,
-                                bookmarked,
-                                bookmarksCount,
-                              );
-                            }
                           },
-                          icon: Icon(
-                            isBookmarked
-                                ? Icons.bookmark
-                                : Icons.bookmark_border_rounded,
-                            color: isBookmarked
-                                ? const Color(0xFF4B63FF)
-                                : const Color(0xFF6B7280),
-                          ),
                         ),
                       ],
                     ),

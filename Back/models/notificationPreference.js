@@ -62,25 +62,7 @@ const notificationPreferenceSchema = new mongoose.Schema(
         email: { type: Boolean, default: true },
       },
     },
-    // Quiet hours (no notifications during this period)
-    quiet_hours: {
-      enabled: {
-        type: Boolean,
-        default: false,
-      },
-      start: {
-        type: String,
-        default: '22:00', // 10 PM
-      },
-      end: {
-        type: String,
-        default: '08:00', // 8 AM
-      },
-      timezone: {
-        type: String,
-        default: 'UTC',
-      },
-    },
+
     // Device-specific settings
     device_settings: {
       android: {
@@ -124,24 +106,7 @@ notificationPreferenceSchema.methods.isEmailEnabled = function (notificationType
   return typePreference ? typePreference.email : true;
 };
 
-/**
- * Check if current time is within quiet hours
- */
-notificationPreferenceSchema.methods.isQuietHours = function () {
-  if (!this.quiet_hours.enabled) return false;
-  
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-  const start = this.quiet_hours.start;
-  const end = this.quiet_hours.end;
-  
-  // Handle overnight quiet hours (e.g., 22:00 to 08:00)
-  if (start > end) {
-    return currentTime >= start || currentTime < end;
-  }
-  
-  return currentTime >= start && currentTime < end;
-};
+
 
 /**
  * Get user's notification preferences

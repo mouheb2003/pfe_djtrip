@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/bookmark_provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -11,9 +13,11 @@ import '../../services/auth_service.dart';
 import '../../services/inscription_service.dart';
 import '../../services/review_service.dart';
 import '../../services/user_service.dart';
+import '../../services/booking_service.dart';
 import '../../theme/app_theme.dart';
 import '../tourist/booking_detail_screen.dart';
 import '../tourist/booking_selection_screen.dart';
+import '../organizer/verify_booking_screen.dart';
 import 'chat_conversation_screen.dart';
 import 'public_profile_screen.dart';
 import 'edit_review_modal.dart';
@@ -82,20 +86,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   ];
 
   List<String> get _displayImages {
-    final photos = _activity?.photos ?? const <String>[];
-    final List<String> extractedUrls = [];
-    final urlRegExp = RegExp(r'https?://[^"\\]+');
-
-    for (final p in photos) {
-      if (p.startsWith('http')) {
-        extractedUrls.add(p);
-      } else if (p.isNotEmpty && p.toLowerCase() != 'null') {
-        extractedUrls.add(p); // ApiConfig will handle the prefix
-      }
-    }
-    // Only use default images if NO images are provided
-    if (extractedUrls.isEmpty) return _images;
-    return extractedUrls;
+    return _activity?.displayPhotos ?? const <String>[];
   }
 
 
@@ -463,6 +454,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
         _loadingActivity = false;
       });
 
+      // Seed the provider with the initial bookmarked state
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Provider.of<BookmarkProvider>(context, listen: false)
+              .updateActivityState(widget.activityId, _activity?.isBookmarked ?? false);
+        }
+      });
+
       print('✅ Activity loaded successfully: ${_activity?.titre ?? 'null'}');
 
       // Load reviews after activity is loaded
@@ -514,6 +513,37 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
   Future<void> _deletePendingBooking() async {
     final booking = _bookingForActivity;
     if (booking == null) return;
+
+    final activityStart = _activity?.dateDebut;
+    if (activityStart != null) {
+      final difference = activityStart.difference(DateTime.now());
+      if (difference.inHours < 24) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: Colors.red.shade600),
+                const SizedBox(width: 10),
+                const Text('Cancellation Blocked', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+              ],
+            ),
+            content: const Text(
+              'To ensure fairness for organizers and other participants, cancellations must be made at least 24 hours before the activity starts.\n\nSince this activity is scheduled to start in less than 24 hours, this reservation can no longer be cancelled.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF475569)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -573,6 +603,104 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     }
   }
 
+  void _showCancellationPolicyDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: Colors.white,
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.priority_high_rounded,
+                  color: Colors.amber.shade800,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Cancellation Policy',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please note that reservations can only be cancelled up to 24 hours before the activity starts.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time_rounded, color: Colors.blue.shade600, size: 20),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Minimum 24-hour notice required for cancellations.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B1A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Got It',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showTranslationSelector() {
     showModalBottomSheet(
       context: context,
@@ -619,45 +747,24 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
     if (_activity == null || _isSavingBookmark) return;
 
     final activityId = widget.activityId;
-    final currentBookmarked = _isBookmarked;
-    final currentCount = _bookmarksCount;
-
-    // Optimistic UI update
-    setState(() {
-      _isBookmarked = !currentBookmarked;
-      _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
-      _isSavingBookmark = true;
-    });
+    setState(() => _isSavingBookmark = true);
 
     try {
-      final result = await ActivityService.toggleActivityBookmark(activityId);
-      if (result['success'] == true) {
-        if (mounted) {
-          setState(() {
-            _isBookmarked = result['bookmarked'] == true;
-            _bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? _bookmarksCount;
-          });
-        }
-      } else {
-        // Revert on failure
-        if (mounted) {
-          setState(() {
-            _isBookmarked = currentBookmarked;
-            _bookmarksCount = currentCount;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to update bookmark')),
-          );
-        }
+      final provider = Provider.of<BookmarkProvider>(context, listen: false);
+      final currentBookmarked = provider.isActivityBookmarked(activityId);
+      final currentCount = _bookmarksCount;
+
+      // Optimistically update the central provider state, which invokes the backend service
+      await provider.toggleActivityBookmark(activityId);
+
+      if (mounted) {
+        setState(() {
+          _isBookmarked = !currentBookmarked;
+          _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+        });
       }
     } catch (e) {
       print('❌ Error toggling bookmark: $e');
-      if (mounted) {
-        setState(() {
-          _isBookmarked = currentBookmarked;
-          _bookmarksCount = currentCount;
-        });
-      }
     } finally {
       if (mounted) {
         setState(() => _isSavingBookmark = false);
@@ -741,7 +848,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
 
       if (mounted) {
         setState(() {
-          _participants = participants;
+          _participants = participants.where((p) {
+            final s = (p.statut ?? '').toString().toLowerCase();
+            return s != 'refusee' && s != 'rejected' && s != 'annulee' && s != 'cancelled';
+          }).toList();
           _loadingParticipants = false;
         });
       }
@@ -770,6 +880,80 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
           _loadingParticipants = false;
         });
       }
+    }
+  }
+
+  Future<void> _excludeParticipant(InscriptionModel participant) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exclude Participant'),
+        content: const Text(
+          'Are you sure you want to exclude this participant from the activity?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Exclude', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _loadingParticipants = true);
+    try {
+      final success = await InscriptionService.rejectInscription(
+        participant.id,
+        message: 'Excluded by organizer',
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Participant excluded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _loadParticipants();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to exclude participant'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingParticipants = false);
+      }
+    }
+  }
+
+  Future<void> _checkInParticipant(InscriptionModel participant) async {
+    final qrCode = participant.qrToken ?? participant.id;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VerifyBookingScreen(initialCode: qrCode),
+      ),
+    );
+    if (mounted) {
+      await _loadParticipants();
     }
   }
 
@@ -972,10 +1156,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                       Positioned(
                         top: 40,
                         right: 16,
-                        child: _TopIconButton(
-                          icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
-                          iconColor: _isBookmarked ? AppColors.primary : null,
-                          onTap: _toggleBookmark,
+                        child: Consumer<BookmarkProvider>(
+                          builder: (context, provider, child) {
+                            final isProviderBookmarked = provider.isActivityBookmarked(widget.activityId);
+                            return _TopIconButton(
+                              icon: isProviderBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                              iconColor: isProviderBookmarked ? AppColors.primary : null,
+                              onTap: _toggleBookmark,
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -990,38 +1179,112 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                         const SizedBox(height: 20),
                         _HeroSummaryCard(activity: activity),
                         const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _SectionTitle('Description'),
-                            if (_isTranslating)
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            else if (_currentLang != null)
-                              TextButton.icon(
-                                onPressed: _resetDescription,
-                                icon: const Icon(Icons.undo, size: 16),
-                                label: const Text('Original'),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                        _SectionTitle('Organizer'),
+                        _OrganizerCard(
+                          organizer: activity.organisateur,
+                          canContact: _isTouristUser && _canContactOrganizer,
+                          onTap: () {
+                            final orgId =
+                                (activity.organisateur?['_id'] ??
+                                        activity.organisateur?['id'] ??
+                                        '')
+                                    .toString()
+                                    .trim();
+                            if (orgId.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PublicProfileScreen(userId: orgId),
                                 ),
-                              )
-                            else
-                              TextButton.icon(
-                                onPressed: _showTranslationSelector,
-                                icon: const Icon(Icons.translate, size: 16),
-                                label: const Text('Translate'),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  foregroundColor: Theme.of(context).colorScheme.primary,
+                              );
+                            }
+                          },
+                          onContact: () {
+                            final organizer = activity.organisateur;
+                            final orgId =
+                                (organizer?['_id'] ?? organizer?['id'] ?? '')
+                                    .toString()
+                                    .trim();
+                            if (orgId.isEmpty) return;
+
+                            final orgName =
+                                (organizer?['fullname'] ?? 'Organizer')
+                                    .toString();
+                            final orgAvatar = organizer?['avatar']?.toString();
+                            final orgOnline = organizer?['isOnline'] == true;
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatConversationScreen(
+                                  partnerId: orgId,
+                                  partnerName: orgName,
+                                  partnerAvatar: orgAvatar,
+                                  partnerType: 'Organisator',
+                                  partnerOnline: orgOnline,
+                                  initialMessage: _generateActivityMessage(),
                                 ),
                               ),
-                          ],
+                            );
+                          },
                         ),
+                        const SizedBox(height: 20),
+                            _SectionTitle('Description'),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_isTranslating)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                else ...[
+                                  if (_currentLang != null) ...[
+                                    IconButton(
+                                      icon: Icon(Icons.undo, color: Theme.of(context).colorScheme.primary, size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _resetDescription,
+                                      tooltip: 'Show original',
+                                    ),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  IconButton(
+                                    icon: Icon(Icons.translate, color: Theme.of(context).colorScheme.primary, size: 20),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () async {
+                                      String targetLang = 'en';
+                                      try {
+                                        final user = await AuthService.getUser();
+                                        if (user != null) {
+                                          final String? userLang = user['langue_preferee']?.toString();
+                                          if (userLang != null && userLang.isNotEmpty) {
+                                            final match = AiTextService.supportedLanguages.entries.firstWhere(
+                                              (e) => e.value.toLowerCase() == userLang.toLowerCase() || e.key.toLowerCase() == userLang.toLowerCase(),
+                                              orElse: () => const MapEntry('en', 'English'),
+                                            );
+                                            targetLang = match.key;
+                                          }
+                                        }
+                                      } catch (_) {}
+                                      _translateDescription(targetLang);
+                                    },
+                                    tooltip: 'Translate',
+                                  ),
+                                  const SizedBox(width: 10),
+                                  IconButton(
+                                    icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.primary, size: 20),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: _showTranslationSelector,
+                                    tooltip: 'Choose language',
+                                  ),
+                                ],
+                              ],
+                            ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1093,61 +1356,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                             itineraryCoords: activity.itineraireCoords,
                           ),
                         ],
-                        _SectionTitle('Organizer'),
-                        _OrganizerCard(
-                          organizer: activity.organisateur,
-                          canContact: _isTouristUser && _canContactOrganizer,
-                          onTap: () {
-                            final orgId =
-                                (activity.organisateur?['_id'] ??
-                                        activity.organisateur?['id'] ??
-                                        '')
-                                    .toString()
-                                    .trim();
-                            if (orgId.isNotEmpty) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      PublicProfileScreen(userId: orgId),
-                                ),
-                              );
-                            }
-                          },
-                          onContact: () {
-                            final organizer = activity.organisateur;
-                            final orgId =
-                                (organizer?['_id'] ?? organizer?['id'] ?? '')
-                                    .toString()
-                                    .trim();
-                            if (orgId.isEmpty) return;
-
-                            final orgName =
-                                (organizer?['fullname'] ?? 'Organizer')
-                                    .toString();
-                            final orgAvatar = organizer?['avatar']?.toString();
-                            final orgOnline = organizer?['isOnline'] == true;
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatConversationScreen(
-                                  partnerId: orgId,
-                                  partnerName: orgName,
-                                  partnerAvatar: orgAvatar,
-                                  partnerType: 'Organisator',
-                                  partnerOnline: orgOnline,
-                                  initialMessage: _generateActivityMessage(),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
                         // Participants section (visible to all users for ongoing/past activities, always visible to organizer)
                         if (_isActivityOrganizer ||
                             _activity?.isOngoing == true ||
                             _activity?.isPast == true) ...[
-                          _SectionTitle('Participants'),
+                          _SectionTitle('Participants (${_participants.fold<int>(0, (sum, p) => sum + (p.nombreParticipants ?? 1))})'),
                           if (_loadingParticipants)
                             const Center(
                               child: Padding(
@@ -1174,61 +1387,19 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                            )
-                          else
+                            ),
                             ..._participants
-                                .where(
-                                  (participant) => _canDisplayParticipant(
-                                    participant.toJson(),
-                                  ),
-                                )
                                 .map(
                                   (participant) => _ParticipantCard(
                                     participant: participant,
                                     currentUserId: _currentUserId,
+                                    canExclude: _isActivityOrganizer &&
+                                        (participant.touriste?['_id'] ?? participant.touriste?['id'] ?? '') != _currentUserId,
+                                    onExclude: () => _excludeParticipant(participant),
+                                    onCheckIn: _isActivityOrganizer ? () => _checkInParticipant(participant) : null,
                                   ),
                                 )
                                 .toList(),
-                          // Show privacy notice if some participants are hidden
-                          if (_participants.any(
-                            (p) => !_canDisplayParticipant(p.toJson()),
-                          ))
-                            Container(
-                              margin: const EdgeInsets.only(top: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceVariant,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.privacy_tip_outlined,
-                                    size: 20,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Some participants have chosen to keep their profiles private.',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                         ],
                         // Activity Review Section (for participants only - ongoing ONLY)
                         if (_activity?.isOngoing == true &&
@@ -1346,7 +1517,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                         ? null
                                         : _submitOngoingReview,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3B82F6),
+                                      backgroundColor: const Color(0xFFFF6B1A),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
@@ -1393,7 +1564,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                   icon: const Icon(Icons.rate_review, size: 16),
                                   label: const Text('Review'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF3B82F6),
+                                    backgroundColor: const Color(0xFFFF6B1A),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -1511,7 +1682,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                                       'Check Reservation Status',
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3B82F6),
+                                      backgroundColor: const Color(0xFFFF6B1A),
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
@@ -1530,7 +1701,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
               ],
             ),
           ),
-          if (!widget.viewOnly && !_isActivityOrganizer)
+          if (!widget.viewOnly && !_isActivityOrganizer && !_isOrganizerUser)
             Positioned(
               left: 0,
               right: 0,
@@ -1549,8 +1720,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen>
                           : _bookActivity),
                 isLoading: _isBooking,
                 showDeleteButton: _hasBookingForActivity,
-                deleteIcon: Icons.info_outline,
-                onDelete: _openBookingStatus,
+                deleteIcon: Icons.priority_high_rounded,
+                onDelete: _showCancellationPolicyDialog,
               ),
             ),
         ],
@@ -1833,13 +2004,22 @@ class _HeroSummaryCard extends StatelessWidget {
 class _ParticipantCard extends StatelessWidget {
   final InscriptionModel participant;
   final String currentUserId;
+  final bool canExclude;
+  final VoidCallback? onExclude;
+  final VoidCallback? onCheckIn;
 
   const _ParticipantCard({
     required this.participant,
     required this.currentUserId,
+    this.canExclude = false,
+    this.onExclude,
+    this.onCheckIn,
   });
 
   String _participantName() {
+    if (participant.isExternal) {
+      return participant.externalName ?? 'External Participant';
+    }
     final touriste = participant.touriste;
     print('🔍 [CARD DEBUG] participant.touriste: $touriste');
 
@@ -1852,10 +2032,11 @@ class _ParticipantCard extends StatelessWidget {
     // Show "X places" for group bookings instead of "Participant"
     final places = participant.nombreParticipants ?? 1;
     print('🔍 [CARD DEBUG] using places: $places');
-    return '$places place${places > 1 ? 's' : ''}';
+    return "$places place${places > 1 ? 's' : ''}";
   }
 
   String _participantAvatar() {
+    if (participant.isExternal) return '';
     final touriste = participant.touriste;
     if (touriste != null && touriste is Map<String, dynamic>) {
       return (touriste['avatar'] ?? '').toString();
@@ -1864,11 +2045,42 @@ class _ParticipantCard extends StatelessWidget {
   }
 
   String _participantId() {
+    if (participant.isExternal) return '';
     final touriste = participant.touriste;
     if (touriste != null && touriste is Map<String, dynamic>) {
       return (touriste['_id'] ?? touriste['id'] ?? '').toString().trim();
     }
     return '';
+  }
+
+  String _getStatusLabel(String statut) {
+    switch (statut) {
+      case 'approuvee':
+        return 'Approved';
+      case 'verifie':
+        return 'Verified';
+      case 'en_attente':
+        return 'Pending';
+      case 'annulee':
+        return 'Cancelled';
+      default:
+        return statut;
+    }
+  }
+
+  Color _getStatusColor(String statut) {
+    switch (statut) {
+      case 'approuvee':
+        return const Color(0xFF22C55E);
+      case 'verifie':
+        return const Color(0xFF22C55E); // Green
+      case 'en_attente':
+        return const Color(0xFFF59E0B);
+      case 'annulee':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF9CA3AF);
+    }
   }
 
   @override
@@ -1889,113 +2101,169 @@ class _ParticipantCard extends StatelessWidget {
       profileVisibility = touriste['profileVisibility'] ?? true;
     }
 
-    // If not current user and profileVisibility is false, show only alert
-    if (!isCurrentUser && !profileVisibility) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.visibility_off, size: 20, color: AppColors.textGrey),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'This participant has chosen to keep their profile private',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textGrey,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final isHidden = !participant.isExternal && !isCurrentUser && !profileVisibility;
+    final displayName = isHidden ? "Hidden User" : name;
 
     return InkWell(
-      onTap: () {
-        if (participantId.isNotEmpty) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PublicProfileScreen(userId: participantId),
-            ),
-          );
-        }
-      },
+      onTap: isHidden || participant.isExternal
+          ? null
+          : () {
+              if (participantId.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PublicProfileScreen(userId: participantId),
+                  ),
+                );
+              }
+            },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isHidden ? const Color(0xFFF9FAFB) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundImage: avatar.isNotEmpty
-                  ? NetworkImage(ApiConfig.getImageUrl(avatar))
-                  : null,
-              child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
-            ),
+            if (isHidden)
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: const Color(0xFFE5E7EB),
+                child: const Icon(Icons.visibility_off, size: 22, color: Color(0xFF9CA3AF)),
+              )
+            else if (participant.isExternal)
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.teal.withOpacity(0.12),
+                child: const Icon(Icons.person_add_alt_1_rounded, size: 22, color: Colors.teal),
+              )
+            else
+              CircleAvatar(
+                radius: 24,
+                backgroundImage: avatar.isNotEmpty
+                    ? NetworkImage(ApiConfig.getImageUrl(avatar))
+                    : null,
+                child: avatar.isEmpty ? const Icon(Icons.person, size: 24) : null,
+              ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
-                    style: const TextStyle(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: Color(0xFF1F2937),
+                      color: isHidden ? const Color(0xFF6B7280) : const Color(0xFF1F2937),
+                      fontStyle: isHidden ? FontStyle.italic : null,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                  const SizedBox(height: 6),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      Icon(Icons.people, size: 14, color: AppColors.textGrey),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$nbParticipants place${nbParticipants > 1 ? 's' : ''}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people, size: 14, color: AppColors.textGrey),
+                          const SizedBox(width: 4),
+                          Text(
+                            "$nbParticipants place${nbParticipants > 1 ? 's' : ''}",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(participant.statut).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _getStatusLabel(participant.statut),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(participant.statut),
+                          ),
                         ),
                       ),
+                      if (participant.isExternal)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'External Tourist',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        ),
+                      if (bookingDate != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${bookingDate.day}/${bookingDate.month}/${bookingDate.year}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
-            if (bookingDate != null) ...[
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${bookingDate.day}/${bookingDate.month}/${bookingDate.year}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+            if (participant.statut == 'verifie' || participant.statut == 'verified') ...[
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF22C55E),
+                size: 24,
+              ),
+            ] else if (onCheckIn != null && participant.statut != 'annulee') ...[
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.teal, size: 22),
+                onPressed: onCheckIn,
+                tooltip: 'Quick Check-In / Verify QR Code',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+            if (canExclude && onExclude != null) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFEF4444), size: 22),
+                onPressed: onExclude,
+                tooltip: 'Exclude participant',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ],
@@ -2500,6 +2768,7 @@ class _OrganizerCard extends StatelessWidget {
   final VoidCallback onTap;
   final bool canContact;
   final VoidCallback? onContact;
+
   const _OrganizerCard({
     required this.organizer,
     required this.onTap,
@@ -2511,26 +2780,56 @@ class _OrganizerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = (organizer?['fullname'] ?? 'Organizer').toString();
     final avatar = organizer?['avatar']?.toString() ?? '';
+    final double ratingVal = (organizer?['noteMoyenne'] as num?)?.toDouble() ?? 0.0;
+    final int reviewsVal = (organizer?['nombreAvis'] as num?)?.toInt() ?? 0;
+    final bool isOnline = organizer?['isOnline'] == true || organizer?['isReallyOnline'] == true;
+
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundImage: avatar.isNotEmpty
-                      ? NetworkImage(ApiConfig.getImageUrl(avatar))
-                      : null,
-                  child: avatar.isEmpty ? const Icon(Icons.person) : null,
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundImage: avatar.isNotEmpty
+                          ? NetworkImage(ApiConfig.getImageUrl(avatar))
+                          : null,
+                      child: avatar.isEmpty ? const Icon(Icons.person, size: 28) : null,
+                    ),
+                    if (isOnline)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -2539,40 +2838,104 @@ class _OrganizerCard extends StatelessWidget {
                     children: [
                       Text(
                         name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
                           fontSize: 16,
+                          color: Color(0xFF1E225E),
                         ),
                       ),
-                      const Text(
-                        'View full profile',
-                        style: TextStyle(color: Colors.blue, fontSize: 12),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, color: ratingVal > 0 ? Colors.amber : Colors.grey.shade300, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                ratingVal.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '($reviewsVal ${reviewsVal > 1 ? 'reviews' : 'review'})',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8EDFF),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFF4F6BFF).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified, size: 10, color: Color(0xFF4F6BFF)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'ORGANIZER',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF4F6BFF),
+                                    letterSpacing: 1.0,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.grey),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.chevron_right, color: Color(0xFF4B5563), size: 18),
+                ),
               ],
             ),
             if (canContact && onContact != null) ...[
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
-                height: 42,
+                height: 44,
                 child: ElevatedButton.icon(
                   onPressed: onContact,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF315CFF),
+                    backgroundColor: const Color(0xFFFF6B1A),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
                   label: const Text(
-                    'Contact',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    'Contact Organizer',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
               ),
@@ -2675,7 +3038,7 @@ class _StickyBottomBar extends StatelessWidget {
                       ? Colors.red
                       : (showDeleteButton
                             ? const Color(0xFFF59E0B)
-                            : const Color(0xFF3B82F6)),
+                            : const Color(0xFFFF6B1A)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

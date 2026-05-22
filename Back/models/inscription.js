@@ -7,7 +7,23 @@ const inscriptionSchema = new mongoose.Schema(
     touriste_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Touriste",
-      required: [true, "Tourist is required"],
+      required: false,
+    },
+    isExternal: {
+      type: Boolean,
+      default: false,
+    },
+    externalName: {
+      type: String,
+      trim: true,
+    },
+    externalPhone: {
+      type: String,
+      trim: true,
+    },
+    externalEmail: {
+      type: String,
+      trim: true,
     },
     // Reference to the activity
     activite_id: {

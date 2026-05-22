@@ -447,7 +447,7 @@ class InscriptionService {
     final body = <String, dynamic>{};
     if (message != null) body['message_organisateur'] = message;
     final res = await ApiClient.put(
-      '/inscriptions/$inscriptionId/approuver',
+      '/inscriptions/$inscriptionId/approve',
       body,
     );
     return res.statusCode == 200;
@@ -461,7 +461,7 @@ class InscriptionService {
     final body = <String, dynamic>{};
     if (message != null) body['message_organisateur'] = message;
     final res = await ApiClient.put(
-      '/inscriptions/$inscriptionId/refuser',
+      '/inscriptions/$inscriptionId/reject',
       body,
     );
     return res.statusCode == 200;
@@ -644,6 +644,53 @@ class InscriptionService {
     } catch (e) {
       print('Error rejecting reservation: $e');
       return false;
+    }
+  }
+
+  /// Organizer: Add an external/manual participant to an activity.
+  static Future<Map<String, dynamic>> addExternalParticipant({
+    required String activiteId,
+    required String externalName,
+    String? externalPhone,
+    String? externalEmail,
+    required int nombreParticipants,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'activite_id': activiteId,
+        'externalName': externalName,
+        'nombre_participants': nombreParticipants,
+      };
+      if (externalPhone != null && externalPhone.isNotEmpty) {
+        body['externalPhone'] = externalPhone;
+      }
+      if (externalEmail != null && externalEmail.isNotEmpty) {
+        body['externalEmail'] = externalEmail;
+      }
+
+      final res = await ApiClient.post('/inscriptions/organisateur/external', body);
+      final resBody = _decodeObject(res.body);
+
+      if (res.statusCode == 201) {
+        return {
+          'success': true,
+          'message': resBody['message'] ?? 'External participant added successfully',
+          'inscription': resBody['inscription'] != null
+              ? InscriptionModel.fromJson(resBody['inscription'])
+              : null,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': resBody['message'] ?? 'Failed to add participant',
+      };
+    } catch (e) {
+      print('Error adding external participant: $e');
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
     }
   }
 }

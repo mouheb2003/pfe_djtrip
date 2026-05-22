@@ -43,4 +43,30 @@ class NoveltyBadgeService {
 
     return seen.trim() != normalized;
   }
+
+  static Future<bool> hasUnseenInsertions(String section, List<String> currentIds) async {
+    if (currentIds.isEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final key = await _keyFor('${section}_all_seen_ids');
+    final List<String> seenIds = prefs.getStringList(key) ?? [];
+    
+    // Check if there is any ID in currentIds that is NOT in seenIds
+    final hasNew = currentIds.any((id) => !seenIds.contains(id));
+    
+    if (seenIds.isEmpty) {
+      // First time initialization: mark all current as seen, don't show badge
+      await prefs.setStringList(key, currentIds);
+      return false;
+    }
+    
+    return hasNew;
+  }
+
+  static Future<void> markSeenInsertions(String section, List<String> currentIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = await _keyFor('${section}_all_seen_ids');
+    final List<String> seenIds = prefs.getStringList(key) ?? [];
+    final newSet = {...seenIds, ...currentIds}.toList();
+    await prefs.setStringList(key, newSet);
+  }
 }

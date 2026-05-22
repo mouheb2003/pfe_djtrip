@@ -60,8 +60,8 @@ class CancellationPolicy {
       return { canCancel: false, reason: 'Marked as no-show' };
     }
     
-    if (hoursBeforeStart <= 0) {
-      return { canCancel: false, reason: 'Activity already started' };
+    if (hoursBeforeStart < 24) {
+      return { canCancel: false, reason: 'Cancellations must be made at least 24 hours before the activity starts.' };
     }
     
     // Cancellation allowed any time before activity starts

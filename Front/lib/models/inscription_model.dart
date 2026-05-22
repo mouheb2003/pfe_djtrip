@@ -18,6 +18,10 @@ class InscriptionModel {
   final DateTime? qrTokenExpiresAt;
   final DateTime? qrUsedAt;
   final String? cancellationReason;
+  final bool isExternal;
+  final String? externalName;
+  final String? externalPhone;
+  final String? externalEmail;
 
   const InscriptionModel({
     required this.id,
@@ -35,6 +39,10 @@ class InscriptionModel {
     this.qrTokenExpiresAt,
     this.qrUsedAt,
     this.cancellationReason,
+    this.isExternal = false,
+    this.externalName,
+    this.externalPhone,
+    this.externalEmail,
   });
 
   static Map<String, dynamic>? _safeMap(dynamic raw) {
@@ -113,6 +121,10 @@ class InscriptionModel {
       cancellationReason: (json['cancellationPolicy'] != null && json['cancellationPolicy'] is Map)
           ? (json['cancellationPolicy']['cancellationReason'] as String?)
           : (json['cancellationReason'] as String?),
+      isExternal: json['isExternal'] as bool? ?? false,
+      externalName: json['externalName'] as String?,
+      externalPhone: json['externalPhone'] as String?,
+      externalEmail: json['externalEmail'] as String?,
     );
   }
 
@@ -221,6 +233,10 @@ class InscriptionModel {
       'qr_token_expires_at': qrTokenExpiresAt?.toIso8601String(),
       'qr_used_at': qrUsedAt?.toIso8601String(),
       'cancellationReason': cancellationReason,
+      'isExternal': isExternal,
+      'externalName': externalName,
+      'externalPhone': externalPhone,
+      'externalEmail': externalEmail,
     };
   }
 }

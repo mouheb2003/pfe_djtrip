@@ -784,41 +784,57 @@ exports.rejectReservation = async (req, res) => {
       return res.status(403).json({ message: "You can only reject reservations for your activities" });
     }
 
-    // Check if reservation is pending
-    if (inscription.statut !== "pending") {
+    // Check if reservation is pending, approved, or verified
+    const isValidStatus = ["pending", "approved", "verified"].includes(inscription.statut);
+    if (!isValidStatus) {
       return res.status(400).json({ 
         message: `Cannot reject reservation with status: ${inscription.statut}` 
       });
     }
 
+    const wasApproved = inscription.statut === "approved" || inscription.statut === "verified";
+
+    // If it was already approved/verified, decrement the activity capacity count
+    if (wasApproved && inscription.activite_id) {
+      const Activite = require("../models/activite");
+      await Activite.findByIdAndUpdate(
+        inscription.activite_id._id,
+        { $inc: { nombre_reservations: -inscription.nombre_participants } }
+      );
+    }
+
     // Reject the reservation
     await inscription.reject(message_organisateur);
 
-    // Send rejection email
-    try {
-      const touristEmail = inscription.touriste_id?.email;
-      const touristName = inscription.touriste_id?.fullname || "Traveler";
-      const activityTitle = inscription.activite_id.titre;
+    // Send rejection email (only if tourist_id exists)
+    if (inscription.touriste_id) {
+      try {
+        const touristEmail = inscription.touriste_id.email;
+        const touristName = inscription.touriste_id.fullname || "Traveler";
+        const activityTitle = inscription.activite_id.titre;
 
-      await emailService.sendBookingRejectionEmail({
-        email: touristEmail,
-        fullname: touristName,
-        activityTitle,
-        rejectionReason: message_organisateur || "No reason provided",
-      });
-    } catch (emailError) {
-      console.error("Error sending rejection email:", emailError);
+        await emailService.sendBookingRejectionEmail({
+          email: touristEmail,
+          fullname: touristName,
+          activityTitle,
+          rejectionReason: message_organisateur || "No reason provided",
+        });
+      } catch (emailError) {
+        console.error("Error sending rejection email:", emailError);
+      }
     }
 
-    // Emit notification
-    try {
-      notificationEventBus.emitBookingRejected({
-        touristId: inscription.touriste_id._id,
-        activityTitle: inscription.activite_id.titre,
-        bookingId: inscription._id.toString(),
-      });
-    } catch (notifError) {
-      console.warn('Failed to emit booking rejected event:', notifError.message);
+    // Emit notification (only if tourist_id exists)
+    if (inscription.touriste_id) {
+      try {
+        notificationEventBus.emitBookingRejected({
+          touristId: inscription.touriste_id._id,
+          activityTitle: inscription.activite_id.titre,
+          bookingId: inscription._id.toString(),
+        });
+      } catch (notifError) {
+        console.warn('Failed to emit booking rejected event:', notifError.message);
+      }
     }
 
     res.json({
@@ -1625,19 +1641,23 @@ exports.getActivityParticipants = async (req, res) => {
         statut: participant.statut,
         dateDemande: participant.date_demande,
         prixTotal: participant.prix_total,
-        touriste: {
+        isExternal: participant.isExternal || false,
+        externalName: participant.externalName || '',
+        externalPhone: participant.externalPhone || '',
+        externalEmail: participant.externalEmail || '',
+        touriste: touriste._id ? {
           _id: touristeId,
           fullname: touriste.fullname || 'Unknown',
           avatar: touriste.avatar || '',
           profileVisibility: touriste.profileVisibility !== undefined ? touriste.profileVisibility : true
-        },
+        } : null,
         activite: {
           _id: activiteId,
           titre: activite.titre || 'Unknown Activity'
         },
         // Add helper methods for frontend
-        isCurrentUser: touristeId === req.user.userId,
-        canDisplay: (touriste.profileVisibility !== undefined ? touriste.profileVisibility : true) || touristeId === req.user.userId
+        isCurrentUser: touriste._id ? touristeId === req.user.userId : false,
+        canDisplay: participant.isExternal ? true : ((touriste.profileVisibility !== undefined ? touriste.profileVisibility : true) || touristeId === req.user.userId)
       };
     });
 
@@ -1849,41 +1869,57 @@ exports.rejectReservation = async (req, res) => {
       return res.status(403).json({ message: "You can only reject reservations for your activities" });
     }
 
-    // Check if reservation is pending
-    if (inscription.statut !== "pending") {
+    // Check if reservation is pending, approved, or verified
+    const isValidStatus = ["pending", "approved", "verified"].includes(inscription.statut);
+    if (!isValidStatus) {
       return res.status(400).json({ 
         message: `Cannot reject reservation with status: ${inscription.statut}` 
       });
     }
 
+    const wasApproved = inscription.statut === "approved" || inscription.statut === "verified";
+
+    // If it was already approved/verified, decrement the activity capacity count
+    if (wasApproved && inscription.activite_id) {
+      const Activite = require("../models/activite");
+      await Activite.findByIdAndUpdate(
+        inscription.activite_id._id,
+        { $inc: { nombre_reservations: -inscription.nombre_participants } }
+      );
+    }
+
     // Reject the reservation
     await inscription.reject(message_organisateur);
 
-    // Send rejection email
-    try {
-      const touristEmail = inscription.touriste_id?.email;
-      const touristName = inscription.touriste_id?.fullname || "Traveler";
-      const activityTitle = inscription.activite_id.titre;
+    // Send rejection email (only if tourist_id exists)
+    if (inscription.touriste_id) {
+      try {
+        const touristEmail = inscription.touriste_id.email;
+        const touristName = inscription.touriste_id.fullname || "Traveler";
+        const activityTitle = inscription.activite_id.titre;
 
-      await emailService.sendBookingRejectionEmail({
-        email: touristEmail,
-        fullname: touristName,
-        activityTitle,
-        rejectionReason: message_organisateur || "No reason provided",
-      });
-    } catch (emailError) {
-      console.error("Error sending rejection email:", emailError);
+        await emailService.sendBookingRejectionEmail({
+          email: touristEmail,
+          fullname: touristName,
+          activityTitle,
+          rejectionReason: message_organisateur || "No reason provided",
+        });
+      } catch (emailError) {
+        console.error("Error sending rejection email:", emailError);
+      }
     }
 
-    // Emit notification
-    try {
-      notificationEventBus.emitBookingRejected({
-        touristId: inscription.touriste_id._id,
-        activityTitle: inscription.activite_id.titre,
-        bookingId: inscription._id.toString(),
-      });
-    } catch (notifError) {
-      console.warn('Failed to emit booking rejected event:', notifError.message);
+    // Emit notification (only if tourist_id exists)
+    if (inscription.touriste_id) {
+      try {
+        notificationEventBus.emitBookingRejected({
+          touristId: inscription.touriste_id._id,
+          activityTitle: inscription.activite_id.titre,
+          bookingId: inscription._id.toString(),
+        });
+      } catch (notifError) {
+        console.warn('Failed to emit booking rejected event:', notifError.message);
+      }
     }
 
     res.json({
@@ -1899,5 +1935,174 @@ exports.rejectReservation = async (req, res) => {
       message: "Error rejecting reservation",
       error: error.message
     });
+  }
+};
+
+// Add an external/manual participant (Organizer only)
+exports.addExternalParticipant = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const organizerId = req.user.userId;
+    const { activite_id, externalName, externalPhone, externalEmail, nombre_participants } = req.body;
+    const nombreParticipants = Number.parseInt(nombre_participants, 10) || 1;
+
+    console.log('[INSCRIPTION] Adding external participant:', {
+      organizerId,
+      activite_id,
+      externalName,
+      externalPhone,
+      externalEmail,
+      nombreParticipants
+    });
+
+    if (!externalName || !externalName.trim()) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Participant name is required" });
+    }
+
+    if (!externalEmail || !externalEmail.trim()) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Participant email is required" });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(externalEmail.trim())) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Invalid email address format" });
+    }
+
+    const activite = await Activite.findById(activite_id).session(session);
+    if (!activite) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Activity not found" });
+    }
+
+    if (activite.organisateur_id.toString() !== organizerId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: "You can only add participants to your own activities" });
+    }
+
+    const available = activite.capacite_max - activite.nombre_reservations;
+    if (available < nombreParticipants) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        message: `Cannot add: only ${Math.max(available, 0)} place${available > 1 ? "s" : ""} left`,
+        available: Math.max(available, 0),
+        requested: nombreParticipants
+      });
+    }
+
+    const prixTotal = activite.prix * nombreParticipants;
+
+    const inscription = new Inscription({
+      touriste_id: null,
+      isExternal: true,
+      externalName: externalName.trim(),
+      externalPhone: externalPhone ? externalPhone.trim() : undefined,
+      externalEmail: externalEmail.trim(),
+      activite_id: activite_id,
+      organisateur_id: organizerId,
+      nombre_participants: nombreParticipants,
+      prix_total: prixTotal,
+      statut: "approved",
+      date_demande: new Date(),
+      date_reponse: new Date()
+    });
+
+    // Generate QR token
+    const qrToken = createBookingQrToken(inscription, activite);
+    const activityDeadline = getActivityDeadline(activite);
+    
+    inscription.qr_token = qrToken;
+    inscription.qr_token_generated_at = new Date();
+    inscription.qr_token_expires_at = activityDeadline;
+
+    await inscription.save({ session });
+
+    await Activite.findByIdAndUpdate(
+      activite._id,
+      { $inc: { nombre_reservations: nombreParticipants } },
+      { session }
+    );
+
+    // Generate QR Image and upload to Cloudinary
+    let qrPublicUrl = null;
+    try {
+      const cloudinary = require("../config/cloudinary");
+      const qrBuffer = await QRCode.toBuffer(qrToken, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 280,
+      });
+      
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            folder: "djtrip/booking-qr",
+            public_id: `booking-qr-${inscription._id}`,
+            resource_type: "image",
+            format: "png",
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        ).end(qrBuffer);
+      });
+      
+      qrPublicUrl = uploadResult.secure_url;
+      console.log('QR code uploaded to Cloudinary for external guest:', qrPublicUrl);
+    } catch (qrError) {
+      console.error("Error generating or uploading booking QR code for external guest:", qrError);
+    }
+
+    await session.commitTransaction();
+
+    // Send confirmation email
+    try {
+      const activityTitle = activite.titre;
+      const bookingDate = activite.date_debut
+        ? new Date(activite.date_debut).toLocaleDateString("en-GB")
+        : new Date().toLocaleDateString("en-GB");
+      const bookingTime = activite.date_debut
+        ? new Date(activite.date_debut).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "--:--";
+
+      await emailService.sendBookingConfirmationEmail({
+        email: externalEmail.trim(),
+        fullname: externalName.trim(),
+        bookingCode: qrToken,
+        activityTitle,
+        bookingDate,
+        bookingTime,
+        participants: nombreParticipants,
+        totalPrice: `${prixTotal.toFixed(2)} TND`,
+        qrPublicUrl,
+      });
+      console.log(`✅ Booking confirmation email sent to external guest: ${externalEmail.trim()}`);
+    } catch (emailError) {
+      console.error("Error sending booking confirmation email to external guest:", emailError);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "External participant added successfully.",
+      inscription
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error adding external participant:', error);
+    res.status(500).json({
+      message: "Error adding external participant",
+      error: error.message
+    });
+  } finally {
+    session.endSession();
   }
 };

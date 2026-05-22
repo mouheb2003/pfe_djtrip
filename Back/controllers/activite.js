@@ -875,16 +875,19 @@ exports.deleteActivite = async (req, res) => {
 
         // Send emails to all participants
         for (const ins of activeInscriptions) {
-          if (ins.touriste_id && ins.touriste_id.email) {
+          const email = ins.isExternal ? ins.externalEmail : ins.touriste_id?.email;
+          const fullname = ins.isExternal ? ins.externalName : ins.touriste_id?.fullname || "Traveler";
+
+          if (email) {
             try {
               await emailService.sendActivityCancelledEmail({
-                email: ins.touriste_id.email,
-                fullname: ins.touriste_id.fullname || "Traveler",
+                email,
+                fullname,
                 activityTitle: activite.titre,
                 reason: cancellationMessage || "The organizer has cancelled this activity.",
               });
             } catch (emailErr) {
-              console.warn(`Failed to send cancellation email to ${ins.touriste_id.email}:`, emailErr.message);
+              console.warn(`Failed to send cancellation email to ${email}:`, emailErr.message);
             }
           }
         }

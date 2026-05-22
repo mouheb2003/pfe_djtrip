@@ -161,33 +161,6 @@ exports.toggleAllEmailNotifications = async (req, res) => {
   }
 };
 
-// PUT /notifications/preferences/quiet-hours
-exports.setQuietHours = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { enabled, start, end, timezone } = req.body;
-    
-    const preferences = await notificationPreferencesService.setQuietHours(userId, {
-      enabled,
-      start,
-      end,
-      timezone,
-    });
-    
-    res.status(200).json({
-      success: true,
-      preferences,
-      message: 'Quiet hours updated successfully',
-    });
-  } catch (error) {
-    console.error('Error setting quiet hours:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error setting quiet hours',
-      error: error.message,
-    });
-  }
-};
 
 // PUT /notifications/preferences/device/:device
 exports.updateDeviceSettings = async (req, res) => {

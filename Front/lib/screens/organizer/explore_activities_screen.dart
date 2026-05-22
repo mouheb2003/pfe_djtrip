@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import '../../providers/bookmark_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/activity_model.dart';
 import '../../services/activity_service.dart';
@@ -134,6 +136,23 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
     }
   }
 
+  int _searchRank(ActivityModel activity, String query) {
+    if (query.isEmpty) return 0;
+    final title = activity.titre.toLowerCase();
+    if (title.contains(query)) return 0;
+
+    final category = activity.categorie.toLowerCase();
+    if (category.contains(query)) return 1;
+
+    final description = activity.description.toLowerCase();
+    if (description.contains(query)) return 2;
+
+    final location = activity.lieu.toLowerCase();
+    if (location.contains(query)) return 3;
+
+    return 4;
+  }
+
   void _applyFilters() {
     List<ActivityModel> result = _activities;
 
@@ -142,9 +161,12 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
       final query = _searchQuery.toLowerCase();
       result = result.where((activity) {
         return activity.titre.toLowerCase().contains(query) ||
-               activity.lieu.toLowerCase().contains(query) ||
-               activity.typeActivite.toLowerCase().contains(query);
+               activity.categorie.toLowerCase().contains(query) ||
+               activity.description.toLowerCase().contains(query) ||
+               activity.lieu.toLowerCase().contains(query);
       }).toList();
+
+      result.sort((a, b) => _searchRank(a, query).compareTo(_searchRank(b, query)));
     }
 
     // Timeline filter
@@ -688,28 +710,34 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Color _getStatusColor(String status) {
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'UPCOMING':
-      case 'active':
-        return const Color(0xFF22C55E); // Green
+      case 'ACTIVE':
+        return const Color(0xFF10B981); // Green
       case 'ONGOING':
         return const Color(0xFFF59E0B); // Orange
+      case 'CANCELLED':
+        return const Color(0xFFEF4444); // Red
+      case 'COMPLETED':
       case 'PAST':
-      case 'completed':
-        return const Color(0xFF94A3B8); // Grey
+        return const Color(0xFF6B7280); // Grey
       default:
         return const Color(0xFF6B7280);
     }
   }
 
   String _getStatusLabel(String status) {
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'UPCOMING':
-        return 'Active';
+      case 'ACTIVE':
+        return 'UPCOMING';
       case 'ONGOING':
-        return 'Ongoing';
+        return 'ONGOING';
+      case 'CANCELLED':
+        return 'CANCELLED';
+      case 'COMPLETED':
       case 'PAST':
-        return 'Completed';
+        return 'COMPLETED';
       default:
         return status.toUpperCase();
     }
@@ -1200,7 +1228,6 @@ class _ExploreActivityCard extends StatefulWidget {
 
 class _ExploreActivityCardState extends State<_ExploreActivityCard> {
   int _currentImageIndex = 0;
-  bool _isBookmarked = false;
   int _bookmarksCount = 0;
 
   String _resolveImageUrl(String url) {
@@ -1211,35 +1238,31 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
   @override
   void initState() {
     super.initState();
-    _isBookmarked = widget.activity.isBookmarked ?? false;
     _bookmarksCount = widget.activity.bookmarksCount ?? 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<BookmarkProvider>(context, listen: false)
+            .updateActivityState(widget.activity.id, widget.activity.isBookmarked ?? false);
+      }
+    });
   }
 
   Future<void> _toggleBookmark() async {
     final activityId = widget.activity.id;
     if (activityId.isEmpty) return;
 
-    final currentBookmarked = _isBookmarked;
-    final currentCount = _bookmarksCount;
+    try {
+      final provider = Provider.of<BookmarkProvider>(context, listen: false);
+      final currentBookmarked = provider.isActivityBookmarked(activityId);
+      final currentCount = _bookmarksCount;
 
-    setState(() {
-      _isBookmarked = !currentBookmarked;
-      _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
-    });
+      setState(() {
+        _bookmarksCount = !currentBookmarked ? currentCount + 1 : currentCount - 1;
+      });
 
-    final result = await ActivityService.toggleActivityBookmark(activityId);
-    if (result['success'] == true) {
-      final bookmarked = result['bookmarked'] == true;
-      final bookmarksCount = (result['bookmarksCount'] as num?)?.toInt() ?? currentCount;
-      setState(() {
-        _isBookmarked = bookmarked;
-        _bookmarksCount = bookmarksCount;
-      });
-    } else {
-      setState(() {
-        _isBookmarked = currentBookmarked;
-        _bookmarksCount = currentCount;
-      });
+      await provider.toggleActivityBookmark(activityId);
+    } catch (e) {
+      debugPrint('❌ Error toggling bookmark in explore activities: $e');
     }
   }
 
@@ -1279,12 +1302,18 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
                     // Image or Placeholder
                     photos.isEmpty
                         ? Container(
-                            color: const Color(0xFFF3F4F6),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
+                              ),
+                            ),
                             child: const Center(
                               child: Icon(
-                                Icons.image_outlined,
+                                Icons.image_not_supported_rounded,
                                 size: 48,
-                                color: Color(0xFF9CA3AF),
+                                color: Colors.white70,
                               ),
                             ),
                           )
@@ -1312,10 +1341,16 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
                                   ),
                                 ),
                                 errorWidget: (context, url, error) => Container(
-                                  color: const Color(0xFFF3F4F6),
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
+                                    ),
+                                  ),
                                   child: const Icon(
-                                    Icons.image_not_supported_outlined,
-                                    color: Color(0xFF9CA3AF),
+                                    Icons.broken_image_rounded,
+                                    color: Colors.white70,
                                     size: 48,
                                   ),
                                 ),
@@ -1384,27 +1419,32 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
                     Positioned(
                       top: 12,
                       right: hasMultiplePhotos ? 60 : 12,
-                      child: GestureDetector(
-                        onTap: _toggleBookmark,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+                      child: Consumer<BookmarkProvider>(
+                        builder: (context, provider, child) {
+                          final isProviderBookmarked = provider.isActivityBookmarked(widget.activity.id);
+                          return GestureDetector(
+                            onTap: _toggleBookmark,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            _isBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
-                            color: _isBookmarked ? AppColors.primary : const Color(0xFF6B7280),
-                            size: 20,
-                          ),
-                        ),
+                              child: Icon(
+                                isProviderBookmarked ? Icons.bookmark : Icons.bookmark_border_rounded,
+                                color: isProviderBookmarked ? AppColors.primary : const Color(0xFF6B7280),
+                                size: 20,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     

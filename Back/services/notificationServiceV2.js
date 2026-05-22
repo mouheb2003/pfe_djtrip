@@ -93,11 +93,7 @@ async function shouldSendNotification(userId, notificationType, channel = 'push'
   try {
     const preferences = await NotificationPreference.getUserPreferences(userId);
     
-    // Check quiet hours
-    if (preferences.isQuietHours()) {
-      console.log(`🔇 Quiet hours active for user ${userId}`);
-      return false;
-    }
+
     
     // Check channel preference
     if (channel === 'push') {
@@ -373,10 +369,12 @@ async function sendBatchNotification({ userIds, title, body, data = {}, notifica
 
   // Collect valid tokens
   for (const userId of userIds) {
-    const { token } = await getUserFcmToken(userId);
-    if (token) {
-      validTokens.push(token);
-      userIdsMap.set(token, userId);
+    const { tokens, accountStatus } = await getUserFcmToken(userId);
+    if (accountStatus === 'active' && tokens && tokens.length > 0) {
+      for (const token of tokens) {
+        validTokens.push(token);
+        userIdsMap.set(token, userId);
+      }
     }
   }
 

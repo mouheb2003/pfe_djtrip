@@ -129,4 +129,42 @@ class FollowService {
       return 0;
     }
   }
+
+  // Get followers list
+  static Future<List<Map<String, dynamic>>> getFollowersList(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiClient.baseUrl}/follow/followers/$userId'),
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['followers'] != null) {
+          return List<Map<String, dynamic>>.from(body['followers']);
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Get following list
+  static Future<List<Map<String, dynamic>>> getFollowingList(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiClient.baseUrl}/follow/following/$userId'),
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['following'] != null) {
+          return List<Map<String, dynamic>>.from(body['following']);
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
 }

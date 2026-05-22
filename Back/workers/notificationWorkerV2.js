@@ -247,43 +247,74 @@ async function initializeEventListeners() {
       const isSuccess = data.status !== 'failed';
 
       if (isSuccess) {
-        await Notification.createNotification({
-          user_id: data.touristId,
-          type: 'booking',
-          title: 'Check-in Confirmed ✅',
-          message: `Your booking for "${data.activityTitle}" is validated`,
-          data: { bookingId: data.bookingId, activityId: data.activityId },
-          priority: 'high',
-          related_entity_type: 'booking',
-          related_entity_id: data.bookingId,
-          skipPush: true,
-        });
+        // Send email confirmation to participant (Tourist or External)
+        try {
+          const booking = await Inscription.findById(data.bookingId)
+            .populate('touriste_id', 'fullname email')
+            .populate('activite_id', 'titre');
 
-        await notificationService.sendCheckInConfirmation({
-          touristId: data.touristId,
-          activityTitle: data.activityTitle,
-          bookingId: data.bookingId,
-          activityId: data.activityId,
-        });
+          if (booking) {
+            const email = booking.isExternal ? booking.externalEmail : booking.touriste_id?.email;
+            const fullname = booking.isExternal ? booking.externalName : booking.touriste_id?.fullname || "Traveler";
+            const activityTitle = booking.activite_id?.titre || data.activityTitle || "Activity";
+
+            if (email) {
+              const mailService = require('../services/email');
+              await mailService.sendCheckInConfirmationEmail({
+                email,
+                fullname,
+                activityTitle,
+                bookingCode: booking.qr_token || data.bookingId,
+                checkedInAt: booking.qr_used_at || new Date(),
+              });
+              console.log(`✅ Check-in confirmation email sent to ${email}`);
+            }
+          }
+        } catch (mailErr) {
+          console.error('❌ Failed to send check-in confirmation email:', mailErr.message);
+        }
+
+        if (data.touristId) {
+          await Notification.createNotification({
+            user_id: data.touristId,
+            type: 'booking',
+            title: 'Check-in Confirmed ✅',
+            message: `Your booking for "${data.activityTitle}" is validated`,
+            data: { bookingId: data.bookingId, activityId: data.activityId },
+            priority: 'high',
+            related_entity_type: 'booking',
+            related_entity_id: data.bookingId,
+            skipPush: true,
+          });
+
+          await notificationService.sendCheckInConfirmation({
+            touristId: data.touristId,
+            activityTitle: data.activityTitle,
+            bookingId: data.bookingId,
+            activityId: data.activityId,
+          });
+        }
       } else {
-        await Notification.createNotification({
-          user_id: data.touristId,
-          type: 'booking',
-          title: 'Check-in Failed ❌',
-          message: `Check-in for "${data.activityTitle}" failed: ${data.reason || 'Invalid QR'}`,
-          data: { bookingId: data.bookingId, status: 'failed' },
-          priority: 'high',
-          related_entity_type: 'booking',
-          related_entity_id: data.bookingId,
-          skipPush: true,
-        });
+        if (data.touristId) {
+          await Notification.createNotification({
+            user_id: data.touristId,
+            type: 'booking',
+            title: 'Check-in Failed ❌',
+            message: `Check-in for "${data.activityTitle}" failed: ${data.reason || 'Invalid QR'}`,
+            data: { bookingId: data.bookingId, status: 'failed' },
+            priority: 'high',
+            related_entity_type: 'booking',
+            related_entity_id: data.bookingId,
+            skipPush: true,
+          });
 
-        await notificationService.sendCheckInFailedNotification({
-          touristId: data.touristId,
-          activityTitle: data.activityTitle,
-          bookingId: data.bookingId,
-          reason: data.reason,
-        });
+          await notificationService.sendCheckInFailedNotification({
+            touristId: data.touristId,
+            activityTitle: data.activityTitle,
+            bookingId: data.bookingId,
+            reason: data.reason,
+          });
+        }
       }
 
     } catch (error) {
@@ -335,26 +366,57 @@ async function initializeEventListeners() {
       console.log('📨 comment.created event:', data);
       const commenterName = data.commenterName || 'Someone';
 
-      await Notification.createNotification({
-        user_id: data.postOwnerId,
-        type: 'comment',
-        title: 'New Comment',
-        message: `${commenterName} commented on your post`,
-        data: { postId: data.postId, commentId: data.commentId },
-        priority: 'medium',
-        related_entity_type: 'post',
-        related_entity_id: data.postId,
-        skipPush: true,
-      });
+      if (!data.isSelfComment && data.postOwnerId) {
+        await Notification.createNotification({
+          user_id: data.postOwnerId,
+          type: 'comment',
+          title: 'New Comment',
+          message: `${commenterName} commented on your post`,
+          data: { postId: data.postId, commentId: data.commentId },
+          priority: 'medium',
+          related_entity_type: 'post',
+          related_entity_id: data.postId,
+          skipPush: true,
+        });
 
-      await notificationService.sendPushNotification({
-        userId: data.postOwnerId,
-        title: 'New Comment',
-        body: `${commenterName} commented on your post`,
-        data: { type: 'new_comment', postId: data.postId, commentId: data.commentId },
-        notificationType: 'system',
-        priority: 'medium',
-      });
+        await notificationService.sendPushNotification({
+          userId: data.postOwnerId,
+          title: 'New Comment',
+          body: `${commenterName} commented on your post`,
+          data: { type: 'new_comment', postId: data.postId, commentId: data.commentId },
+          notificationType: 'system',
+          priority: 'medium',
+        });
+      }
+
+      // Notify users mentioned in the post
+      if (data.postMentions && Array.isArray(data.postMentions)) {
+        for (const mentionedId of data.postMentions) {
+          // Don't notify the mentioned user if they are the ones who commented, or if they are the post owner (already notified)
+          if (String(mentionedId) !== String(data.postOwnerId)) {
+            await Notification.createNotification({
+              user_id: mentionedId,
+              type: 'comment',
+              title: 'New Comment',
+              message: `${commenterName} commented on a post where you are mentioned`,
+              data: { postId: data.postId, commentId: data.commentId, type: 'comment_mentioned' },
+              priority: 'medium',
+              related_entity_type: 'post',
+              related_entity_id: data.postId,
+              skipPush: true,
+            });
+
+            await notificationService.sendPushNotification({
+              userId: mentionedId,
+              title: 'New Comment',
+              body: `${commenterName} commented on a post where you are mentioned`,
+              data: { type: 'comment_mentioned', postId: data.postId, commentId: data.commentId },
+              notificationType: 'system',
+              priority: 'medium',
+            });
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Error processing comment.created event:', error);
@@ -367,26 +429,56 @@ async function initializeEventListeners() {
       const reactorName = data.reactorName || 'Someone';
       const reactionType = data.reactionType || 'like';
 
-      await Notification.createNotification({
-        user_id: data.postOwnerId,
-        type: 'reaction',
-        title: 'New Reaction',
-        message: `${reactorName} reacted to your post`,
-        data: { postId: data.postId, reactionType },
-        priority: 'low',
-        related_entity_type: 'post',
-        related_entity_id: data.postId,
-        skipPush: true,
-      });
+      if (!data.isSelfReaction && data.postOwnerId) {
+        await Notification.createNotification({
+          user_id: data.postOwnerId,
+          type: 'reaction',
+          title: 'New Reaction',
+          message: `${reactorName} reacted to your post`,
+          data: { postId: data.postId, reactionType },
+          priority: 'low',
+          related_entity_type: 'post',
+          related_entity_id: data.postId,
+          skipPush: true,
+        });
 
-      await notificationService.sendPushNotification({
-        userId: data.postOwnerId,
-        title: 'New Reaction',
-        body: `${reactorName} reacted to your post`,
-        data: { type: 'post_reaction', postId: data.postId, reactionType },
-        notificationType: 'system',
-        priority: 'low',
-      });
+        await notificationService.sendPushNotification({
+          userId: data.postOwnerId,
+          title: 'New Reaction',
+          body: `${reactorName} reacted to your post`,
+          data: { type: 'post_reaction', postId: data.postId, reactionType },
+          notificationType: 'system',
+          priority: 'low',
+        });
+      }
+
+      // Notify users mentioned in the post
+      if (data.postMentions && Array.isArray(data.postMentions)) {
+        for (const mentionedId of data.postMentions) {
+          if (String(mentionedId) !== String(data.postOwnerId)) {
+            await Notification.createNotification({
+              user_id: mentionedId,
+              type: 'reaction',
+              title: 'New Reaction',
+              message: `${reactorName} reacted to a post where you are mentioned`,
+              data: { postId: data.postId, reactionType, type: 'reaction_mentioned' },
+              priority: 'low',
+              related_entity_type: 'post',
+              related_entity_id: data.postId,
+              skipPush: true,
+            });
+
+            await notificationService.sendPushNotification({
+              userId: mentionedId,
+              title: 'New Reaction',
+              body: `${reactorName} reacted to a post where you are mentioned`,
+              data: { type: 'reaction_mentioned', postId: data.postId, reactionType },
+              notificationType: 'system',
+              priority: 'low',
+            });
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Error processing post.reaction event:', error);
@@ -687,6 +779,18 @@ async function initializeEventListeners() {
           notificationType: 'activity',
           priority: 'medium',
         });
+
+        const notifications = data.bookedUserIds.map(userId => ({
+          user_id: userId,
+          type: 'activity',
+          title: 'Activity Updated ✏️',
+          message: `"${data.activityTitle}" has been updated`,
+          data: { activityId: data.activityId },
+          priority: 'medium',
+          related_entity_type: 'activity',
+          related_entity_id: data.activityId,
+        }));
+        await Notification.insertMany(notifications);
       }
     } catch (error) {
       console.error('Error processing activity.updated event:', error);
@@ -726,10 +830,13 @@ async function initializeEventListeners() {
         }).populate('touriste_id', 'fullname email');
 
         for (const booking of bookings) {
-          if (booking.touriste_id?.email) {
+          const email = booking.isExternal ? booking.externalEmail : booking.touriste_id?.email;
+          const fullname = booking.isExternal ? booking.externalName : booking.touriste_id?.fullname;
+
+          if (email) {
             await mailService.sendActivityCancelledEmail({
-              email: booking.touriste_id.email,
-              fullname: booking.touriste_id.fullname,
+              email,
+              fullname: fullname || "Traveler",
               activityTitle: data.activityTitle,
               reason: data.reason || booking.message_organisateur,
             });

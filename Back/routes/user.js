@@ -309,6 +309,13 @@ router.put(
 // REMOVED: Get user by username
 // router.get("/username/:username", cacheGet("users:by-username", 60), userController.getUserByUsername);
 
+// Block/Unblock/Mute/Unmute privacy lists routes
+router.post("/privacy/block/:targetId", verifyToken, userController.blockUser);
+router.post("/privacy/unblock/:targetId", verifyToken, userController.unblockUser);
+router.post("/privacy/mute/:targetId", verifyToken, userController.muteUser);
+router.post("/privacy/unmute/:targetId", verifyToken, userController.unmuteUser);
+router.get("/privacy/blocked-and-muted", verifyToken, userController.getBlockedAndMutedUsers);
+
 // GET /:id - Get user by ID
 router.get("/:id", cacheGet("users:by-id", 60), userController.getUserById);
 

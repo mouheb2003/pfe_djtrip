@@ -7,6 +7,7 @@ import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/message_service.dart';
 import 'chat_conversation_screen.dart';
+import '../../services/user_service.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -380,14 +381,47 @@ class _MessagesScreenState extends State<MessagesScreen>
           ],
         ),
       ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100.0),
+        child: FloatingActionButton(
+          heroTag: null,
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => const _NewChatModal(),
+            ).then((_) {
+              _loadConversations();
+            });
+          },
+          backgroundColor: const Color(0xFF4F6BFF),
+          shape: const CircleBorder(),
+          elevation: 6,
+          child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 28),
+        ),
+      ),
     );
   }
 }
 
-class _SearchField extends StatelessWidget {
+class _SearchField extends StatefulWidget {
   final ValueChanged<String> onChanged;
 
   const _SearchField({required this.onChanged});
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +440,11 @@ class _SearchField extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
-              onChanged: onChanged,
+              controller: _controller,
+              onChanged: (v) {
+                widget.onChanged(v);
+                setState(() {});
+              },
               decoration: const InputDecoration(
                 hintText: 'Search conversations...',
                 border: InputBorder.none,
@@ -417,6 +455,15 @@ class _SearchField extends StatelessWidget {
               ),
             ),
           ),
+          if (_controller.text.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _controller.clear();
+                widget.onChanged('');
+                setState(() {});
+              },
+              child: const Icon(Icons.clear, color: Color(0xFF9CA3AF), size: 20),
+            ),
         ],
       ),
     );
@@ -622,6 +669,279 @@ class _SwipeActionBackground extends StatelessWidget {
               color: Colors.white,
               fontWeight: FontWeight.w800,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewChatModal extends StatefulWidget {
+  const _NewChatModal();
+
+  @override
+  State<_NewChatModal> createState() => _NewChatModalState();
+}
+
+class _NewChatModalState extends State<_NewChatModal> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _isSearching = false;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onTextChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    final q = query.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      if (!mounted) return;
+      setState(() => _isSearching = true);
+
+      try {
+        final users = await UserService.searchUsersByName(q);
+        final currentUserId = AuthService.currentUser?['_id']?.toString() ?? AuthService.currentUser?['id']?.toString();
+        final filteredUsers = users.where((u) {
+          final id = u['_id']?.toString() ?? u['id']?.toString() ?? '';
+          final type = u['userType']?.toString().toLowerCase() ?? u['role']?.toString().toLowerCase() ?? '';
+          return id.isNotEmpty && id != currentUserId && type != 'admin' && type != 'admin/support';
+        }).toList();
+
+
+        if (mounted) {
+          setState(() {
+            _results = filteredUsers;
+            _isSearching = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _results = [];
+            _isSearching = false;
+          });
+        }
+      }
+    });
+  }
+
+  Color _getBadgeColor(String role) {
+    switch (role.trim().toLowerCase()) {
+      case 'organizer':
+      case 'organisateur':
+        return const Color(0xFFFF9F0A);
+      case 'guide':
+        return const Color(0xFF34C759);
+      case 'admin':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF007AFF);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'New Conversation',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E225E),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F4FF),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFFE4E7FF)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by fullname...',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
+                  ),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear_rounded, color: Color(0xFF9CA3AF)),
+                    onPressed: () {
+                      _searchController.clear();
+                      _onSearchChanged('');
+                    },
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: _isSearching
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF4F6BFF),
+                    ),
+                  )
+                : _results.isEmpty
+                    ? Center(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[300]),
+                              const SizedBox(height: 12),
+                              Text(
+                                _searchController.text.isEmpty
+                                    ? 'Type a name to search'
+                                    : 'No users found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[500],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _results.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF2F4FF)),
+                        itemBuilder: (context, index) {
+                          final user = _results[index];
+                          final id = user['_id']?.toString() ?? user['id']?.toString() ?? '';
+                          final fullname = user['fullname']?.toString() ?? user['name']?.toString() ?? 'Anonymous';
+                          final rawAvatar = (user['avatar']?.toString() ?? '').trim();
+                          final hasValidRemoteAvatar = rawAvatar.startsWith('http://') || rawAvatar.startsWith('https://');
+                          final role = user['userType']?.toString() ?? user['role']?.toString() ?? 'Tourist';
+
+                          return ListTile(
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatConversationScreen(
+                                    partnerId: id,
+                                    partnerName: fullname,
+                                    partnerAvatar: rawAvatar,
+                                    partnerType: role,
+                                    partnerOnline: false,
+                                  ),
+                                ),
+                              );
+                            },
+                            leading: CircleAvatar(
+                              radius: 22,
+                              backgroundImage: hasValidRemoteAvatar ? NetworkImage(rawAvatar) : null,
+                              child: rawAvatar.isEmpty ? const Icon(Icons.person) : null,
+                            ),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    fullname,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: Color(0xFF1E225E),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: _getBadgeColor(role).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    role.toUpperCase(),
+                                    style: TextStyle(
+                                      color: _getBadgeColor(role),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Text(
+                              user['username']?.toString() ?? '',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

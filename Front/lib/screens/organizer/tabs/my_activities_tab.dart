@@ -14,6 +14,9 @@ import '../verify_booking_screen.dart';
 import '../my_reservations_screen.dart';
 import '../../shared/ai_chat_screen.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/inscription_service.dart';
+import '../../../models/inscription_model.dart';
+import '../../../models/inscription_model.dart';
 
 class MyActivitiesTab extends StatefulWidget {
   const MyActivitiesTab({super.key});
@@ -36,6 +39,12 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   String _searchQuery = '';
   int _unreadNotificationCount = 0;
   int _pendingReservationsCount = 0;
+  
+  int _totalActivities = 0;
+  int _totalBookingsApproved = 0;
+  int _totalParticipantsApproved = 0;
+  double _totalRevenue = 0.0;
+  bool _isLoadingStats = true;
 
   @override
   void initState() {
@@ -207,8 +216,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
     setState(() {
       if (refresh) {
         _isRefreshing = true;
+        _isLoadingStats = true;
       } else {
         _isLoading = true;
+        _isLoadingStats = true;
       }
     });
 
@@ -220,12 +231,27 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         return bTime.compareTo(aTime);
       });
       
+      List<InscriptionModel> allBookings = [];
+      try {
+        allBookings = await InscriptionService.getOrganizerAllRequests();
+      } catch (statsError) {
+        debugPrint('❌ Error loading stats/bookings: $statsError');
+      }
+      
       if (!mounted) return;
       
       setState(() {
         _activities = allActivities;
+        _totalActivities = allActivities.length;
+        
+        final approvedBookings = allBookings.where((b) => b.isApproved || b.isUsed);
+        _totalBookingsApproved = approvedBookings.length;
+        _totalParticipantsApproved = approvedBookings.fold<int>(0, (sum, b) => sum + b.nombreParticipants);
+        _totalRevenue = approvedBookings.fold<double>(0.0, (sum, b) => sum + b.prixTotal);
+        
         _isLoading = false;
         _isRefreshing = false;
+        _isLoadingStats = false;
       });
       _fetchPendingCount();
     } catch (e) {
@@ -235,6 +261,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       setState(() {
         _isLoading = false;
         _isRefreshing = false;
+        _isLoadingStats = false;
       });
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -468,6 +495,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
   }
 
   void _showActivityOptions(ActivityModel activity) {
+    final isArchive = activity.isPast || activity.statut == 'cancelled';
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -520,23 +548,36 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                     );
                   },
                 ),
-                const Divider(height: 1),
-                _OptionTile(
-                  icon: Icons.edit_outlined,
-                  title: 'Edit Activity',
-                  subtitle: 'Modify activity details',
-                  iconColor: AppColors.primary,
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final updated = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditActivityScreen(activity: activity),
-                      ),
-                    );
-                    if (updated == true) _loadActivities(refresh: true);
-                  },
-                ),
+                if (!isArchive) ...[
+                  const Divider(height: 1),
+                  _OptionTile(
+                    icon: Icons.edit_outlined,
+                    title: 'Edit Activity',
+                    subtitle: 'Modify activity details',
+                    iconColor: AppColors.primary,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      final updated = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditActivityScreen(activity: activity),
+                        ),
+                      );
+                      if (updated == true) _loadActivities(refresh: true);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _OptionTile(
+                    icon: Icons.person_add_alt_1_outlined,
+                    title: 'Add Participant',
+                    subtitle: 'Add an external participant manually',
+                    iconColor: Colors.teal,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showAddParticipantDialog(activity);
+                    },
+                  ),
+                ],
                 const Divider(height: 1),
                 _OptionTile(
                   icon: (activity.isUpcoming || activity.isOngoing) && activity.statut != 'cancelled' 
@@ -561,6 +602,271 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
           ),
         ),
       ),
+    );
+  }
+
+  void _showAddParticipantDialog(ActivityModel activity) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    int placesCount = 1;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_add_alt_1_rounded,
+                      color: Colors.teal,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Add Participant',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1B2458),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add a participant who is not using the app (e.g. phone or walk-in booking).',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      const Text(
+                        'Full Name *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1B2458),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: nameController,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: 'John Doe',
+                          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Full name is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Email Address *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1B2458),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: 'john@example.com',
+                          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email address is required';
+                          }
+                          final emailRegExp = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                          if (!emailRegExp.hasMatch(value.trim())) {
+                            return 'Enter a valid email address';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Places/Seats',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1B2458),
+                            ),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                                  onPressed: placesCount > 1
+                                      ? () => setDialogState(() => placesCount--)
+                                      : null,
+                                  color: placesCount > 1 ? AppColors.primary : Colors.grey,
+                                ),
+                                Text(
+                                  '$placesCount',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1B2458),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                                  onPressed: () => setDialogState(() => placesCount++),
+                                  color: AppColors.primary,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsPadding: const EdgeInsets.only(bottom: 20, right: 20, left: 20),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          
+                          setDialogState(() => isSubmitting = true);
+                          
+                          final result = await InscriptionService.addExternalParticipant(
+                            activiteId: activity.id,
+                            externalName: nameController.text.trim(),
+                            externalEmail: emailController.text.trim(),
+                            nombreParticipants: placesCount,
+                          );
+
+                          setDialogState(() => isSubmitting = false);
+                          
+                          if (mounted) {
+                            Navigator.pop(context);
+                            
+                            if (result['success'] == true) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_outline, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${nameController.text.trim()} added successfully!',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: const Color(0xFF22C55E),
+                                ),
+                              );
+                              _loadActivities(refresh: true);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message'] ?? 'Failed to add participant',
+                                  ),
+                                  backgroundColor: const Color(0xFFFF4757),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Add',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -678,57 +984,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                             ],
                           ),
                         ),
-                        // Notification Icon
-                        GestureDetector(
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NotificationsScreen(),
-                              ),
-                            );
-                            _loadUnreadCount();
-                          },
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(
-                                  Icons.notifications_outlined,
-                                  color: AppColors.primary,
-                                  size: 22,
-                                ),
-                                if (_unreadNotificationCount > 0)
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
+
                         // Reservations Management Icon
                         InkWell(
                           onTap: () {
@@ -900,6 +1156,12 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                   ),
                 ),
               
+              // Dashboard Statistics Block
+              if (!_isSelectionMode)
+                SliverToBoxAdapter(
+                  child: _buildStatsDashboard(),
+                ),
+
               // Tab Bar
               SliverToBoxAdapter(
                 child: Padding(
@@ -939,7 +1201,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                         _buildTab('All', _activities.length),
                         _buildTab('Upcoming', _activeActivities.length),
                         _buildTab('Ongoing', _ongoingActivities.length),
-                        _buildTab('Past', _pastActivities.length),
+                        _buildTab('Archive', _pastActivities.length),
                       ],
                     ),
                   ),
@@ -960,6 +1222,164 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
       ),
       floatingActionButton: _buildFloatingButtons(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  Widget _buildStatsDashboard() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.bar_chart_rounded,
+                  size: 20,
+                  color: Color(0xFF4B63FF),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Dashboard Statistics',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 96,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildStatCard(
+                  title: 'Total Activities',
+                  value: '$_totalActivities',
+                  icon: Icons.event_note_rounded,
+                  color: const Color(0xFF4B63FF),
+                  isLoading: _isLoadingStats,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  title: 'Total Bookings (Approved)',
+                  value: '$_totalBookingsApproved',
+                  icon: Icons.bookmark_added_rounded,
+                  color: const Color(0xFF10B981),
+                  isLoading: _isLoadingStats,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  title: 'Total Participants (Approved)',
+                  value: '$_totalParticipantsApproved',
+                  icon: Icons.people_alt_rounded,
+                  color: const Color(0xFFFF6B1A),
+                  isLoading: _isLoadingStats,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  title: 'Total Revenue (DT)',
+                  value: '${_totalRevenue.toStringAsFixed(0)} DT',
+                  icon: Icons.account_balance_wallet_rounded,
+                  color: const Color(0xFFF59E0B),
+                  isLoading: _isLoadingStats,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required bool isLoading,
+  }) {
+    return Container(
+      width: 175,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: color.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                isLoading
+                    ? SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      )
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1F2937),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1389,9 +1809,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: widget.activity.statut == 'cancelled' 
-                              ? Colors.red 
-                              : widget.statusColor,
+                          color: widget.statusColor,
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
@@ -1402,9 +1820,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                           ],
                         ),
                         child: Text(
-                          widget.activity.statut == 'cancelled' 
-                              ? 'CANCELLED' 
-                              : widget.activity.timelineStatus,
+                          widget.activity.timelineStatus,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,

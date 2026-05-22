@@ -29,22 +29,21 @@ import 'chat_conversation_screen.dart';
 import 'comments_screen.dart';
 import 'edit_profile_screen.dart';
 import '../settings/privacy_settings_screen.dart';
+import 'relations_screen.dart';
 
 /// Modern Public Profile Screen
 /// Supports both Tourist and Organizer profiles with premium UI/UX
 class PublicProfileScreen extends StatefulWidget {
   final String? userId;
 
-  const PublicProfileScreen({
-    super.key,
-    this.userId,
-  });
+  const PublicProfileScreen({super.key, this.userId});
 
   @override
   State<PublicProfileScreen> createState() => _PublicProfileScreenState();
 }
 
-class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsBindingObserver {
+class _PublicProfileScreenState extends State<PublicProfileScreen>
+    with WidgetsBindingObserver {
   // State
   bool _isLoading = true;
   bool _isLoadingContent = false;
@@ -55,6 +54,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   List<Map<String, dynamic>> _reviews = [];
   int _participatedActivities = 0;
   int _submittedReviews = 0;
+  int _followersCount = 0;
+  int _followingCount = 0;
   final Set<String> _likedPostIds = {}; // Track locally liked posts
 
   // Pagination
@@ -73,16 +74,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   // Current user info
   String? _currentUserId;
-  
+
   // Follow status
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-  
+
   // Real-time location tracking
   Timer? _locationUpdateTimer;
   String? _currentLocation;
   bool _isAdmin = false;
-  
+
   // Privacy settings change listener
   StreamSubscription<Map<String, dynamic>>? _privacySettingsSubscription;
 
@@ -117,27 +118,31 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     super.didUpdateWidget(oldWidget);
     // Reload data if userId changed or when screen is revisited
     if (widget.userId != oldWidget.userId) {
-      debugPrint('🔄 Profile changed from ${oldWidget.userId} to ${widget.userId} - refreshing data');
-      
+      debugPrint(
+        '🔄 Profile changed from ${oldWidget.userId} to ${widget.userId} - refreshing data',
+      );
+
       // Stop presence updates for old profile
       _presenceUpdateTimer?.cancel();
-      
+
       // Reset user data to prevent showing old presence info
       setState(() {
         _userData = null;
         _user = null;
       });
-      
+
       // Force cache invalidation for both old and new profiles
       if (oldWidget.userId != null) {
         CacheManager.instance.remove('GET:/users/${oldWidget.userId}');
-        CacheManager.instance.removeByPattern('GET:/users/${oldWidget.userId}*');
+        CacheManager.instance.removeByPattern(
+          'GET:/users/${oldWidget.userId}*',
+        );
       }
       if (widget.userId != null) {
         CacheManager.instance.remove('GET:/users/${widget.userId}');
         CacheManager.instance.removeByPattern('GET:/users/${widget.userId}*');
       }
-      
+
       // Load new profile data with force refresh
       _loadUserData(forceRefresh: true);
     }
@@ -177,7 +182,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       if (_shownActivitiesCount >= _activities.length) {
         _shownActivitiesCount = 6; // Reset to initial state
       } else {
-        _shownActivitiesCount = (_shownActivitiesCount + 6).clamp(6, _activities.length);
+        _shownActivitiesCount = (_shownActivitiesCount + 6).clamp(
+          6,
+          _activities.length,
+        );
       }
     });
   }
@@ -205,31 +213,38 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         return;
       }
 
-      debugPrint('🔄 Loading user data for: $targetId (forceRefresh: $forceRefresh)');
-      
+      debugPrint(
+        '🔄 Loading user data for: $targetId (forceRefresh: $forceRefresh)',
+      );
+
       // Stop any existing presence updates before loading new data
       _presenceUpdateTimer?.cancel();
-      
+
       // Users are now identified exclusively by their MongoDB ObjectId
-      final userData = await UserService.getUserById(targetId!, forceRefresh: forceRefresh);
+      final userData = await UserService.getUserById(
+        targetId!,
+        forceRefresh: forceRefresh,
+      );
       if (userData != null && mounted) {
         debugPrint('✅ User data loaded successfully');
-        debugPrint('🔍 New user presence data: isReallyOnline=${userData['isReallyOnline']}, lastActiveAt=${userData['lastActiveAt']}');
-        
+        debugPrint(
+          '🔍 New user presence data: isReallyOnline=${userData['isReallyOnline']}, lastActiveAt=${userData['lastActiveAt']}',
+        );
+
         setState(() {
           _userData = userData;
           _user = UserModel.fromJson(userData!);
           _isLoading = false;
         });
-        
+
         // Load role-specific content
         await _loadRoleSpecificContent(_user!);
-        
+
         // Check follow status if viewing another user's profile
         if (targetId != _currentUserId && _currentUserId != null) {
           await _checkFollowStatus(targetId!);
         }
-        
+
         // Start periodic presence updates for real-time status
         _startPresenceUpdates();
       }
@@ -242,9 +257,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   Future<void> _checkFollowStatus(String targetId) async {
     try {
       final isFollowing = await FollowService.checkFollowStatus(targetId);
+      final followers = await FollowService.getFollowers(targetId);
+      final following = await FollowService.getFollowing(targetId);
       if (mounted) {
         setState(() {
           _isFollowing = isFollowing;
+          _followersCount = followers.length;
+          _followingCount = following.length;
         });
       }
     } catch (e) {
@@ -254,9 +273,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   void _startPresenceUpdates() {
     _presenceUpdateTimer?.cancel();
-    
+
     // Smart presence update: check every 10 seconds but only fetch if needed
-    _presenceUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _presenceUpdateTimer = Timer.periodic(const Duration(seconds: 10), (
+      timer,
+    ) async {
       if (_userData != null && mounted) {
         final targetId = widget.userId ?? _currentUserId;
         if (targetId != null) {
@@ -268,37 +289,50 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               if (lastActiveAt != null) {
                 final now = DateTime.now();
                 final timeSinceLastActive = now.difference(lastActiveAt);
-                
+
                 // If user was online within last 70 seconds, check more frequently
                 // If user was offline longer, check less frequently
-                final shouldCheck = timeSinceLastActive.inSeconds < 70 || 
-                                  timeSinceLastActive.inMinutes % 2 == 0; // Every 2 minutes for offline users
-                
+                final shouldCheck =
+                    timeSinceLastActive.inSeconds < 70 ||
+                    timeSinceLastActive.inMinutes % 2 ==
+                        0; // Every 2 minutes for offline users
+
                 if (!shouldCheck) {
-                  debugPrint('🔄 [PRESENCE] Skipping check for user: $targetId (offline: ${timeSinceLastActive.inMinutes}m ago)');
+                  debugPrint(
+                    '🔄 [PRESENCE] Skipping check for user: $targetId (offline: ${timeSinceLastActive.inMinutes}m ago)',
+                  );
                   return;
                 }
               }
             }
-            
-            debugPrint('🔄 [PRESENCE] Updating presence data for user: $targetId');
-            
+
+            debugPrint(
+              '🔄 [PRESENCE] Updating presence data for user: $targetId',
+            );
+
             // Force cache invalidation for real-time data
             CacheManager.instance.remove('GET:/users/$targetId');
             CacheManager.instance.removeByPattern('GET:/users/$targetId*');
-            
+
             // Users are now identified exclusively by their MongoDB ObjectId
-            final userData = await UserService.getUserById(targetId, forceRefresh: true);
+            final userData = await UserService.getUserById(
+              targetId,
+              forceRefresh: true,
+            );
             if (userData != null && mounted) {
               final newIsOnline = userData['isReallyOnline'] ?? false;
               final newLastActiveAt = userData['lastActiveAt']?.toString();
               final currentIsOnline = _userData?['isReallyOnline'] ?? false;
-              final currentLastActiveAt = _userData?['lastActiveAt']?.toString();
-              
-              debugPrint('🔄 [PRESENCE] Status: $currentIsOnline → $newIsOnline, LastActive: $currentLastActiveAt → $newLastActiveAt');
-              
+              final currentLastActiveAt = _userData?['lastActiveAt']
+                  ?.toString();
+
+              debugPrint(
+                '🔄 [PRESENCE] Status: $currentIsOnline → $newIsOnline, LastActive: $currentLastActiveAt → $newLastActiveAt',
+              );
+
               // Update state if presence data changed
-              if (newIsOnline != currentIsOnline || newLastActiveAt != currentLastActiveAt) {
+              if (newIsOnline != currentIsOnline ||
+                  newLastActiveAt != currentLastActiveAt) {
                 debugPrint('🔄 [PRESENCE] Status changed! Updating UI...');
                 setState(() {
                   _userData = userData;
@@ -316,7 +350,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Future<void> _toggleFollow() async {
     if (_isFollowLoading) return;
-    
+
     final targetId = widget.userId ?? _currentUserId;
     if (targetId == null || targetId == _currentUserId) return;
 
@@ -347,9 +381,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error toggling follow: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -376,19 +410,24 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Future<void> _loadOrganizerContent(String userId) async {
     debugPrint('Loading organizer content for userId: $userId');
-    
+
     final targetId = (_userData?['_id'] ?? '').toString();
     debugPrint('Target ID for organizer: $targetId');
-    
+
     // Use dedicated backend endpoint to get organizer's activities
     List<ActivityModel> organizerActivities = [];
     try {
-      organizerActivities = await ActivityService.getActivitiesByOrganisateur(targetId, refresh: true);
-      debugPrint('Organizer activities loaded from backend: ${organizerActivities.length}');
+      organizerActivities = await ActivityService.getActivitiesByOrganisateur(
+        targetId,
+        refresh: true,
+      );
+      debugPrint(
+        'Organizer activities loaded from backend: ${organizerActivities.length}',
+      );
     } catch (e) {
       debugPrint('Error loading organizer activities: $e');
     }
-    
+
     // Load reviews submitted by tourists to this organizer
     List<Map<String, dynamic>> organizerReviews = [];
     try {
@@ -400,7 +439,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error loading organizer reviews: $e');
     }
-    
+
     setState(() {
       _activities = organizerActivities;
       _reviews = organizerReviews;
@@ -417,23 +456,23 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error loading organizer posts: $e');
     }
-    
+
     // Restart auto-scroll with new reviews
     _startAutoScroll();
   }
 
   Future<void> _loadTouristContent(String userId) async {
     debugPrint('Loading tourist content for userId: $userId');
-    
+
     // Load posts from backend (includes authored posts and mentions)
     List<PostModel> userPosts = [];
     try {
       final targetId = (_userData?['_id'] ?? '').toString();
       debugPrint('Target ID for fetching posts: $targetId');
-      
+
       final rawPosts = await PostService.getPublicUserPosts(targetId);
       userPosts = rawPosts.map((post) => PostModel.fromJson(post)).toList();
-      
+
       debugPrint('Loaded user posts from backend: ${userPosts.length}');
     } catch (e) {
       debugPrint('Error loading user posts: $e');
@@ -457,13 +496,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     // Load participated activities count (public endpoint)
     int participatedCount = 0;
     try {
-      participatedCount = await InscriptionService.getTouristeParticipatedCount(userId);
+      participatedCount = await InscriptionService.getTouristeParticipatedCount(
+        userId,
+      );
       debugPrint('Tourist participated activities: $participatedCount');
     } catch (e) {
       debugPrint('Error loading tourist participated count: $e');
     }
 
-    debugPrint('Tourist stats - posts: ${userPosts.length}, submitted reviews: $submittedReviewsCount, participated: $participatedCount');
+    debugPrint(
+      'Tourist stats - posts: ${userPosts.length}, submitted reviews: $submittedReviewsCount, participated: $participatedCount',
+    );
 
     // Initialize liked posts from post data
     _likedPostIds.clear();
@@ -523,7 +566,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     }
     return '$serverUrl/$value';
   }
-
 
   void _showAvatarFullScreen(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return;
@@ -606,16 +648,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     // Clean phone number - remove spaces, dashes, etc.
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
     debugPrint('🔍 DEBUG: Launching phone with clean number: $cleanPhone');
-    
+
     // Try different URI formats for Android compatibility
     final List<Uri> phoneUris = [
       Uri(scheme: 'tel', path: cleanPhone),
       Uri(scheme: 'tel', path: phone), // Original format
     ];
-    
+
     for (final phoneUri in phoneUris) {
       debugPrint('🔍 DEBUG: Trying phone URI: $phoneUri');
-      
+
       try {
         if (await canLaunchUrl(phoneUri)) {
           debugPrint('🔍 DEBUG: Can launch phone, attempting...');
@@ -623,7 +665,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             phoneUri,
             mode: LaunchMode.platformDefault,
           );
-          
+
           if (launched) {
             debugPrint('🔍 DEBUG: Phone launch successful with URI: $phoneUri');
             return; // Success, exit the method
@@ -636,13 +678,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         continue; // Try next URI format
       }
     }
-    
+
     // If all attempts failed
     debugPrint('🔍 DEBUG: All phone launch attempts failed');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not launch phone app. Please check your device settings.'),
+          content: Text(
+            'Could not launch phone app. Please check your device settings.',
+          ),
           duration: Duration(seconds: 3),
         ),
       );
@@ -651,16 +695,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Future<void> _launchEmail(String email) async {
     debugPrint('🔍 DEBUG: Launching email with address: $email');
-    
+
     // Try different URI formats for Android compatibility
     final List<Uri> emailUris = [
       Uri(scheme: 'mailto', path: email),
-      Uri(scheme: 'mailto', path: email, query: 'subject=Contact from DJTrip'), // With subject
+      Uri(
+        scheme: 'mailto',
+        path: email,
+        query: 'subject=Contact from DJTrip',
+      ), // With subject
     ];
-    
+
     for (final emailUri in emailUris) {
       debugPrint('🔍 DEBUG: Trying email URI: $emailUri');
-      
+
       try {
         if (await canLaunchUrl(emailUri)) {
           debugPrint('🔍 DEBUG: Can launch email, attempting...');
@@ -668,7 +716,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             emailUri,
             mode: LaunchMode.platformDefault,
           );
-          
+
           if (launched) {
             debugPrint('🔍 DEBUG: Email launch successful with URI: $emailUri');
             return; // Success, exit the method
@@ -681,13 +729,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         continue; // Try next URI format
       }
     }
-    
+
     // If all attempts failed
     debugPrint('🔍 DEBUG: All email launch attempts failed');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not launch email app. Please check your device settings.'),
+          content: Text(
+            'Could not launch email app. Please check your device settings.',
+          ),
           duration: Duration(seconds: 3),
         ),
       );
@@ -698,17 +748,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     // Clean phone number - remove spaces, dashes, etc.
     final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
     debugPrint('🔍 DEBUG: Launching SMS with clean number: $cleanPhone');
-    
+
     // Try different URI formats for Android compatibility
     final List<Uri> smsUris = [
       Uri(scheme: 'sms', path: cleanPhone),
       Uri(scheme: 'smsto', path: cleanPhone), // Alternative SMS scheme
       Uri(scheme: 'sms', path: phone), // Original format
     ];
-    
+
     for (final smsUri in smsUris) {
       debugPrint('🔍 DEBUG: Trying SMS URI: $smsUri');
-      
+
       try {
         if (await canLaunchUrl(smsUri)) {
           debugPrint('🔍 DEBUG: Can launch SMS, attempting...');
@@ -716,7 +766,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             smsUri,
             mode: LaunchMode.platformDefault,
           );
-          
+
           if (launched) {
             debugPrint('🔍 DEBUG: SMS launch successful with URI: $smsUri');
             return; // Success, exit the method
@@ -729,13 +779,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         continue; // Try next URI format
       }
     }
-    
+
     // If all attempts failed
     debugPrint('🔍 DEBUG: All SMS launch attempts failed');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not launch SMS app. Please check your device settings.'),
+          content: Text(
+            'Could not launch SMS app. Please check your device settings.',
+          ),
           duration: Duration(seconds: 3),
         ),
       );
@@ -746,7 +798,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final reviewId = review['_id']?.toString() ?? '';
     final currentNote = (review['note'] ?? 0).toDouble();
     final currentComment = (review['commentaire'] ?? '').toString();
-    
+
     showDialog(
       context: context,
       builder: (context) => _EditReviewDialog(
@@ -769,7 +821,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(result['message'] ?? 'Failed to update review')),
+              SnackBar(
+                content: Text(result['message'] ?? 'Failed to update review'),
+              ),
             );
           }
         },
@@ -779,7 +833,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   void _handleDeleteReview(Map<String, dynamic> review) {
     final reviewId = review['_id']?.toString() ?? '';
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -800,7 +854,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                 );
                 // Reload reviews
                 if (_userData != null) {
-                  await _loadOrganizerContent(_userData?['_id']?.toString() ?? '');
+                  await _loadOrganizerContent(
+                    _userData?['_id']?.toString() ?? '',
+                  );
                 }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -836,10 +892,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             children: [
               Icon(Icons.person_off, size: 64, color: AppColors.textGrey),
               const SizedBox(height: 16),
-              Text(
-                'User not found',
-                style: AppTextStyles.headlineSmall,
-              ),
+              Text('User not found', style: AppTextStyles.headlineSmall),
             ],
           ),
         ),
@@ -847,7 +900,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     }
 
     final userType = _userData?['userType']?.toString() ?? '';
-    final isOrganizer = userType == 'Organisator' || _userData?['isOrganisator'] == true;
+    final isOrganizer =
+        userType == 'Organisator' || _userData?['isOrganisator'] == true;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
@@ -860,10 +914,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           slivers: [
             // Cover Image & Profile Header
             SliverToBoxAdapter(child: _buildProfileHeader()),
-            
+
             // Interests Section (for tourists only)
-            if (!isOrganizer) SliverToBoxAdapter(child: _buildInterestsSection()),
-            
+            if (!isOrganizer)
+              SliverToBoxAdapter(child: _buildInterestsSection()),
+
             // Specialties and Languages (for organizers only)
             if (isOrganizer) ...[
               SliverToBoxAdapter(child: _buildSpecialtiesSection()),
@@ -871,23 +926,23 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               SliverToBoxAdapter(child: _buildLanguagesSection()),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
             ],
-            
+
             // Stats Bar
-            SliverToBoxAdapter(child: _buildStatsBar()),
-            
+            SliverToBoxAdapter(child: _buildStatsBar(isOrganizer: isOrganizer)),
+
             // Contact Information (respect privacy)
             SliverToBoxAdapter(child: _buildContactInfo()),
-            
+
             // Action Buttons
             SliverToBoxAdapter(child: _buildActionButtons()),
-            
+
             // Role-Specific Content
             if (isOrganizer) ...[
-              SliverToBoxAdapter(child: _buildActivitiesSection()),
+              _buildOrganizerContent(),
               SliverToBoxAdapter(child: _buildReviewsSection()),
             ] else
               _buildTouristContent(),
-            
+
             // Bottom spacing
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
@@ -922,12 +977,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         ),
       ),
       centerTitle: true,
-      actions: [
-        IconButton(
-          icon: Icon(Icons.share, color: AppColors.primary),
-          onPressed: _handleShare,
-        ),
-      ],
     );
   }
 
@@ -984,16 +1033,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarUrl = _resolveUrl(_userData?['avatar']?.toString());
     final coverUrl = _resolveUrl(_userData?['cover_photo']?.toString());
-    
+
     // Use _userData directly for name, bio, and location
     final fullname = (_userData?['fullname']?.toString() ?? '').trim();
     final displayName = fullname.isEmpty ? 'User' : fullname;
     final bio = (_userData?['bio']?.toString() ?? '').trim();
     final userType = _userData?['userType']?.toString() ?? '';
-    final isOrganizer = userType == 'Organisator' || _userData?['isOrganisator'] == true;
+    final isOrganizer =
+        userType == 'Organisator' || _userData?['isOrganisator'] == true;
     final subtitle = bio.isEmpty ? '' : bio;
     final location = (_userData?['pays_origine']?.toString() ?? '').trim();
-    
+
     // Privacy settings - stored directly in user document, not nested
     final profileVisibility = _userData?['profileVisibility'] ?? true;
     final showOnlineStatus = _userData?['showOnlineStatus'] ?? true;
@@ -1006,7 +1056,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     // Check if this is the current user's own profile
     final targetUserId = widget.userId ?? _currentUserId;
     final isCurrentUser = targetUserId == _currentUserId;
-    
+
     // If profile is not visible and not the current user, show restricted message
     if (!profileVisibility && !isCurrentUser) {
       return _buildRestrictedProfile();
@@ -1023,10 +1073,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF4B63FF),
-                Color(0xFF1B2458),
-              ],
+              colors: [Color(0xFF4B63FF), Color(0xFF1B2458)],
             ),
           ),
           child: Stack(
@@ -1034,19 +1081,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               // Abstract Mediterranean pattern overlay
               Opacity(
                 opacity: 0.15,
-                child: coverUrl.isNotEmpty 
-                  ? CachedNetworkImage(
-                      imageUrl: coverUrl,
-                      width: double.infinity,
-                      height: 240,
-                      fit: BoxFit.cover,
-                    )
-                  : Image.network(
-                      'https://images.unsplash.com/photo-1544413647-ad342f022790?auto=format&fit=crop&w=1200&q=80',
-                      width: double.infinity,
-                      height: 240,
-                      fit: BoxFit.cover,
-                    ),
+                child: coverUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrl,
+                        width: double.infinity,
+                        height: 240,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        'https://images.unsplash.com/photo-1544413647-ad342f022790?auto=format&fit=crop&w=1200&q=80',
+                        width: double.infinity,
+                        height: 240,
+                        fit: BoxFit.cover,
+                      ),
               ),
               // Glassmorphism accent
               Positioned(
@@ -1113,12 +1160,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                                 placeholder: (_, __) => Container(
                                   color: const Color(0xFFF1F5F9),
                                   child: const Center(
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
                                 ),
-                                errorWidget: (_, __, ___) => const Icon(Icons.person, size: 50, color: Color(0xFF94A3B8)),
+                                errorWidget: (_, __, ___) => const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Color(0xFF94A3B8),
+                                ),
                               )
-                            : const Icon(Icons.person, size: 60, color: Color(0xFF94A3B8)),
+                            : const Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Color(0xFF94A3B8),
+                              ),
                       ),
                     ),
                   ),
@@ -1132,9 +1189,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                       width: 22,
                       height: 22,
                       decoration: BoxDecoration(
-                        color: (_userData?['isOnline'] == true) ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+                        color: (_userData?['isOnline'] == true)
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFF94A3B8),
                         shape: BoxShape.circle,
-                        border: Border.all(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, width: 3),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF1E1E1E)
+                              : Colors.white,
+                          width: 3,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.1),
@@ -1146,9 +1210,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Name & Verification Badge
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1173,24 +1237,36 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                       ),
                       if (isOrganizer) ...[
                         const SizedBox(width: 8),
-                        const Icon(Icons.verified, color: Color(0xFF4B63FF), size: 22),
+                        const Icon(
+                          Icons.verified,
+                          color: Color(0xFF4B63FF),
+                          size: 22,
+                        ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 4),
                   // Badge for User Type
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isOrganizer ? const Color(0xFFEEF2FF) : const Color(0xFFF0FDF4),
+                      color: isOrganizer
+                          ? const Color(0xFFEEF2FF)
+                          : const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      (isOrganizer ? 'Expert Organizer' : 'Djerba Explorer').toUpperCase(),
+                      (isOrganizer ? 'Expert Organizer' : 'Djerba Explorer')
+                          .toUpperCase(),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: isOrganizer ? const Color(0xFF4B63FF) : const Color(0xFF16A34A),
+                        color: isOrganizer
+                            ? const Color(0xFF4B63FF)
+                            : const Color(0xFF16A34A),
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -1214,7 +1290,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 16,
+                        color: Color(0xFF94A3B8),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         location,
@@ -1235,213 +1315,65 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     );
   }
 
-  Widget _buildStatsBar() {
-    if (_userData == null) return const SizedBox.shrink();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildStatsBar({required bool isOrganizer}) {
+    // Privacy setting to show/hide relations
+    final bool showRelations = _userData?['showRelations'] ?? true;
 
-    final userType = _userData?['userType']?.toString() ?? '';
-    final isOrganizer = userType == 'Organisator' || _userData?['isOrganisator'] == true;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4B63FF).withOpacity(0.06),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: isOrganizer
-            ? _buildOrganizerStats()
-            : _buildTouristStats(),
-      ),
-    );
-  }
-
-  Widget _buildOrganizerStats() {
-    // Activities created
-    final activitiesCreated = _activities.length;
-    
-    // Separate reviews by type
-    final organizerReviews = _reviews.where((r) => r['type'] == 'organisateur').toList();
-    final activityReviews = _reviews.where((r) => r['type'] == 'activite').toList();
-    
-    // Calculate organizer rating (only organizer-type reviews)
-    double organizerRating = 0.0;
-    if (organizerReviews.isNotEmpty) {
-      final totalRating = organizerReviews.fold<double>(0, (sum, review) {
-        final note = review['note'] as num? ?? 0;
-        return sum + note.toDouble();
-      });
-      organizerRating = totalRating / organizerReviews.length;
-    }
-    
-    // Calculate activity rating (only activity-type reviews)
-    double activityRating = 0.0;
-    if (activityReviews.isNotEmpty) {
-      final totalRating = activityReviews.fold<double>(0, (sum, review) {
-        final note = review['note'] as num? ?? 0;
-        return sum + note.toDouble();
-      });
-      activityRating = totalRating / activityReviews.length;
-    }
-    
-    // Total reviews count (organizer-type only)
-    final organizerReviewsCount = organizerReviews.length;
-    final activityReviewsCount = activityReviews.length;
-
-    debugPrint('Organizer stats - Activities: $activitiesCreated, Organizer Reviews: $organizerReviewsCount, Activity Reviews: $activityReviewsCount, Organizer Rating: $organizerRating, Activity Rating: $activityRating');
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _StatItem(
-          value: organizerRating.toStringAsFixed(1),
-          label: 'Rate',
-          icon: Icons.star,
-          showStar: true,
-        ),
-        _buildDivider(),
-        _StatItem(
-          value: activitiesCreated.toString(),
-          label: 'Activities',
-          icon: Icons.local_activity_rounded,
-        ),
-        _buildDivider(),
-        _StatItem(
-          value: _posts.length.toString(),
-          label: 'Posts',
-          icon: Icons.article_rounded,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTouristStats() {
-    // Use submitted reviews count from API
-    final reviewsCount = _submittedReviews;
-    
-    // Calculate total activities (participated) from all bookings
-    final totalActivities = _participatedActivities;
-    
-    // Posts count
-    final postsCount = _posts.length;
-    
-    debugPrint('Building tourist stats - posts: $postsCount, submitted reviews: $reviewsCount, participated: $totalActivities');
-    
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _StatItem(
-          value: postsCount.toString(),
-          label: 'Posts',
-          icon: Icons.article_rounded,
-        ),
-        _buildDivider(),
-        _StatItem(
-          value: totalActivities.toString(),
-          label: 'Bookings',
-          icon: Icons.hiking_rounded,
-        ),
-        _buildDivider(),
-        _StatItem(
-          value: reviewsCount.toString(),
-          label: 'Reviews',
-          icon: Icons.rate_review_outlined,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
     return Container(
-      width: 1,
-      height: 40,
-      color: AppColors.outline,
-    );
-  }
-
-  Widget _buildRestrictedProfile() {
-    return Container(
-      height: 400,
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.outline.withOpacity(0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.lock_outline,
-              size: 40,
-              color: AppColors.textGrey,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Private Profile',
-            style: AppTextStyles.headlineSmall.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'This user has set their profile to private. Only they can see their full profile information.',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textGrey,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Profile visibility is disabled',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
           ),
         ],
       ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          if (isOrganizer)
+            _buildStatItem('Activities', _activities.length.toString())
+          else
+            _buildStatItem('Participated', _participatedActivities.toString()),
+          _buildStatItem('Reviews', _reviews.length.toString()),
+          _buildRelationsStatItem('Followers', _followersCount.toString(), true, showRelations),
+          _buildRelationsStatItem('Following', _followingCount.toString(), false, showRelations),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRelationsStatItem(String label, String value, bool isFollowers, bool showRelations) {
+    return InkWell(
+      onTap: () {
+        if (!showRelations) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User has hidden their followers and following lists.')),
+          );
+          return;
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RelationsScreen(
+              userId: widget.userId ?? _currentUserId!,
+              initialTabIndex: isFollowers ? 0 : 1,
+            ),
+          ),
+        );
+      },
+      child: _buildStatItem(label, value),
     );
   }
 
   Widget _buildContactInfo() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Privacy settings - stored directly in user document, not nested
-    
+
     debugPrint('🔍 DEBUG: User data keys: ${_userData?.keys.toList()}');
     debugPrint('🔍 DEBUG: showPhone: ${_userData?['showPhone']}');
     debugPrint('🔍 DEBUG: showEmail: ${_userData?['showEmail']}');
@@ -1449,27 +1381,28 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     debugPrint('🔍 DEBUG: allowPhoneCalls: ${_userData?['allowPhoneCalls']}');
     debugPrint('🔍 DEBUG: isReallyOnline: ${_userData?['isReallyOnline']}');
     debugPrint('🔍 DEBUG: lastActiveAt: ${_userData?['lastActiveAt']}');
-    
+
     // Backend stores privacy settings directly in user document
     final showPhone = _userData?['showPhone'] ?? false;
     final showEmail = _userData?['showEmail'] ?? false;
     final showLastSeen = _userData?['showLastSeen'] ?? false;
     final allowLocationSharing = _userData?['allowLocationSharing'] ?? false;
     final allowPhoneCalls = _userData?['allowPhoneCalls'] ?? true;
-    
+
     // New presence system data
     final isReallyOnline = _userData?['isReallyOnline'] ?? false;
     final lastActiveAtString = _userData?['lastActiveAt']?.toString();
-    final lastActiveAt = lastActiveAtString != null && lastActiveAtString.isNotEmpty
+    final lastActiveAt =
+        lastActiveAtString != null && lastActiveAtString.isNotEmpty
         ? DateTime.tryParse(lastActiveAtString)
         : null;
-    
+
     // Legacy derniere_connexion (kept for backward compatibility)
     final lastSeenString = _userData?['derniere_connexion']?.toString();
     final lastSeen = lastSeenString != null && lastSeenString.isNotEmpty
         ? DateTime.tryParse(lastSeenString)
         : null;
-    
+
     debugPrint('🔍 DEBUG: Presence data:');
     debugPrint('  - isReallyOnline: $isReallyOnline');
     debugPrint('  - lastActiveAtString: $lastActiveAtString');
@@ -1477,16 +1410,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     debugPrint('  - lastSeenString: $lastSeenString');
     debugPrint('  - lastSeen: $lastSeen');
     debugPrint('  - showLastSeen: $showLastSeen');
-    
+
     final phone = _userData?['num_tel']?.toString() ?? '';
     final email = _userData?['email']?.toString() ?? '';
-    
-    final hasPhone = phone.isNotEmpty && showPhone; // Show phone number when showPhone is true
+
+    final hasPhone =
+        phone.isNotEmpty &&
+        showPhone; // Show phone number when showPhone is true
     final hasEmail = email.isNotEmpty && showEmail;
     // Use new presence system: show online status or last active time
     // Temporarily bypass showLastSeen for testing - remove this line for production
     final hasPresenceInfo = (isReallyOnline || lastActiveAt != null);
-    
+
     debugPrint('🔍 DEBUG Contact Info:');
     debugPrint('  - phone: "$phone"');
     debugPrint('  - email: "$email"');
@@ -1499,16 +1434,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     debugPrint('  - hasPhone: $hasPhone');
     debugPrint('  - hasEmail: $hasEmail');
     debugPrint('  - hasPresenceInfo: $hasPresenceInfo');
-    
-    if (!hasPhone && !hasEmail && !hasPresenceInfo) return const SizedBox.shrink();
-    
+
+    if (!hasPhone && !hasEmail && !hasPresenceInfo)
+      return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9), width: 1.5),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -1522,7 +1461,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         children: [
           Row(
             children: [
-              const Icon(Icons.alternate_email_rounded, color: Color(0xFF4B63FF), size: 20),
+              const Icon(
+                Icons.alternate_email_rounded,
+                color: Color(0xFF4B63FF),
+                size: 20,
+              ),
               const SizedBox(width: 10),
               const Text(
                 'Contact Details',
@@ -1542,7 +1485,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_outline, size: 10, color: Color(0xFF64748B)),
+                    Icon(
+                      Icons.lock_outline,
+                      size: 10,
+                      color: Color(0xFF64748B),
+                    ),
                     SizedBox(width: 4),
                     Text(
                       'Private',
@@ -1582,8 +1529,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             _buildContactItem(
               icon: Icons.access_time_rounded,
               label: 'Last Active',
-              value: isReallyOnline ? 'Online Now' : (lastActiveAt != null ? _formatDate(lastActiveAt) : 'Recently'),
-              color: isReallyOnline ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+              value: isReallyOnline
+                  ? 'Online Now'
+                  : (lastActiveAt != null
+                        ? _formatDate(lastActiveAt)
+                        : 'Recently'),
+              color: isReallyOnline
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFF94A3B8),
               showBadge: isReallyOnline,
             ),
         ],
@@ -1627,7 +1580,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF262626) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9),
+        ),
       ),
       child: Row(
         children: [
@@ -1672,14 +1627,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                 color: Color(0xFF22C55E),
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: Color(0x6622C55E), blurRadius: 4, spreadRadius: 1),
+                  BoxShadow(
+                    color: Color(0x6622C55E),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
                 ],
               ),
             ),
           if (onTap != null)
             IconButton(
               onPressed: onTap,
-              icon: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: color),
+              icon: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: color,
+              ),
               visualDensity: VisualDensity.compact,
             ),
         ],
@@ -1689,8 +1652,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Widget _buildActionButtons() {
     final isOwnProfile = _userData?['_id']?.toString() == _currentUserId;
-    final isOrganizer = _userData?['userType']?.toString() == 'Organisateur' || _userData?['isOrganisator'] == true;
-    
+    final isOrganizer =
+        _userData?['userType']?.toString() == 'Organisateur' ||
+        _userData?['isOrganisator'] == true;
+
     // Privacy settings - stored directly in user document, not nested
     final allowDirectMessages = _userData?['allowDirectMessages'] ?? true;
     final allowPhoneCalls = _userData?['allowPhoneCalls'] ?? true;
@@ -1765,10 +1730,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                           end: Alignment.bottomRight,
                         )
                       : LinearGradient(
-                          colors: [
-                            Colors.grey.shade400,
-                            Colors.grey.shade500,
-                          ],
+                          colors: [Colors.grey.shade400, Colors.grey.shade500],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -1786,7 +1748,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   onPressed: allowDirectMessages ? _handleContact : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: allowDirectMessages ? Colors.white : Colors.white70,
+                    foregroundColor: allowDirectMessages
+                        ? Colors.white
+                        : Colors.white70,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
@@ -1795,7 +1759,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     shadowColor: Colors.transparent,
                   ),
                   icon: Icon(
-                    allowDirectMessages ? Icons.message_rounded : Icons.message_outlined, 
+                    allowDirectMessages
+                        ? Icons.message_rounded
+                        : Icons.message_outlined,
                     size: 22,
                   ),
                   label: Text(
@@ -1803,14 +1769,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     style: AppTextStyles.labelLarge.copyWith(
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
-                      color: allowDirectMessages ? Colors.white : Colors.white70,
+                      color: allowDirectMessages
+                          ? Colors.white
+                          : Colors.white70,
                     ),
                   ),
                 ),
               ),
             ),
-          ]
-          else
+          ] else
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () {
@@ -1830,7 +1797,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                icon: const Icon(Icons.edit_rounded, size: 22, color: Colors.white),
+                icon: const Icon(
+                  Icons.edit_rounded,
+                  size: 22,
+                  color: Colors.white,
+                ),
                 label: Text(
                   'Edit Profile',
                   style: AppTextStyles.labelLarge.copyWith(
@@ -1868,7 +1839,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _activeTabIndex == 0 ? (isDark ? const Color(0xFF1E1E1E) : Colors.white) : Colors.transparent,
+                  color: _activeTabIndex == 0
+                      ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: _activeTabIndex == 0
                       ? [
@@ -1885,15 +1858,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   children: [
                     Icon(
                       Icons.explore_outlined,
-                      color: _activeTabIndex == 0 ? AppColors.primary : AppColors.textGrey,
+                      color: _activeTabIndex == 0
+                          ? AppColors.primary
+                          : AppColors.textGrey,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Activities',
                       style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: _activeTabIndex == 0 ? FontWeight.w700 : FontWeight.w500,
-                        color: _activeTabIndex == 0 ? AppColors.primary : AppColors.textGrey,
+                        fontWeight: _activeTabIndex == 0
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: _activeTabIndex == 0
+                            ? AppColors.primary
+                            : AppColors.textGrey,
                       ),
                     ),
                   ],
@@ -1913,7 +1892,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _activeTabIndex == 1 ? (isDark ? const Color(0xFF1E1E1E) : Colors.white) : Colors.transparent,
+                  color: _activeTabIndex == 1
+                      ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: _activeTabIndex == 1
                       ? [
@@ -1930,15 +1911,21 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   children: [
                     Icon(
                       Icons.article_outlined,
-                      color: _activeTabIndex == 1 ? AppColors.primary : AppColors.textGrey,
+                      color: _activeTabIndex == 1
+                          ? AppColors.primary
+                          : AppColors.textGrey,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Posts',
                       style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: _activeTabIndex == 1 ? FontWeight.w700 : FontWeight.w500,
-                        color: _activeTabIndex == 1 ? AppColors.primary : AppColors.textGrey,
+                        fontWeight: _activeTabIndex == 1
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: _activeTabIndex == 1
+                            ? AppColors.primary
+                            : AppColors.textGrey,
                       ),
                     ),
                   ],
@@ -1952,11 +1939,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   }
 
   Widget _buildOrganizerContent() {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverList(
-        delegate: SliverChildListDelegate([
-          _buildOrganizerTabs(),
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildOrganizerTabs(),
+          ),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             switchInCurve: Curves.easeIn,
@@ -1968,10 +1957,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   )
                 : KeyedSubtree(
                     key: const ValueKey('organizer_posts'),
-                    child: _buildPostsSection(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildPostsSection(),
+                    ),
                   ),
           ),
-        ]),
+        ],
       ),
     );
   }
@@ -1982,10 +1974,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          'Specialized Activities',
-          style: AppTextStyles.headlineSmall,
-        ),
+        Text('Specialized Activities', style: AppTextStyles.headlineSmall),
         const SizedBox(height: 20),
         if (specialties.isEmpty)
           Container(
@@ -1998,7 +1987,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             ),
             child: Text(
               'No specialties listed',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textGrey,
+              ),
               textAlign: TextAlign.center,
             ),
           )
@@ -2017,25 +2008,26 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   Widget _buildLanguagesSection() {
     final languages = _userData?['langues_proposees'] as List? ?? [];
-    
+
     // Privacy settings
-    final privacySettings = _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
+    final privacySettings =
+        _userData?['privacy_settings'] as Map<String, dynamic>? ?? {};
     final profileVisibility = privacySettings['profile_visibility'] ?? true;
-    
+
     // If profile is not visible, show restricted message
     if (!profileVisibility) {
       return _buildRestrictedProfile();
     }
 
-    final languageList = languages.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    final languageList = languages
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          'Spoken Languages',
-          style: AppTextStyles.headlineSmall,
-        ),
+        Text('Spoken Languages', style: AppTextStyles.headlineSmall),
         const SizedBox(height: 12),
         if (languages.isEmpty || languages.first.isEmpty)
           Container(
@@ -2048,7 +2040,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             ),
             child: Text(
               'No languages listed',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textGrey,
+              ),
               textAlign: TextAlign.center,
             ),
           )
@@ -2068,9 +2062,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   Widget _buildActivitiesSection() {
     final displayCount = _shownActivitiesCount.clamp(0, _activities.length);
     final hasMore = _activities.length > displayCount;
-    
+
     // Calculate activity stats (type activite)
-    final activityReviews = _reviews.where((r) => r['type'] == 'activite').toList();
+    final activityReviews = _reviews
+        .where((r) => r['type'] == 'activite')
+        .toList();
     double activityRating = 0.0;
     if (activityReviews.isNotEmpty) {
       final totalRating = activityReviews.fold<double>(0, (sum, review) {
@@ -2080,7 +2076,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       activityRating = totalRating / activityReviews.length;
     }
     final activityReviewsCount = activityReviews.length;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2089,10 +2085,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Activities',
-                style: AppTextStyles.headlineSmall,
-              ),
+              Text('Activities', style: AppTextStyles.headlineSmall),
               const SizedBox(width: 8),
               if (_activities.isNotEmpty)
                 Flexible(
@@ -2106,7 +2099,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.star, size: 14, color: AppColors.primary),
+                              Icon(
+                                Icons.star,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 activityRating.toStringAsFixed(1),
@@ -2121,13 +2118,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                         // Activity reviews count
                         Text(
                           '$activityReviewsCount reviews',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         // Total activities count
                         Text(
                           '${_activities.length} activities',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textGrey,
+                          ),
                         ),
                       ],
                     ),
@@ -2154,7 +2155,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   const SizedBox(height: 12),
                   Text(
                     'No activities yet',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textGrey,
+                    ),
                   ),
                 ],
               ),
@@ -2183,14 +2186,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     child: TextButton.icon(
                       onPressed: _toggleShowMoreActivities,
                       icon: Icon(
-                        _shownActivitiesCount >= _activities.length 
-                            ? Icons.keyboard_arrow_up 
-                            : Icons.keyboard_arrow_down, 
+                        _shownActivitiesCount >= _activities.length
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         size: 18,
                       ),
                       label: Text(
-                        _shownActivitiesCount >= _activities.length 
-                            ? 'Show less' 
+                        _shownActivitiesCount >= _activities.length
+                            ? 'Show less'
                             : 'Show more',
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.primary,
@@ -2216,14 +2219,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Reviews',
-                style: AppTextStyles.headlineSmall,
-              ),
+              Text('Reviews', style: AppTextStyles.headlineSmall),
               if (_reviews.isNotEmpty)
                 Text(
                   '${_reviews.length} reviews',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textGrey),
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textGrey,
+                  ),
                 ),
             ],
           ),
@@ -2242,11 +2244,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
               ),
               child: Column(
                 children: [
-                  Icon(Icons.rate_review_outlined, size: 48, color: AppColors.textGrey),
+                  Icon(
+                    Icons.rate_review_outlined,
+                    size: 48,
+                    color: AppColors.textGrey,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'No reviews yet',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textGrey,
+                    ),
                   ),
                 ],
               ),
@@ -2298,12 +2306,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   Widget _buildInterestsSection() {
     // Use _userData directly with centres_interet key
     final interestsRaw = _userData?['centres_interet'] as List? ?? [];
-    
+
     final interests = interestsRaw
         .map((e) => e.toString().trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    
+
     debugPrint('Interests: $interests');
 
     return Padding(
@@ -2312,35 +2320,34 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 16),
-          Text(
-            'Interests',
-            style: AppTextStyles.headlineSmall,
-          ),
+          Text('Interests', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
-        if (interests.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.outline),
+          if (interests.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Text(
+                'No interests listed',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textGrey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: interests
+                  .map((interest) => _InterestChip(label: interest))
+                  .toList(),
             ),
-            child: Text(
-              'No interests listed',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
-              textAlign: TextAlign.center,
-            ),
-          )
-        else
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: interests
-                .map((interest) => _InterestChip(label: interest))
-                .toList(),
-          ),
         ],
       ),
     );
@@ -2352,12 +2359,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Posts',
-              style: AppTextStyles.headlineSmall,
-            ),
-          ],
+          children: [Text('Posts', style: AppTextStyles.headlineSmall)],
         ),
         const SizedBox(height: 12),
         if (_posts.isEmpty)
@@ -2371,11 +2373,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
             ),
             child: Column(
               children: [
-                Icon(Icons.article_outlined, size: 48, color: AppColors.textGrey),
+                Icon(
+                  Icons.article_outlined,
+                  size: 48,
+                  color: AppColors.textGrey,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'No posts yet',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textGrey),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textGrey,
+                  ),
                 ),
               ],
             ),
@@ -2384,7 +2392,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _posts.length > 6 ? 6 : _posts.length,
+            itemCount: _posts.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final post = _posts[index];
@@ -2409,7 +2417,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     setState(() {
                       final index = _posts.indexWhere((p) => p.id == post.id);
                       if (index != -1) {
-                        _posts[index] = _posts[index].copyWith(isBookmarked: bookmarked);
+                        _posts[index] = _posts[index].copyWith(
+                          isBookmarked: bookmarked,
+                        );
                       }
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -2430,7 +2440,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                   final result = await PostService.togglePostHide(post.id);
                   if (result['success'] == true && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result['message'] ?? 'Action successful')),
+                      SnackBar(
+                        content: Text(result['message'] ?? 'Action successful'),
+                      ),
                     );
                     _loadRoleSpecificContent(_user!);
                   }
@@ -2442,9 +2454,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
                     builder: (context) => TikTokShareWidget(
                       postId: post.id,
                       postContent: post.content,
-                      postImageUrl: (post.imageUrl?.isNotEmpty == true) ? post.imageUrl : null,
+                      postImageUrl: (post.imageUrl?.isNotEmpty == true)
+                          ? post.imageUrl
+                          : null,
                     ),
                   );
+                },
+                onCommentsUpdated: () async {
+                  await _loadRoleSpecificContent(_user!);
                 },
               );
             },
@@ -2461,14 +2478,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   List<String> _extractSpecialties() {
     // Use the user's specialites_activites field from backend
     final specialtiesRaw = _userData?['specialites_activites'] as List? ?? [];
-    
+
     final specialties = specialtiesRaw
         .map((e) => e.toString().trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    
+
     debugPrint('Specialties from user data: $specialties');
-    
+
     // If no specialties in user data, fallback to extracting from activities
     if (specialties.isEmpty) {
       final activitySpecialties = <String>{};
@@ -2485,16 +2502,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       }
       return activitySpecialties.take(8).toList();
     }
-    
+
     return specialties.take(8).toList();
   }
 
   String _getCountryFlag(String country) {
     if (country.isEmpty) return '🌍';
-    
+
     // Clean the country name - remove extra spaces and lowercase
     final cleanCountry = country.trim().toLowerCase();
-    
+
     // Common country codes to flag emojis
     final countryFlags = {
       // Tunisia variations
@@ -2750,17 +2767,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       'north korea': '🇰🇵',
       'coree du nord': '🇰🇵',
     };
-    
+
     final flag = countryFlags[cleanCountry];
     if (flag != null) return flag;
-    
+
     // Try to find partial match (e.g., "Tunisian" contains "tunisia")
     for (final entry in countryFlags.entries) {
-      if (cleanCountry.contains(entry.key) || entry.key.contains(cleanCountry)) {
+      if (cleanCountry.contains(entry.key) ||
+          entry.key.contains(cleanCountry)) {
         return entry.value;
       }
     }
-    
+
     debugPrint('No flag found for country: $country');
     return '🌍';
   }
@@ -2769,7 +2787,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     debugPrint('🔍 DEBUG: Formatting last seen: $lastSeen');
     final now = DateTime.now();
     final difference = now.difference(lastSeen);
-    debugPrint('🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m');
+    debugPrint(
+      '🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m',
+    );
 
     if (difference.inDays > 30) {
       return '${lastSeen.day}/${lastSeen.month}/${lastSeen.year}';
@@ -2790,12 +2810,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
   String _formatLastActive(DateTime lastActiveAt) {
     debugPrint('🔍 DEBUG: Formatting last active: $lastActiveAt');
-    
+
     // Convert to local time for proper timezone handling
     final localLastActive = lastActiveAt.toLocal();
     final now = DateTime.now();
     final difference = now.difference(localLastActive);
-    debugPrint('🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m');
+    debugPrint(
+      '🔍 DEBUG: Time difference: ${difference.inDays}d, ${difference.inHours}h, ${difference.inMinutes}m',
+    );
 
     if (difference.inDays > 30) {
       return '${localLastActive.day}/${localLastActive.month}/${localLastActive.year}';
@@ -2817,7 +2839,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
   Future<void> _checkIfAdmin() async {
     try {
       final currentUser = await AuthService.getUser();
-      _isAdmin = currentUser?['userType'] == 'Admin' || currentUser?['isAdmin'] == true;
+      _isAdmin =
+          currentUser?['userType'] == 'Admin' ||
+          currentUser?['isAdmin'] == true;
       debugPrint('🔐 User is admin: $_isAdmin');
     } catch (e) {
       debugPrint('Error checking admin status: $e');
@@ -2838,15 +2862,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
 
     debugPrint('📍 Starting real-time location updates for admin');
     _locationUpdateTimer?.cancel();
-    
-    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (
+      timer,
+    ) async {
       await _updateRealTimeLocation();
     });
   }
 
   Future<void> _updateRealTimeLocation() async {
     if (!_isAdmin) return;
-    
+
     try {
       // Check location permissions
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -2872,8 +2898,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
         timeLimit: const Duration(seconds: 10),
       );
 
-      final newLocation = await _getCountryFromCoordinates(position.latitude, position.longitude);
-      
+      final newLocation = await _getCountryFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
       if (newLocation != _currentLocation && mounted) {
         setState(() {
           _currentLocation = newLocation;
@@ -2885,20 +2914,23 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
     }
   }
 
-  Future<String> _getCountryFromCoordinates(double latitude, double longitude) async {
+  Future<String> _getCountryFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     // For demo purposes, return Tunisia for admins
     // In production, you'd use a reverse geocoding service
     // like geocoding package or Google Maps Geocoding API
-    
+
     try {
       // Simulate API call delay
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // For now, always return Tunisia for admin demo
       // In real implementation:
       // List<Placemark> placemarks = await Geocoding.placemarkFromCoordinates(latitude, longitude);
       // return placemarks.first.country ?? 'Unknown';
-      
+
       return 'Tunisia';
     } catch (e) {
       debugPrint('Error getting country from coordinates: $e');
@@ -2916,9 +2948,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with WidgetsB
       // import 'package:geolocator/geolocator.dart';
       // Position position = await Geolocator.getCurrentPosition();
       // return await _getCountryFromCoordinates(position.latitude, position.longitude);
-      
+
       // For now, return stored location with real-time fetching simulation
-      await Future.delayed(const Duration(milliseconds: 500)); // Simulate API call
+      await Future.delayed(
+        const Duration(milliseconds: 500),
+      ); // Simulate API call
       return _userData?['pays_origine']?.toString() ?? 'Unknown';
     } catch (e) {
       debugPrint('Error fetching real-time location: $e');
@@ -2964,7 +2998,9 @@ class _StatItem extends StatelessWidget {
             Icon(
               showStar ? Icons.star_rounded : icon,
               size: 12,
-              color: showStar ? const Color(0xFFFFB31B) : const Color(0xFF94A3B8),
+              color: showStar
+                  ? const Color(0xFFFFB31B)
+                  : const Color(0xFF94A3B8),
             ),
             const SizedBox(width: 4),
             Text(
@@ -2995,7 +3031,9 @@ class _SpecialtyChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF4B63FF).withOpacity(0.05),
@@ -3029,7 +3067,9 @@ class _LanguageChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFFFB31B).withOpacity(0.05),
@@ -3063,7 +3103,9 @@ class _InterestChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF22C55E).withOpacity(0.05),
@@ -3170,16 +3212,20 @@ class _ActivityCardState extends State<_ActivityCard> {
                               });
                             },
                             itemBuilder: (context, index) {
-                              final resolvedUrl = _resolveImageUrl(photos[index]);
+                              final resolvedUrl = _resolveImageUrl(
+                                photos[index],
+                              );
                               return CachedNetworkImage(
                                 imageUrl: resolvedUrl,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: AppColors.outline,
-                                ),
+                                placeholder: (_, __) =>
+                                    Container(color: AppColors.outline),
                                 errorWidget: (_, __, ___) => Container(
                                   color: AppColors.outline,
-                                  child: Icon(Icons.image, color: AppColors.textGrey),
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               );
                             },
@@ -3197,7 +3243,9 @@ class _ActivityCardState extends State<_ActivityCard> {
                                   (index) => Container(
                                     width: 6,
                                     height: 6,
-                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: _currentImageIndex == index
@@ -3214,7 +3262,10 @@ class _ActivityCardState extends State<_ActivityCard> {
                               top: 8,
                               right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.black.withOpacity(0.6),
                                   borderRadius: BorderRadius.circular(12),
@@ -3248,7 +3299,11 @@ class _ActivityCardState extends State<_ActivityCard> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 14, color: AppColors.textGrey),
+                      Icon(
+                        Icons.location_on,
+                        size: 14,
+                        color: AppColors.textGrey,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -3356,7 +3411,8 @@ class _ReviewCard extends StatelessWidget {
       return '$serverUrl/$avatar';
     }
     if (fallbackAvatar != null && fallbackAvatar!.isNotEmpty) {
-      if (fallbackAvatar!.startsWith('http://') || fallbackAvatar!.startsWith('https://')) {
+      if (fallbackAvatar!.startsWith('http://') ||
+          fallbackAvatar!.startsWith('https://')) {
         return fallbackAvatar!;
       }
       final serverUrl = ApiClient.baseUrl.replaceFirst(
@@ -3480,10 +3536,7 @@ class _ReviewCard extends StatelessWidget {
           // Review text
           Text(
             reviewText,
-            style: AppTextStyles.bodyMedium.copyWith(
-              height: 1.4,
-              fontSize: 13,
-            ),
+            style: AppTextStyles.bodyMedium.copyWith(height: 1.4, fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -3495,7 +3548,10 @@ class _ReviewCard extends StatelessWidget {
               runSpacing: 6,
               children: tags.take(2).map((tag) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryLight.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -3517,7 +3573,6 @@ class _ReviewCard extends StatelessWidget {
     );
   }
 }
-
 
 class _EditReviewDialog extends StatefulWidget {
   final String reviewId;
@@ -3656,7 +3711,9 @@ class _PostCard extends StatelessWidget {
           // Image or placeholder
           if (imageUrl.isNotEmpty)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
                 child: CachedNetworkImage(
@@ -3664,14 +3721,15 @@ class _PostCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(
                     color: AppColors.outline,
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
                   errorWidget: (_, __, ___) => Container(
                     color: AppColors.outline,
                     child: const Center(
-                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                 ),

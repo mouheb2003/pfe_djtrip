@@ -7,7 +7,6 @@ const {
   toggleEmailNotification,
   toggleAllPushNotifications,
   toggleAllEmailNotifications,
-  setQuietHours,
   updateDeviceSettings,
 } = require('../controllers/notificationPreferences');
 const { verifyToken } = require('../middleware/auth');
@@ -33,8 +32,6 @@ router.put('/preferences/all-push', toggleAllPushNotifications);
 // PUT /notifications/preferences/all-email - Toggle all email notifications
 router.put('/preferences/all-email', toggleAllEmailNotifications);
 
-// PUT /notifications/preferences/quiet-hours - Set quiet hours
-router.put('/preferences/quiet-hours', setQuietHours);
 
 // PUT /notifications/preferences/device/:device - Update device settings
 router.put('/preferences/device/:device', updateDeviceSettings);

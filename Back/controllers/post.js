@@ -94,6 +94,23 @@ exports.getPublicUserPosts = async (req, res) => {
     const { userId } = req.params;
     const currentUserId = req.user.userId;
 
+    // Mutual block check
+    if (currentUserId && userId) {
+      const isBlocked = await User.findOne({
+        $or: [
+          { _id: currentUserId, blockedUsers: userId },
+          { _id: userId, blockedUsers: currentUserId }
+        ]
+      });
+      if (isBlocked) {
+        return res.json({
+          success: true,
+          count: 0,
+          posts: []
+        });
+      }
+    }
+
     // Find posts where user is author OR mentioned
     // BUT exclude posts that the USER (profile owner) has hidden from their profile
     const posts = await Post.find({
@@ -279,7 +296,34 @@ exports.createPost = async (req, res) => {
 exports.getFeedPosts = async (req, res) => {
   try {
     const currentUserId = req.user?.userId || null;
-    const posts = await Post.find({ is_active: true })
+    let excludeUserIds = [];
+
+    if (currentUserId) {
+      // 1. Get blocked and muted users
+      const currentUser = await User.findById(currentUserId).select("blockedUsers mutedUsers").lean();
+      if (currentUser) {
+        if (currentUser.blockedUsers) {
+          excludeUserIds = excludeUserIds.concat(currentUser.blockedUsers.map(id => id.toString()));
+        }
+        if (currentUser.mutedUsers) {
+          excludeUserIds = excludeUserIds.concat(currentUser.mutedUsers.map(id => id.toString()));
+        }
+      }
+
+      // 2. Get users who blocked the current user
+      const usersWhoBlockedMe = await User.find({ blockedUsers: currentUserId }).select("_id").lean();
+      excludeUserIds = excludeUserIds.concat(usersWhoBlockedMe.map(u => u._id.toString()));
+    }
+
+    // Deduplicate
+    excludeUserIds = [...new Set(excludeUserIds)];
+
+    const query = { is_active: true };
+    if (excludeUserIds.length > 0) {
+      query.author_id = { $nin: excludeUserIds };
+    }
+
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .limit(100)
       .populate(basePopulate)
@@ -690,9 +734,25 @@ exports.togglePostLike = async (req, res) => {
             reactorName: reactor?.fullname || 'Someone',
             postId: String(post._id),
             reactionType: reactionType,
+            postMentions: post.mentions || [], // pass the people mentioned in the post
           });
         } catch (notifError) {
           console.error('Error emitting post reaction notification:', notifError);
+        }
+      } else if (post.mentions && post.mentions.length > 0) {
+        // If author reacts to their own post, still notify mentioned users
+        try {
+          const reactor = await User.findById(userId).select('fullname');
+          notificationEventBus.emitPostReaction({
+            postOwnerId: post.author_id,
+            reactorName: reactor?.fullname || 'Someone',
+            postId: String(post._id),
+            reactionType: reactionType,
+            postMentions: post.mentions || [],
+            isSelfReaction: true,
+          });
+        } catch (notifError) {
+          console.error('Error emitting post reaction notification for mentions:', notifError);
         }
       }
     } else {

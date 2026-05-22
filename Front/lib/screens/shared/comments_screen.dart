@@ -11,6 +11,7 @@ import '../../../services/auth_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/time_ago.dart';
 import '../../../widgets/mention_autocomplete.dart';
+import 'public_profile_screen.dart';
 
 class CommentsScreen extends StatefulWidget {
   final String postId;
@@ -1029,14 +1030,20 @@ class _CommentsScreenState extends State<CommentsScreen>
                                 color: Color(0xFF4B63FF),
                               ),
                             )
-                          : IconButton(
-                              onPressed: _commentController.text.trim().isEmpty
-                                  ? null
-                                  : _postComment,
-                              icon: const Icon(
-                                Icons.send,
-                                color: Color(0xFF4B63FF),
-                              ),
+                          : ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _commentController,
+                              builder: (context, value, child) {
+                                final hasText = value.text.trim().isNotEmpty;
+                                return IconButton(
+                                  onPressed: hasText ? _postComment : null,
+                                  icon: Icon(
+                                    Icons.send,
+                                    color: hasText 
+                                        ? const Color(0xFF4B63FF) 
+                                        : Colors.grey[400],
+                                  ),
+                                );
+                              },
                             ),
                     ],
                   ),
@@ -1130,15 +1137,25 @@ class _CommentsScreenState extends State<CommentsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Avatar
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: const Color(0xFFE8E5FF),
-            backgroundImage: post.authorAvatar?.isNotEmpty == true
-                ? NetworkImage(post.authorAvatar!)
-                : null,
-            child: post.authorAvatar?.isEmpty != false
-                ? const Icon(Icons.person, color: Color(0xFF4B63FF), size: 20)
-                : null,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PublicProfileScreen(userId: post.authorId),
+                ),
+              );
+            },
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFFE8E5FF),
+              backgroundImage: post.authorAvatar?.isNotEmpty == true
+                  ? NetworkImage(post.authorAvatar!)
+                  : null,
+              child: post.authorAvatar?.isEmpty != false
+                  ? const Icon(Icons.person, color: Color(0xFF4B63FF), size: 20)
+                  : null,
+            ),
           ),
           const SizedBox(width: 12),
 
@@ -1395,19 +1412,29 @@ class _CommentTreeState extends State<_CommentTree> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Avatar
-              CircleAvatar(
-                radius: avatarSize,
-                backgroundColor: const Color(0xFFE8E5FF),
-                backgroundImage: widget.comment.authorAvatar?.isNotEmpty == true
-                    ? NetworkImage(widget.comment.authorAvatar!)
-                    : null,
-                child: widget.comment.authorAvatar?.isEmpty != false
-                    ? Icon(
-                        Icons.person,
-                        color: const Color(0xFF4B63FF),
-                        size: avatarSize,
-                      )
-                    : null,
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PublicProfileScreen(userId: widget.comment.authorId),
+                    ),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: avatarSize,
+                  backgroundColor: const Color(0xFFE8E5FF),
+                  backgroundImage: widget.comment.authorAvatar?.isNotEmpty == true
+                      ? NetworkImage(widget.comment.authorAvatar!)
+                      : null,
+                  child: widget.comment.authorAvatar?.isEmpty != false
+                      ? Icon(
+                          Icons.person,
+                          color: const Color(0xFF4B63FF),
+                          size: avatarSize,
+                        )
+                      : null,
+                ),
               ),
               const SizedBox(width: 12),
 

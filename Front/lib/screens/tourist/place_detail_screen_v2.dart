@@ -8,7 +8,9 @@ import '../../services/auth_service.dart';
 import '../../services/lieu_service.dart';
 import '../../services/review_service.dart';
 import '../../services/place_service.dart';
+import '../../services/ai_text_service.dart';
 import '../../utils/snackbar_utils.dart';
+import '../../widgets/ai_text_widgets.dart';
 import 'view_all_places_screen.dart';
 import '../shared/activity_detail_screen.dart';
 import '../shared/bookmarked_items_screen.dart';
@@ -42,6 +44,15 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
   Map<String, dynamic> _placeData = const {};
   String _currentUserId = '';
   String _currentUserDisplayName = '';
+
+  // ── Translation state ─────────────────────────────────────────────────────
+  String? _shortDescTranslated;
+  String? _shortDescLang;
+  bool _isTranslatingShort = false;
+
+  String? _longDescTranslated;
+  String? _longDescLang;
+  bool _isTranslatingLong = false;
 
   Map<String, dynamic> get _place {
     if (_placeData.isNotEmpty) return _placeData;
@@ -821,6 +832,61 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
     return id;
   }
 
+  // ── Translation helpers ───────────────────────────────────────────────────
+
+  void _showTranslationMenu({
+    required bool isLong,
+    required String originalText,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => LanguageSelectorBottomSheet(
+        onLanguageSelected: (lang) =>
+            isLong ? _translateLong(lang, originalText) : _translateShort(lang, originalText),
+      ),
+    );
+  }
+
+  Future<void> _translateShort(String lang, String text) async {
+    if (_isTranslatingShort) return;
+    setState(() => _isTranslatingShort = true);
+    try {
+      final result = await AiTextService.translateText(text, lang);
+      if (!mounted) return;
+      if (result['success'] == true) {
+        setState(() {
+          _shortDescTranslated = result['result'];
+          _shortDescLang = lang;
+        });
+      } else {
+        if (mounted) SnackbarUtils.showError(context, result['error'] ?? 'Translation failed');
+      }
+    } finally {
+      if (mounted) setState(() => _isTranslatingShort = false);
+    }
+  }
+
+  Future<void> _translateLong(String lang, String text) async {
+    if (_isTranslatingLong) return;
+    setState(() => _isTranslatingLong = true);
+    try {
+      final result = await AiTextService.translateText(text, lang);
+      if (!mounted) return;
+      if (result['success'] == true) {
+        setState(() {
+          _longDescTranslated = result['result'];
+          _longDescLang = lang;
+        });
+      } else {
+        if (mounted) SnackbarUtils.showError(context, result['error'] ?? 'Translation failed');
+      }
+    } finally {
+      if (mounted) setState(() => _isTranslatingLong = false);
+    }
+  }
+
   Future<void> _toggleSave() async {
     final placeId = _reviewLieuId;
     if (placeId.isEmpty) {
@@ -1214,9 +1280,9 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                         ],
                                       ),
                                       const SizedBox(height: 12),
-                                      if (shortDescription.isNotEmpty)
+                                      if (shortDescription.isNotEmpty) ...[
                                         Text(
-                                          shortDescription,
+                                          _shortDescTranslated ?? shortDescription,
                                           style: const TextStyle(
                                             color: Colors.white70,
                                             fontSize: 13,
@@ -1225,28 +1291,86 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                                           maxLines: _showFull ? null : 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                      if (shortDescription.isNotEmpty)
-                                        TextButton(
-                                          onPressed: () => setState(
-                                            () => _showFull = !_showFull,
-                                          ),
-                                          style: TextButton.styleFrom(
-                                            padding: EdgeInsets.zero,
-                                            minimumSize: Size.zero,
-                                            tapTargetSize: MaterialTapTargetSize
-                                                .shrinkWrap,
-                                          ),
-                                          child: Text(
-                                            _showFull
-                                                ? 'Show less'
-                                                : 'Show more',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () => setState(
+                                                () => _showFull = !_showFull,
+                                              ),
+                                              style: TextButton.styleFrom(
+                                                padding: EdgeInsets.zero,
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              child: Text(
+                                                _showFull ? 'Show less' : 'Show more',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
                                             ),
-                                          ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (_isTranslatingShort)
+                                                  const SizedBox(
+                                                    width: 14,
+                                                    height: 14,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white70,
+                                                    ),
+                                                  )
+                                                else ...[
+                                                  if (_shortDescTranslated != null) ...[
+                                                    IconButton(
+                                                      icon: const Icon(
+                                                        Icons.undo,
+                                                        color: Colors.white70,
+                                                        size: 16,
+                                                      ),
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(),
+                                                      onPressed: () => setState(() {
+                                                        _shortDescTranslated = null;
+                                                        _shortDescLang = null;
+                                                      }),
+                                                      tooltip: 'Show original',
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.translate,
+                                                      color: Colors.white70,
+                                                      size: 16,
+                                                    ),
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(),
+                                                    onPressed: () => _translateShort('en', shortDescription),
+                                                    tooltip: 'Translate',
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.more_vert,
+                                                      color: Colors.white70,
+                                                      size: 16,
+                                                    ),
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(),
+                                                    onPressed: () => _showTranslationMenu(isLong: false, originalText: shortDescription),
+                                                    tooltip: 'Choose language',
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
                                         ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -1343,17 +1467,72 @@ class _PlaceDetailScreenV2State extends State<PlaceDetailScreenV2> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Long description',
-                            style: TextStyle(
-                              color: textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Long description',
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isTranslatingLong)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  else ...[
+                                    if (_longDescTranslated != null) ...[
+                                      Text(
+                                        _longDescLang?.toUpperCase() ?? '',
+                                        style: TextStyle(
+                                          color: textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      IconButton(
+                                        icon: const Icon(Icons.undo, color: AppColors.primary, size: 20),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        onPressed: () => setState(() {
+                                          _longDescTranslated = null;
+                                          _longDescLang = null;
+                                        }),
+                                        tooltip: 'Show original',
+                                      ),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    IconButton(
+                                      icon: const Icon(Icons.translate, color: AppColors.primary, size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _translateLong('en', description),
+                                      tooltip: 'Translate',
+                                    ),
+                                    const SizedBox(width: 10),
+                                    IconButton(
+                                      icon: const Icon(Icons.more_vert, color: AppColors.primary, size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showTranslationMenu(isLong: true, originalText: description),
+                                      tooltip: 'Choose language',
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            description,
+                            _longDescTranslated ?? description,
                             style: const TextStyle(
                               color: Color(0xFF6B7280),
                               height: 1.5,

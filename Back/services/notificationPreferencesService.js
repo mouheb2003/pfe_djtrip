@@ -56,20 +56,6 @@ async function toggleAllEmailNotifications(userId, enabled) {
 }
 
 /**
- * Set quiet hours
- */
-async function setQuietHours(userId, { enabled, start, end, timezone }) {
-  return await NotificationPreference.updateUserPreferences(userId, {
-    quiet_hours: {
-      enabled,
-      start: start || '22:00',
-      end: end || '08:00',
-      timezone: timezone || 'UTC',
-    },
-  });
-}
-
-/**
  * Update device settings
  */
 async function updateDeviceSettings(userId, device, settings) {

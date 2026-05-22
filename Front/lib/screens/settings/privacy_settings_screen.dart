@@ -30,6 +30,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   bool _allowPhoneCalls = true;
   bool _allowLocationSharing = false;
   bool _allowDataAnalytics = false;
+  bool _showRelations = true;
   
   // Local cache to prevent reset when re-entering screen
   Map<String, bool>? _localPrivacySettings;
@@ -98,6 +99,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     _showPhone = settings['showPhone'] ?? settings['show_phone'] ?? false;
     _showEmail = settings['showEmail'] ?? settings['show_email'] ?? false;
     _allowPhoneCalls = settings['allowPhoneCalls'] ?? settings['allow_phone_calls'] ?? true;
+    _allowLocationSharing = settings['allowLocationSharing'] ?? settings['allow_location_sharing'] ?? false;
+    _allowDataAnalytics = settings['allowDataAnalytics'] ?? settings['allow_data_analytics'] ?? false;
+    _showRelations = settings['showRelations'] ?? settings['show_relations'] ?? true;
     _allowLocationSharing = settings['allowLocationSharing'] ?? settings['allow_location_sharing'] ?? false;
     _allowDataAnalytics = settings['allowDataAnalytics'] ?? settings['allow_data_analytics'] ?? false;
   }
@@ -250,6 +254,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         'allow_phone_calls': _allowPhoneCalls,
         'allow_location_sharing': _allowLocationSharing,
         'allow_data_analytics': _allowDataAnalytics,
+        'showRelations': _showRelations,
       };
       await _saveLocalPrivacySettings(currentSettings);
       
@@ -283,6 +288,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               break;
             case 'allow_data_analytics':
               _allowDataAnalytics = !value;
+              break;
+            case 'showRelations':
+              _showRelations = !value;
               break;
           }
         });
@@ -387,6 +395,14 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             ),
             const SizedBox(height: 8),
             _buildPrivacyCard(
+              icon: Icons.people_outline,
+              title: 'Show Follower/Following',
+              subtitle: 'Allow others to see your connections',
+              value: _showRelations,
+              onChanged: (value) => _updatePrivacySetting('showRelations', value),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyCard(
               icon: Icons.phone,
               title: 'Show Phone Number',
               subtitle: 'Display your phone number on your profile',
@@ -409,6 +425,35 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               value: _allowPhoneCalls,
               onChanged: (value) =>
                   _updatePrivacySetting('allow_phone_calls', value),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Privacy Lists Section
+            _buildSectionHeader('Privacy Lists'),
+            const SizedBox(height: 12),
+            _buildPrivacyListTile(
+              icon: Icons.block,
+              title: 'Blocked Users',
+              subtitle: 'Manage users you have blocked',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyListScreen(type: PrivacyListType.blocked),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildPrivacyListTile(
+              icon: Icons.volume_off,
+              title: 'Muted Users',
+              subtitle: 'Manage users you have muted',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyListScreen(type: PrivacyListType.muted),
+                ),
+              ),
             ),
 
             const SizedBox(height: 24),
@@ -840,5 +885,259 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Widget _buildPrivacyListTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8E5FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFF4B63FF), size: 22),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E225E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum PrivacyListType { blocked, muted }
+
+class PrivacyListScreen extends StatefulWidget {
+  final PrivacyListType type;
+
+  const PrivacyListScreen({super.key, required this.type});
+
+  @override
+  State<PrivacyListScreen> createState() => _PrivacyListScreenState();
+}
+
+class _PrivacyListScreenState extends State<PrivacyListScreen> {
+  List<Map<String, dynamic>> _users = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadList();
+  }
+
+  Future<void> _loadList() async {
+    setState(() => _isLoading = true);
+    final result = await UserService.getBlockedAndMutedUsers();
+    if (mounted) {
+      setState(() {
+        if (widget.type == PrivacyListType.blocked) {
+          _users = List<Map<String, dynamic>>.from(result['blockedUsers'] ?? []);
+        } else {
+          _users = List<Map<String, dynamic>>.from(result['mutedUsers'] ?? []);
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handleAction(String userId) async {
+    bool success = false;
+    if (widget.type == PrivacyListType.blocked) {
+      success = await UserService.unblockUser(userId);
+    } else {
+      success = await UserService.unmuteUser(userId);
+    }
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.type == PrivacyListType.blocked
+                ? 'User unblocked successfully'
+                : 'User unmuted successfully',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _loadList();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Operation failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.type == PrivacyListType.blocked ? 'Blocked Users' : 'Muted Users';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FF),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _users.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        widget.type == PrivacyListType.blocked
+                            ? Icons.block
+                            : Icons.volume_off,
+                        size: 64,
+                        color: Colors.grey[300],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No ${title.toLowerCase()} yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) {
+                    final user = _users[index];
+                    final fullname = user['fullname']?.toString() ?? 'User';
+                    final avatar = user['avatar']?.toString() ?? '';
+                    final userId = user['_id']?.toString() ?? user['id']?.toString() ?? '';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                            backgroundColor: const Color(0xFFE8E5FF),
+                            child: avatar.isEmpty
+                                ? const Icon(Icons.person, color: Color(0xFF4B63FF))
+                                : null,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              fullname,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E225E),
+                              ),
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => _handleAction(userId),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: widget.type == PrivacyListType.blocked
+                                  ? const Color(0xFFEFF6FF)
+                                  : const Color(0xFFECFDF5),
+                              foregroundColor: widget.type == PrivacyListType.blocked
+                                  ? const Color(0xFF2563EB)
+                                  : const Color(0xFF059669),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            child: Text(
+                              widget.type == PrivacyListType.blocked ? 'Unblock' : 'Unmute',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+    );
   }
 }

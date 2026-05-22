@@ -96,7 +96,7 @@ app.disable("x-powered-by");
 // 🤖 AI Chatbot Proxy (For Render deployment)
 // Routes all requests from /chatbot/* to the AI service on port 3001
 app.use('/chatbot', createProxyMiddleware({
-  target: 'http://localhost:3001',
+  target: 'http://127.0.0.1:3001',
   changeOrigin: true,
   pathRewrite: {
     '^/chatbot': '', // Remove /chatbot prefix

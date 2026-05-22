@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import '../../../models/user_model.dart';
 import '../../../models/post_model.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/post_service.dart';
 import '../../../widgets/facebook_mentions_inline_widget.dart';
@@ -25,6 +26,7 @@ import '../../shared/public_profile_screen.dart';
 import '../../shared/bookmarked_items_screen.dart';
 import '../../../widgets/publication_card.dart';
 import '../../../providers/user_provider.dart';
+import '../../../services/follow_service.dart';
 import 'create_post_screen.dart';
 
 class ScreenNetwork extends StatefulWidget {
@@ -55,17 +57,39 @@ class _ScreenNetworkState extends State<ScreenNetwork>
   final Map<String, _LocalLikeState> _localLikeStateByPost = {};
   final Map<String, _LocalBookmarkState> _localBookmarkStateByPost = {};
   _FeedFilter _activeFilter = _FeedFilter.allPosts;
+  Set<String> _followingIds = {};
 
   List<Map<String, dynamic>> get _visiblePosts {
     var result = List<Map<String, dynamic>>.from(_posts);
 
     switch (_activeFilter) {
       case _FeedFilter.allPosts:
+        // Sort: followed users first, then by most recent
+        result.sort((a, b) {
+          final aAuthorId = _extractAuthorId(a);
+          final bAuthorId = _extractAuthorId(b);
+          final aFollowed = _followingIds.contains(aAuthorId);
+          final bFollowed = _followingIds.contains(bAuthorId);
+          
+          if (aFollowed && !bFollowed) return -1;
+          if (!aFollowed && bFollowed) return 1;
+          
+          // Within same group, sort by most recent
+          final aTime = DateTime.tryParse(a['createdAt']?.toString() ?? a['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = DateTime.tryParse(b['createdAt']?.toString() ?? b['created_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bTime.compareTo(aTime);
+        });
         return result;
       case _FeedFilter.myPosts:
         return result.where((post) {
           final authorId = _extractAuthorId(post);
-          return authorId == _currentUserId;
+          // Hide post if currentUserId is in hidden_from_profiles
+          final hiddenProfiles = (post['hidden_from_profiles'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          if (hiddenProfiles.contains(_currentUserId)) {
+            return false;
+          }
+          final mentions = (post['mentions'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          return authorId == _currentUserId || (_currentUserId.isNotEmpty && mentions.contains(_currentUserId));
         }).toList();
       case _FeedFilter.trending:
         result.sort((a, b) {
@@ -173,7 +197,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
   }
 
   String _extractAuthorId(Map<String, dynamic> post) {
-    final author = post['author_id'];
+    final author = post['author'] ?? post['author_id'] ?? post['user_id'];
     if (author is Map<String, dynamic>) {
       return (author['_id'] ?? author['id'] ?? '').toString();
     }
@@ -193,17 +217,28 @@ class _ScreenNetworkState extends State<ScreenNetwork>
     );
   }
 
-  void _muteAuthor(Map<String, dynamic> post) {
+  void _muteAuthor(Map<String, dynamic> post) async {
     if (!mounted) return;
     final authorId = _extractAuthorId(post);
     if (authorId.isEmpty) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Author muted successfully'),
-        backgroundColor: Color(0xFF22C55E),
-      ),
-    );
+    final success = await UserService.muteUser(authorId);
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Author muted successfully'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+      _loadFeed(); // Reload feed to filter out muted author's posts
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to mute author'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showFilterBottomSheet() {
@@ -365,9 +400,12 @@ class _ScreenNetworkState extends State<ScreenNetwork>
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final userId = userProvider.user is Map
+      var userId = userProvider.user is Map
           ? (userProvider.user as Map)['_id']?.toString() ?? ''
           : (userProvider.user as UserModel?)?.id ?? '';
+      if (userId.isEmpty && AuthService.currentUser != null) {
+        userId = AuthService.currentUser?['_id']?.toString() ?? AuthService.currentUser?['id']?.toString() ?? '';
+      }
       _currentUserId = userId;
 
       final posts = await PostService.getFeedPosts();
@@ -388,6 +426,12 @@ class _ScreenNetworkState extends State<ScreenNetwork>
             .toList();
         _loading = false;
       });
+
+      // Fetch following list for feed sorting
+      if (userId.isNotEmpty) {
+        final followingList = await FollowService.getFollowingList(userId);
+        _followingIds = followingList.map((u) => (u['_id'] ?? u['id'] ?? '').toString()).toSet();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -421,6 +465,9 @@ class _ScreenNetworkState extends State<ScreenNetwork>
     _scrollController.addListener(_handleScroll);
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabChange);
+    if (widget.showOnlyMyPosts) {
+      _activeFilter = _FeedFilter.myPosts;
+    }
     _loadFeed();
   }
 
@@ -436,9 +483,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FC),
-      body: Stack(
-        children: [
-          RefreshIndicator(
+      body: RefreshIndicator(
         onRefresh: _refreshFeed,
         color: AppColors.primary,
         child: CustomScrollView(
@@ -836,55 +881,62 @@ class _ScreenNetworkState extends State<ScreenNetwork>
                       if (result['success'] == true && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(result['message'] ?? 'Post hidden from profile'),
+                            content: Text(result['message'] ?? 'Post updated'),
                             backgroundColor: AppColors.primary,
                           ),
                         );
-                        // Refresh to reflect changes if we are in "My Posts" filter
-                        if (_activeFilter == _FeedFilter.myPosts) {
-                          _refreshFeed();
-                        }
+                        setState(() {
+                          final idx = _posts.indexWhere((p) => (p['_id']?.toString() ?? '') == postId);
+                          if (idx != -1) {
+                            final list = List<String>.from(_posts[idx]['hidden_from_profiles'] ?? []);
+                            if (list.contains(_currentUserId)) {
+                              list.remove(_currentUserId);
+                            } else {
+                              list.add(_currentUserId);
+                            }
+                            _posts[idx]['hidden_from_profiles'] = list;
+                          }
+                        });
                       }
                     },
                   );
                 }, childCount: _visiblePosts.length),
               ),
+            const SliverToBoxAdapter(child: SizedBox(height: 200)),
           ],
         ),
       ),
-          Positioned(
-            top: 220,
-            right: 16,
-            child: FloatingActionButton(
-              onPressed: () async {
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                final userModel = userProvider.user is Map
-                    ? UserModel(
-                        id: (userProvider.user as Map)['_id']?.toString() ?? '',
-                        fullname: (userProvider.user as Map)['fullname']?.toString() ?? 'User',
-                        email: (userProvider.user as Map)['email']?.toString() ?? '',
-                        avatar: (userProvider.user as Map)['avatar']?.toString(),
-                        userType: (userProvider.user as Map)['userType']?.toString() ?? 'Touriste',
-                      )
-                    : (userProvider.user as UserModel?);
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100.0),
+        child: FloatingActionButton(
+          heroTag: null,
+          onPressed: () async {
+            final userProvider = Provider.of<UserProvider>(context, listen: false);
+            final userModel = userProvider.user is Map
+                ? UserModel(
+                    id: (userProvider.user as Map)['_id']?.toString() ?? '',
+                    fullname: (userProvider.user as Map)['fullname']?.toString() ?? 'User',
+                    email: (userProvider.user as Map)['email']?.toString() ?? '',
+                    avatar: (userProvider.user as Map)['avatar']?.toString(),
+                    userType: (userProvider.user as Map)['userType']?.toString() ?? 'Touriste',
+                  )
+                : (userProvider.user as UserModel?);
 
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CreatePostScreen(
-                      user: userModel,
-                    ),
-                  ),
-                );
-                if (result == true) {
-                  _refreshFeed();
-                }
-              },
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
-          ),
-        ],
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CreatePostScreen(
+                  user: userModel,
+                ),
+              ),
+            );
+            if (result == true) {
+              _refreshFeed();
+            }
+          },
+          backgroundColor: AppColors.primary,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }

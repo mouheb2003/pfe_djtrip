@@ -64,7 +64,21 @@ exports.getUserNotifications = async (req, res) => {
     } = req.query;
 
     // Only allow fetching these notification types for display
-    const allowedTypes = ['message', 'approval', 'appeal', 'booking'];
+    const allowedTypes = [
+      'booking',
+      'message',
+      'review',
+      'system',
+      'appeal',
+      'activity',
+      'reminder',
+      'follow',
+      'profile',
+      'publication',
+      'reaction',
+      'comment',
+      'reply'
+    ];
     const queryType = type && allowedTypes.includes(type) ? type : null;
 
     const notifications = await Notification.getUserNotifications(userId, {

@@ -4,7 +4,8 @@ import '../../../services/notification_service.dart';
 import '../../../theme/app_theme.dart';
 
 class NotificationHistoryScreen extends StatefulWidget {
-  const NotificationHistoryScreen({super.key});
+  final bool isTab;
+  const NotificationHistoryScreen({super.key, this.isTab = false});
 
   @override
   State<NotificationHistoryScreen> createState() => _NotificationHistoryScreenState();
@@ -210,10 +211,13 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
             color: Color(0xFF1A1A2E),
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1A1A2E)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: !widget.isTab,
+        leading: widget.isTab
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1A1A2E)),
+                onPressed: () => Navigator.pop(context),
+              ),
         actions: [
           if (_unreadCount > 0)
             TextButton(

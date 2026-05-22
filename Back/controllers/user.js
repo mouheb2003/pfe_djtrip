@@ -2185,3 +2185,129 @@ exports.heartbeatForUser = async (req, res) => {
     });
   }
 };
+
+// Block User (POST /users/privacy/block/:targetId)
+exports.blockUser = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetId } = req.params;
+
+    if (userId === targetId) {
+      return res.status(400).json({ message: "You cannot block yourself" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { blockedUsers: targetId }
+    });
+
+    console.log(`🚫 [PRIVACY] User ${userId} blocked user ${targetId}`);
+    res.status(200).json({ success: true, message: "User blocked successfully" });
+  } catch (err) {
+    console.error("❌ Error blocking user:", err);
+    res.status(500).json({ message: "Error blocking user", error: err.message });
+  }
+};
+
+// Unblock User (POST /users/privacy/unblock/:targetId)
+exports.unblockUser = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetId } = req.params;
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { blockedUsers: targetId }
+    });
+
+    console.log(`🔓 [PRIVACY] User ${userId} unblocked user ${targetId}`);
+    res.status(200).json({ success: true, message: "User unblocked successfully" });
+  } catch (err) {
+    console.error("❌ Error unblocking user:", err);
+    res.status(500).json({ message: "Error unblocking user", error: err.message });
+  }
+};
+
+// Mute User (POST /users/privacy/mute/:targetId)
+exports.muteUser = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetId } = req.params;
+
+    if (userId === targetId) {
+      return res.status(400).json({ message: "You cannot mute yourself" });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { mutedUsers: targetId }
+    });
+
+    console.log(`🔇 [PRIVACY] User ${userId} muted user ${targetId}`);
+    res.status(200).json({ success: true, message: "User muted successfully" });
+  } catch (err) {
+    console.error("❌ Error muting user:", err);
+    res.status(500).json({ message: "Error muting user", error: err.message });
+  }
+};
+
+// Unmute User (POST /users/privacy/unmute/:targetId)
+exports.unmuteUser = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetId } = req.params;
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { mutedUsers: targetId }
+    });
+
+    console.log(`🔊 [PRIVACY] User ${userId} unmuted user ${targetId}`);
+    res.status(200).json({ success: true, message: "User unmuted successfully" });
+  } catch (err) {
+    console.error("❌ Error unmuting user:", err);
+    res.status(500).json({ message: "Error unmuting user", error: err.message });
+  }
+};
+
+// Get Blocked and Muted Users (GET /users/privacy/blocked-and-muted)
+exports.getBlockedAndMutedUsers = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId)
+      .populate("blockedUsers", "fullname avatar email userType")
+      .populate("mutedUsers", "fullname avatar email userType")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      blockedUsers: user.blockedUsers || [],
+      mutedUsers: user.mutedUsers || [],
+    });
+  } catch (err) {
+    console.error("❌ Error fetching blocked and muted users:", err);
+    res.status(500).json({ message: "Error fetching privacy lists", error: err.message });
+  }
+};
+
+// GET /users/admin
+exports.getAdminUser = async (req, res) => {
+  try {
+    const admin = await User.findOne({
+      userType: { $regex: /^admin$/i },
+      accountStatus: 'active'
+    }).select('fullname avatar email userType').lean();
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      admin: admin
+    });
+  } catch (err) {
+    console.error("❌ Error fetching admin user:", err);
+    res.status(500).json({ message: "Error fetching admin user", error: err.message });
+  }
+};

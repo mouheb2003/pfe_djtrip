@@ -20,6 +20,7 @@ class PostModel {
   final List<String> hashtags;
   final List<String> mentions;
   final String? audience;
+  final List<String> hiddenFromProfiles;
 
   const PostModel({
     required this.id,
@@ -43,6 +44,7 @@ class PostModel {
     this.hashtags = const [],
     this.mentions = const [],
     this.audience,
+    this.hiddenFromProfiles = const [],
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -84,6 +86,11 @@ class PostModel {
       mentionsList = (json['mentions'] as List).map((e) => e.toString()).toList();
     }
 
+    List<String> hiddenFromList = [];
+    if (json['hidden_from_profiles'] is List) {
+      hiddenFromList = (json['hidden_from_profiles'] as List).map((e) => e.toString()).toList();
+    }
+
     return PostModel(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       authorId: author['_id']?.toString() ?? author['id']?.toString() ?? '',
@@ -106,6 +113,7 @@ class PostModel {
       hashtags: hashtagsList,
       mentions: mentionsList,
       audience: json['audience']?.toString(),
+      hiddenFromProfiles: hiddenFromList,
     );
   }
 
@@ -135,6 +143,7 @@ class PostModel {
     bool? isVerified,
     List<String>? hashtags,
     String? audience,
+    List<String>? hiddenFromProfiles,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -156,6 +165,7 @@ class PostModel {
       isVerified: isVerified ?? this.isVerified,
       hashtags: hashtags ?? this.hashtags,
       audience: audience ?? this.audience,
+      hiddenFromProfiles: hiddenFromProfiles ?? this.hiddenFromProfiles,
     );
   }
 

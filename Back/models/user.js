@@ -60,6 +60,7 @@ const userSchema = new mongoose.Schema(
     dataShared: { type: Boolean, default: false },
     locationHistory: [{ type: String }], // Array of location data
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    mutedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isOnline: { type: Boolean, default: false },
     accountStatus: {
       type: String,

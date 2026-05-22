@@ -10,7 +10,8 @@ import '../../theme/app_theme.dart';
 enum _VerifyView { scanner, manualEntry, manualSuccess, manualFailure }
 
 class VerifyBookingScreen extends StatefulWidget {
-  const VerifyBookingScreen({super.key});
+  final String? initialCode;
+  const VerifyBookingScreen({super.key, this.initialCode});
 
   @override
   State<VerifyBookingScreen> createState() => _VerifyBookingScreenState();
@@ -34,6 +35,12 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
       autoStart: true,
       torchEnabled: false,
     );
+
+    if (widget.initialCode != null && widget.initialCode!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _verifyAndRoute(widget.initialCode!, source: VerificationSource.scanner);
+      });
+    }
   }
 
   @override

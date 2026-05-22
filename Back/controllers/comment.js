@@ -243,8 +243,19 @@ exports.createComment = async (req, res) => {
           commenterName: commenterName,
           postId: String(post._id),
           commentId: String(comment._id),
+          postMentions: post.mentions || [], // pass the people mentioned in the post
         });
         console.log('[createComment] Step 7 complete: Comment notification sent');
+      } else if (post.mentions && post.mentions.length > 0) {
+        // If author comments on their own post, still notify mentioned users
+        notificationEventBus.emitCommentCreated({
+          postOwnerId: post.author_id,
+          commenterName: commenterName,
+          postId: String(post._id),
+          commentId: String(comment._id),
+          postMentions: post.mentions || [],
+          isSelfComment: true,
+        });
       }
 
       // Notify parent comment author if it's a reply

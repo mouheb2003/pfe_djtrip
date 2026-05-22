@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/conversation_model.dart';
 import '../services/message_service.dart';
@@ -113,16 +112,6 @@ class _TikTokShareWidgetState extends State<TikTokShareWidget> {
     Share.share(text, subject: 'Check out this post from DJTrip');
   }
 
-  void _copyLink() {
-    // Simuler la copie du lien
-    HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Link copied to clipboard!'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,12 +181,6 @@ class _TikTokShareWidgetState extends State<TikTokShareWidget> {
                   label: 'Twitter',
                   color: const Color(0xFF1DA1F2),
                   onTap: _shareToTwitter,
-                ),
-                _ShareOption(
-                  icon: Icons.link,
-                  label: 'Copy Link',
-                  color: const Color(0xFF6B7280),
-                  onTap: _copyLink,
                 ),
               ],
             ),

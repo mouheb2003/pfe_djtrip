@@ -438,13 +438,13 @@ exports.sendBookingConfirmationEmail = async ({
             body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
-            .header { background: linear-gradient(135deg, #1d4ed8, #4f6bff); color:#fff; padding: 28px; }
+            .header { background: linear-gradient(135deg, #0066CC, #1A7FFF); color:#fff; padding: 28px; }
             .content { padding: 28px; }
             .qr { text-align:center; padding: 18px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fbff; }
             .qr img { max-width:100%; height:auto; display:inline-block; }
             .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
             .meta p { margin: 6px 0; }
-            .code { font-weight:700; letter-spacing:1px; color:#1d4ed8; }
+            .code { font-weight:700; letter-spacing:1px; color:#0066CC; }
           </style>
         </head>
         <body>
@@ -494,7 +494,7 @@ exports.sendBookingRejectionEmail = async ({
   email,
   fullname,
   activityTitle,
-  rejectionReason,
+  rejectionReason, // Kept in parameters to avoid breaking callers
 }) => {
   try {
     const mailOptions = getBaseMailOptions({
@@ -510,9 +510,8 @@ exports.sendBookingRejectionEmail = async ({
             body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
-            .header { background: linear-gradient(135deg, #ef4444, #f87171); color:#fff; padding: 28px; }
+            .header { background: linear-gradient(135deg, #FF6B1A, #FFA066); color:#fff; padding: 28px; }
             .content { padding: 28px; }
-            .reason-box { margin: 18px 0; padding: 16px; background:#fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; }
           </style>
         </head>
         <body>
@@ -524,10 +523,6 @@ exports.sendBookingRejectionEmail = async ({
               </div>
               <div class="content">
                 <p>Unfortunately, your booking for <strong>${activityTitle}</strong> could not be approved at this time.</p>
-                <div class="reason-box">
-                  <p style="margin:0; color:#b91c1c;"><strong>Reason provided:</strong></p>
-                  <p style="margin:8px 0 0; color:#1e293b;">${rejectionReason}</p>
-                </div>
                 <p>Feel free to explore other activities available on DJTrip!</p>
               </div>
             </div>
@@ -535,7 +530,7 @@ exports.sendBookingRejectionEmail = async ({
         </body>
         </html>
       `,
-      text: `Hello ${fullname},\n\nUnfortunately, your booking for "${activityTitle}" has been rejected.\n\nReason: ${rejectionReason}\n\nFeel free to explore other activities on DJTrip!`,
+      text: `Hello ${fullname},\n\nUnfortunately, your booking for "${activityTitle}" has been rejected.\n\nFeel free to explore other activities on DJTrip!`,
     });
 
     const info = await sendMailWithLogging(
@@ -545,6 +540,77 @@ exports.sendBookingRejectionEmail = async ({
     return { success: true, messageId: info.messageId };
   } catch (error) {
     emailLog("error", "Error sending booking rejection email", {
+      message: error.message,
+      code: error.code,
+    });
+    return { success: false, error: error.message };
+  }
+};
+
+// Send check-in/verification confirmation email
+exports.sendCheckInConfirmationEmail = async ({
+  email,
+  fullname,
+  activityTitle,
+  bookingCode,
+  checkedInAt,
+}) => {
+  try {
+    const checkinTimeText = checkedInAt
+      ? new Date(checkedInAt).toLocaleString("en-GB")
+      : new Date().toLocaleString("en-GB");
+
+    const mailOptions = getBaseMailOptions({
+      to: email,
+      subject: "Check-in Confirmed! 🎉 - DJTrip",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
+            .container { max-width: 680px; margin: 0 auto; padding: 24px; }
+            .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+            .header { background: linear-gradient(135deg, #10B981, #059669); color:#fff; padding: 28px; text-align: center; }
+            .content { padding: 28px; }
+            .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
+            .meta p { margin: 6px 0; }
+            .code { font-weight:700; letter-spacing:1px; color:#10B981; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="card">
+              <div class="header">
+                <h1 style="margin:0; font-size:24px;">Check-in Confirmed! ✅</h1>
+                <p style="margin:8px 0 0; opacity:.92;">Welcome, ${fullname}! You are successfully checked in.</p>
+              </div>
+              <div class="content">
+                <p>Enjoy your adventure! Your ticket/booking has been verified by the organizer.</p>
+                <div class="meta">
+                  <p><strong>Activity:</strong> ${activityTitle}</p>
+                  <p><strong>Check-in Time:</strong> ${checkinTimeText}</p>
+                  ${bookingCode ? `<p><strong>Booking Code:</strong> <span class="code">${bookingCode}</span></p>` : ""}
+                </div>
+                <p>Thank you for choosing DJTrip! We hope you have an incredible time.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nYour check-in is confirmed!\n\nActivity: ${activityTitle}\nCheck-in Time: ${checkinTimeText}\n\nHave a fantastic experience with DJTrip!`,
+    });
+
+    const info = await sendMailWithLogging(
+      "check-in confirmation email",
+      mailOptions,
+    );
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    emailLog("error", "Error sending check-in confirmation email", {
       message: error.message,
       code: error.code,
     });
@@ -575,7 +641,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
               padding: 20px;
             }
             .header {
-              background-color: #2D5016;
+              background-color: #FF6B1A;
               color: white;
               padding: 20px;
               text-align: center;
@@ -588,7 +654,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
             }
             .code {
               background-color: white;
-              border: 2px solid #2D5016;
+              border: 2px solid #FF6B1A;
               padding: 20px;
               text-align: center;
               font-size: 32px;
@@ -596,7 +662,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
               letter-spacing: 8px;
               margin: 20px 0;
               border-radius: 8px;
-              color: #2D5016;
+              color: #FF6B1A;
             }
             .footer {
               text-align: center;

@@ -99,6 +99,72 @@ class _ActivityCardState extends State<ActivityCard>
     widget.onFavorite?.call();
   }
 
+  Widget _buildCardImage({
+    required double width,
+    required double height,
+    required BorderRadius borderRadius,
+  }) {
+    final imageUrl = widget.activity.imageUrl ?? '';
+    final hasImage = imageUrl.isNotEmpty && imageUrl.toLowerCase() != 'null';
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: hasImage
+          ? Image.network(
+              imageUrl,
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  width: width,
+                  height: height,
+                  color: const Color(0xFFF1F5F9),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF4B63FF),
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: width,
+                height: height,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
+                  ),
+                ),
+                child: const Icon(
+                  Icons.broken_image_rounded,
+                  size: 32,
+                  color: Colors.white70,
+                ),
+              ),
+            )
+          : Container(
+              width: width,
+              height: height,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF8E9EFF), Color(0xFFA5B4FC)],
+                ),
+              ),
+              child: const Icon(
+                Icons.image_not_supported_rounded,
+                size: 36,
+                color: Colors.white70,
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.isCompact) {
@@ -126,7 +192,7 @@ class _ActivityCardState extends State<ActivityCard>
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(
+                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
@@ -139,32 +205,75 @@ class _ActivityCardState extends State<ActivityCard>
                     // Image
                     Expanded(
                       flex: 3,
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                          image: DecorationImage(
-                            image: NetworkImage(widget.activity.imageUrl ?? ''),
-                            fit: BoxFit.cover,
-                            onError: (error, stackTrace) {
-                              // Handle error silently
-                            },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildCardImage(
+                            width: double.infinity,
+                            height: double.infinity,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                           ),
-                        ),
-                        child: Stack(
-                          children: [
-                            // Status Badge
+                          // Status Badge
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor().withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                widget.activity.timelineStatus.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          // Favorite Button
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: _toggleFavorite,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Consumer<BookmarkProvider>(
+                                  builder: (context, provider, child) {
+                                    final isFavorite = provider.isActivityBookmarked(widget.activity.id);
+                                    return Icon(
+                                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                                      color: isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
+                                      size: 16,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          // Price Badge
+                          if (widget.activity.price != null)
                             Positioned(
-                              top: 8,
-                              left: 8,
+                              bottom: 8,
+                              right: 8,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor().withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: const Color(0xFF00B894),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  widget.activity.timelineStatus.toUpperCase(),
+                                  '\$${widget.activity.price}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
@@ -173,57 +282,7 @@ class _ActivityCardState extends State<ActivityCard>
                                 ),
                               ),
                             ),
-                            
-                            // Favorite Button
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: GestureDetector(
-                                onTap: _toggleFavorite,
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Consumer<BookmarkProvider>(
-                                    builder: (context, provider, child) {
-                                      final isFavorite = provider.isActivityBookmarked(widget.activity.id);
-                                      return Icon(
-                                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                                        color: isFavorite ? const Color(0xFFFF4757) : const Color(0xFF6C757D),
-                                        size: 16,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                            
-                            // Price Badge
-                            if (widget.activity.price != null)
-                              Positioned(
-                                bottom: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF00B894),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '\$${widget.activity.price}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                     
@@ -243,8 +302,8 @@ class _ActivityCardState extends State<ActivityCard>
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF1E225E),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                              overflow: TextOverflow.visible,
                             ),
                             
                             const SizedBox(height: 4),
@@ -333,21 +392,17 @@ class _ActivityCardState extends State<ActivityCard>
                 child: Row(
                   children: [
                     // Image
-                    Container(
+                    SizedBox(
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-                        image: DecorationImage(
-                          image: NetworkImage(widget.activity.imageUrl ?? ''),
-                          fit: BoxFit.cover,
-                          onError: (error, stackTrace) {
-                            // Handle error silently
-                          },
-                        ),
-                      ),
                       child: Stack(
+                        fit: StackFit.expand,
                         children: [
+                          _buildCardImage(
+                            width: 120,
+                            height: 120,
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                          ),
                           // Status Badge
                           Positioned(
                             top: 8,
@@ -412,8 +467,8 @@ class _ActivityCardState extends State<ActivityCard>
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFF1E225E),
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.visible,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -532,15 +587,17 @@ class _ActivityCardState extends State<ActivityCard>
   }
 
   Color _getStatusColor() {
-    switch (widget.activity.timelineStatus.toLowerCase()) {
-      case 'upcoming':
-        return const Color(0xFF4B63FF);
-      case 'ongoing':
-        return const Color(0xFF00B894);
-      case 'completed':
-        return const Color(0xFF6C757D);
+    switch (widget.activity.timelineStatus.toUpperCase()) {
+      case 'UPCOMING':
+        return const Color(0xFF10B981); // Green
+      case 'ONGOING':
+        return const Color(0xFFF59E0B); // Orange
+      case 'CANCELLED':
+        return const Color(0xFFEF4444); // Red
+      case 'COMPLETED':
+        return const Color(0xFF6B7280); // Grey
       default:
-        return const Color(0xFF4B63FF);
+        return const Color(0xFF6B7280);
     }
   }
 }

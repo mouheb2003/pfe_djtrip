@@ -456,6 +456,144 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
+  Widget _buildImagesGallery() {
+    if (_existingImageUrls.isEmpty && _images.isEmpty) {
+      return _ActionTile(
+        icon: Icons.add_a_photo_rounded,
+        label: 'Photos',
+        color: const Color(0xFF4B63FF),
+        onTap: _pickImages,
+        isFullWidth: true,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${_existingImageUrls.length + _images.length} Photo(s)',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1D245D)),
+            ),
+            TextButton.icon(
+              onPressed: _pickImages,
+              icon: const Icon(Icons.add_a_photo, size: 16),
+              label: const Text('Add More'),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 100,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              ..._existingImageUrls.map((url) => _buildImageItem(
+                imageUrl: url,
+                onRemove: () => setState(() => _existingImageUrls.remove(url)),
+              )),
+              ..._images.map((img) => _buildImageItem(
+                file: File(img.path),
+                onRemove: () => setState(() => _images.remove(img)),
+              )),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageItem({String? imageUrl, File? file, required VoidCallback onRemove}) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 8),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: imageUrl != null 
+                  ? Image.network(imageUrl, fit: BoxFit.cover)
+                  : Image.file(file!, fit: BoxFit.cover),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHashtagsList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_hashtags.isEmpty)
+          _ActionTile(
+            icon: Icons.tag_rounded,
+            label: 'Hashtags',
+            color: const Color(0xFF00D2D3),
+            onTap: _addHashtag,
+            isFullWidth: true,
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+              color: Colors.white,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Hashtags', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1D245D))),
+                    GestureDetector(
+                      onTap: _addHashtag,
+                      child: const Icon(Icons.add_circle, color: Color(0xFF00D2D3)),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _hashtags.map((tag) => Chip(
+                    label: Text(tag),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    onDeleted: () => setState(() => _hashtags.remove(tag)),
+                    backgroundColor: const Color(0xFFE0F7FA),
+                    labelStyle: const TextStyle(color: Color(0xFF00ACC1), fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide.none),
+                  )).toList(),
+                ),
+              ],
+            ),
+          )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -601,91 +739,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
 
-            // Images Preview
-            if (_images.isNotEmpty || _existingImageUrls.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    const Text(
-                      'ATTACHED PHOTOS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF9E9E9E),
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${_images.length + _existingImageUrls.length}/10',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 120,
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _existingImageUrls.length + _images.length,
-                  itemBuilder: (context, i) {
-                    if (i < _existingImageUrls.length) {
-                      final url = _existingImageUrls[i];
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                url,
-                                width: 120,
-                                height: 120,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: GestureDetector(
-                                onTap: () => setState(() => _existingImageUrls.removeAt(i)),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.close, size: 16, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    } else {
-                      final localIdx = i - _existingImageUrls.length;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: _ImagePreviewChip(
-                          file: _images[localIdx],
-                          onRemove: () => setState(() => _images.removeAt(localIdx)),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
 
             // Mention Zone
             Padding(
@@ -717,69 +771,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionTile(
-                          icon: Icons.add_a_photo_rounded,
-                          label: 'Photos',
-                          color: const Color(0xFF4B63FF),
-                          onTap: _pickImages,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ActionTile(
-                          icon: Icons.location_on_rounded,
-                          label: 'Place',
-                          color: const Color(0xFFFF4757),
-                          onTap: _mentionPlace,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildImagesGallery(),
                   const SizedBox(height: 12),
                   _ActionTile(
-                    icon: Icons.tag_rounded,
-                    label: _hashtags.isEmpty ? 'Hashtags' : _hashtags.join(' '),
-                    color: const Color(0xFF00D2D3),
-                    onTap: _addHashtag,
+                    icon: Icons.location_on_rounded,
+                    label: _locationCtrl.text.isNotEmpty ? _locationCtrl.text : 'Place',
+                    color: const Color(0xFFFF4757),
+                    onTap: _mentionPlace,
                     isFullWidth: true,
+                    onClear: _locationCtrl.text.isNotEmpty
+                        ? () {
+                            setState(() {
+                              _locationCtrl.clear();
+                            });
+                          }
+                        : null,
                   ),
-                  
-                  if (_locationCtrl.text.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F4FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on, color: AppColors.primary, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _locationCtrl.text,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1D245D),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => setState(() => _locationCtrl.clear()),
-                            icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 12),
+                  _buildHashtagsList(),
+
                 ],
               ),
             ),
@@ -797,6 +807,10 @@ class _ActionTile extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   final bool isFullWidth;
+  final String? previewImageUrl;
+  final File? previewFile;
+  final int? imageCount;
+  final VoidCallback? onClear;
 
   const _ActionTile({
     required this.icon,
@@ -804,40 +818,122 @@ class _ActionTile extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.isFullWidth = false,
+    this.previewImageUrl,
+    this.previewFile,
+    this.imageCount,
+    this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasPreview = previewImageUrl != null || previewFile != null;
+    final hasClear = onClear != null;
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: isFullWidth ? double.infinity : null,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: Row(
-            mainAxisAlignment: isFullWidth ? MainAxisAlignment.start : MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1D245D),
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
+            child: Container(
+              width: isFullWidth ? double.infinity : null,
+              height: isFullWidth ? null : 120, // Nice square shape
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
               ),
-            ],
+              child: hasPreview
+                  ? Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: previewImageUrl != null
+                                ? Image.network(
+                                    previewImageUrl!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    previewFile!,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.black.withOpacity(0.4),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(icon, color: Colors.white, size: 24),
+                              const SizedBox(height: 6),
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, color: color, size: 28),
+                        const SizedBox(height: 8),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontWeight: hasClear ? FontWeight.w800 : FontWeight.w700,
+                            color: hasClear ? AppColors.primary : const Color(0xFF1D245D),
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+            ),
           ),
-        ),
+          if (hasClear)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: GestureDetector(
+                onTap: onClear,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

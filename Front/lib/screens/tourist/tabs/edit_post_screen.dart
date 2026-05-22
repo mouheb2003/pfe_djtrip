@@ -29,6 +29,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
   late final TextEditingController _tagsCtrl;
   final List<String> _hashtags = [];
   final List<String> _mentions = [];
+  final Map<String, String> _initialFullnames = {};
 
   final List<String> _existingImageUrls = [];
   final List<XFile> _newImages = [];
@@ -66,9 +67,29 @@ class _EditPostScreenState extends State<EditPostScreen> {
   List<String> _readMentions() {
     final mentions = _effectivePost['mentions'];
     if (mentions is List) {
-      return mentions.map((e) => e.toString()).toList();
+      return mentions.map((e) {
+        if (e is Map) return (e['_id'] ?? e['id'] ?? '').toString();
+        return e.toString();
+      }).where((e) => e.isNotEmpty).toList();
     }
     return [];
+  }
+
+  Map<String, String> _readMentionsFullnames() {
+    final Map<String, String> map = {};
+    final mentions = _effectivePost['mentions'];
+    if (mentions is List) {
+      for (final e in mentions) {
+        if (e is Map) {
+          final id = (e['_id'] ?? e['id'] ?? '').toString();
+          final name = (e['fullname'] ?? e['name'] ?? '').toString();
+          if (id.isNotEmpty && name.isNotEmpty) {
+            map[id] = name;
+          }
+        }
+      }
+    }
+    return map;
   }
 
   List<String> _readImageUrls() {
@@ -202,6 +223,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
     );
     _hashtags.addAll(_readHashtags().map(_normalizeTag));
     _mentions.addAll(_readMentions());
+    _initialFullnames.addAll(_readMentionsFullnames());
     _tagsCtrl = TextEditingController();
 
     final uniqueImages = _readImageUrls();
@@ -277,6 +299,91 @@ class _EditPostScreenState extends State<EditPostScreen> {
     });
   }
 
+  Future<void> _mentionPlace() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Mention a Place',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1D245D),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.dns, color: AppColors.primary),
+              title: const Text('Choose from database'),
+              onTap: () => Navigator.pop(context, 'db'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map, color: AppColors.primary),
+              title: const Text('Pick from map'),
+              onTap: () => Navigator.pop(context, 'map'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.edit_location_alt,
+                color: AppColors.primary,
+              ),
+              title: const Text('Type manually'),
+              onTap: () => Navigator.pop(context, 'manual'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+
+    if (action == 'db') {
+      await _pickPlaceFromDatabase();
+      return;
+    }
+
+    if (action == 'map') {
+      await _pickPlaceFromMap();
+      return;
+    }
+
+    final ctrl = TextEditingController(text: _locationCtrl.text);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mention a place'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'e.g. Houmt Souk Market'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (value == null) return;
+    setState(() {
+      _locationCtrl.text = value;
+      _didEditLocation = true;
+    });
+  }
+
   String _normalizeTag(String tag) {
     final clean = tag.trim().replaceAll('#', '');
     if (clean.isEmpty) return '';
@@ -291,17 +398,34 @@ class _EditPostScreenState extends State<EditPostScreen> {
         .toList();
   }
 
-  void _addTagsFromInput() {
-    final extracted = _extractTagsFromInput(_tagsCtrl.text);
-    if (extracted.isEmpty) return;
+  Future<void> _addHashtag() async {
+    final ctrl = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add hashtag'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'traveltips'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
 
+    if (value == null || value.isEmpty) return;
+    final normalized = value.startsWith('#') ? value : '#$value';
+    if (_hashtags.contains(normalized)) return;
     setState(() {
-      for (final tag in extracted) {
-        if (!_hashtags.contains(tag)) {
-          _hashtags.add(tag);
-        }
-      }
-      _tagsCtrl.clear();
+      _hashtags.add(normalized);
       _didEditTags = true;
     });
   }
@@ -323,8 +447,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
       if (url != null && url.isNotEmpty) uploadedUrls.add(url);
     }
 
-    final typedTags = _extractTagsFromInput(_tagsCtrl.text);
-    final tags = <String>{..._hashtags, ...typedTags}.toList();
+    final tags = <String>{..._hashtags}.toList();
 
     final result = await PostService.updatePost(
       postId: postId,
@@ -474,6 +597,90 @@ class _EditPostScreenState extends State<EditPostScreen> {
     }
   }
 
+  Widget _buildImagesGallery() {
+    if (_existingImageUrls.isEmpty && _newImages.isEmpty) {
+      return _ActionTile(
+        icon: Icons.add_a_photo_rounded,
+        label: 'Photos',
+        color: const Color(0xFF4B63FF),
+        onTap: _addMoreImages,
+        isFullWidth: true,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${_existingImageUrls.length + _newImages.length} Photo(s)',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1D245D)),
+            ),
+            TextButton.icon(
+              onPressed: _addMoreImages,
+              icon: const Icon(Icons.add_a_photo, size: 16),
+              label: const Text('Add More'),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 100,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              ..._existingImageUrls.map((url) => _buildImageItem(
+                imageUrl: url,
+                onRemove: () => setState(() => _existingImageUrls.remove(url)),
+              )),
+              ..._newImages.map((img) => _buildImageItem(
+                file: File(img.path),
+                onRemove: () => setState(() => _newImages.remove(img)),
+              )),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageItem({String? imageUrl, File? file, required VoidCallback onRemove}) {
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 8),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: imageUrl != null 
+                  ? Image.network(imageUrl, fit: BoxFit.cover)
+                  : Image.file(file!, fit: BoxFit.cover),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -614,13 +821,34 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
             const SizedBox(height: 24),
 
-            // Photos Section
+            // Mention Zone
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
+              child: MentionZoneWidget(
+                selectedMentions: _mentions,
+                initialFullnames: _initialFullnames,
+                onMentionsChanged: (newMentions) {
+                  setState(() {
+                    _mentions.clear();
+                    _mentions.addAll(newMentions);
+                  });
+                },
+                onFullnamesUpdated: (updatedFullnames) {
+                  _initialFullnames.addAll(updatedFullnames);
+                },
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Actions Section
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'ATTACHED PHOTOS',
+                    'ADD TO YOUR POST',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -628,213 +856,27 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       letterSpacing: 1.2,
                     ),
                   ),
-                  const Spacer(),
-                  Text(
-                    '${_existingImageUrls.length + _newImages.length}/10',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                ..._existingImageUrls.asMap().entries.map(
-                  (entry) => _ImageTile(
-                    imageUrl: entry.value,
-                    onRemove: () => setState(
-                      () => _existingImageUrls.removeAt(entry.key),
-                    ),
-                  ),
-                ),
-                ..._newImages.asMap().entries.map(
-                  (entry) => _ImageTile(
-                    file: File(entry.value.path),
-                    onRemove: () =>
-                        setState(() => _newImages.removeAt(entry.key)),
-                  ),
-                ),
-                _AddMediaTile(onTap: _addMoreImages),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _InfoCard(
-              icon: Icons.map_rounded,
-              iconBg: const Color(0xFFC9CAF9),
-              title: 'LOCATION',
-              child: TextField(
-                controller: _locationCtrl,
-                readOnly: true,
-                onTap: _pickPlaceFromMap,
-                onChanged: (_) => _didEditLocation = true,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF1F245A),
-                  fontWeight: FontWeight.w500,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Change Location',
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFD6D9ED)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFD6D9ED)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF9BA6E8),
-                      width: 1,
-                    ),
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_locationCtrl.text.trim().isNotEmpty)
-                        IconButton(
-                          onPressed: () {
+                  const SizedBox(height: 16),
+                  _buildImagesGallery(),
+                  const SizedBox(height: 12),
+                  _ActionTile(
+                    icon: Icons.location_on_rounded,
+                    label: _locationCtrl.text.isNotEmpty ? _locationCtrl.text : 'Place',
+                    color: const Color(0xFFFF4757),
+                    onTap: _mentionPlace,
+                    isFullWidth: true,
+                    onClear: _locationCtrl.text.isNotEmpty
+                        ? () {
                             setState(() {
                               _locationCtrl.clear();
                               _didEditLocation = true;
                             });
-                          },
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: Color(0xFF7C83AA),
-                          ),
-                        ),
-                      IconButton(
-                        onPressed: _pickPlaceFromDatabase,
-                        icon: const Icon(
-                          Icons.list_alt_rounded,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        tooltip: 'Choose from database',
-                      ),
-                      IconButton(
-                        onPressed: _pickPlaceFromMap,
-                        icon: const Icon(
-                          Icons.map_outlined,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        tooltip: 'Pick from map',
-                      ),
-                    ],
+                          }
+                        : null,
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            _InfoCard(
-              icon: Icons.tips_and_updates,
-              iconBg: const Color(0xFFF3A5EB),
-              title: 'GUIDANCE',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _tagsCtrl,
-                    onChanged: (_) => _didEditTags = true,
-                    onSubmitted: (_) => _addTagsFromInput(),
-                    maxLines: 1,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1F245A),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Type tags then press +',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 11,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFD6D9ED),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: Color(0xFFD6D9ED),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF9BA6E8),
-                          width: 1,
-                        ),
-                      ),
-                      suffixIcon: IconButton(
-                        onPressed: _addTagsFromInput,
-                        icon: const Icon(
-                          Icons.add_circle_outline,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (_hashtags.isNotEmpty) ...[
-                    const Text(
-                      'Current tags:',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF7C83AA),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: _hashtags.map((tag) {
-                        return Chip(
-                          label: Text('#$tag'),
-                          labelStyle: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF1F245A),
-                          ),
-                          backgroundColor: const Color(0xFFF0F1FF),
-                          deleteIcon: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: Color(0xFF7C83AA),
-                          ),
-                          onDeleted: () {
-                            setState(() {
-                              _hashtags.remove(tag);
-                              _didEditTags = true;
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                  const SizedBox(height: 12),
+                  _buildHashtagsList(),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -1048,6 +1090,144 @@ class _EditPlacesPickerSheetState extends State<_EditPlacesPickerSheet> {
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool isFullWidth;
+  final String? previewImageUrl;
+  final File? previewFile;
+  final int? imageCount;
+  final VoidCallback? onClear;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.isFullWidth = false,
+    this.previewImageUrl,
+    this.previewFile,
+    this.imageCount,
+    this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPreview = previewImageUrl != null || previewFile != null;
+    final hasClear = onClear != null;
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: isFullWidth ? double.infinity : null,
+              height: isFullWidth ? null : 120, // Square shape
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: hasPreview
+                  ? Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: previewImageUrl != null
+                                ? Image.network(
+                                    previewImageUrl!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    previewFile!,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.black.withOpacity(0.4),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(icon, color: Colors.white, size: 24),
+                              const SizedBox(height: 6),
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, color: color, size: 28),
+                        const SizedBox(height: 8),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontWeight: hasClear ? FontWeight.w800 : FontWeight.w700,
+                            color: hasClear ? AppColors.primary : const Color(0xFF1D245D),
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          if (hasClear)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: GestureDetector(
+                onTap: onClear,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

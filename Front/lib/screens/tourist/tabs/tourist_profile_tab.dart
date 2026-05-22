@@ -14,15 +14,14 @@ import '../../../services/user_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/auto_image_carousel.dart';
 import '../../../widgets/guide_arrow_button.dart';
-import '../../shared/edit_profile_screen.dart';
-import '../../shared/settings_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
 import '../place_detail_screen_v2.dart';
 import '../all_places_simple.dart';
 import '../../../widgets/mention_text_widget.dart';
-import 'screen_network.dart';
 import '../../../utils/snackbar_utils.dart';
+import '../../../services/follow_service.dart';
+import '../../shared/relations_screen.dart';
 
 class TouristProfileTab extends StatefulWidget {
   final ValueChanged<int>? onNavigateToTab;
@@ -38,6 +37,8 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
   int _bookingsCount = 0;
   int _postsCount = 0;
   int _reviewsCount = 0;
+  int _followersCount = 0;
+  int _followingCount = 0;
   bool _isLoadingAll = false;
 
   List<Map<String, dynamic>> _myPosts = [];
@@ -104,14 +105,22 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
 
       final myPosts =
           (myPostsFromApi.isNotEmpty
-                  ? myPostsFromApi
+                  ? myPostsFromApi.where((p) {
+                      final hiddenProfiles = (p['hidden_from_profiles'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                      return !hiddenProfiles.contains(currentUserId);
+                    }).toList()
                   : feedPosts.where((p) {
                       final author = p['author_id'];
                       final authorId = author is Map<String, dynamic>
                           ? (author['_id'] ?? author['id'] ?? '').toString()
                           : author?.toString() ?? '';
+                      final hiddenProfiles = (p['hidden_from_profiles'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                      if (hiddenProfiles.contains(currentUserId)) {
+                        return false;
+                      }
+                      final mentions = (p['mentions'] as List?)?.map((e) => e.toString()).toList() ?? [];
                       return currentUserId.isNotEmpty &&
-                          authorId == currentUserId;
+                          (authorId == currentUserId || mentions.contains(currentUserId));
                     }).toList())
               .take(12)
               .toList();
@@ -132,6 +141,17 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         _myPosts = myPosts;
         _featuredPlaces = featuredPlaces.take(6).toList();
       });
+
+      if (currentUserId.isNotEmpty) {
+        final followers = await FollowService.getFollowersCount(currentUserId);
+        final following = await FollowService.getFollowingCount(currentUserId);
+        if (mounted) {
+          setState(() {
+            _followersCount = followers;
+            _followingCount = following;
+          });
+        }
+      }
     } catch (e, st) {
       if (kDebugMode) {
         debugPrint('[TouristProfileTab] load failed: $e');
@@ -142,6 +162,8 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         _bookingsCount = 0;
         _postsCount = 0;
         _reviewsCount = 0;
+        _followersCount = 0;
+        _followingCount = 0;
         _myPosts = <Map<String, dynamic>>[];
         _featuredPlaces = <Map<String, dynamic>>[];
       });
@@ -1166,14 +1188,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
-                    icon: const Icon(Icons.settings),
-                    color: AppColors.primary,
-                  ),
+                  const SizedBox(width: 48),
                 ],
               ),
               const SizedBox(height: 6),
@@ -1381,6 +1396,53 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 ),
               ],
               const SizedBox(height: 14),
+              // Stats Relations (Followers / Following)
+              InkWell(
+                onTap: () {
+                  final userId = (_user?.id ?? '').toString();
+                  if (userId.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RelationsScreen(userId: userId),
+                      ),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _StatItem(
+                          value: '$_followersCount',
+                          label: 'Followers',
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 34,
+                        color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
+                      ),
+                      Expanded(
+                        child: _StatItem(
+                          value: '$_followingCount',
+                          label: 'Following',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 10,
@@ -1421,50 +1483,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const EditProfileScreen(),
-                        ),
-                      ).then((_) => _loadAll()),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                      child: const Text('Edit Profile'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
-                        side: BorderSide.none,
-                        foregroundColor: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF46508A),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                      child: const Text('Settings'),
-                    ),
-                  ),
-                ],
-              ),
+
               const SizedBox(height: 12),
             ],
           ),

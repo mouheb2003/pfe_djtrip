@@ -104,6 +104,15 @@ router.put(
   inscriptionController.rejectReservation,
 );
 
+// Add an external/manual participant (Organizer only)
+router.post(
+  "/organisateur/external",
+  verifyToken,
+  verifyOrganisator,
+  invalidateCache(["inscriptions", "activites"]),
+  inscriptionController.addExternalParticipant,
+);
+
 // ========================================
 // COMMON ROUTES (Read access)
 // ========================================

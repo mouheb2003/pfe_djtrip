@@ -113,6 +113,12 @@ class NotificationModel {
         return 'Payment';
       case 'profile':
         return 'Profile';
+      case 'reaction':
+        return 'Reaction';
+      case 'comment':
+        return 'Comment';
+      case 'reply':
+        return 'Reply';
       default:
         return type;
     }
@@ -170,6 +176,12 @@ class NotificationModel {
         return const Color(0xFF28A745); // Green
       case 'profile':
         return const Color(0xFF6F42C1); // Pink
+      case 'reaction':
+        return const Color(0xFFE91E63); // Pink/Red for reactions
+      case 'comment':
+        return const Color(0xFF2196F3); // Blue for comments
+      case 'reply':
+        return const Color(0xFF00BCD4); // Cyan for replies
       default:
         return const Color(0xFF6C757D); // Gray
     }
@@ -197,6 +209,12 @@ class NotificationModel {
         return Icons.payment;
       case 'profile':
         return Icons.person;
+      case 'reaction':
+        return Icons.favorite;
+      case 'comment':
+        return Icons.comment;
+      case 'reply':
+        return Icons.reply;
       default:
         return Icons.notifications;
     }

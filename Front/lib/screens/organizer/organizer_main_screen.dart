@@ -14,6 +14,8 @@ import '../../services/message_service.dart';
 import '../../services/post_service.dart';
 import '../shared/ai_chat_screen.dart';
 import '../../services/novelty_badge_service.dart';
+import '../../services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrganizerMainScreen extends StatefulWidget {
   final int initialIndex;
@@ -28,24 +30,20 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
 
   static const String _sectionActivities = 'organizer_activities';
   static const String _sectionNetwork = 'organizer_network';
-  static const String _sectionMessages = 'organizer_messages';
 
   late int _currentIndex;
   Timer? _noveltyTimer;
 
-  bool _showActivitiesDot = false;
-  bool _showNetworkDot = false;
-  bool _showMessagesDot = false;
-
-  String _activitiesSignature = '';
-  String _networkSignature = '';
-  String _messagesSignature = '';
+  int _activitiesCount = 0;
+  int _networkCount = 0;
+  int _messagesCount = 0;
 
   List<Widget> get _pages => [
     const MyActivitiesTab(),
     const ExploreActivitiesScreen(),
-    const ScreenNetwork(),
     const MessagesScreen(),
+    const ScreenNetwork(),
+    const NotificationsScreen(isTab: true),
     const OrganizerProfileTab(),
   ];
 
@@ -84,103 +82,112 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
     super.dispose();
   }
 
-  Future<String> _buildActivitiesSignature() async {
-    final activities = await ActivityService.getMyActivities(refresh: true);
-    if (activities.isEmpty) return 'none';
-
-    final items =
-        activities
-            .map(
-              (a) =>
-                  '${a.id}:${a.nombreReservations}:${a.updatedAt?.millisecondsSinceEpoch ?? 0}',
-            )
-            .toList()
-          ..sort();
-    return 'count:${items.length}|${items.join(',')}';
+  Future<List<String>> _getActivitiesIds() async {
+    try {
+      final activities = await ActivityService.getMyActivities(refresh: true);
+      return activities.map((a) => a.id).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
-  Future<String> _buildNetworkSignature() async {
-    final posts = await PostService.getFeedPosts();
-    if (posts.isEmpty) return 'none';
-
-    posts.sort((a, b) {
-      final aDate =
-          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      final bDate =
-          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      return bDate.compareTo(aDate);
-    });
-
-    final first = posts.first;
-    final latestId = (first['_id'] ?? first['id'] ?? '').toString();
-    final latestTs = (first['createdAt'] ?? '').toString();
-    return 'count:${posts.length}|id:$latestId|ts:$latestTs';
+  Future<int> _getActivitiesCount() async {
+    final ids = await _getActivitiesIds();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = (await AuthService.getUserId() ?? '').trim();
+    final scope = userId.isEmpty ? 'guest' : userId;
+    final key = 'novelty_seen_${scope}_organizer_activities_all_seen_ids';
+    final seen = prefs.getStringList(key) ?? [];
+    if (seen.isEmpty) {
+      await prefs.setStringList(key, ids);
+      return 0;
+    }
+    return ids.where((id) => !seen.contains(id)).length;
   }
 
-  Future<String> _buildMessagesSignature() async {
-    final conversations = await MessageService.getConversations();
-    if (conversations.isEmpty) return 'none';
+  Future<List<String>> _getNetworkIds() async {
+    try {
+      final posts = await PostService.getFeedPosts();
+      return posts.map((p) => (p['_id'] ?? p['id'] ?? '').toString()).where((id) => id.isNotEmpty).toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
-    final unread = conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
-    conversations.sort((a, b) {
-      final aTime = a.lastMessageTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bTime = b.lastMessageTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return bTime.compareTo(aTime);
-    });
+  Future<int> _getNetworkCount() async {
+    final ids = await _getNetworkIds();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = (await AuthService.getUserId() ?? '').trim();
+    final scope = userId.isEmpty ? 'guest' : userId;
+    final key = 'novelty_seen_${scope}_organizer_network_all_seen_ids';
+    final seen = prefs.getStringList(key) ?? [];
+    if (seen.isEmpty) {
+      await prefs.setStringList(key, ids);
+      return 0;
+    }
+    return ids.where((id) => !seen.contains(id)).length;
+  }
 
-    final latest = conversations.first;
-    final latestTs = latest.lastMessageTime?.millisecondsSinceEpoch ?? 0;
-    return 'unread:$unread|latest:${latest.partnerId}:$latestTs';
+  Future<int> _getMessagesCount() async {
+    try {
+      final conversations = await MessageService.getConversations();
+      return conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<void> _refreshNoveltyBadges() async {
     try {
-      final signatures = await Future.wait<String>([
-        _buildActivitiesSignature(),
-        _buildNetworkSignature(),
-        _buildMessagesSignature(),
-      ]);
-      if (!mounted) return;
-
-      _activitiesSignature = signatures[0];
-      _networkSignature = signatures[1];
-      _messagesSignature = signatures[2];
-
-      final unseen = await Future.wait<bool>([
-        NoveltyBadgeService.hasUnseen(_sectionActivities, _activitiesSignature),
-        NoveltyBadgeService.hasUnseen(_sectionNetwork, _networkSignature),
-        NoveltyBadgeService.hasUnseen(_sectionMessages, _messagesSignature),
+      final results = await Future.wait([
+        _getActivitiesCount(),
+        _getNetworkCount(),
+        _getMessagesCount(),
       ]);
       if (!mounted) return;
 
       setState(() {
-        _showActivitiesDot = _currentIndex != 0 && unseen[0];
-        _showNetworkDot = _currentIndex != 2 && unseen[1];
-        _showMessagesDot = _currentIndex != 3 && unseen[2];
+        _activitiesCount = _currentIndex == 0 ? 0 : results[0];
+        _networkCount = _currentIndex == 3 ? 0 : results[1];
+        _messagesCount = _currentIndex == 2 ? 0 : results[2];
       });
     } catch (_) {
       // Best-effort badges: ignore service errors.
     }
   }
 
-  void _goToTab(int index) {
-    if (index == 0 && _activitiesSignature.isNotEmpty) {
-      NoveltyBadgeService.markSeen(_sectionActivities, _activitiesSignature);
+  void _markSeenForTab(int index) async {
+    if (index == 0) {
+      final ids = await _getActivitiesIds();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = (await AuthService.getUserId() ?? '').trim();
+      final scope = userId.isEmpty ? 'guest' : userId;
+      final key = 'novelty_seen_${scope}_organizer_activities_all_seen_ids';
+      final seenIds = prefs.getStringList(key) ?? [];
+      final newSet = {...seenIds, ...ids}.toList();
+      await prefs.setStringList(key, newSet);
+      setState(() => _activitiesCount = 0);
     }
-    if (index == 2 && _networkSignature.isNotEmpty) {
-      NoveltyBadgeService.markSeen(_sectionNetwork, _networkSignature);
+    if (index == 3) {
+      final ids = await _getNetworkIds();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = (await AuthService.getUserId() ?? '').trim();
+      final scope = userId.isEmpty ? 'guest' : userId;
+      final key = 'novelty_seen_${scope}_organizer_network_all_seen_ids';
+      final seenIds = prefs.getStringList(key) ?? [];
+      final newSet = {...seenIds, ...ids}.toList();
+      await prefs.setStringList(key, newSet);
+      setState(() => _networkCount = 0);
     }
-    if (index == 3 && _messagesSignature.isNotEmpty) {
-      NoveltyBadgeService.markSeen(_sectionMessages, _messagesSignature);
-    }
+  }
 
+  void _goToTab(int index) {
+    _markSeenForTab(index);
     setState(() {
       _currentIndex = index;
-      if (index == 0) _showActivitiesDot = false;
-      if (index == 2) _showNetworkDot = false;
-      if (index == 3) _showMessagesDot = false;
+      if (index == 0) _activitiesCount = 0;
+      if (index == 3) _networkCount = 0;
+      if (index == 2) _messagesCount = 0;
     });
   }
 
@@ -241,7 +248,7 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                 onTap: _goToTab,
                 activeColor: navActive,
                 inactiveColor: navInactive,
-                showDot: _showActivitiesDot,
+                badgeCount: _activitiesCount,
               ),
               _NavItem(
                 icon: Icons.explore_outlined,
@@ -254,32 +261,42 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
                 inactiveColor: navInactive,
               ),
               _NavItem(
-                icon: Icons.public,
-                activeIcon: Icons.public,
-                label: 'Network',
+                icon: Icons.chat_bubble_outline,
+                activeIcon: Icons.chat_bubble,
+                label: 'Messages',
                 index: 2,
                 currentIndex: _currentIndex,
                 onTap: _goToTab,
                 activeColor: navActive,
                 inactiveColor: navInactive,
-                showDot: _showNetworkDot,
+                badgeCount: _messagesCount,
               ),
               _NavItem(
-                icon: Icons.chat_bubble_outline,
-                activeIcon: Icons.chat_bubble,
-                label: 'Messages',
+                icon: Icons.public,
+                activeIcon: Icons.public,
+                label: 'Network',
                 index: 3,
                 currentIndex: _currentIndex,
                 onTap: _goToTab,
                 activeColor: navActive,
                 inactiveColor: navInactive,
-                showDot: _showMessagesDot,
+                badgeCount: _networkCount,
+              ),
+              _NavItem(
+                icon: Icons.notifications_none,
+                activeIcon: Icons.notifications,
+                label: 'Notifs',
+                index: 4,
+                currentIndex: _currentIndex,
+                onTap: _goToTab,
+                activeColor: navActive,
+                inactiveColor: navInactive,
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 activeIcon: Icons.person,
                 label: 'Profile',
-                index: 4,
+                index: 5,
                 currentIndex: _currentIndex,
                 onTap: _goToTab,
                 activeColor: navActive,
@@ -288,7 +305,6 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
             ],
           ),
         ),
-        // center handled as a normal _NavItem in the Row above
       ],
     );
   }
@@ -303,7 +319,7 @@ class _NavItem extends StatelessWidget {
   final void Function(int) onTap;
   final Color activeColor;
   final Color inactiveColor;
-  final bool showDot;
+  final int badgeCount;
 
   const _NavItem({
     required this.icon,
@@ -314,7 +330,7 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
     required this.activeColor,
     required this.inactiveColor,
-    this.showDot = false,
+    this.badgeCount = 0,
   });
 
   @override
@@ -344,21 +360,44 @@ class _NavItem extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                                color: activeColor.withOpacity(0.22),
-                                blurRadius: 14,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          )
-                        : null,
+                              color: activeColor.withOpacity(0.22),
+                              blurRadius: 14,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        )
+                      : null,
                   child: Icon(
                     isActive ? activeIcon : icon,
                     color: isActive ? cs.onPrimary : inactiveColor,
                     size: isActive ? 26 : 18,
                   ),
                 ),
-                if (showDot)
-                  const Positioned(top: -2, right: -5, child: _RedDot()),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF3B30),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 0.5),
@@ -372,23 +411,6 @@ class _NavItem extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RedDot extends StatelessWidget {
-  const _RedDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 9,
-      height: 9,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF3B30),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.2),
       ),
     );
   }

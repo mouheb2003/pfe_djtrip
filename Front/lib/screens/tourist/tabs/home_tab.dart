@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/bookmark_provider.dart';
 import '../../../models/lieu_model.dart';
 import '../../../models/place_model.dart';
 import '../../../models/activity_model.dart';
@@ -16,12 +18,15 @@ import '../../../widgets/place_card.dart';
 import '../../../widgets/auto_image_carousel.dart';
 import '../../../theme/app_theme.dart';
 import '../../../config/api_config.dart';
+import '../../../services/auth_service.dart';
+import '../../../providers/user_provider.dart';
 
 class HomeTab extends StatefulWidget {
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
   final VoidCallback? onActivitiesTap;
   final VoidCallback? onNotificationsTap;
+  final VoidCallback onProfileTap;
   final bool showMessagesDot;
 
   const HomeTab({
@@ -30,6 +35,7 @@ class HomeTab extends StatefulWidget {
     required this.onMessagesTap,
     this.onActivitiesTap,
     this.onNotificationsTap,
+    required this.onProfileTap,
     this.showMessagesDot = false,
   });
 
@@ -91,6 +97,15 @@ class _HomeTabState extends State<HomeTab> {
     _isFetching = true;
 
     try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final user = userProvider.user;
+      List<String> userInterests = [];
+      if (user != null && user['centres_interet'] != null) {
+        userInterests = (user['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+      } else if (AuthService.currentUser != null && AuthService.currentUser!['centres_interet'] != null) {
+        userInterests = (AuthService.currentUser!['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+      }
+
       final lieux = await LieuService.getLieux();
       print('[DEBUG] Fetched ${lieux.length} lieux');
       for (var lieu in lieux.take(3)) {
@@ -109,8 +124,16 @@ class _HomeTabState extends State<HomeTab> {
         return activity.isUpcoming;
       }).toList();
 
-      // Sort by rating (highest first) and take top 10 for display
+      // Sort by interests first, then by rating (highest first) and take top 10 for display
       upcomingActivities.sort((a, b) {
+        bool aMatches = userInterests.any((interest) => 
+            a.categorie.toLowerCase().contains(interest) || a.titre.toLowerCase().contains(interest) || a.description.toLowerCase().contains(interest));
+        bool bMatches = userInterests.any((interest) => 
+            b.categorie.toLowerCase().contains(interest) || b.titre.toLowerCase().contains(interest) || b.description.toLowerCase().contains(interest));
+        
+        if (aMatches && !bMatches) return -1;
+        if (!aMatches && bMatches) return 1;
+        
         final ratingA = a.noteMoyenne;
         final ratingB = b.noteMoyenne;
         return ratingB.compareTo(ratingA);
@@ -168,17 +191,36 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   List<LieuModel> get _topDestinationsList {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final user = userProvider.user;
+    List<String> userInterests = [];
+    if (user != null && user['centres_interet'] != null) {
+      userInterests = (user['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+    } else if (AuthService.currentUser != null && AuthService.currentUser!['centres_interet'] != null) {
+      userInterests = (AuthService.currentUser!['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+    }
+
     final items = List<LieuModel>.from(_filteredVisibleLieux);
     print(
       '[DEBUG] _filteredVisibleLieux count: ${_filteredVisibleLieux.length}',
     );
-    // D'abord prioriser les top destinations, puis trier par rating
+    
+    // Prioriser par centres d'intérêt, puis top destinations, puis note
     items.sort((a, b) {
+      bool aMatches = userInterests.any((interest) => 
+          (a.categorie ?? '').toLowerCase().contains(interest) || a.titre.toLowerCase().contains(interest) || a.description.toLowerCase().contains(interest));
+      bool bMatches = userInterests.any((interest) => 
+          (b.categorie ?? '').toLowerCase().contains(interest) || b.titre.toLowerCase().contains(interest) || b.description.toLowerCase().contains(interest));
+      
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+      
       if (a.topDestination && !b.topDestination) return -1;
       if (!a.topDestination && b.topDestination) return 1;
-      // Si les deux ont le même statut topDestination, trier par rating
+      
       return b.noteMoyenne.compareTo(a.noteMoyenne);
     });
+    
     final result = items.take(6).toList();
     print('[DEBUG] _topDestinations count: ${result.length}');
     for (var lieu in result.take(3)) {
@@ -209,11 +251,30 @@ class _HomeTabState extends State<HomeTab> {
     return grouped;
   }
 
-  // Obtenir les 5 meilleurs lieux notés
+  // Obtenir les 10 meilleurs lieux notés en priorisant les centres d'intérêt
   List<LieuModel> get _topRatedPlaces {
-    final items = [..._visibleLieux];
-    items.sort((a, b) => b.noteMoyenne.compareTo(a.noteMoyenne));
-    return items.take(5).toList();
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final user = userProvider.user;
+    List<String> userInterests = [];
+    if (user != null && user['centres_interet'] != null) {
+      userInterests = (user['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+    } else if (AuthService.currentUser != null && AuthService.currentUser!['centres_interet'] != null) {
+      userInterests = (AuthService.currentUser!['centres_interet'] as List).map((e) => e.toString().toLowerCase()).toList();
+    }
+
+    final items = [..._lieux];
+    items.sort((a, b) {
+      bool aMatches = userInterests.any((interest) => 
+          (a.categorie ?? '').toLowerCase().contains(interest) || a.titre.toLowerCase().contains(interest) || a.description.toLowerCase().contains(interest));
+      bool bMatches = userInterests.any((interest) => 
+          (b.categorie ?? '').toLowerCase().contains(interest) || b.titre.toLowerCase().contains(interest) || b.description.toLowerCase().contains(interest));
+      
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+
+      return b.noteMoyenne.compareTo(a.noteMoyenne);
+    });
+    return items.take(10).toList();
   }
 
   // Formater le nom de la catégorie
@@ -402,6 +463,7 @@ class _HomeTabState extends State<HomeTab> {
               onExploreTap: widget.onExploreTap,
               onMessagesTap: widget.onMessagesTap,
               onNotificationsTap: widget.onNotificationsTap,
+              onProfileTap: widget.onProfileTap,
               showMessagesDot: widget.showMessagesDot,
             ),
             Transform.translate(
@@ -732,85 +794,6 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                     const SizedBox(height: 32),
 
-                    // Destinations by Category Sections
-                    ...(_lieuxByCategory.entries.map((entry) {
-                      final category = entry.key;
-                      final places = entry.value
-                          .take(5)
-                          .toList(); // Top 5 par catégorie
-
-                      if (places.isEmpty) return const SizedBox.shrink();
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 32),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _formatCategoryName(category),
-                                  style: TextStyle(
-                                    fontSize: 44 / 2,
-                                    fontWeight: FontWeight.w900,
-                                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
-                                  ),
-                                ),
-                              ),
-                              TextButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ViewAllPlacesScreen(),
-                                    ),
-                                  );
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFF167BFF),
-                                ),
-                                iconAlignment: IconAlignment.end,
-                                icon: const Icon(Icons.arrow_forward, size: 18),
-                                label: const Text(
-                                  'View All',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 280,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: places.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 16),
-                              itemBuilder: (context, index) {
-                                final lieu = places[index];
-                                return _TopDestinationCard(
-                                  lieu: lieu,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => PlaceDetailScreenV2(
-                                        place: _toPlaceMap(lieu),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList()),
-
-                    const SizedBox(height: 32),
                     // Top Activities Section
                     Row(
                       children: [
@@ -902,6 +885,87 @@ class _HomeTabState extends State<HomeTab> {
                               },
                             ),
                           ),
+
+                    const SizedBox(height: 32),
+
+                    // Destinations by Category Sections
+                    ...(_lieuxByCategory.entries.map((entry) {
+                      final category = entry.key;
+                      final places = entry.value
+                          .take(5)
+                          .toList(); // Top 5 par catégorie
+
+                      if (places.isEmpty) return const SizedBox.shrink();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _formatCategoryName(category),
+                                  style: TextStyle(
+                                    fontSize: 44 / 2,
+                                    fontWeight: FontWeight.w900,
+                                    color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ViewAllPlacesScreen(),
+                                    ),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF167BFF),
+                                ),
+                                iconAlignment: IconAlignment.end,
+                                icon: const Icon(Icons.arrow_forward, size: 18),
+                                label: const Text(
+                                  'View All',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 280,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: places.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 16),
+                              itemBuilder: (context, index) {
+                                final lieu = places[index];
+                                return _TopDestinationCard(
+                                  lieu: lieu,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PlaceDetailScreenV2(
+                                        place: _toPlaceMap(lieu),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList()),
+
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -910,26 +974,29 @@ class _HomeTabState extends State<HomeTab> {
           ],
         ),
       ),
-      floatingActionButton: SizedBox(
-        width: 56,
-        height: 56,
-        child: Hero(
-          tag: 'ai_chat_fab',
-          child: Material(
-            color: const Color(0xFFFF6B1A),
-            elevation: 8,
-            shape: const CircleBorder(),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(28),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AiChatScreen()),
-                );
-              },
-              child: const Padding(
-                padding: EdgeInsets.all(16),
-                child: Icon(Icons.smart_toy, color: Colors.white, size: 24),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100.0),
+        child: SizedBox(
+          width: 56,
+          height: 56,
+          child: Hero(
+            tag: 'ai_chat_fab',
+            child: Material(
+              color: const Color(0xFF167BFF),
+              elevation: 8,
+              shape: const CircleBorder(),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(28),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AiChatScreen()),
+                  );
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Icon(Icons.smart_toy, color: Colors.white, size: 24),
+                ),
               ),
             ),
           ),
@@ -944,6 +1011,7 @@ class _HomeHero extends StatelessWidget {
   final VoidCallback onExploreTap;
   final VoidCallback onMessagesTap;
   final VoidCallback? onNotificationsTap;
+  final VoidCallback onProfileTap;
   final bool showMessagesDot;
 
   const _HomeHero({
@@ -951,8 +1019,54 @@ class _HomeHero extends StatelessWidget {
     required this.onExploreTap,
     required this.onMessagesTap,
     this.onNotificationsTap,
+    required this.onProfileTap,
     required this.showMessagesDot,
   });
+
+  String _resolveAvatarUrl(String? avatar) {
+    if (avatar == null || avatar.isEmpty || avatar == 'null') return '';
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+    final baseUrl = ApiConfig.baseUrl.replaceAll('/api', '');
+    if (avatar.startsWith('/')) {
+      return '$baseUrl$avatar';
+    }
+    return '$baseUrl/$avatar';
+  }
+
+  Widget _buildProfileButton() {
+    final user = AuthService.currentUser;
+    final avatar = user?['avatar']?.toString();
+    final resolvedAvatar = _resolveAvatarUrl(avatar);
+    
+    return GestureDetector(
+      onTap: onProfileTap,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.8), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.white.withOpacity(0.2),
+          backgroundImage: resolvedAvatar.isNotEmpty
+              ? NetworkImage(resolvedAvatar)
+              : null,
+          child: resolvedAvatar.isEmpty
+              ? const Icon(Icons.person, color: Colors.white, size: 20)
+              : null,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -997,16 +1111,7 @@ class _HomeHero extends StatelessWidget {
                   Row(
                     children: [
                       const Spacer(),
-                      _HeroIcon(
-                        icon: Icons.chat_bubble_outline,
-                        onTap: onMessagesTap,
-                        showDot: showMessagesDot,
-                      ),
-                      const SizedBox(width: 12),
-                      _HeroIcon(
-                        icon: Icons.notifications_none,
-                        onTap: onNotificationsTap ?? () {},
-                      ),
+                      _buildProfileButton(),
                     ],
                   ),
                   const Spacer(),
@@ -1492,33 +1597,27 @@ class _HomeActivityCard extends StatefulWidget {
 }
 
 class _HomeActivityCardState extends State<_HomeActivityCard> {
-  late bool _isBookmarked;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _isBookmarked = widget.activity.isBookmarked;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<BookmarkProvider>(context, listen: false)
+            .updateActivityState(widget.activity.id, widget.activity.isBookmarked);
+      }
+    });
   }
 
   Future<void> _toggleBookmark() async {
     if (_isSaving) return;
-    final prev = _isBookmarked;
-    setState(() {
-      _isBookmarked = !prev;
-      _isSaving = true;
-    });
+    setState(() => _isSaving = true);
     try {
-      final result = await ActivityService.toggleActivityBookmark(widget.activity.id);
-      if (mounted) {
-        setState(() {
-          _isBookmarked = result['success'] == true
-              ? result['bookmarked'] == true
-              : prev;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isBookmarked = prev);
+      final provider = Provider.of<BookmarkProvider>(context, listen: false);
+      await provider.toggleActivityBookmark(widget.activity.id);
+    } catch (e) {
+      debugPrint('❌ Error toggling bookmark in home activity card: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -1612,32 +1711,37 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                     Positioned(
                       top: 4,
                       right: 4,
-                      child: GestureDetector(
-                        onTap: _toggleBookmark,
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
+                      child: Consumer<BookmarkProvider>(
+                        builder: (context, provider, child) {
+                          final isProviderBookmarked = provider.isActivityBookmarked(activity.id);
+                          return GestureDetector(
+                            onTap: _toggleBookmark,
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            _isBookmarked
-                                ? Icons.bookmark
-                                : Icons.bookmark_border_rounded,
-                            size: 16,
-                            color: _isBookmarked
-                                ? const Color(0xFF167BFF)
-                                : const Color(0xFF6B7280),
-                          ),
-                        ),
+                              child: Icon(
+                                isProviderBookmarked
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_border_rounded,
+                                size: 16,
+                                color: isProviderBookmarked
+                                    ? const Color(0xFF167BFF)
+                                    : const Color(0xFF6B7280),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

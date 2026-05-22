@@ -14,22 +14,25 @@ class BookmarkProvider extends ChangeNotifier {
   bool isLieuBookmarked(String id) => _lieuBookmarks[id] ?? false;
   bool isPostBookmarked(String id) => _postBookmarks[id] ?? false;
 
-  /// Update the internal state for an activity without notifying (useful for bulk loading)
-  void updateActivityState(String id, bool isBookmarked) {
-    if (_activityBookmarks[id] != isBookmarked) {
+  /// Update the internal state for an activity
+  void updateActivityState(String id, bool isBookmarked, {bool force = false}) {
+    if (force || !_activityBookmarks.containsKey(id)) {
       _activityBookmarks[id] = isBookmarked;
+      notifyListeners();
     }
   }
 
-  void updateLieuState(String id, bool isBookmarked) {
-    if (_lieuBookmarks[id] != isBookmarked) {
+  void updateLieuState(String id, bool isBookmarked, {bool force = false}) {
+    if (force || !_lieuBookmarks.containsKey(id)) {
       _lieuBookmarks[id] = isBookmarked;
+      notifyListeners();
     }
   }
 
-  void updatePostState(String id, bool isBookmarked) {
-    if (_postBookmarks[id] != isBookmarked) {
+  void updatePostState(String id, bool isBookmarked, {bool force = false}) {
+    if (force || !_postBookmarks.containsKey(id)) {
       _postBookmarks[id] = isBookmarked;
+      notifyListeners();
     }
   }
 

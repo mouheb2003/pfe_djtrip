@@ -699,6 +699,88 @@ class UserService {
     }
   }
 
+  /// Get blocked and muted users
+  static Future<Map<String, dynamic>> getBlockedAndMutedUsers() async {
+    try {
+      final res = await ApiClient.get('/users/privacy/blocked-and-muted', cacheFirst: false);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body is Map<String, dynamic> && body['success'] == true) {
+          return {
+            'success': true,
+            'blockedUsers': List<Map<String, dynamic>>.from(body['blockedUsers'] ?? []),
+            'mutedUsers': List<Map<String, dynamic>>.from(body['mutedUsers'] ?? []),
+          };
+        }
+      }
+      return {'success': false, 'blockedUsers': [], 'mutedUsers': []};
+    } catch (e) {
+      _devLog('Error fetching privacy list: $e');
+      return {'success': false, 'blockedUsers': [], 'mutedUsers': []};
+    }
+  }
+
+  /// Block a user
+  static Future<bool> blockUser(String targetId) async {
+    try {
+      final res = await ApiClient.post('/users/privacy/block/$targetId', {});
+      return res.statusCode == 200;
+    } catch (e) {
+      _devLog('Error blocking user: $e');
+      return false;
+    }
+  }
+
+  /// Unblock a user
+  static Future<bool> unblockUser(String targetId) async {
+    try {
+      final res = await ApiClient.post('/users/privacy/unblock/$targetId', {});
+      return res.statusCode == 200;
+    } catch (e) {
+      _devLog('Error unblocking user: $e');
+      return false;
+    }
+  }
+
+  /// Mute a user
+  static Future<bool> muteUser(String targetId) async {
+    try {
+      final res = await ApiClient.post('/users/privacy/mute/$targetId', {});
+      return res.statusCode == 200;
+    } catch (e) {
+      _devLog('Error muting user: $e');
+      return false;
+    }
+  }
+
+  /// Unmute a user
+  static Future<bool> unmuteUser(String targetId) async {
+    try {
+      final res = await ApiClient.post('/users/privacy/unmute/$targetId', {});
+      return res.statusCode == 200;
+    } catch (e) {
+      _devLog('Error unmuting user: $e');
+      return false;
+    }
+  }
+
+  /// Get admin user for chat support
+  static Future<Map<String, dynamic>?> getAdminUser() async {
+    try {
+      final res = await ApiClient.get('/users/admin', cacheFirst: false);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        if (body is Map<String, dynamic> && body['admin'] != null) {
+          return body['admin'] as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      _devLog('Error getting admin user: $e');
+      return null;
+    }
+  }
+
   /// Development logging with TAG prefix
   static void _devLog(String message) {
     if (kDebugMode) {

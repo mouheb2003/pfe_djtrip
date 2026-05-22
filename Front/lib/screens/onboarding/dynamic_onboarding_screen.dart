@@ -624,13 +624,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
     switch (stepId) {
       case 'phone':
         if (_phoneController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Please enter your phone number for ${step['title']}'),
-              backgroundColor: const Color(0xFFFFA502),
-            ),
-          );
-          return false;
+          return true; // Phone number is optional
         }
         
         // Validate phone number format
@@ -763,16 +757,6 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           );
           return false;
         }
-        final minLength = stepId == 'organizer_bio' ? 50 : 30;
-        if (bio.length < minLength) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Please provide at least $minLength characters for your bio'),
-              backgroundColor: const Color(0xFFFFA502),
-            ),
-          );
-          return false;
-        }
         break;
       case 'reason_to_join':
         final reason = _reasonToJoinController.text.trim();
@@ -848,10 +832,17 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           orElse: () => phoneCountries.first,
         );
         
-        stepData = {
-          'num_tel': '${selectedPhoneCountry['code']}${_phoneController.text.trim()}',
-          'pays_telephone': selectedPhoneCountry['name'],
-        };
+        if (_phoneController.text.trim().isEmpty) {
+          stepData = {
+            'num_tel': '',
+            'pays_telephone': '',
+          };
+        } else {
+          stepData = {
+            'num_tel': '${selectedPhoneCountry['code']}${_phoneController.text.trim()}',
+            'pays_telephone': selectedPhoneCountry['name'],
+          };
+        }
         break;
       case 'profile_picture':
         stepData = {'avatar': _onboardingData['avatar']};
@@ -927,6 +918,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (!mounted) return;
 
       if (result['success'] == true) {
+        // Refresh the current user profile from backend to update local cache
+        await AuthService.refreshCurrentUser();
+        
         // Navigate to the appropriate home screen
         await OnboardingService.navigateToAppropriateScreen();
       } else {
@@ -1063,6 +1057,36 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
     );
   }
 
+  Widget _buildStepTitle(Map<String, dynamic> step) {
+    final isRequired = step['required'] == true;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(
+            text: step['title'] ?? '',
+            children: [
+              if (isRequired)
+                const TextSpan(
+                  text: ' *',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1E225E),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
   Widget _buildStepPage(Map<String, dynamic> step) {
     final stepId = step['id'] as String;
     
@@ -1132,15 +1156,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1257,15 +1273,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1450,15 +1458,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1563,15 +1563,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1752,15 +1744,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1840,7 +1824,6 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Română', 'flag': '🇷🇴', 'code': 'ro'},
       {'name': 'Български', 'flag': '🇧🇬', 'code': 'bg'},
       {'name': 'Українська', 'flag': '🇺🇦', 'code': 'uk'},
-      {'name': 'עברית', 'flag': '🇮🇱', 'code': 'he'},
       {'name': 'ไทย', 'flag': '🇹🇭', 'code': 'th'},
       {'name': 'Tiếng Việt', 'flag': '🇻🇳', 'code': 'vi'},
       {'name': 'Bahasa Indonesia', 'flag': '🇮🇩', 'code': 'id'},
@@ -1852,15 +1835,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -1956,15 +1931,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -2045,7 +2012,6 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Română', 'flag': '🇷🇴'},
       {'name': 'Български', 'flag': '🇧🇬'},
       {'name': 'Українська', 'flag': '🇺🇦'},
-      {'name': 'עברית', 'flag': '🇮🇱'},
       {'name': 'ไทย', 'flag': '🇹🇭'},
       {'name': 'Tiếng Việt', 'flag': '🇻🇳'},
       {'name': 'Bahasa Indonesia', 'flag': '🇮🇩'},
@@ -2223,15 +2189,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -2300,15 +2258,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -2360,15 +2310,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -2420,15 +2362,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
@@ -2489,15 +2423,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step['title'] ?? '',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E225E),
-            ),
-          ),
-          const SizedBox(height: 12),
+          _buildStepTitle(step),
           Text(
             step['description'] ?? '',
             style: const TextStyle(
