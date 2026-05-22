@@ -257,8 +257,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   Future<void> _checkFollowStatus(String targetId) async {
     try {
       final isFollowing = await FollowService.checkFollowStatus(targetId);
-      final followers = await FollowService.getFollowers(targetId);
-      final following = await FollowService.getFollowing(targetId);
+      final followers = await FollowService.getFollowersList(targetId);
+      final following = await FollowService.getFollowingList(targetId);
       if (mounted) {
         setState(() {
           _isFollowing = isFollowing;
@@ -1367,6 +1367,38 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
         );
       },
       child: _buildStatItem(label, value),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRestrictedProfile() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profile')),
+      body: const Center(
+        child: Text('This profile is private or unavailable.'),
+      ),
     );
   }
 

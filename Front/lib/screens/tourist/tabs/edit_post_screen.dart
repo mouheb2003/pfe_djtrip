@@ -885,6 +885,67 @@ class _EditPostScreenState extends State<EditPostScreen> {
       ),
     );
   }
+  Widget _buildHashtagsList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Hashtags',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1D245D),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ..._hashtags.map((tag) => Chip(
+              label: Text('#$tag'),
+              onDeleted: () => setState(() => _hashtags.remove(tag)),
+            )),
+            ActionChip(
+              avatar: const Icon(Icons.add, size: 16),
+              label: const Text('Add Tag'),
+              onPressed: _showAddHashtagDialog,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showAddHashtagDialog() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Hashtag'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'tag (without #)'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              final tag = ctrl.text.trim().replaceAll('#', '');
+              if (tag.isNotEmpty) {
+                setState(() => _hashtags.add(tag));
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('ADD'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ImageTile extends StatelessWidget {
