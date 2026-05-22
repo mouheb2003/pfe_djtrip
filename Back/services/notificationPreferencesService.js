@@ -64,6 +64,15 @@ async function updateDeviceSettings(userId, device, settings) {
   return await NotificationPreference.updateUserPreferences(userId, updates);
 }
 
+/**
+ * Set quiet hours
+ */
+async function setQuietHours(userId, quietHoursData) {
+  return await NotificationPreference.updateUserPreferences(userId, {
+    quiet_hours: quietHoursData,
+  });
+}
+
 module.exports = {
   getUserPreferences,
   updateUserPreferences,
