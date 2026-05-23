@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/bookmark_provider.dart';
@@ -434,13 +435,13 @@ class _HomeTabState extends State<HomeTab> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
         color: isSelected ? AppColors.primary : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
       ),
       child: Text(
         text,
         style: TextStyle(
           color: isSelected ? Colors.white : const Color(0xFF6B7280),
-          fontSize: 14,
+          fontSize: 14.sp,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -471,14 +472,14 @@ class _HomeTabState extends State<HomeTab> {
               child: Container(
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF121212) : const Color(0xFFF3F3F3),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(34.r)),
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 18),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18.h),
+                    const SizedBox(height: 20.h),
                     // Barre de recherche fonctionnelle
                     SizedBox(
                       height: _showSuggestions ? 280 : 50,
@@ -488,7 +489,7 @@ class _HomeTabState extends State<HomeTab> {
                             height: 50,
                             decoration: BoxDecoration(
                               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                              borderRadius: BorderRadius.circular(25),
+                              borderRadius: BorderRadius.circular(25.r),
                               boxShadow: [
                                 if (!isDark)
                                   BoxShadow(
@@ -519,7 +520,7 @@ class _HomeTabState extends State<HomeTab> {
                                 hintText: 'Search destinations, activities...',
                                 hintStyle: const TextStyle(
                                   color: Color(0xFF9CA3AF),
-                                  fontSize: 14,
+                                  fontSize: 14.sp,
                                 ),
                                 prefixIcon: const Icon(
                                   Icons.search,
@@ -558,7 +559,7 @@ class _HomeTabState extends State<HomeTab> {
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(16.r),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withOpacity(0.15),
@@ -577,7 +578,7 @@ class _HomeTabState extends State<HomeTab> {
                                     return ListTile(
                                       tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                                       leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(8.r),
                                         child: Image.network(
                                           ApiConfig.getImageUrl(suggestion['image'] ?? ''),
                                           width: 48,
@@ -613,13 +614,13 @@ class _HomeTabState extends State<HomeTab> {
                                         suggestion['title'],
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 14,
+                                          fontSize: 14.sp,
                                         ),
                                       ),
                                       subtitle: Text(
                                         suggestion['subtitle'] ?? '',
                                         style: const TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 12.sp,
                                           color: Color(0xFF6B7280),
                                         ),
                                         maxLines: 1,
@@ -633,13 +634,13 @@ class _HomeTabState extends State<HomeTab> {
                                             size: 14,
                                             color: Colors.amber[600],
                                           ),
-                                          const SizedBox(width: 4),
+                                          const SizedBox(width: 4.w),
                                           Text(
                                             suggestion['rating']
                                                     ?.toStringAsFixed(1) ??
                                                 '0.0',
                                             style: const TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 12.sp,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -655,14 +656,14 @@ class _HomeTabState extends State<HomeTab> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 24.h),
 
                     // Djerba Hero Section with Carousel
                     Container(
                       height: 200,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(16.r),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.1),
@@ -675,12 +676,12 @@ class _HomeTabState extends State<HomeTab> {
                         children: [
                           AutoImageCarousel(
                             imageUrls: _djerbaImages,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16.r),
                             interval: const Duration(seconds: 4),
                           ),
                           Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(16.r),
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -692,7 +693,7 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(20.w),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.end,
@@ -700,7 +701,7 @@ class _HomeTabState extends State<HomeTab> {
                                 const Text(
                                   'Djerba',
                                   style: TextStyle(
-                                    fontSize: 32,
+                                    fontSize: 32.sp,
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
                                     letterSpacing: -1,
@@ -709,7 +710,7 @@ class _HomeTabState extends State<HomeTab> {
                                 const Text(
                                   'The Pearl of the Mediterranean',
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 16.sp,
                                     fontWeight: FontWeight.w500,
                                     color: Colors.white,
                                   ),
@@ -721,7 +722,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 32.h),
 
                     // Top Rated Places Section
                     Row(
@@ -730,7 +731,7 @@ class _HomeTabState extends State<HomeTab> {
                           child: Text(
                             'Top Rated Places',
                             style: TextStyle(
-                              fontSize: 44 / 2,
+                              fontSize: 44.sp / 2,
                               fontWeight: FontWeight.w900,
                               color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                             ),
@@ -754,14 +755,14 @@ class _HomeTabState extends State<HomeTab> {
                           label: const Text(
                             'View All',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 15.sp,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 12.h),
                     _isLoading
                         ? const SizedBox(
                             height: 240,
@@ -775,7 +776,7 @@ class _HomeTabState extends State<HomeTab> {
                               scrollDirection: Axis.horizontal,
                               itemCount: _topRatedPlaces.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 16.w),
                               itemBuilder: (context, index) {
                                 final lieu = _topRatedPlaces[index];
                                 return _TopDestinationCard(
@@ -792,7 +793,7 @@ class _HomeTabState extends State<HomeTab> {
                               },
                             ),
                           ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 32.h),
 
                     // Top Activities Section
                     Row(
@@ -801,7 +802,7 @@ class _HomeTabState extends State<HomeTab> {
                           child: Text(
                             'Top Activities',
                             style: TextStyle(
-                              fontSize: 44 / 2,
+                              fontSize: 44.sp / 2,
                               fontWeight: FontWeight.w900,
                               color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                             ),
@@ -817,7 +818,7 @@ class _HomeTabState extends State<HomeTab> {
                           label: const Text(
                             'See all',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 15.sp,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -827,13 +828,13 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 12.h),
                     _topActivities.isEmpty
                         ? Container(
                             height: 180,
                             decoration: BoxDecoration(
                               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(16.r),
                               border: Border.all(
                                 color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB),
                               ),
@@ -847,11 +848,11 @@ class _HomeTabState extends State<HomeTab> {
                                     size: 48,
                                     color: Color(0xFF9CA3AF),
                                   ),
-                                  SizedBox(height: 12),
+                                  SizedBox(height: 12.h),
                                   Text(
                                     'No upcoming activities',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 16.sp,
                                       color: Color(0xFF6B7280),
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -868,7 +869,7 @@ class _HomeTabState extends State<HomeTab> {
                                   ? 5
                                   : _topActivities.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 12.w),
                               itemBuilder: (context, index) {
                                 final activity = _topActivities[index];
                                 return _HomeActivityCard(
@@ -886,7 +887,7 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                           ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 32.h),
 
                     // Destinations by Category Sections
                     ...(_lieuxByCategory.entries.map((entry) {
@@ -900,14 +901,14 @@ class _HomeTabState extends State<HomeTab> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 32.h),
                           Row(
                             children: [
                               Expanded(
                                 child: Text(
                                   _formatCategoryName(category),
                                   style: TextStyle(
-                                    fontSize: 44 / 2,
+                                    fontSize: 44.sp / 2,
                                     fontWeight: FontWeight.w900,
                                     color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
                                   ),
@@ -931,21 +932,21 @@ class _HomeTabState extends State<HomeTab> {
                                 label: const Text(
                                   'View All',
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 15.sp,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 12.h),
                           SizedBox(
                             height: 280,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: places.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 16.w),
                               itemBuilder: (context, index) {
                                 final lieu = places[index];
                                 return _TopDestinationCard(
@@ -966,7 +967,7 @@ class _HomeTabState extends State<HomeTab> {
                       );
                     }).toList()),
 
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 100.h),
                   ],
                 ),
               ),
@@ -986,7 +987,7 @@ class _HomeTabState extends State<HomeTab> {
               elevation: 8,
               shape: const CircleBorder(),
               child: InkWell(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(28.r),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -994,7 +995,7 @@ class _HomeTabState extends State<HomeTab> {
                   );
                 },
                 child: const Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16.w),
                   child: Icon(Icons.smart_toy, color: Colors.white, size: 24),
                 ),
               ),
@@ -1118,7 +1119,7 @@ class _HomeHero extends StatelessWidget {
                   const Text(
                     'Discover the\nBeauty of',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 24.sp,
                       height: 1.05,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
@@ -1127,23 +1128,23 @@ class _HomeHero extends StatelessWidget {
                   const Text(
                     'Djerba',
                     style: TextStyle(
-                      fontSize: 38,
+                      fontSize: 38.sp,
                       height: 0.9,
                       fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFFFF6B1A),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 8.h),
                   const Text(
                     'Explore, Relax, Enjoy.',
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 17.sp,
                       color: Color(0xFFF1F5F9),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 26.h),
                   SizedBox(
                     width: 206,
                     height: 50,
@@ -1152,7 +1153,7 @@ class _HomeHero extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF167BFF),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(34),
+                          borderRadius: BorderRadius.circular(34.r),
                         ),
                         elevation: 0,
                       ),
@@ -1162,17 +1163,17 @@ class _HomeHero extends StatelessWidget {
                           Text(
                             'Explore Now',
                             style: TextStyle(
-                              fontSize: 15,
+                              fontSize: 15.sp,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          SizedBox(width: 8),
+                          SizedBox(width: 8.w),
                           Icon(Icons.arrow_forward, size: 18),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 6.h),
                 ],
               ),
             ),
@@ -1194,7 +1195,7 @@ class _HeroIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(999.r),
       child: Container(
         width: 46,
         height: 46,
@@ -1263,7 +1264,7 @@ class _CategoryAvatar extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(2),
+              padding: const EdgeInsets.all(2.w),
               child: ClipOval(
                 child: Image.network(
                   imageUrl,
@@ -1285,7 +1286,7 @@ class _CategoryAvatar extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 13.sp,
                 color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w500,
               ),
@@ -1316,7 +1317,7 @@ class _TopDestinationCard extends StatelessWidget {
         width: 200,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             if (!isDark)
               BoxShadow(
@@ -1334,7 +1335,7 @@ class _TopDestinationCard extends StatelessWidget {
               flex: 3,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
+                  top: Radius.circular(20.r),
                 ),
                 child: Stack(
                   children: [
@@ -1372,7 +1373,7 @@ class _TopDestinationCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12.r),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1382,12 +1383,12 @@ class _TopDestinationCard extends StatelessWidget {
                               color: Color(0xFFFFC529),
                               size: 12,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 4.w),
                             Text(
                               '${lieu.noteMoyenne.toStringAsFixed(1)}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 11,
+                                fontSize: 11.sp,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1403,7 +1404,7 @@ class _TopDestinationCard extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1412,23 +1413,23 @@ class _TopDestinationCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
                         color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 2.h),
                     Text(
                       lieu.sousTitre.isNotEmpty ? lieu.sousTitre : 'Djerba',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.sp,
                         color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 6.h),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1437,14 +1438,14 @@ class _TopDestinationCard extends StatelessWidget {
                             lieu.prix == 'FREE' ? 'Free' : '${lieu.prix}',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 12.sp,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF167BFF),
                             ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(6.w),
                           decoration: BoxDecoration(
                             color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFF1F5F9),
                             shape: BoxShape.circle,
@@ -1479,7 +1480,7 @@ class _PlanTripCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 20, 16, 18),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E2530) : const Color(0xFFDDE9F3),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(26.r),
         border: Border.all(color: isDark ? const Color(0xFF2E3B4E) : const Color(0xFFCFE0EE)),
       ),
       child: Row(
@@ -1492,16 +1493,16 @@ class _PlanTripCard extends StatelessWidget {
                   'Plan Your Perfect Trip',
                   style: TextStyle(
                     color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A),
-                    fontSize: 18,
+                    fontSize: 18.sp,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 6.h),
                 Text(
                   'Discover & Book in one place!',
                   style: TextStyle(
                     color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF475569),
-                    fontSize: 14,
+                    fontSize: 14.sp,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1516,13 +1517,13 @@ class _PlanTripCard extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(34),
+                        borderRadius: BorderRadius.circular(34.r),
                       ),
                     ),
                     child: const Text(
                       'Get Started',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 15.sp,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1531,7 +1532,7 @@ class _PlanTripCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 8.w),
           Container(
             width: 126,
             height: 126,
@@ -1565,19 +1566,19 @@ class _EmptyDestinations extends StatelessWidget {
       height: 220,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
       ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.location_off, color: Color(0xFF7A8BA6), size: 34),
-            const SizedBox(height: 10),
+            const SizedBox(height: 10.h),
             const Text(
               'Not yet available',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 8.h),
             TextButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
         ),
@@ -1633,7 +1634,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
         width: 160,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             if (!isDark)
               BoxShadow(
@@ -1649,7 +1650,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
             Expanded(
               flex: 3,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16.r)),
                 child: Stack(
                   children: [
                     Container(
@@ -1688,18 +1689,18 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.65),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(Icons.star, color: Color(0xFFFFC529), size: 10),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 2.w),
                             Text(
                               activity.noteMoyenne.toStringAsFixed(1),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: 10.sp,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1751,7 +1752,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1760,12 +1761,12 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 12.sp,
                         fontWeight: FontWeight.w600,
                         color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 3.h),
                     Text(
                       activity.organisateur?['fullname'] ??
                           activity.organisateur?['nom_organisation'] ??
@@ -1774,7 +1775,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 10.sp,
                         color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B),
                       ),
                     ),
@@ -1782,7 +1783,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                     Text(
                       activity.prixFormatted,
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.sp,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF167BFF),
                       ),

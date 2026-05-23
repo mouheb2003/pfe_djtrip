@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'config/app_routes.dart';
 import 'services/theme_service.dart';
@@ -234,30 +235,37 @@ class _MyAppState extends State<MyApp> {
             create: (_) => BookmarkProvider()..initialize(),
           ),
         ],
-        child: MaterialApp(
-          title: 'DJTrip',
-          navigatorKey: NavigationService.navigatorKey,
-          scaffoldMessengerKey: rootScaffoldMessengerKey,
-          debugShowCheckedModeBanner: false,
-
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844), // iPhone 13/14 standard size
+          minTextAdapt: true,
+          splitScreenMode: true,
           builder: (context, child) {
-            _disableDebugOverlays();
-            return DefaultTextStyle.merge(
-              style: const TextStyle(
-                decoration: TextDecoration.none,
-                decorationColor: Colors.transparent,
-                decorationThickness: 0,
-              ),
-              child: child ?? const SizedBox.shrink(),
+            return MaterialApp(
+              title: 'DJTrip',
+              navigatorKey: NavigationService.navigatorKey,
+              scaffoldMessengerKey: rootScaffoldMessengerKey,
+              debugShowCheckedModeBanner: false,
+
+              builder: (context, widget) {
+                _disableDebugOverlays();
+                return DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    decoration: TextDecoration.none,
+                    decorationColor: Colors.transparent,
+                    decorationThickness: 0,
+                  ),
+                  child: widget ?? const SizedBox.shrink(),
+                );
+              },
+
+              theme: AppTheme.light,
+              darkTheme: AppTheme.dark,
+              themeMode: mode,
+
+              initialRoute: AppRoutes.splash,
+              onGenerateRoute: AppRoutes.onGenerateRoute,
             );
           },
-
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: mode,
-
-          initialRoute: AppRoutes.splash,
-          onGenerateRoute: AppRoutes.onGenerateRoute,
         ),
       ),
     );
