@@ -22,6 +22,7 @@ import '../../../widgets/mention_text_widget.dart';
 import '../../../utils/snackbar_utils.dart';
 import '../../../services/follow_service.dart';
 import '../../shared/relations_screen.dart';
+import '../../shared/settings_screen.dart';
 
 class TouristProfileTab extends StatefulWidget {
   final ValueChanged<int>? onNavigateToTab;
@@ -1188,7 +1189,18 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.settings_rounded),
+                    color: AppColors.primary,
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
