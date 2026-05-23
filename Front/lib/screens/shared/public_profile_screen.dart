@@ -1363,14 +1363,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   }
 
   Widget _buildRelationsStatItem(String label, String value, bool isFollowers, bool showRelations) {
+    if (!showRelations) {
+      return _buildStatItem(label, value);
+    }
     return InkWell(
       onTap: () {
-        if (!showRelations) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User has hidden their followers and following lists.')),
-          );
-          return;
-        }
         Navigator.push(
           context,
           MaterialPageRoute(

@@ -68,6 +68,36 @@ class FollowService {
     }
   }
 
+  // Remove a follower (someone following the current user)
+  static Future<Map<String, dynamic>> deleteFollower(String followerId) async {
+    try {
+      final token = await AuthService.getAccessToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated.'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('${ApiClient.baseUrl}/follow/follower/$followerId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final body = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': body['message']};
+      }
+
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Error removing follower',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
   // Check if following a user
   static Future<bool> checkFollowStatus(String followingId) async {
     try {

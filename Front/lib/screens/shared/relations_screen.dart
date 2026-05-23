@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/follow_service.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import 'public_profile_screen.dart';
 
@@ -23,13 +24,24 @@ class _RelationsScreenState extends State<RelationsScreen> with SingleTickerProv
   List<Map<String, dynamic>> _following = [];
   bool _isLoadingFollowers = true;
   bool _isLoadingFollowing = true;
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this, initialIndex: widget.initialTabIndex);
+    _loadCurrentUserId();
     _loadFollowers();
     _loadFollowing();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final id = await AuthService.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentUserId = id;
+      });
+    }
   }
 
   @override
@@ -60,7 +72,7 @@ class _RelationsScreenState extends State<RelationsScreen> with SingleTickerProv
     }
   }
 
-  Widget _buildUserList(List<Map<String, dynamic>> users, bool isLoading) {
+  Widget _buildUserList(List<Map<String, dynamic>> users, bool isLoading, bool isFollowersTab) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -79,6 +91,13 @@ class _RelationsScreenState extends State<RelationsScreen> with SingleTickerProv
         final avatar = user['photo_profil'] ?? user['profileImage'] ?? '';
         final userType = user['userType'] ?? 'Tourist';
 
+        final bool isOwner = _currentUserId == widget.userId;
+        
+        // Show Unfollow if we are viewing our own following list
+        final bool showUnfollow = isOwner && !isFollowersTab;
+        // Show Delete if we are viewing our own followers list
+        final bool showDelete = isOwner && isFollowersTab;
+
         return ListTile(
           leading: CircleAvatar(
             backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
@@ -86,6 +105,49 @@ class _RelationsScreenState extends State<RelationsScreen> with SingleTickerProv
           ),
           title: Text(finalName, style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(userType),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showUnfollow)
+                TextButton(
+                  onPressed: () async {
+                    final res = await FollowService.unfollowUser(id);
+                    if (res['success'] == true) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Unfollowed user')));
+                        _loadFollowing();
+                      }
+                    } else {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(res['message'] ?? 'Error')));
+                      }
+                    }
+                  },
+                  child: const Text('Unfollow', style: TextStyle(color: Colors.red)),
+                ),
+              if (showDelete)
+                TextButton(
+                  onPressed: () async {
+                    final res = await FollowService.deleteFollower(id);
+                    if (res['success'] == true) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Removed follower')));
+                        _loadFollowers();
+                      }
+                    } else {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(res['message'] ?? 'Error')));
+                      }
+                    }
+                  },
+                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                ),
+            ],
+          ),
           onTap: () {
             if (id.isNotEmpty) {
               Navigator.push(
@@ -122,8 +184,8 @@ class _RelationsScreenState extends State<RelationsScreen> with SingleTickerProv
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildUserList(_followers, _isLoadingFollowers),
-          _buildUserList(_following, _isLoadingFollowing),
+          _buildUserList(_followers, _isLoadingFollowers, true),
+          _buildUserList(_following, _isLoadingFollowing, false),
         ],
       ),
     );

@@ -1410,61 +1410,60 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
               ],
               SizedBox(height: 14.h),
               // Unified stats bar: Posts | Reservations | Relations
-              InkWell(
-                onTap: () {
-                  final userId = (_user?.id ?? '').toString();
-                  if (userId.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => RelationsScreen(userId: userId),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _StatItem(
+                        value: '$_postsCount',
+                        label: 'Posts',
                       ),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(20.r),
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
-                    borderRadius: BorderRadius.circular(20.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _StatItem(
-                          value: '$_postsCount',
-                          label: 'Posts',
-                        ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 34,
+                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
+                    ),
+                    Expanded(
+                      child: _StatItem(
+                        value: '$_bookingsCount',
+                        label: 'Reservations',
                       ),
-                      Container(
-                        width: 1,
-                        height: 34,
-                        color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
-                      ),
-                      Expanded(
-                        child: _StatItem(
-                          value: '$_bookingsCount',
-                          label: 'Reservations',
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 34,
-                        color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
-                      ),
-                      Expanded(
+                    ),
+                    Container(
+                      width: 1,
+                      height: 34,
+                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          final userId = (_user?.id ?? '').toString();
+                          if (userId.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => RelationsScreen(userId: userId),
+                              ),
+                            );
+                          }
+                        },
                         child: _StatItem(
                           value: '${_followersCount + _followingCount}',
                           label: 'Relations',
                           icon: Icons.people_alt_rounded,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(height: 12.h),
