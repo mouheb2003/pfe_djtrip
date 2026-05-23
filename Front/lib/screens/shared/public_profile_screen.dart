@@ -1335,16 +1335,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          if (isOrganizer)
-            _buildStatItem('Activities', _activities.length.toString())
-          else
-            _buildStatItem('Participated', _participatedActivities.toString()),
-          _buildStatItem('Reviews', _reviews.length.toString()),
-          _buildRelationsStatItem('Followers', _followersCount.toString(), true, showRelations),
-          _buildRelationsStatItem('Following', _followingCount.toString(), false, showRelations),
+          if (isOrganizer) ...[
+            _buildStatItem('Activities', _activities.length.toString()),
+            _buildDivider(),
+            _buildStatItem('Posts', _posts.length.toString()),
+            _buildDivider(),
+            _buildStatItem('Rate', _reviews.isEmpty
+                ? '0.0'
+                : (_reviews.fold<double>(0, (s, r) => s + ((r['rating'] as num?)?.toDouble() ?? 0)) / _reviews.length).toStringAsFixed(1)),
+            _buildDivider(),
+            _buildRelationsStatItem('Relations', '${_followersCount + _followingCount}', true, showRelations),
+          ] else ...[
+            _buildStatItem('Posts', _posts.length.toString()),
+            _buildDivider(),
+            _buildStatItem('Reservations', _participatedActivities.toString()),
+            _buildDivider(),
+            _buildRelationsStatItem('Relations', '${_followersCount + _followingCount}', true, showRelations),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildDivider() {
+    return Container(width: 1, height: 34, color: Colors.grey.withOpacity(0.2));
   }
 
   Widget _buildRelationsStatItem(String label, String value, bool isFollowers, bool showRelations) {

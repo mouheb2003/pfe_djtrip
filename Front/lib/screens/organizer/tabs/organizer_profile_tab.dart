@@ -18,6 +18,8 @@ import '../organizer_main_screen.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/settings_screen.dart';
 import '../../../services/post_service.dart';
+import '../../shared/relations_screen.dart';
+import '../../../services/follow_service.dart';
 
 class OrganizerProfileTab extends StatefulWidget {
   const OrganizerProfileTab({super.key});
@@ -35,6 +37,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
   List<ActivityModel> _myActivities = [];
   List<String> _spokenLanguages = []; // 🚀 NEW: Organizer languages
   List<String> _specialties = []; // 🚀 NEW: Organizer specialties
+  int _followersCount = 0;
+  int _followingCount = 0;
   bool _isLoading = true;
   bool _isLoadingAll = false;
 
@@ -212,6 +216,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
         ReviewService.getOrganizerReviews(targetId),
         ActivityService.getActivitiesByTimeline(),
         PostService.getMyPosts(),
+        FollowService.getFollowersList(targetId),
+        FollowService.getFollowingList(targetId),
       ]);
 
       if (!mounted) return;
@@ -222,6 +228,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
       final reviews = results[3] as List<Map<String, dynamic>>;
       final timeline = results[4] as Map<String, List<ActivityModel>>;
       final myPosts = results[5] as List<Map<String, dynamic>>;
+      final followersList = results[6] as List<dynamic>;
+      final followingList = results[7] as List<dynamic>;
       final primaryActivities = <ActivityModel>[
         ...activeActivities,
         ...archivedActivities,
@@ -273,6 +281,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
         _reviewsCount = computedReviews;
         _postsCount = myPosts.length;
         _myActivities = mine;
+        _followersCount = followersList.length;
+        _followingCount = followingList.length;
 
         // 🚀 NEW: Load languages and specialties
         if (userData != null) {
@@ -974,10 +984,28 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                 ),
               ],
               const SizedBox(height: 14),
-              _OrganizerStatsRow(
-                activities: _activitiesCount,
-                rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
-                posts: _postsCount,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: InkWell(
+                  onTap: () {
+                    final userId = (_user?.id ?? '').toString();
+                    if (userId.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RelationsScreen(userId: userId),
+                        ),
+                      );
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: _OrganizerStatsRow(
+                    activities: _activitiesCount,
+                    rate: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '0.0',
+                    posts: _postsCount,
+                    relations: _followersCount + _followingCount,
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -1167,12 +1195,13 @@ class _OrganizerLanguagesCard extends StatelessWidget {
 }
 
 class _OrganizerStatsRow extends StatelessWidget {
-  final int activities, posts;
+  final int activities, posts, relations;
   final String rate;
   const _OrganizerStatsRow({
     required this.activities,
     required this.rate,
     required this.posts,
+    required this.relations,
   });
 
   @override
@@ -1190,6 +1219,8 @@ class _OrganizerStatsRow extends StatelessWidget {
           _StatCardItem(label: 'RATE', value: rate),
           Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
           _StatCardItem(label: 'POSTS', value: posts.toString()),
+          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
+          _StatCardItem(label: 'RELATIONS', value: relations.toString()),
         ],
       ),
     );

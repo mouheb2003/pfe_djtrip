@@ -1396,7 +1396,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 ),
               ],
               const SizedBox(height: 14),
-              // Stats Relations (Followers / Following)
+              // Unified stats bar: Posts | Reservations | Relations
               InkWell(
                 onTap: () {
                   final userId = (_user?.id ?? '').toString();
@@ -1423,8 +1423,8 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     children: [
                       Expanded(
                         child: _StatItem(
-                          value: '$_followersCount',
-                          label: 'Followers',
+                          value: '$_postsCount',
+                          label: 'Posts',
                         ),
                       ),
                       Container(
@@ -1434,56 +1434,26 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       ),
                       Expanded(
                         child: _StatItem(
-                          value: '$_followingCount',
-                          label: 'Following',
+                          value: '$_bookingsCount',
+                          label: 'Reservations',
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 34,
+                        color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
+                      ),
+                      Expanded(
+                        child: _StatItem(
+                          value: '${_followersCount + _followingCount}',
+                          label: 'Relations',
+                          icon: Icons.people_alt_rounded,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _StatItem(
-                        value: '$_bookingsCount',
-                        label: 'Bookings',
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 34,
-                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
-                    ),
-                    Expanded(
-                      child: _StatItem(value: '$_postsCount', label: 'Posts'),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 34,
-                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC),
-                    ),
-                    Expanded(
-                      child: _StatItem(
-                        value: '$_reviewsCount',
-                        label: 'Reviews',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
               const SizedBox(height: 12),
             ],
           ),
@@ -1496,20 +1466,30 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
+  final IconData? icon;
 
-  const _StatItem({required this.value, required this.label});
+  const _StatItem({required this.value, required this.label, this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.primary,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: AppColors.primary),
+              const SizedBox(width: 3),
+            ],
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 2),
         Text(
