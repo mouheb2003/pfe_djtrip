@@ -923,9 +923,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             // Specialties and Languages (for organizers only)
             if (isOrganizer) ...[
               SliverToBoxAdapter(child: _buildSpecialtiesSection()),
-              const SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+              SliverToBoxAdapter(child: SizedBox(height: 24.h)),
               SliverToBoxAdapter(child: _buildLanguagesSection()),
-              const SliverToBoxAdapter(child: SizedBox(height: 12.h)),
+              SliverToBoxAdapter(child: SizedBox(height: 12.h)),
             ],
 
             // Stats Bar
@@ -945,7 +945,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               _buildTouristContent(),
 
             // Bottom spacing
-            const SliverToBoxAdapter(child: SizedBox(height: 32.h)),
+            SliverToBoxAdapter(child: SizedBox(height: 32.h)),
           ],
         ),
       ),
@@ -1000,7 +1000,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           Container(
             width: 100,
             height: 100,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.outline,
               shape: BoxShape.circle,
             ),
@@ -1070,7 +1070,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
         Container(
           height: 240,
           width: double.infinity,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1139,7 +1139,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                 Container(
                   width: 124,
                   height: 124,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
                       colors: [Color(0xFFE0E7FF), Colors.white],
@@ -1160,7 +1160,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                                 fit: BoxFit.cover,
                                 placeholder: (_, __) => Container(
                                   color: const Color(0xFFF1F5F9),
-                                  child: const Center(
+                                  child: Center(
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                     ),
@@ -1411,7 +1411,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   Widget _buildRestrictedProfile() {
     return Scaffold(
       appBar: AppBar(title: Text('Profile')),
-      body: const Center(
+      body: Center(
         child: Text('This profile is private or unavailable.'),
       ),
     );
@@ -1670,7 +1670,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Color(0xFF22C55E),
                 shape: BoxShape.circle,
                 boxShadow: [
@@ -3768,11 +3768,11 @@ class _PostCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(
                     color: AppColors.outline,
-                    child: const Center(child: CircularProgressIndicator()),
+                    child: Center(child: CircularProgressIndicator()),
                   ),
                   errorWidget: (_, __, ___) => Container(
                     color: AppColors.outline,
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.image_not_supported,
                         color: Colors.grey,
@@ -3785,11 +3785,11 @@ class _PostCard extends StatelessWidget {
           else
             Container(
               height: 200,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.outline,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(Icons.image_outlined, color: Colors.grey, size: 48),
               ),
             ),

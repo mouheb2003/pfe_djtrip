@@ -808,7 +808,7 @@ class _ExploreTabState extends State<ExploreTab> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(15.r),
                 onTap: _continueInGoogleMaps,
-                child: const Center(
+                child: Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

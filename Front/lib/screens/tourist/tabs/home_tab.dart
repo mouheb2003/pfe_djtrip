@@ -590,7 +590,7 @@ class _HomeTabState extends State<HomeTab> {
                                               width: 48,
                                               height: 48,
                                               color: const Color(0xFFF1F5F9),
-                                              child: const Center(
+                                              child: Center(
                                                 child: CircularProgressIndicator(
                                                   strokeWidth: 2,
                                                   color: AppColors.primary,
@@ -839,7 +839,7 @@ class _HomeTabState extends State<HomeTab> {
                                 color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB),
                               ),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -1090,7 +1090,7 @@ class _HomeHero extends StatelessWidget {
                       Container(color: const Color(0xFF167BFF)),
                 ),
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -1199,7 +1199,7 @@ class _HeroIcon extends StatelessWidget {
       child: Container(
         width: 46,
         height: 46,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
         ),
@@ -1207,7 +1207,7 @@ class _HeroIcon extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Center(child: Icon(icon, color: const Color(0xFF1E293B), size: 20)),
-            if (showDot) const Positioned(top: 9, right: 10, child: _RedDot()),
+            if (showDot) Positioned(top: 9, right: 10, child: _RedDot()),
           ],
         ),
       ),
@@ -1347,7 +1347,7 @@ class _TopDestinationCard extends StatelessWidget {
                         if (loadingProgress == null) return child;
                         return Container(
                           color: const Color(0xFFF8FAFC),
-                          child: const Center(
+                          child: Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               color: AppColors.primary,
@@ -1357,7 +1357,7 @@ class _TopDestinationCard extends StatelessWidget {
                       },
                       errorBuilder: (_, __, ___) => Container(
                         color: const Color(0xFFF1F5F9),
-                        child: const Center(
+                        child: Center(
                           child: Icon(Icons.image, color: Color(0xFF94A3B8)),
                         ),
                       ),
@@ -1665,7 +1665,7 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                                 if (loadingProgress == null) return child;
                                 return Container(
                                   color: const Color(0xFFF8FAFC),
-                                  child: const Center(
+                                  child: Center(
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       color: AppColors.primary,
@@ -1673,11 +1673,11 @@ class _HomeActivityCardState extends State<_HomeActivityCard> {
                                   ),
                                 );
                               },
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (_, __, ___) => Center(
                                 child: Icon(Icons.event, color: Color(0xFF94A3B8)),
                               ),
                             )
-                          : const Center(
+                          : Center(
                               child: Icon(Icons.event, color: Color(0xFF94A3B8)),
                             ),
                     ),

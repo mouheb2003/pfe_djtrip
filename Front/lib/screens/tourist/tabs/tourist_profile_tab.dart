@@ -1221,7 +1221,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         fit: BoxFit.cover,
                         filterQuality: FilterQuality.high,
                         errorBuilder: (_, __, ___) => Container(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [Color(0xFF4D74F5), Color(0xFF7B93FF)],
                             ),
