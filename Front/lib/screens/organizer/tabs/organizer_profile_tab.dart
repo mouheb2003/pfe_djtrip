@@ -179,7 +179,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     right: 20,
                     child: IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                      icon: Icon(Icons.close, color: Colors.white, size: 32),
                     ),
                   ),
                 ],
@@ -678,13 +678,13 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
           onRefresh: _loadAll,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(0, 6, 0, 100),
+            padding: EdgeInsets.fromLTRB(0, 6, 0, 100),
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    const SizedBox(width: 48.w), // spacer to center the title
+                    SizedBox(width: 48.w), // spacer to center the title
                     Expanded(
                       child: ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
@@ -692,7 +692,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ).createShader(bounds),
-                        child: const Text(
+                        child: Text(
                           'Profile',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -713,13 +713,13 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                           ),
                         );
                       },
-                      icon: const Icon(Icons.settings_rounded),
+                      icon: Icon(Icons.settings_rounded),
                       color: AppColors.primary,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 6.h),
+              SizedBox(height: 6.h),
 
               // ── Cover Photo + Avatar ────────────────────────────────
               Stack(
@@ -727,9 +727,9 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                 alignment: Alignment.bottomCenter,
                 children: [
                   // Cover photo
-                  const SizedBox(height: 10.h),
+                  SizedBox(height: 10.h),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(22.r),
                       child: SizedBox(
@@ -812,12 +812,12 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 56.h),
+              SizedBox(height: 56.h),
 
               // ── Badge ───────────────────────────────────────────────
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 5,
                   ),
@@ -833,8 +833,8 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.verified, size: 12, color: AppColors.primary),
-                      const SizedBox(width: 4.w),
-                      const Text(
+                      SizedBox(width: 4.w),
+                      Text(
                         'ORGANIZER',
                         style: TextStyle(
                           fontSize: 10.sp,
@@ -848,15 +848,15 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8.h),
+              SizedBox(height: 8.h),
               // ── Full Name ─────────────────────────────────────
               if (_user?.fullname != null && _user!.fullname!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
                     _user!.fullname!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24.sp,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF1D245D),
@@ -865,12 +865,12 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ),
               if (_user?.fullname != null && _user!.fullname!.isNotEmpty)
-                const SizedBox(height: 4.h),
+                SizedBox(height: 4.h),
               // ── Username ───────────────────────────────────
               if (_user?.username != null && _user!.username!.isNotEmpty)
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8EDFF),
                     borderRadius: BorderRadius.circular(12.r),
@@ -886,10 +886,10 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                         size: 16,
                         color: AppColors.primary,
                       ),
-                      const SizedBox(width: 8.w),
+                      SizedBox(width: 8.w),
                       Text(
                         '@${_user!.username}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF1B2458),
@@ -901,7 +901,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                           _copyUsername(_user!.username!);
                         },
                         child: Container(
-                          padding: const EdgeInsets.all(6.w),
+                          padding: EdgeInsets.all(6.w),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8.r),
@@ -917,10 +917,10 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ),
               if (_user?.username != null && _user!.username!.isNotEmpty)
-                const SizedBox(height: 8.h),
+                SizedBox(height: 8.h),
               // ── Location ─────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -929,10 +929,10 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       size: 16,
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 6.w),
+                    SizedBox(width: 6.w),
                     Text(
                       _displayLocation(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1D245D),
@@ -942,14 +942,14 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8.h),
+              SizedBox(height: 8.h),
               // ── Bio ────────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   _safeBio(),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.sp,
                     height: 1.35,
                     color: Color(0xFF56608B),
@@ -957,9 +957,9 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                 ),
               ),
               if (_specialties.isNotEmpty) ...[
-                const SizedBox(height: 10.h),
+                SizedBox(height: 10.h),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 12),
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 8,
@@ -971,9 +971,9 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                 ),
               ],
               if (_spokenLanguages.isNotEmpty) ...[
-                const SizedBox(height: 10.h),
+                SizedBox(height: 10.h),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 12),
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 8,
@@ -984,9 +984,9 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ),
               ],
-              const SizedBox(height: 14.h),
+              SizedBox(height: 14.h),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: InkWell(
                   onTap: () {
                     final userId = (_user?.id ?? '').toString();
@@ -1008,7 +1008,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20.h),
+              SizedBox(height: 20.h),
 
 
             ],
@@ -1043,11 +1043,11 @@ class _StatItem extends StatelessWidget {
           children: [
             if (icon != null) ...[
               Icon(icon, size: 16, color: iconColor ?? AppColors.primary),
-              const SizedBox(width: 3.w),
+              SizedBox(width: 3.w),
             ],
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22.sp,
                 fontWeight: FontWeight.w800,
                 color: AppColors.primary,
@@ -1055,10 +1055,10 @@ class _StatItem extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2.h),
+        SizedBox(height: 2.h),
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.sp,
             fontWeight: FontWeight.w700,
             color: Color(0xFF6F7396),
@@ -1079,7 +1079,7 @@ class _LanguageChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFFE1FEE7), // Soft green for languages
         borderRadius: BorderRadius.circular(999.r),
@@ -1087,7 +1087,7 @@ class _LanguageChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
           color: Color(0xFF065F46),
@@ -1106,7 +1106,7 @@ class _SpecialtyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     // Member colors updated to Blue as requested
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF6FF), // Soft blue for specialties
         borderRadius: BorderRadius.circular(999.r),
@@ -1114,7 +1114,7 @@ class _SpecialtyChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
           color: Color(0xFF1E40AF),
@@ -1130,11 +1130,11 @@ class _OrganizerBioCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: 20),
       child: Text(
         bio,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 12.sp, height: 1.35, color: Color(0xFF56608B)),
+        style: TextStyle(fontSize: 12.sp, height: 1.35, color: Color(0xFF56608B)),
       ),
     );
   }
@@ -1146,11 +1146,11 @@ class _OrganizerLocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: 20),
       child: Text(
         country.toUpperCase(),
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12.sp,
           letterSpacing: 1.4,
           fontWeight: FontWeight.w700,
@@ -1167,7 +1167,7 @@ class _OrganizerSpecialtiesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 12),
       child: Wrap(
         alignment: WrapAlignment.center,
         spacing: 8,
@@ -1184,7 +1184,7 @@ class _OrganizerLanguagesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 12),
       child: Wrap(
         alignment: WrapAlignment.center,
         spacing: 8,
@@ -1208,7 +1208,7 @@ class _OrganizerStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFE8E8F6),
         borderRadius: BorderRadius.circular(20.r),
@@ -1241,15 +1241,15 @@ class _StatCardItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (label == 'RATE')
-                const Icon(
+                Icon(
                   Icons.star,
                   size: 16,
                   color: Color(0xFFFFC107),
                 ),
-              if (label == 'RATE') const SizedBox(width: 4.w),
+              if (label == 'RATE') SizedBox(width: 4.w),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF131A4A),
@@ -1259,7 +1259,7 @@ class _StatCardItem extends StatelessWidget {
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9.sp,
               fontWeight: FontWeight.w800,
               color: Color(0xFF6F7396),
@@ -1277,7 +1277,7 @@ class _DefaultAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFE2E7F6),
-      child: const Icon(
+      child: Icon(
         Icons.person,
         size: 42,
         color: Color(0xFF8892AE),
@@ -1304,7 +1304,7 @@ class _EditBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: const Icon(
+      child: Icon(
         Icons.edit,
         size: 15,
         color: Colors.white,

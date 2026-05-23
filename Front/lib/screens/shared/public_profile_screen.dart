@@ -838,12 +838,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Review'),
-        content: const Text('Are you sure you want to delete this review?'),
+        title: Text('Delete Review'),
+        content: Text('Are you sure you want to delete this review?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
@@ -866,7 +866,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               }
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text('Delete'),
           ),
         ],
       ),
@@ -892,7 +892,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.person_off, size: 64, color: AppColors.textGrey),
-              const SizedBox(height: 16.h),
+              SizedBox(height: 16.h),
               Text('User not found', style: AppTextStyles.headlineSmall),
             ],
           ),
@@ -983,7 +983,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
 
   Widget _buildSkeletonLoader() {
     return Padding(
-      padding: const EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(16.w),
       child: Column(
         children: [
           // Cover skeleton
@@ -995,7 +995,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               borderRadius: BorderRadius.circular(16.r),
             ),
           ),
-          const SizedBox(height: 60.h),
+          SizedBox(height: 60.h),
           // Avatar skeleton
           Container(
             width: 100,
@@ -1005,7 +1005,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
           // Name skeleton
           Container(
             width: 150,
@@ -1015,7 +1015,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               borderRadius: BorderRadius.circular(8.r),
             ),
           ),
-          const SizedBox(height: 8.h),
+          SizedBox(height: 8.h),
           // Bio skeleton
           Container(
             width: 250,
@@ -1116,7 +1116,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
         // 2. Main Profile Content (Avatar & Info)
         Column(
           children: [
-            const SizedBox(height: 140.h),
+            SizedBox(height: 140.h),
             // Avatar with Premium Border
             Stack(
               alignment: Alignment.center,
@@ -1147,7 +1147,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  padding: const EdgeInsets.all(4.w),
+                  padding: EdgeInsets.all(4.w),
                   child: GestureDetector(
                     onTap: () => _showAvatarFullScreen(avatarUrl),
                     child: Hero(
@@ -1166,13 +1166,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                                     ),
                                   ),
                                 ),
-                                errorWidget: (_, __, ___) => const Icon(
+                                errorWidget: (_, __, ___) => Icon(
                                   Icons.person,
                                   size: 50,
                                   color: Color(0xFF94A3B8),
                                 ),
                               )
-                            : const Icon(
+                            : Icon(
                                 Icons.person,
                                 size: 60,
                                 color: Color(0xFF94A3B8),
@@ -1212,11 +1212,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               ],
             ),
 
-            const SizedBox(height: 16.h),
+            SizedBox(height: 16.h),
 
             // Name & Verification Badge
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
                   Row(
@@ -1226,7 +1226,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                       Flexible(
                         child: Text(
                           displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 26.sp,
                             fontWeight: FontWeight.w900,
                             color: Color(0xFF1E293B),
@@ -1237,8 +1237,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                         ),
                       ),
                       if (isOrganizer) ...[
-                        const SizedBox(width: 8.w),
-                        const Icon(
+                        SizedBox(width: 8.w),
+                        Icon(
                           Icons.verified,
                           color: Color(0xFF4B63FF),
                           size: 22,
@@ -1246,10 +1246,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4.h),
+                  SizedBox(height: 4.h),
                   // Badge for User Type
                   Container(
-                    padding: const EdgeInsets.symmetric(
+                    padding: EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
                     ),
@@ -1272,12 +1272,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   if (bio.isNotEmpty)
                     Text(
                       bio,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15.sp,
                         color: Color(0xFF64748B),
                         height: 1.5,
@@ -1286,20 +1286,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   // Location Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.location_on_rounded,
                         size: 16,
                         color: Color(0xFF94A3B8),
                       ),
-                      const SizedBox(width: 4.w),
+                      SizedBox(width: 4.w),
                       Text(
                         location,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.sp,
                           color: Color(0xFF94A3B8),
                           fontWeight: FontWeight.w600,
@@ -1321,8 +1321,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
     final bool showRelations = _userData?['showRelations'] ?? true;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      padding: const EdgeInsets.all(16.w),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
@@ -1391,12 +1391,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18.sp,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 4.h),
+        SizedBox(height: 4.h),
         Text(
           label,
           style: TextStyle(
@@ -1410,7 +1410,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
 
   Widget _buildRestrictedProfile() {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text('Profile')),
       body: const Center(
         child: Text('This profile is private or unavailable.'),
       ),
@@ -1486,8 +1486,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.all(20.w),
+      margin: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(24.r),
@@ -1508,13 +1508,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.alternate_email_rounded,
                 color: Color(0xFF4B63FF),
                 size: 20,
               ),
-              const SizedBox(width: 10.w),
-              const Text(
+              SizedBox(width: 10.w),
+              Text(
                 'Contact Details',
                 style: TextStyle(
                   fontSize: 17.sp,
@@ -1524,12 +1524,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
@@ -1551,7 +1551,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               ),
             ],
           ),
-          const SizedBox(height: 20.h),
+          SizedBox(height: 20.h),
           if (hasPhone) ...[
             _buildContactItem(
               icon: Icons.phone_rounded,
@@ -1560,7 +1560,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               color: const Color(0xFF22C55E),
               onTap: () => _launchPhone(phone),
             ),
-            const SizedBox(height: 12.h),
+            SizedBox(height: 12.h),
           ],
           if (hasEmail) ...[
             _buildContactItem(
@@ -1570,7 +1570,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               color: const Color(0xFF4B63FF),
               onTap: () => _launchEmail(email),
             ),
-            const SizedBox(height: 12.h),
+            SizedBox(height: 12.h),
           ],
           if (hasPresenceInfo)
             _buildContactItem(
@@ -1623,7 +1623,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF262626) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16.r),
@@ -1634,30 +1634,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8.w),
+            padding: EdgeInsets.all(8.w),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12.w),
+          SizedBox(width: 12.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.sp,
                     color: Color(0xFF94A3B8),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 1.h),
+                SizedBox(height: 1.h),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.sp,
                     color: Color(0xFF1E293B),
                     fontWeight: FontWeight.w700,
@@ -1708,7 +1708,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
     final allowPhoneCalls = _userData?['allowPhoneCalls'] ?? true;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         children: [
           if (!isOwnProfile) ...[
@@ -1732,13 +1732,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.primary,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16.r),
                     ),
                   ),
                   icon: _isFollowLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
@@ -1761,7 +1761,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                 ),
               ),
             ),
-            const SizedBox(width: 12.w),
+            SizedBox(width: 12.w),
             // Contact button (respect privacy)
             Expanded(
               child: Container(
@@ -1799,7 +1799,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                         ? Colors.white
                         : Colors.white70,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16.r),
                     ),
@@ -1839,12 +1839,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                   backgroundColor: const Color(0xFF3049D9),
                   foregroundColor: Colors.white,
                   elevation: 2,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  padding: EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16.r),
                   ),
                 ),
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_rounded,
                   size: 22,
                   color: Colors.white,
@@ -1866,8 +1866,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   Widget _buildOrganizerTabs() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      padding: const EdgeInsets.all(4.w),
+      margin: EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.all(4.w),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.06),
         borderRadius: BorderRadius.circular(16.r),
@@ -1884,7 +1884,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: _activeTabIndex == 0
                       ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
@@ -1910,7 +1910,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                           : AppColors.textGrey,
                       size: 20,
                     ),
-                    const SizedBox(width: 8.w),
+                    SizedBox(width: 8.w),
                     Text(
                       'Activities',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -1937,7 +1937,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: _activeTabIndex == 1
                       ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
@@ -1963,7 +1963,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                           : AppColors.textGrey,
                       size: 20,
                     ),
-                    const SizedBox(width: 8.w),
+                    SizedBox(width: 8.w),
                     Text(
                       'Posts',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -1990,7 +1990,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: _buildOrganizerTabs(),
           ),
           AnimatedSwitcher(
@@ -2005,7 +2005,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                 : KeyedSubtree(
                     key: const ValueKey('organizer_posts'),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.symmetric(horizontal: 16),
                       child: _buildPostsSection(),
                     ),
                   ),
@@ -2022,11 +2022,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text('Specialized Activities', style: AppTextStyles.headlineSmall),
-        const SizedBox(height: 20.h),
+        SizedBox(height: 20.h),
         if (specialties.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(20.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16.r),
@@ -2075,11 +2075,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text('Spoken Languages', style: AppTextStyles.headlineSmall),
-        const SizedBox(height: 12.h),
+        SizedBox(height: 12.h),
         if (languages.isEmpty || languages.first.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(20.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16.r),
@@ -2128,12 +2128,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Activities', style: AppTextStyles.headlineSmall),
-              const SizedBox(width: 8.w),
+              SizedBox(width: 8.w),
               if (_activities.isNotEmpty)
                 Flexible(
                   child: FittedBox(
@@ -2151,7 +2151,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                                 size: 14,
                                 color: AppColors.primary,
                               ),
-                              const SizedBox(width: 4.w),
+                              SizedBox(width: 4.w),
                               Text(
                                 activityRating.toStringAsFixed(1),
                                 style: AppTextStyles.bodySmall.copyWith(
@@ -2159,7 +2159,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(width: 8.w),
+                              SizedBox(width: 8.w),
                             ],
                           ),
                         // Activity reviews count
@@ -2169,7 +2169,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                             color: AppColors.textGrey,
                           ),
                         ),
-                        const SizedBox(width: 8.w),
+                        SizedBox(width: 8.w),
                         // Total activities count
                         Text(
                           '${_activities.length} activities',
@@ -2184,13 +2184,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             ],
           ),
         ),
-        const SizedBox(height: 12.h),
+        SizedBox(height: 12.h),
         if (_activities.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24.w),
+              padding: EdgeInsets.all(24.w),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16.r),
@@ -2199,7 +2199,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               child: Column(
                 children: [
                   Icon(Icons.event_busy, size: 48, color: AppColors.textGrey),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   Text(
                     'No activities yet',
                     style: AppTextStyles.bodyMedium.copyWith(
@@ -2214,12 +2214,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: displayCount,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12.h),
+                  separatorBuilder: (_, __) => SizedBox(height: 12.h),
                   itemBuilder: (context, index) {
                     final activity = _activities[index];
                     return _ActivityCard(activity: activity);
@@ -2228,7 +2228,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
               ),
               if (_activities.length > 6)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(vertical: 16),
                   child: Center(
                     child: TextButton.icon(
                       onPressed: _toggleShowMoreActivities,
@@ -2260,9 +2260,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 32.h),
+        SizedBox(height: 32.h),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2277,13 +2277,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             ],
           ),
         ),
-        const SizedBox(height: 12.h),
+        SizedBox(height: 12.h),
         if (_reviews.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24.w),
+              padding: EdgeInsets.all(24.w),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16.r),
@@ -2296,7 +2296,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                     size: 48,
                     color: AppColors.textGrey,
                   ),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   Text(
                     'No reviews yet',
                     style: AppTextStyles.bodyMedium.copyWith(
@@ -2309,7 +2309,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           )
         else
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
               height: 160,
               child: PageView.builder(
@@ -2318,7 +2318,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                 itemBuilder: (context, index) {
                   final review = _reviews[index];
                   return Padding(
-                    padding: const EdgeInsets.only(right: 12),
+                    padding: EdgeInsets.only(right: 12),
                     child: _ReviewCard(
                       review: review,
                       currentUserId: _currentUserId,
@@ -2338,7 +2338,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
 
   Widget _buildTouristContent() {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
           // Posts Section
@@ -2362,17 +2362,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
     debugPrint('Interests: $interests');
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
           Text('Interests', style: AppTextStyles.headlineSmall),
-          const SizedBox(height: 12.h),
+          SizedBox(height: 12.h),
           if (interests.isEmpty)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20.w),
+              padding: EdgeInsets.all(20.w),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16.r),
@@ -2408,11 +2408,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [Text('Posts', style: AppTextStyles.headlineSmall)],
         ),
-        const SizedBox(height: 12.h),
+        SizedBox(height: 12.h),
         if (_posts.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24.w),
+            padding: EdgeInsets.all(24.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16.r),
@@ -2425,7 +2425,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                   size: 48,
                   color: AppColors.textGrey,
                 ),
-                const SizedBox(height: 12.h),
+                SizedBox(height: 12.h),
                 Text(
                   'No posts yet',
                   style: AppTextStyles.bodyMedium.copyWith(
@@ -2440,7 +2440,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _posts.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12.h),
+            separatorBuilder: (_, __) => SizedBox(height: 12.h),
             itemBuilder: (context, index) {
               final post = _posts[index];
               return PublicationCard(
@@ -2514,7 +2514,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
             },
           ),
         if (_isLoadingContent)
-          const Padding(
+          Padding(
             padding: EdgeInsets.all(20.w),
             child: Center(child: CircularProgressIndicator()),
           ),
@@ -3031,14 +3031,14 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 22.sp,
             fontWeight: FontWeight.w900,
             color: Color(0xFF1E293B),
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 2.h),
+        SizedBox(height: 2.h),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3049,10 +3049,10 @@ class _StatItem extends StatelessWidget {
                   ? const Color(0xFFFFB31B)
                   : const Color(0xFF94A3B8),
             ),
-            const SizedBox(width: 4.w),
+            SizedBox(width: 4.w),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF94A3B8),
@@ -3074,7 +3074,7 @@ class _SpecialtyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
@@ -3091,7 +3091,7 @@ class _SpecialtyChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: Color(0xFF4B63FF),
           fontWeight: FontWeight.w700,
           fontSize: 13.sp,
@@ -3110,7 +3110,7 @@ class _LanguageChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
@@ -3127,7 +3127,7 @@ class _LanguageChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: Color(0xFFFFB31B),
           fontWeight: FontWeight.w700,
           fontSize: 13.sp,
@@ -3146,7 +3146,7 @@ class _InterestChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
@@ -3163,7 +3163,7 @@ class _InterestChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: Color(0xFF22C55E),
           fontWeight: FontWeight.w700,
           fontSize: 13.sp,
@@ -3237,7 +3237,7 @@ class _ActivityCardState extends State<_ActivityCard> {
           children: [
             // Image carousel on top
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(
+              borderRadius: BorderRadius.vertical(
                 top: Radius.circular(16.r),
               ),
               child: SizedBox(
@@ -3290,7 +3290,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                                   (index) => Container(
                                     width: 6,
                                     height: 6,
-                                    margin: const EdgeInsets.symmetric(
+                                    margin: EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
                                     decoration: BoxDecoration(
@@ -3309,7 +3309,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                               top: 8,
                               right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(
+                                padding: EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 4,
                                 ),
@@ -3319,7 +3319,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                                 ),
                                 child: Text(
                                   '${_currentImageIndex + 1}/${photos.length}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12.sp,
                                     fontWeight: FontWeight.w500,
@@ -3333,7 +3333,7 @@ class _ActivityCardState extends State<_ActivityCard> {
             ),
             // Content below
             Padding(
-              padding: const EdgeInsets.all(16.w),
+              padding: EdgeInsets.all(16.w),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -3343,7 +3343,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8.h),
+                  SizedBox(height: 8.h),
                   Row(
                     children: [
                       Icon(
@@ -3351,7 +3351,7 @@ class _ActivityCardState extends State<_ActivityCard> {
                         size: 14,
                         color: AppColors.textGrey,
                       ),
-                      const SizedBox(width: 4.w),
+                      SizedBox(width: 4.w),
                       Expanded(
                         child: Text(
                           widget.activity.formattedLieu,
@@ -3362,18 +3362,18 @@ class _ActivityCardState extends State<_ActivityCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   Row(
                     children: [
                       Icon(Icons.star, size: 14, color: AppColors.accent),
-                      const SizedBox(width: 4.w),
+                      SizedBox(width: 4.w),
                       Text(
                         widget.activity.noteMoyenne.toStringAsFixed(1),
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 8.w),
+                      SizedBox(width: 8.w),
                       Text(
                         '(${widget.activity.nombreAvis})',
                         style: AppTextStyles.bodySmall.copyWith(
@@ -3505,7 +3505,7 @@ class _ReviewCard extends StatelessWidget {
     final tags = review['tags'] as List? ?? [];
 
     return Container(
-      padding: const EdgeInsets.all(14.w),
+      padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16.r),
@@ -3533,7 +3533,7 @@ class _ReviewCard extends StatelessWidget {
                     ? Icon(Icons.person, size: 20, color: AppColors.primary)
                     : null,
               ),
-              const SizedBox(width: 10.w),
+              SizedBox(width: 10.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3557,7 +3557,7 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10.r),
@@ -3565,7 +3565,7 @@ class _ReviewCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(Icons.star, size: 14, color: AppColors.accent),
-                    const SizedBox(width: 3.w),
+                    SizedBox(width: 3.w),
                     Text(
                       rating.toStringAsFixed(1),
                       style: AppTextStyles.labelLarge.copyWith(
@@ -3579,7 +3579,7 @@ class _ReviewCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10.h),
+          SizedBox(height: 10.h),
           // Review text
           Text(
             reviewText,
@@ -3589,13 +3589,13 @@ class _ReviewCard extends StatelessWidget {
           ),
           // Tags if available
           if (tags.isNotEmpty) ...[
-            const SizedBox(height: 8.h),
+            SizedBox(height: 8.h),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: tags.take(2).map((tag) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 3,
                   ),
@@ -3659,7 +3659,7 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Edit Review'),
+      title: Text('Edit Review'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3679,7 +3679,7 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
               );
             }),
           ),
-          const SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
           TextField(
             controller: _commentController,
             maxLines: 3,
@@ -3695,7 +3695,7 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSaving
@@ -3709,12 +3709,12 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
                   }
                 },
           child: _isSaving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save'),
+              : Text('Save'),
         ),
       ],
     );
@@ -3758,7 +3758,7 @@ class _PostCard extends StatelessWidget {
           // Image or placeholder
           if (imageUrl.isNotEmpty)
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(
+              borderRadius: BorderRadius.vertical(
                 top: Radius.circular(12.r),
               ),
               child: AspectRatio(
@@ -3795,7 +3795,7 @@ class _PostCard extends StatelessWidget {
             ),
 
           Padding(
-            padding: const EdgeInsets.all(12.w),
+            padding: EdgeInsets.all(12.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -3806,7 +3806,7 @@ class _PostCard extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8.h),
+                SizedBox(height: 8.h),
 
                 // Date
                 Text(
@@ -3815,7 +3815,7 @@ class _PostCard extends StatelessWidget {
                     color: AppColors.textGrey,
                   ),
                 ),
-                const SizedBox(height: 12.h),
+                SizedBox(height: 12.h),
 
                 // Actions
                 Row(
@@ -3830,7 +3830,7 @@ class _PostCard extends StatelessWidget {
                             size: 18,
                             color: isLiked ? Colors.red : AppColors.textGrey,
                           ),
-                          const SizedBox(width: 4.w),
+                          SizedBox(width: 4.w),
                           Text(
                             '${post.likesCount}',
                             style: AppTextStyles.bodySmall.copyWith(
@@ -3840,7 +3840,7 @@ class _PostCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16.w),
+                    SizedBox(width: 16.w),
 
                     // Comment button
                     GestureDetector(
@@ -3852,7 +3852,7 @@ class _PostCard extends StatelessWidget {
                             size: 18,
                             color: AppColors.textGrey,
                           ),
-                          const SizedBox(width: 4.w),
+                          SizedBox(width: 4.w),
                           Text(
                             '${post.commentsCount}',
                             style: AppTextStyles.bodySmall.copyWith(

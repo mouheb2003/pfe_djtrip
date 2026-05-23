@@ -405,16 +405,16 @@ class _ExploreTabState extends State<ExploreTab> {
           // 2. OVERLAY D'INTERFACE (RECHERCHE OU ITINERAIRE)
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Column(
                 children: [
                   _showItineraryPanel
                       ? _buildItineraryPanel()
                       : _buildSearchBar(),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
                   if (!_showItineraryPanel) _buildFilterList(),
                   if (!_showItineraryPanel && _searchSuggestions.isNotEmpty)
-                    const SizedBox(height: 10.h),
+                    SizedBox(height: 10.h),
                   if (!_showItineraryPanel && _searchSuggestions.isNotEmpty)
                     _buildSearchSuggestions(),
                 ],
@@ -436,7 +436,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     tag: 'details_fab',
                     child: Material(
                       color: const Color(0xFF2158F6),
-                      shape: const RoundedRectangleBorder(
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.all(Radius.circular(28.r)),
                       ),
                       child: InkWell(
@@ -452,16 +452,16 @@ class _ExploreTabState extends State<ExploreTab> {
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
+                          padding: EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 12,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.info, color: Colors.white),
-                              const SizedBox(width: 8.w),
-                              const Text(
+                              Icon(Icons.info, color: Colors.white),
+                              SizedBox(width: 8.w),
+                              Text(
                                 "Plus Détails",
                                 style: TextStyle(
                                   color: Colors.white,
@@ -482,7 +482,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     tag: 'itinerary_fab',
                     child: Material(
                       color: const Color(0xFF2158F6),
-                      shape: const RoundedRectangleBorder(
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.all(Radius.circular(28.r)),
                       ),
                       child: InkWell(
@@ -494,16 +494,16 @@ class _ExploreTabState extends State<ExploreTab> {
                           _fetchRoute();
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
+                          padding: EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 12,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.directions, color: Colors.white),
-                              const SizedBox(width: 8.w),
-                              const Text(
+                              Icon(Icons.directions, color: Colors.white),
+                              SizedBox(width: 8.w),
+                              Text(
                                 "Itinerary",
                                 style: TextStyle(
                                   color: Colors.white,
@@ -525,13 +525,13 @@ class _ExploreTabState extends State<ExploreTab> {
                       onPressed: _continueInGoogleMaps,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2158F6),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30.r),
                         ),
                         elevation: 5,
                       ),
-                      child: const Text(
+                      child: Text(
                         "Continue in Google Maps",
                         style: TextStyle(
                           color: Colors.white,
@@ -558,7 +558,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(28.r),
                     onTap: _recenterToDjerba,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(12.w),
                       child: Icon(Icons.my_location, color: Color(0xFF2158F6)),
                     ),
@@ -577,7 +577,7 @@ class _ExploreTabState extends State<ExploreTab> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8EEF5),
         borderRadius: BorderRadius.circular(30.r),
@@ -592,8 +592,8 @@ class _ExploreTabState extends State<ExploreTab> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search, color: Color(0xFF245CF7), size: 26),
-          const SizedBox(width: 12.w),
+          Icon(Icons.search, color: Color(0xFF245CF7), size: 26),
+          SizedBox(width: 12.w),
           Expanded(
             child: Container(
               height: 40,
@@ -652,7 +652,7 @@ class _ExploreTabState extends State<ExploreTab> {
           final lieu = _searchSuggestions[index];
           return ListTile(
             dense: true,
-            leading: const Icon(Icons.place, color: Color(0xFF2158F6)),
+            leading: Icon(Icons.place, color: Color(0xFF2158F6)),
             title: Text(
               lieu.titre,
               maxLines: 1,
@@ -680,8 +680,8 @@ class _ExploreTabState extends State<ExploreTab> {
   Widget _buildItineraryPanel() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(20.w),
+      margin: EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20.r),
@@ -703,18 +703,18 @@ class _ExploreTabState extends State<ExploreTab> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8.w),
+                padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2158F6).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10.r),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions,
                   color: Color(0xFF2158F6),
                   size: 20,
                 ),
               ),
-              const SizedBox(width: 12.w),
+              SizedBox(width: 12.w),
               Expanded(
                 child: Text(
                   'Itinéraire',
@@ -728,7 +728,7 @@ class _ExploreTabState extends State<ExploreTab> {
               GestureDetector(
                 onTap: () => setState(() => _showItineraryPanel = false),
                 child: Container(
-                  padding: const EdgeInsets.all(8.w),
+                  padding: EdgeInsets.all(8.w),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10.r),
@@ -742,7 +742,7 @@ class _ExploreTabState extends State<ExploreTab> {
               ),
             ],
           ),
-          const SizedBox(height: 20.h),
+          SizedBox(height: 20.h),
 
           // Section Point de départ
           _buildRouteSection(
@@ -753,12 +753,12 @@ class _ExploreTabState extends State<ExploreTab> {
             isOrigin: true,
           ),
 
-          const SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
 
           // Ligne de connexion
           Container(
             height: 2,
-            margin: const EdgeInsets.only(left: 20),
+            margin: EdgeInsets.only(left: 20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -771,7 +771,7 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           ),
 
-          const SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
 
           // Section Destination
           _buildRouteSection(
@@ -782,7 +782,7 @@ class _ExploreTabState extends State<ExploreTab> {
             isOrigin: false,
           ),
 
-          const SizedBox(height: 20.h),
+          SizedBox(height: 20.h),
 
           // Bouton d'action
           Container(
@@ -842,7 +842,7 @@ class _ExploreTabState extends State<ExploreTab> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF121212) : Colors.grey.withOpacity(0.05),
         borderRadius: BorderRadius.circular(15.r),
@@ -859,21 +859,21 @@ class _ExploreTabState extends State<ExploreTab> {
               color: isDark ? Colors.grey[400] : const Color(0xFF666666),
             ),
           ),
-          const SizedBox(height: 8.h),
+          SizedBox(height: 8.h),
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8.w),
+                padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: Icon(icon, color: iconColor, size: 18),
               ),
-              const SizedBox(width: 12.w),
+              SizedBox(width: 12.w),
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
                   ),
@@ -908,16 +908,16 @@ class _ExploreTabState extends State<ExploreTab> {
                 ),
               ),
               if (isOrigin) ...[
-                const SizedBox(width: 12.w),
+                SizedBox(width: 12.w),
                 GestureDetector(
                   onTap: _refreshCurrentPosition,
                   child: Container(
-                    padding: const EdgeInsets.all(8.w),
+                    padding: EdgeInsets.all(8.w),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2158F6).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8.r),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.refresh,
                       color: Color(0xFF2158F6),
                       size: 18,
@@ -940,7 +940,7 @@ class _ExploreTabState extends State<ExploreTab> {
   }) {
     return Container(
       height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF1F4F9),
         borderRadius: BorderRadius.circular(12.r),
@@ -978,14 +978,14 @@ class _ExploreTabState extends State<ExploreTab> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10.w),
+        separatorBuilder: (_, __) => SizedBox(width: 10.w),
         itemBuilder: (context, index) {
           final item = _filters[index];
           final isSelected = item == _activeFilter;
           return GestureDetector(
             onTap: () => setState(() => _activeFilter = item),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
+              padding: EdgeInsets.symmetric(horizontal: 22),
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF2158F6)

@@ -227,7 +227,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     right: 20,
                     child: IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
                         color: Colors.white,
                         size: 32,
@@ -268,7 +268,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
           child: Center(
             child: Container(
               width: 320,
-              padding: const EdgeInsets.all(24.w),
+              padding: EdgeInsets.all(24.w),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(16.r),
@@ -292,13 +292,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       color: isDark ? const Color(0xFF2D1616) : const Color(0xFFFFF2F0),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.delete_outline_rounded,
                       color: Color(0xFFDC2626),
                       size: 28,
                     ),
                   ),
-                  const SizedBox(height: 20.h),
+                  SizedBox(height: 20.h),
 
                   // Title
                   Text(
@@ -310,7 +310,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 12.h),
+                  SizedBox(height: 12.h),
 
                   // Description
                   Text(
@@ -323,7 +323,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                       letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 24.h),
+                  SizedBox(height: 24.h),
 
                   // Buttons
                   Row(
@@ -333,12 +333,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         child: TextButton(
                           onPressed: () => Navigator.pop(context, false),
                           style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8.r),
                             ),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Cancel',
                             style: TextStyle(
                               fontSize: 15.sp,
@@ -349,7 +349,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12.w),
+                      SizedBox(width: 12.w),
 
                       // Delete button
                       Expanded(
@@ -358,13 +358,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFDC2626),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8.r),
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Delete',
                             style: TextStyle(
                               fontSize: 15.sp,
@@ -428,12 +428,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.only(top: 30),
+              padding: EdgeInsets.only(top: 30),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 26),
+                padding: EdgeInsets.fromLTRB(18, 10, 18, 26),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF4F4FB),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(34.r)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(34.r)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -446,7 +446,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         borderRadius: BorderRadius.circular(10.r),
                       ),
                     ),
-                    const SizedBox(height: 18.h),
+                    SizedBox(height: 18.h),
                     _ActionRow(
                       icon: Icons.edit_rounded,
                       label: 'Edit Post',
@@ -510,7 +510,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : const Color(0xFFF6F6FD),
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
       builder: (context) {
@@ -572,10 +572,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           borderRadius: BorderRadius.circular(4.r),
                         ),
                       ),
-                      const SizedBox(height: 10.h),
+                      SizedBox(height: 10.h),
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'Comments',
                             style: TextStyle(
                               fontSize: 20.sp,
@@ -586,7 +586,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           const Spacer(),
                           Text(
                             '${workingComments.length}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF6770A3),
@@ -594,7 +594,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10.h),
+                      SizedBox(height: 10.h),
                       Expanded(
                         child: ListView(
                           children: [
@@ -619,13 +619,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
+                            padding: EdgeInsets.only(bottom: 6),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Text(
                                     'Replying to $replyToName',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Color(0xFF636CA0),
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -639,7 +639,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                       replyToName = '';
                                     });
                                   },
-                                  icon: const Icon(Icons.close, size: 18),
+                                  icon: Icon(Icons.close, size: 18),
                                 ),
                               ],
                             ),
@@ -655,7 +655,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                 hintText: 'Write a comment...',
                                 filled: true,
                                 fillColor: isDark ? const Color(0xFF2E2E2E) : Colors.white,
-                                border: const OutlineInputBorder(
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(18.r),
                                   ),
@@ -664,7 +664,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8.w),
+                          SizedBox(width: 8.w),
                           FilledButton(
                             onPressed: submit,
                             style: FilledButton.styleFrom(
@@ -672,7 +672,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                               foregroundColor: Colors.white,
                               shape: const StadiumBorder(),
                             ),
-                            child: const Text('Send'),
+                            child: Text('Send'),
                           ),
                         ],
                       ),
@@ -753,7 +753,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
           child: SafeArea(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
+                padding: EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 10,
                 ),
@@ -764,7 +764,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   ),
                   child: SingleChildScrollView(
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF2F2FA),
                         borderRadius: BorderRadius.circular(22.r),
@@ -780,10 +780,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                     ? NetworkImage(avatar)
                                     : null,
                                 child: avatar.isEmpty
-                                    ? const Icon(Icons.person, size: 16)
+                                    ? Icon(Icons.person, size: 16)
                                     : null,
                               ),
-                              const SizedBox(width: 10.w),
+                              SizedBox(width: 10.w),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,7 +798,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                     ),
                                     Text(
                                       _timeAgo(parsedDate).toUpperCase(),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11.sp,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 0.6,
@@ -811,9 +811,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             ],
                           ),
                           if (locationLabel.isNotEmpty) ...[
-                            const SizedBox(height: 10.h),
+                            SizedBox(height: 10.h),
                             Container(
-                              padding: const EdgeInsets.symmetric(
+                              padding: EdgeInsets.symmetric(
                                 horizontal: 10,
                                 vertical: 6,
                               ),
@@ -824,12 +824,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.location_on,
                                     size: 14,
                                     color: Color(0xFF6D5FD8),
                                   ),
-                                  const SizedBox(width: 4.w),
+                                  SizedBox(width: 4.w),
                                   Text(
                                     locationLabel,
                                     style: TextStyle(
@@ -843,7 +843,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             ),
                           ],
                           if (content.isNotEmpty) ...[
-                            const SizedBox(height: 14.h),
+                            SizedBox(height: 14.h),
                             Text(
                               content,
                               style: TextStyle(
@@ -855,7 +855,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                             ),
                           ],
                           if (hashtags.isNotEmpty) ...[
-                            const SizedBox(height: 10.h),
+                            SizedBox(height: 10.h),
                             Wrap(
                               spacing: 5,
                               runSpacing: 5,
@@ -873,7 +873,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                   .toList(),
                             ),
                           ],
-                          const SizedBox(height: 14.h),
+                          SizedBox(height: 14.h),
                           if (galleryUrls.isNotEmpty)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(18.r),
@@ -883,14 +883,14 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                                 showIndicators: galleryUrls.length > 1,
                               ),
                             ),
-                          const SizedBox(height: 12.h),
+                          SizedBox(height: 12.h),
                           Row(
                             children: [
                               _DetailAction(
                                 icon: Icons.favorite,
                                 label: '$likes',
                               ),
-                              const SizedBox(width: 18.w),
+                              SizedBox(width: 18.w),
                               _DetailAction(
                                 icon: Icons.chat_bubble,
                                 label: '$commentsCount',
@@ -1162,13 +1162,13 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
         child: RefreshIndicator(
           onRefresh: _loadAll,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+            padding: EdgeInsets.fromLTRB(16, 6, 16, 16),
             children: [
               Row(
                 children: [
                   IconButton(
                     onPressed: () => widget.onNavigateToTab?.call(0),
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(Icons.arrow_back),
                     color: AppColors.primary,
                   ),
                   Expanded(
@@ -1199,12 +1199,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.settings_rounded),
+                    icon: Icon(Icons.settings_rounded),
                     color: AppColors.primary,
                   ),
                 ],
               ),
-              const SizedBox(height: 6.h),
+              SizedBox(height: 6.h),
               // ── Cover Photo + Avatar ────────────────────────────────
               Stack(
                 clipBehavior: Clip.none,
@@ -1297,12 +1297,12 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 56.h),
+              SizedBox(height: 56.h),
               // ── Badge ───────────────────────────────────────────────
               if (user != null)
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
+                    padding: EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 5,
                     ),
@@ -1322,10 +1322,10 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                           size: 12,
                           color: AppColors.primary,
                         ),
-                        const SizedBox(width: 4.w),
+                        SizedBox(width: 4.w),
                         Text(
                           _isOrganizer ? 'ORGANIZER' : 'TOURIST',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10.sp,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
@@ -1337,7 +1337,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 18.h),
+              SizedBox(height: 18.h),
               Text(
                 user?.fullname ?? 'Traveler',
                 textAlign: TextAlign.center,
@@ -1347,21 +1347,21 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1B2458),
                 ),
               ),
-              const SizedBox(height: 2.h),
+              SizedBox(height: 2.h),
 
               Text(
                 _displayLocation(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.sp,
                   letterSpacing: 1.4,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(height: 8.h),
+              SizedBox(height: 8.h),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   _safeBio(),
                   textAlign: TextAlign.center,
@@ -1373,9 +1373,9 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 ),
               ),
               if (!_isOrganizer && interests.isNotEmpty) ...[
-                const SizedBox(height: 10.h),
+                SizedBox(height: 10.h),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 12),
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 8,
@@ -1383,7 +1383,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                     children: interests
                         .map(
                           (interest) => Container(
-                            padding: const EdgeInsets.symmetric(
+                            padding: EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 6,
                             ),
@@ -1408,7 +1408,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   ),
                 ),
               ],
-              const SizedBox(height: 14.h),
+              SizedBox(height: 14.h),
               // Unified stats bar: Posts | Reservations | Relations
               InkWell(
                 onTap: () {
@@ -1424,7 +1424,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                 },
                 borderRadius: BorderRadius.circular(20.r),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     vertical: 10,
                     horizontal: 8,
                   ),
@@ -1467,7 +1467,7 @@ class _TouristProfileTabState extends State<TouristProfileTab> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12.h),
+              SizedBox(height: 12.h),
             ],
           ),
         ),
@@ -1492,11 +1492,11 @@ class _StatItem extends StatelessWidget {
           children: [
             if (icon != null) ...[
               Icon(icon, size: 14, color: AppColors.primary),
-              const SizedBox(width: 3.w),
+              SizedBox(width: 3.w),
             ],
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22.sp,
                 fontWeight: FontWeight.w800,
                 color: AppColors.primary,
@@ -1504,10 +1504,10 @@ class _StatItem extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2.h),
+        SizedBox(height: 2.h),
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.sp,
             fontWeight: FontWeight.w700,
             color: Color(0xFF6F7396),
@@ -1532,10 +1532,10 @@ class _DetailAction extends StatelessWidget {
       children: [
         Icon(icon, size: 19, color: const Color(0xFF7D7FA4)),
         if (label != null) ...[
-          const SizedBox(width: 5.w),
+          SizedBox(width: 5.w),
           Text(
             label!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13.sp,
               fontWeight: FontWeight.w700,
               color: Color(0xFF7D7FA4),
@@ -1567,7 +1567,7 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       onTap: onTap,
       leading: Container(
         width: 54,
@@ -1632,11 +1632,11 @@ class _CommentTile extends StatelessWidget {
     final created = DateTime.tryParse(comment['createdAt']?.toString() ?? '');
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: 10),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(10.w),
+            padding: EdgeInsets.all(10.w),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(14.r),
@@ -1650,10 +1650,10 @@ class _CommentTile extends StatelessWidget {
                       ? NetworkImage(authorAvatar)
                       : null,
                   child: authorAvatar.isEmpty
-                      ? const Icon(Icons.person, size: 16)
+                      ? Icon(Icons.person, size: 16)
                       : null,
                 ),
-                const SizedBox(width: 8.w),
+                SizedBox(width: 8.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1678,18 +1678,18 @@ class _CommentTile extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2.h),
+                      SizedBox(height: 2.h),
                       Text(
                         content,
                         style: TextStyle(color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF40497C)),
                       ),
-                      const SizedBox(height: 6.h),
+                      SizedBox(height: 6.h),
                       GestureDetector(
                         onTap: () => onReply(
                           id,
                           authorId == currentUserId ? 'You' : authorName,
                         ),
-                        child: const Text(
+                        child: Text(
                           'Reply',
                           style: TextStyle(
                             color: AppColors.primary,
@@ -1705,7 +1705,7 @@ class _CommentTile extends StatelessWidget {
           ),
           if (replies.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(left: 24, top: 8),
+              padding: EdgeInsets.only(left: 24, top: 8),
               child: Column(
                 children: replies
                     .map(
@@ -1731,7 +1731,7 @@ class _DefaultAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFE2E7F6),
-      child: const Icon(Icons.person, size: 42, color: Color(0xFF8892AE)),
+      child: Icon(Icons.person, size: 42, color: Color(0xFF8892AE)),
     );
   }
 }
@@ -1754,7 +1754,7 @@ class _EditBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: const Icon(Icons.edit, size: 15, color: Colors.white),
+      child: Icon(Icons.edit, size: 15, color: Colors.white),
     );
   }
 }
