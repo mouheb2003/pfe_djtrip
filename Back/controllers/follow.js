@@ -105,7 +105,7 @@ exports.checkFollowStatus = async (req, res) => {
   }
 };
 
-// Get followers count
+// Get followers count and list
 exports.getFollowersCount = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -114,19 +114,28 @@ exports.getFollowersCount = async (req, res) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
-    const count = await Follow.getFollowersCount(userId);
+    // Fetch the follows and populate the follower_id with user details
+    const follows = await Follow.find({ following_id: userId })
+      .populate("follower_id", "nom prenom username photo_profil profileImage userType")
+      .exec();
 
-    res.status(200).json({ count });
+    // Map to an array of just the users, filtering out any nulls if a user was deleted
+    const followers = follows.map(f => f.follower_id).filter(f => f != null);
+
+    res.status(200).json({ 
+      count: followers.length,
+      followers: followers
+    });
   } catch (error) {
-    console.error("Error getting followers count:", error);
+    console.error("Error getting followers:", error);
     res.status(500).json({
-      message: "Error getting followers count",
+      message: "Error getting followers",
       error: error.message,
     });
   }
 };
 
-// Get following count
+// Get following count and list
 exports.getFollowingCount = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -135,13 +144,22 @@ exports.getFollowingCount = async (req, res) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
-    const count = await Follow.getFollowingCount(userId);
+    // Fetch the follows and populate the following_id with user details
+    const follows = await Follow.find({ follower_id: userId })
+      .populate("following_id", "nom prenom username photo_profil profileImage userType")
+      .exec();
 
-    res.status(200).json({ count });
+    // Map to an array of just the users, filtering out any nulls if a user was deleted
+    const following = follows.map(f => f.following_id).filter(f => f != null);
+
+    res.status(200).json({ 
+      count: following.length,
+      following: following
+    });
   } catch (error) {
-    console.error("Error getting following count:", error);
+    console.error("Error getting following:", error);
     res.status(500).json({
-      message: "Error getting following count",
+      message: "Error getting following",
       error: error.message,
     });
   }
