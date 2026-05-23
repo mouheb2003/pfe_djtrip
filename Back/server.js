@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 const helmet = require("helmet");
 const cors = require("cors");
 const mongoSanitize = require("express-mongo-sanitize");
+const compression = require("compression");
+const hpp = require("hpp");
 const mongoose = require("mongoose");
 const cacheService = require("./services/cache");
 const requestLogger = require("./middleware/requestLogger");
@@ -133,6 +135,11 @@ if (messageController.initSocketIO) {
 // Express JSON parser for regular requests
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// 🚀 Security & Performance Middlewares
+app.use(hpp()); // Prevent HTTP Parameter Pollution
+app.use(compression()); // Compress response bodies
+
 app.use(responseNormalizer);
 app.use(requestLogger);
 app.use(requestTimeout(Number(process.env.REQUEST_TIMEOUT_MS || 120000)));
