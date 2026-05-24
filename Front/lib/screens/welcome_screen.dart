@@ -107,9 +107,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Background image - Beach themed
-                Image.network(
-                  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop',
+                // Background image - Djerba themed
+                Image.asset(
+                  'assets/Pics/Djerbasplash.png',
                   fit: BoxFit.cover,
                 ),
                 

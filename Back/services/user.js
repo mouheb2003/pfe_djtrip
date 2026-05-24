@@ -1043,27 +1043,35 @@ class UserService {
     user.verificationCodeExpiry = verificationCodeExpiry;
     await user.save();
 
-    // Send verification email
-    const emailResult = await emailService.sendVerificationEmail(
-      email,
-      verificationCode,
-      user.fullname,
-    );
+    // Send verification email asynchronously (don't block response)
+    emailService
+      .sendVerificationEmail(email, verificationCode, user.fullname)
+      .then((emailResult) => {
+        console.log(
+          '📧 Verification email resent:',
+          user._id,
+          'Success:',
+          emailResult.success,
+        );
+      })
+      .catch((error) => {
+        console.error('❌ Error resending verification email:', error.message);
+      });
 
     // Log in development
-    if (process.env.NODE_ENV === "development" || !process.env.EMAIL_USER) {
-      console.log("\n========================================");
-      console.log("📧 NEW VERIFICATION CODE (DEV MODE)");
-      console.log("========================================");
-      console.log("User:", user.fullname);
-      console.log("Email:", email);
-      console.log("Code:", verificationCode);
-      console.log("Expires in: 15 minutes");
-      console.log("========================================\n");
+    if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USER) {
+      console.log('\n========================================');
+      console.log('📧 NEW VERIFICATION CODE (DEV MODE)');
+      console.log('========================================');
+      console.log('User:', user.fullname);
+      console.log('Email:', email);
+      console.log('Code:', verificationCode);
+      console.log('Expires in: 15 minutes');
+      console.log('========================================\n');
     }
 
-    console.log("✅ Verification code resent to:", email);
-    return { success: emailResult.success, user };
+    console.log('✅ Verification code resent to:', email);
+    return { success: true, user };
   }
 
   /**

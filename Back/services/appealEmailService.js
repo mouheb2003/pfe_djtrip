@@ -1,4 +1,10 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
+
+// Force IPv4 resolution to avoid ENETUNREACH on IPv6
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 // Email transporter configuration
 const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
