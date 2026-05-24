@@ -61,20 +61,21 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F4F8),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2F4F8),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F4F8),
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Book Activity',
           style: TextStyle(
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
             fontSize: 18,
             fontWeight: FontWeight.w800,
           ),
@@ -86,26 +87,26 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildActivityHeader(),
+            _buildActivityHeader(isDark),
             const SizedBox(height: 14),
-            _buildParticipantsCounter(),
+            _buildParticipantsCounter(isDark),
           ],
         ),
       ),
-      bottomSheet: _buildBottomBar(),
+      bottomSheet: _buildBottomBar(isDark),
     );
   }
 
-  Widget _buildActivityHeader() {
+  Widget _buildActivityHeader(bool isDark) {
     final images = _activityImages;
 
     return Container(
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFD8DFEA)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8DFEA)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -124,10 +125,10 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
                   widget.activity.titre,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -188,16 +189,16 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
     );
   }
 
-  Widget _buildParticipantsCounter() {
+  Widget _buildParticipantsCounter(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Participants',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
         const SizedBox(height: 10),
@@ -209,15 +210,16 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
           canIncrease: _canAddParticipant,
           onChanged: (val) =>
               setState(() => _adults = (_adults + val).clamp(1, 99)),
+          isDark: isDark,
         ),
         const SizedBox(height: 10),
         Text(
           _maxParticipants > 0
               ? 'Maximum available: $_maxParticipants participant${_maxParticipants > 1 ? 's' : ''}'
               : 'No seats available for this activity',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF64748B),
+            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -226,12 +228,12 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   }
 
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar(bool isDark) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.shade200)),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -326,23 +328,25 @@ class _BookingSelectionScreenState extends State<BookingSelectionScreen> {
   }
 
   void _showError(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 26),
-            SizedBox(width: 10),
+            const Icon(Icons.error_outline, color: Colors.red, size: 26),
+            const SizedBox(width: 10),
             Text(
               'Booking Failed',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : null),
             ),
           ],
         ),
         content: Text(
           message,
-          style: const TextStyle(fontSize: 15, color: Color(0xFF374151), height: 1.5),
+          style: TextStyle(fontSize: 15, color: isDark ? Colors.grey[300] : const Color(0xFF374151), height: 1.5),
         ),
         actions: [
           FilledButton(
@@ -366,6 +370,7 @@ class _CounterCard extends StatelessWidget {
   final bool canDecrease;
   final bool canIncrease;
   final void Function(int) onChanged;
+  final bool isDark;
 
   const _CounterCard({
     required this.label,
@@ -374,6 +379,7 @@ class _CounterCard extends StatelessWidget {
     required this.canDecrease,
     required this.canIncrease,
     required this.onChanged,
+    required this.isDark,
   });
 
   @override
@@ -381,9 +387,9 @@ class _CounterCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD8DFEA)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8DFEA)),
       ),
       child: Row(
         children: [
@@ -393,17 +399,17 @@ class _CounterCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: Color(0xFF0F172A),
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
                 Text(
                   sublabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF64748B),
+                    color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                   ),
                 ),
               ],
@@ -417,10 +423,10 @@ class _CounterCard extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             '$count',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
           const SizedBox(width: 12),

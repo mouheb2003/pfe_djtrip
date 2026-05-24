@@ -205,6 +205,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
   }
 
   Widget _buildTip(String title, String subtitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -217,14 +218,14 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                 Text(
                   title,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.onSurface,
+                    color: isDark ? Colors.white : AppColors.onSurface,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   subtitle,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
                     fontSize: 11,
                   ),
                 ),
@@ -238,14 +239,16 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -281,14 +284,14 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                     Text(
                       'Generate Activity Images',
                       style: AppTextStyles.titleMedium.copyWith(
-                        color: AppColors.onSurface,
+                        color: isDark ? Colors.white : AppColors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Let AI create stunning images for your activity',
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: Colors.grey[600],
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -302,10 +305,10 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
+              color: isDark ? const Color(0xFF2C2C2C) : AppColors.primary.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
+                color: isDark ? const Color(0xFF333333) : AppColors.primary.withOpacity(0.2),
               ),
             ),
             child: Column(
@@ -346,13 +349,13 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                     Icon(
                       Icons.photo_library,
                       size: 16,
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Existing Images (${widget.existingImageUrls!.length})',
                       style: AppTextStyles.labelLarge.copyWith(
-                        color: Colors.grey[700],
+                        color: isDark ? Colors.grey[300] : Colors.grey[700],
                       ),
                     ),
                   ],
@@ -379,12 +382,12 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
-                                color: AppColors.surface,
-                                child: const Center(
+                                color: isDark ? const Color(0xFF333333) : AppColors.surface,
+                                child: Center(
                                   child: Icon(
                                     Icons.broken_image,
                                     size: 24,
-                                    color: Colors.grey,
+                                    color: isDark ? Colors.grey[500] : Colors.grey,
                                   ),
                                 ),
                               );
@@ -438,13 +441,13 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                     Icon(
                       Icons.filter_none_rounded,
                       size: 16,
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Number of images to generate:',
                       style: AppTextStyles.labelLarge.copyWith(
-                        color: Colors.grey[700],
+                        color: isDark ? Colors.grey[300] : Colors.grey[700],
                       ),
                     ),
                   ],
@@ -466,10 +469,14 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                           child: Container(
                             height: 40,
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary : Colors.white,
+                              color: isSelected 
+                                  ? AppColors.primary 
+                                  : (isDark ? const Color(0xFF2C2C2C) : Colors.white),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                                color: isSelected 
+                                    ? AppColors.primary 
+                                    : (isDark ? const Color(0xFF333333) : Colors.grey[300]!),
                                 width: 1,
                               ),
                             ),
@@ -477,7 +484,9 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                               child: Text(
                                 count.toString(),
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.grey[700],
+                                  color: isSelected 
+                                      ? Colors.white 
+                                      : (isDark ? Colors.grey[300] : Colors.grey[700]),
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -525,23 +534,22 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
               ),
             ),
 
-          // Loading State
           if (_isGenerating)
             Container(
               width: double.infinity,
               height: 52,
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: isDark ? const Color(0xFF2C2C2C) : AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: AppColors.primary.withOpacity(isDark ? 0.6 : 0.3),
                 ),
               ),
-              child: const Center(
+              child: Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
@@ -551,11 +559,11 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Text(
                       'Generating your images...',
                       style: TextStyle(
-                        color: AppColors.onSurfaceVariant,
+                        color: isDark ? Colors.white : AppColors.onSurfaceVariant,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -614,12 +622,12 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) {
                                           return Container(
-                                            color: AppColors.surface,
-                                            child: const Center(
+                                            color: isDark ? const Color(0xFF333333) : AppColors.surface,
+                                            child: Center(
                                               child: Icon(
                                                 Icons.broken_image,
                                                 size: 48,
-                                                color: Colors.grey,
+                                                color: isDark ? Colors.grey[500] : Colors.grey,
                                               ),
                                             ),
                                           );
@@ -627,7 +635,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                                         loadingBuilder: (context, child, loadingProgress) {
                                           if (loadingProgress == null) return child;
                                           return Container(
-                                            color: AppColors.surface,
+                                            color: isDark ? const Color(0xFF333333) : AppColors.surface,
                                             child: const Center(
                                               child: CircularProgressIndicator(),
                                             ),
@@ -688,15 +696,15 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                             icon: const Icon(Icons.refresh, size: 18),
                             label: const Text('Regenerate'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.surface,
-                              foregroundColor: AppColors.onSurface,
+                              backgroundColor: isDark ? const Color(0xFF2C2C2C) : AppColors.surface,
+                              foregroundColor: isDark ? Colors.white : AppColors.onSurface,
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(
                                 vertical: 12,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.grey[300]!),
+                                side: BorderSide(color: isDark ? const Color(0xFF444444) : Colors.grey[300]!),
                               ),
                             ),
                           ),
@@ -750,7 +758,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
+              color: isDark ? const Color(0xFF2C2C2C) : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -758,14 +766,14 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                 Icon(
                   Icons.info_outline,
                   size: 16,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Swipe to select the best image, then click "Use Image"',
                     style: AppTextStyles.bodySmall.copyWith(
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[300] : Colors.grey[600],
                     ),
                   ),
                 ),
@@ -829,7 +837,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                               Text(
                                 'Prompt Score: $_promptScore/100',
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  color: Colors.grey[700],
+                                  color: isDark ? Colors.grey[300] : Colors.grey[700],
                                   fontSize: 11,
                                 ),
                               ),
@@ -837,7 +845,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                                 Text(
                                   'Processing Time: $_processingTime',
                                   style: AppTextStyles.bodySmall.copyWith(
-                                    color: Colors.grey[700],
+                                    color: isDark ? Colors.grey[300] : Colors.grey[700],
                                     fontSize: 11,
                                   ),
                                 ),
@@ -845,7 +853,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                                 Text(
                                   'Method: $_generationMethod',
                                   style: AppTextStyles.bodySmall.copyWith(
-                                    color: Colors.grey[700],
+                                    color: isDark ? Colors.grey[300] : Colors.grey[700],
                                     fontSize: 11,
                                   ),
                                 ),

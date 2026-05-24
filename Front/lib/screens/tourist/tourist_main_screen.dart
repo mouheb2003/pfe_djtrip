@@ -313,9 +313,10 @@ class _TouristMainScreenState extends State<TouristMainScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const navBg = Color(0xFFE9ECFB);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navBg = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFE9ECFB);
     const navActive = AppColors.primary;
-    const navInactive = Color(0xFF7B82A8);
+    final navInactive = isDark ? const Color(0xFF9DA3C8) : const Color(0xFF7B82A8);
 
     return Scaffold(
       extendBody: true,

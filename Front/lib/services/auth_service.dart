@@ -215,8 +215,23 @@ class AuthService {
     });
 
     // Handle new notifications
-    socket.on('new_notification', (data) {
+    socket.on('new_notification', (data) async {
       print('[AuthService] Received new_notification event: $data');
+      
+      try {
+        final String? type = data['type']?.toString() ?? (data['data'] != null ? data['data']['type']?.toString() : null);
+        if (type == 'organizer_approved') {
+          print('[AuthService] 🎊 Organizer approved instantly via socket!');
+          await refreshCurrentUser();
+          final navigator = NavigationService.navigatorKey.currentState;
+          if (navigator != null) {
+             navigator.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+          }
+        }
+      } catch (e) {
+        print('[AuthService] Error parsing notification for approval: $e');
+      }
+
       // Show local notification
       _showLocalNotification(data);
     });

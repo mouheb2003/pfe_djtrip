@@ -105,8 +105,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white, // Changed to pure white for consistency
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: Stack(
         children: [
           // Back Button
@@ -115,7 +117,7 @@ class _SignupScreenState extends State<SignupScreen> {
             left: 10,
             child: IconButton(
               onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.welcome),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1F2937)),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : const Color(0xFF1F2937)),
               padding: const EdgeInsets.all(12),
             ),
           ),
@@ -128,32 +130,32 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 60),
 
                   // Header
-                  const Text(
+                  Text(
                     'Create an account',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF1F2937),
+                      color: isDark ? Colors.white : const Color(0xFF1F2937),
                       letterSpacing: -1,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Join the DJTrip adventure today',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF6B7280),
+                      color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
                     ),
                   ),
                   const SizedBox(height: 40),
 
                   // User Type Selection
-                  const Text(
+                  Text(
                     'I am a...',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -164,6 +166,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           label: 'Tourist',
                           isSelected: _isTourist,
                           onTap: () => setState(() => _isTourist = true),
+                          isDark: isDark,
                         ),
                       ),
                       const SizedBox(width: 15),
@@ -172,6 +175,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           label: 'Organizer',
                           isSelected: !_isTourist,
                           onTap: () => setState(() => _isTourist = false),
+                          isDark: isDark,
                         ),
                       ),
                     ],
@@ -183,6 +187,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _nameCtrl,
                     hint: 'Full name',
                     icon: Icons.person_outline,
+                    isDark: isDark,
                   ),
                   const SizedBox(height: 16),
                   _buildInputField(
@@ -190,6 +195,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     hint: 'Email',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
+                    isDark: isDark,
                   ),
                   const SizedBox(height: 16),
                   _buildInputField(
@@ -204,6 +210,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
+                    isDark: isDark,
                   ),
                   const SizedBox(height: 16),
                   _buildInputField(
@@ -211,10 +218,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     hint: 'Confirm password',
                     icon: Icons.lock_reset_outlined,
                     obscureText: true,
+                    isDark: isDark,
                   ),
 
                   const SizedBox(height: 20),
-                  _PasswordRequirements(password: _passwordValue),
+                  _PasswordRequirements(password: _passwordValue, isDark: isDark),
                   const SizedBox(height: 20),
 
                   // Terms & Conditions
@@ -237,12 +245,12 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'I accept the terms and conditions and privacy policy',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: isDark ? Colors.grey[400] : AppColors.textSecondary,
                               height: 1.4,
                             ),
                           ),
@@ -253,7 +261,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   const SizedBox(height: 30),
 
-                        const SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   // Sign Up Button
                   Container(
                     height: 56,
@@ -293,10 +301,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           : const Text(
                               'Sign Up',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
                             ),
                     ),
                   ),
@@ -306,9 +313,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         "Already have an account? ",
-                        style: TextStyle(color: AppColors.textSecondary),
+                        style: TextStyle(color: isDark ? Colors.grey[400] : AppColors.textSecondary),
                       ),
                       GestureDetector(
                         onTap: () =>
@@ -337,6 +344,7 @@ class _SignupScreenState extends State<SignupScreen> {
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    required bool isDark,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -344,7 +352,7 @@ class _SignupScreenState extends State<SignupScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -360,7 +368,7 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : AppColors.textSecondary,
+              color: isSelected ? Colors.white : (isDark ? Colors.grey[300] : AppColors.textSecondary),
               fontWeight: FontWeight.bold,
               fontSize: 15,
             ),
@@ -377,14 +385,15 @@ class _SignupScreenState extends State<SignupScreen> {
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType? keyboardType,
+    required bool isDark,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -394,15 +403,15 @@ class _SignupScreenState extends State<SignupScreen> {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: isDark ? Colors.white : AppColors.textPrimary,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
           suffixIcon: suffixIcon,
-          hintStyle: const TextStyle(color: AppColors.textLight),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[500] : AppColors.textLight),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
@@ -418,7 +427,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
 class _PasswordRequirements extends StatelessWidget {
   final String password;
-  const _PasswordRequirements({required this.password});
+  final bool isDark;
+  const _PasswordRequirements({required this.password, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -429,19 +439,19 @@ class _PasswordRequirements extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.primary.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'PASSWORD REQUIREMENTS',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary,
+              color: isDark ? Colors.grey[400] : AppColors.textSecondary,
               letterSpacing: 1,
             ),
           ),
@@ -469,7 +479,7 @@ class _PasswordRequirements extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isMet ? AppColors.textPrimary : AppColors.textSecondary,
+            color: isMet ? Colors.green : (isDark ? Colors.grey[400] : AppColors.textSecondary),
             fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
           ),
         ),

@@ -724,17 +724,36 @@ class _HomeTabState extends State<HomeTab> {
 
                     SizedBox(height: 32.h),
 
-                    // Top Rated Places Section
+                    // Recommended Places Section
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Top Rated Places',
-                            style: TextStyle(
-                              fontSize: 44.sp / 2,
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Recommended Places',
+                                style: TextStyle(
+                                  fontSize: 44.sp / 2,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 12, color: const Color(0xFF167BFF)),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'Based on your interests',
+                                    style: TextStyle(
+                                      fontSize: 12.sp,
+                                      color: const Color(0xFF167BFF),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                         TextButton.icon(
@@ -795,17 +814,36 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                     SizedBox(height: 32.h),
 
-                    // Top Activities Section
+                    // Recommended Activities Section
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Top Activities',
-                            style: TextStyle(
-                              fontSize: 44.sp / 2,
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Recommended Activities',
+                                style: TextStyle(
+                                  fontSize: 44.sp / 2,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 12, color: const Color(0xFF167BFF)),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'Based on your interests',
+                                    style: TextStyle(
+                                      fontSize: 12.sp,
+                                      color: const Color(0xFF167BFF),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                         TextButton.icon(

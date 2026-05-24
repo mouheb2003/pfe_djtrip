@@ -757,8 +757,9 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,6 +795,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FadeTransition(
       opacity: _animationController,
       child: Padding(
@@ -837,22 +839,23 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
+                  if (!isDark)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                 ],
               ),
               child: Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.tune,
-                      color: Color(0xFF1B2458),
+                      color: isDark ? Colors.white : const Color(0xFF1B2458),
                       size: 20,
                     ),
                     onPressed: () {
@@ -888,20 +891,22 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FadeTransition(
       opacity: _animationController,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
+              if (!isDark)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
             ],
           ),
           child: TextField(
@@ -945,6 +950,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Widget _buildFilterChips() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FadeTransition(
       opacity: _animationController,
       child: SizedBox(
@@ -967,14 +973,15 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppColors.primary
-                        : Colors.white,
+                        : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
+                      if (!isDark)
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
                     ],
                   ),
                   child: Text(
@@ -1050,6 +1057,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -1063,7 +1071,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: const Icon(
@@ -1073,12 +1081,12 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'No activities found',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1B2458),
+                    color: isDark ? Colors.white : const Color(0xFF1B2458),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1268,6 +1276,7 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final photos = widget.activity.photos;
     final hasMultiplePhotos = photos.length > 1;
 
@@ -1275,15 +1284,16 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
       onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: -4,
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+                spreadRadius: -4,
+              ),
           ],
         ),
         child: Column(
@@ -1487,10 +1497,10 @@ class _ExploreActivityCardState extends State<_ExploreActivityCard> {
                   // Title (Bold)
                   Text(
                     widget.activity.titre,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B2458),
+                      color: isDark ? Colors.white : const Color(0xFF1B2458),
                       letterSpacing: -0.3,
                       height: 1.3,
                     ),

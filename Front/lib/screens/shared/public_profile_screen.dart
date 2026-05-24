@@ -1383,6 +1383,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
   }
 
   Widget _buildStatItem(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1391,6 +1392,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           style: TextStyle(
             fontSize: 18.sp,
             fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87,
           ),
         ),
         SizedBox(height: 4.h),
@@ -1398,7 +1400,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
           label,
           style: TextStyle(
             fontSize: 12.sp,
-            color: Colors.grey[600],
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
           ),
         ),
       ],

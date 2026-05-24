@@ -1935,12 +1935,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
 
     final selection = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return SafeArea(
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
             child: Column(
@@ -1997,7 +2003,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
 
@@ -2029,6 +2036,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     required Color color,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
@@ -2043,8 +2051,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       ),
       title: Text(
         label,
-        style: const TextStyle(
-          color: Color(0xFF1E2A4A),
+        style: TextStyle(
+          color: isDark ? Colors.white : const Color(0xFF1E2A4A),
           fontSize: 16,
           fontWeight: FontWeight.w700,
         ),
@@ -2323,6 +2331,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
       return _buildEmptyState(cs);
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasSupportCard =
         widget.isSupportChat && !_isReplyLocked && !_isDjTripAdminThread;
     final warningMessages = _messages
@@ -2346,13 +2355,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: isDark ? const Color(0xFF1A2F4E) : const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
+              border: Border.all(color: isDark ? const Color(0xFF2557A7) : const Color(0xFFBFDBFE)),
             ),
             child: Row(
-              children: const [
-                Icon(
+              children: [
+                const Icon(
                   Icons.support_agent_rounded,
                   color: Color(0xFF2563EB),
                   size: 18,
@@ -2362,7 +2371,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                   child: Text(
                     'Support messages and admin warnings are separated below.',
                     style: TextStyle(
-                      color: Color(0xFF1E3A8A),
+                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E3A8A),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2411,18 +2420,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildSectionPill(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           text,
-          style: const TextStyle(
-            color: Color(0xFF64748B),
+          style: TextStyle(
+            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
             letterSpacing: 1.1,
             fontSize: 11,
             fontWeight: FontWeight.w800,
@@ -2438,6 +2448,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     required ColorScheme cs,
   }) {
     final showDay = previous == null || !_isSameDay(previous.time, msg.time);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -2447,13 +2458,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
+                color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 _dayLabel(msg.time),
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
+                style: TextStyle(
+                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                   letterSpacing: 1.4,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -2469,10 +2480,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   Widget _buildMessageItem(_UiMessage msg, ColorScheme cs) {
     final isMine = msg.isMine;
     final isActivityIntro = _isActivityIntroMessage(msg);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bubbleColor = isMine
         ? const Color(0xFF4F6BFF)
-        : const Color(0xFFF1F5F9);
-    final textColor = isMine ? Colors.white : const Color(0xFF1E293B);
+        : (isDark ? const Color(0xFF2D2D2D) : const Color(0xFFF1F5F9));
+    final textColor = isMine ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E293B));
     final timeColor = const Color(0xFF94A3B8);
     final partnerAvatarProvider = _partnerAvatarProvider();
     final bubbleDecoration = BoxDecoration(
@@ -2625,13 +2637,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildMessageContent(_UiMessage msg, Color textColor, ColorScheme cs) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_isWarningType(msg.type)) {
       final avatarProvider = _partnerAvatarProvider();
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -2675,10 +2688,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
                       Row(
                         children: [
                           Flexible(
-                            child: const Text(
+                            child: Text(
                               'DJTrip Admin',
                               style: TextStyle(
-                                color: Color(0xFF1E293B),
+                                color: isDark ? Colors.white : const Color(0xFF1E293B),
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -3057,11 +3070,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildRecordingComposer(ColorScheme cs) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 10, 8, 4),
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
@@ -3088,8 +3102,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
               const SizedBox(width: 10),
               Text(
                 _formatDuration(_recordElapsedSec),
-                style: const TextStyle(
-                  color: Color(0xFF1E2A4A),
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF1E2A4A),
                   fontSize: 44,
                   fontWeight: FontWeight.w800,
                 ),
@@ -3172,10 +3186,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildMoreSheet(ColorScheme cs) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
         child: Column(
@@ -3515,18 +3530,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   }
 
   Widget _buildLockedNoticeBanner({EdgeInsetsGeometry? margin}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
         ],
       ),
       child: Row(
@@ -3585,9 +3602,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
     final isReplyLocked = _isReplyLocked;
     final isBlocked = _isConversationBlocked;
     final isMessagingDisabled = !_allowDirectMessages || isBlocked;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final composerFill = widget.isSupportChat
-        ? const Color(0xFFF1F5FF)
-        : const Color(0xFFE8EDF5);
+        ? (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF1F5FF))
+        : (isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE8EDF5));
     final sendButtonColor = widget.isSupportChat
         ? const Color(0xFF1D4ED8)
         : const Color(0xFF315CFF);
@@ -3606,9 +3624,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF7ED),
+              color: isDark ? const Color(0xFF3E2B1F) : const Color(0xFFFFF7ED),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFFED7AA)),
+              border: Border.all(color: isDark ? const Color(0xFF6B4226) : const Color(0xFFFED7AA)),
             ),
             child: Row(
               children: [
@@ -3636,9 +3654,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
+              color: isDark ? const Color(0xFF3F1616) : const Color(0xFFFEE2E2),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFEF4444)),
+              border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFEF4444)),
             ),
             child: Row(
               children: [
@@ -3928,11 +3946,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: widget.isSupportChat
-          ? const Color(0xFFF7FAFF)
-          : cs.surfaceVariant,
+          ? (isDark ? const Color(0xFF121212) : const Color(0xFFF7FAFF))
+          : (isDark ? const Color(0xFF121212) : cs.surfaceVariant),
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
@@ -4061,20 +4080,22 @@ class _MessageOptionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF252535) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF92A4C4).withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: const Color(0xFF92A4C4).withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
           ],
         ),
         child: Row(

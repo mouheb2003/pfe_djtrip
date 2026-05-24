@@ -938,12 +938,14 @@ class _ExploreTabState extends State<ExploreTab> {
     String hint, {
     bool isDisabled = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 42,
       padding: EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F4F9),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF1F4F9),
         borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
       ),
       child: Row(
         children: [
@@ -955,7 +957,7 @@ class _ExploreTabState extends State<ExploreTab> {
               style: TextStyle(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w400,
-                color: isDisabled ? Colors.grey : Colors.black87,
+                color: isDisabled ? Colors.grey : (isDark ? Colors.white : Colors.black87),
               ),
               decoration: InputDecoration(
                 hintText: hint,

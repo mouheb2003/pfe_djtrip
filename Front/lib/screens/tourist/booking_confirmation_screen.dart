@@ -108,6 +108,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final activity = widget.inscription.activite;
     final photoUrls = _activityPhotoUrls(activity);
     final title = activity?['titre'] as String? ?? 'Activity';
@@ -159,18 +160,18 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
         : 'This booking was cancelled.';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Booking Details',
           style: TextStyle(
-            color: Color(0xFF0F172A),
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -219,7 +220,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 12),
@@ -228,7 +229,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF64748B),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                   height: 1.5,
                 ),
               ),
@@ -252,7 +253,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
@@ -273,7 +274,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                            color: isDark ? Colors.white : const Color(0xFF1E293B),
                           ),
                         ),
                         Container(
@@ -388,20 +389,20 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDFA),
+                    color: isDark ? const Color(0xFF0F3A33) : const Color(0xFFF0FDFA),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF99F6E4)),
+                    border: Border.all(color: isDark ? const Color(0xFF14B8A6) : const Color(0xFF99F6E4)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.verified_rounded, color: Color(0xFF0F766E)),
-                      SizedBox(width: 12),
+                      const Icon(Icons.verified_rounded, color: Color(0xFF0F766E)),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'This booking has already been checked in successfully.',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF115E59),
+                            color: isDark ? const Color(0xFFCCFBF1) : const Color(0xFF115E59),
                             height: 1.45,
                           ),
                         ),
@@ -416,27 +417,27 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFDF2F2),
+                    color: isDark ? const Color(0xFF3F1616) : const Color(0xFFFDF2F2),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFF5C2C7)),
+                    border: Border.all(color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFF5C2C7)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Reason provided by organizer',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF991B1B),
+                          color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        reason!,
-                        style: const TextStyle(
+                        reason,
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF7F1D1D),
+                          color: isDark ? const Color(0xFFFEE2E2) : const Color(0xFF7F1D1D),
                           height: 1.45,
                         ),
                       ),
@@ -563,12 +564,13 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 18, color: AppColors.primary),
@@ -580,20 +582,20 @@ class _SummaryRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF94A3B8),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF94A3B8),
                   letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -628,15 +630,18 @@ class _BookingMediaPanelState extends State<_BookingMediaPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     if (widget.showQr && widget.hasQrData) {
       return Container(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         alignment: Alignment.center,
         child: QrImageView(
           data: widget.qrData,
           version: QrVersions.auto,
           size: 170,
-          backgroundColor: Colors.white,
+          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          foregroundColor: isDark ? Colors.white : Colors.black,
           padding: const EdgeInsets.all(10),
         ),
       );
@@ -644,17 +649,17 @@ class _BookingMediaPanelState extends State<_BookingMediaPanel> {
 
     if (widget.photoUrls.isEmpty) {
       return Container(
-        color: const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF1F5F9),
         alignment: Alignment.center,
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.qr_code_2_outlined, size: 34, color: Color(0xFF94A3B8)),
-            SizedBox(height: 10),
+            Icon(Icons.qr_code_2_outlined, size: 34, color: isDark ? Colors.grey[400] : const Color(0xFF94A3B8)),
+            const SizedBox(height: 10),
             Text(
               'No QR code found',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -676,7 +681,7 @@ class _BookingMediaPanelState extends State<_BookingMediaPanel> {
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 return Container(
-                  color: const Color(0xFFF1F5F9),
+                  color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF1F5F9),
                   child: const Center(
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
@@ -686,11 +691,11 @@ class _BookingMediaPanelState extends State<_BookingMediaPanel> {
                 );
               },
               errorBuilder: (_, __, ___) => Container(
-                color: const Color(0xFFE2E8F0),
+                color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE2E8F0),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.broken_image_rounded,
-                  color: Color(0xFF94A3B8),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF94A3B8),
                   size: 36,
                 ),
               ),

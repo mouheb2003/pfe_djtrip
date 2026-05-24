@@ -217,6 +217,7 @@ class _BookingsTabState extends State<BookingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final items = _itemsForCurrentTab();
 
     return RefreshIndicator(
@@ -258,7 +259,7 @@ class _BookingsTabState extends State<BookingsTab> {
                     Text(
                       _errorMessage!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFF4B4F73)),
+                      style: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF4B4F73)),
                     ),
                     const SizedBox(height: 12),
                     FilledButton(
@@ -276,8 +277,9 @@ class _BookingsTabState extends State<BookingsTab> {
                 child: Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.05),
@@ -286,19 +288,19 @@ class _BookingsTabState extends State<BookingsTab> {
                       ),
                     ],
                   ),
-                  child: const Column(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.event_busy_rounded,
                         size: 44,
-                        color: AppColors.textGrey,
+                        color: isDark ? Colors.grey[500] : AppColors.textGrey,
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Text(
                         'No reservations',
                         style: TextStyle(
-                          color: AppColors.textGrey,
+                          color: isDark ? Colors.grey[400] : AppColors.textGrey,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -411,11 +413,12 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE3E7F3)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE3E7F3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -428,17 +431,19 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: 'Search bookings by title, location or ID',
-          prefixIcon: const Icon(
+          hintStyle: TextStyle(color: isDark ? Colors.grey[500] : const Color(0xFF5F678A)),
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color: Color(0xFF5F678A),
+            color: isDark ? Colors.grey[400] : const Color(0xFF5F678A),
           ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF5F678A),
+                    color: isDark ? Colors.grey[400] : const Color(0xFF5F678A),
                   ),
                   onPressed: onClear,
                 )
@@ -465,12 +470,13 @@ class _BookingsSegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFECEAFF),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFECEAFF),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE2DDFF)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2DDFF)),
       ),
       child: Row(
         children: List.generate(5, (index) {
@@ -490,7 +496,9 @@ class _BookingsSegmentedControl extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 height: 42,
                 decoration: BoxDecoration(
-                  color: active ? Colors.white : Colors.transparent,
+                  color: active
+                      ? (isDark ? const Color(0xFF2D2D2D) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: active
                       ? [
@@ -507,8 +515,8 @@ class _BookingsSegmentedControl extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: active
-                          ? AppColors.primary
-                          : const Color(0xFF696D8D),
+                          ? (isDark ? Colors.white : AppColors.primary)
+                          : (isDark ? Colors.grey[400] : const Color(0xFF696D8D)),
                       fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                       fontSize: 13,
                     ),

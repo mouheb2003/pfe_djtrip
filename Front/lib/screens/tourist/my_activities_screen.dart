@@ -483,16 +483,19 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
   Widget build(BuildContext context) {
     final items = _activitiesForCurrentTab();
     final hasFilters = _searchQuery.trim().isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F3FE),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F3FE),
       body: SafeArea(
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFF7F5FF), Color(0xFFF1F0FD)],
+              colors: isDark
+                  ? [const Color(0xFF121212), const Color(0xFF121212)]
+                  : [const Color(0xFFF7F5FF), const Color(0xFFF1F0FD)],
             ),
           ),
           child: Column(
@@ -522,7 +525,7 @@ class _MyActivitiesScreenState extends State<MyActivitiesScreen> {
                               fontSize: 31,
                               height: 1,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF1F235F),
+                              color: isDark ? Colors.white : const Color(0xFF1F235F),
                             ),
                           ),
                         ],
@@ -660,12 +663,13 @@ class _ActivitiesSegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFECEAFF),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFECEAFF),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE2DDFF)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2DDFF)),
       ),
       child: Row(
         children: List.generate(_labels.length, (index) {
@@ -679,7 +683,9 @@ class _ActivitiesSegmentedControl extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 height: 42,
                 decoration: BoxDecoration(
-                  color: active ? Colors.white : Colors.transparent,
+                  color: active
+                      ? (isDark ? const Color(0xFF2C2C2C) : Colors.white)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: active
                       ? [
@@ -697,7 +703,7 @@ class _ActivitiesSegmentedControl extends StatelessWidget {
                     style: TextStyle(
                       color: active
                           ? AppColors.primary
-                          : const Color(0xFF696D8D),
+                          : (isDark ? Colors.grey[400] : const Color(0xFF696D8D)),
                       fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                       fontSize: 13,
                     ),
@@ -780,6 +786,7 @@ class _ActivitiesFeed extends StatelessWidget {
     }
 
     if (items.isEmpty) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return RefreshIndicator(
         onRefresh: onRefresh,
         child: ListView(
@@ -790,7 +797,7 @@ class _ActivitiesFeed extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
@@ -807,7 +814,7 @@ class _ActivitiesFeed extends StatelessWidget {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0EEFF),
+                      color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0EEFF),
                       borderRadius: BorderRadius.circular(18),
                     ),
                     child: const Icon(
@@ -819,8 +826,8 @@ class _ActivitiesFeed extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(
                     emptyTitle,
-                    style: const TextStyle(
-                      color: AppColors.textDark,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textDark,
                       fontWeight: FontWeight.w800,
                       fontSize: 18,
                     ),
@@ -829,8 +836,8 @@ class _ActivitiesFeed extends StatelessWidget {
                   Text(
                     emptySubtitle,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textGrey,
+                    style: TextStyle(
+                      color: isDark ? Colors.grey[400] : AppColors.textGrey,
                       height: 1.4,
                     ),
                   ),
@@ -1098,11 +1105,12 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE3E7F3)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE3E7F3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -1115,17 +1123,19 @@ class _SearchBar extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         textInputAction: TextInputAction.search,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: 'Search by title, location or category',
-          prefixIcon: const Icon(
+          hintStyle: TextStyle(color: isDark ? Colors.grey[500] : const Color(0xFF5F678A)),
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color: Color(0xFF5F678A),
+            color: isDark ? Colors.grey[400] : const Color(0xFF5F678A),
           ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF5F678A),
+                    color: isDark ? Colors.grey[400] : const Color(0xFF5F678A),
                   ),
                   onPressed: onClear,
                 )

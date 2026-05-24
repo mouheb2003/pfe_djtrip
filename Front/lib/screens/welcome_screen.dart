@@ -95,9 +95,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: Column(
         children: [
           // Top Image Section (approx 35% of height)
@@ -127,10 +128,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: isDark ? Colors.black.withOpacity(0.4) : Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.4),
+                            color: isDark ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.4),
                             width: 1.5,
                           ),
                         ),
@@ -174,19 +175,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           Expanded(
             child: Container(
               width: double.infinity,
-              color: Colors.white,
+              color: isDark ? const Color(0xFF121212) : Colors.white,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 child: Column(
                   children: [
                     // Title Area
-                    const Text(
+                    Text(
                       'Discover',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 48,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF1F2937),
+                        color: isDark ? Colors.white : const Color(0xFF1F2937),
                         height: 1.0,
                         letterSpacing: -1.5,
                       ),
@@ -205,12 +206,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     const SizedBox(height: 12),
                     
                     // Subtitle
-                    const Text(
+                    Text(
                       'Join our community of explorers and\nfind the island\'s hidden treasures.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF6B7280),
+                        color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
                         height: 1.4,
                       ),
                     ),
@@ -221,9 +222,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       width: double.infinity,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB)),
                       ),
                       child: Material(
                         color: Colors.transparent,
@@ -259,13 +260,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     },
                                   ),
                                   const SizedBox(width: 12),
-                                  const Flexible(
+                                  Flexible(
                                     child: Text(
                                       'Continue with Google',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
-                                        color: Color(0xFF1F2937),
+                                        color: isDark ? Colors.white : const Color(0xFF1F2937),
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -323,11 +324,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           "Don't have an account? ",
                           style: TextStyle(
                             fontSize: 15,
-                            color: Color(0xFF6B7280),
+                            color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -349,12 +350,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     // Footer Icons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.beach_access_rounded, color: Color(0xFF9CA3AF), size: 28),
-                        SizedBox(width: 32),
-                        Icon(Icons.restaurant_rounded, color: Color(0xFF9CA3AF), size: 28),
-                        SizedBox(width: 32),
-                        Icon(Icons.explore_rounded, color: Color(0xFF9CA3AF), size: 28),
+                      children: [
+                        Icon(Icons.beach_access_rounded, color: isDark ? Colors.grey[600] : const Color(0xFF9CA3AF), size: 28),
+                        const SizedBox(width: 32),
+                        Icon(Icons.restaurant_rounded, color: isDark ? Colors.grey[600] : const Color(0xFF9CA3AF), size: 28),
+                        const SizedBox(width: 32),
+                        Icon(Icons.explore_rounded, color: isDark ? Colors.grey[600] : const Color(0xFF9CA3AF), size: 28),
                       ],
                     ),
                     const SizedBox(height: 10),

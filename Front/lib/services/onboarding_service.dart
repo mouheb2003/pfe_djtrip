@@ -175,7 +175,7 @@ class OnboardingService {
       if (!isOnboarded) {
         // User needs onboarding
         NavigationService.navigateToOnboarding(userType: userType);
-      } else if (userType == 'Organisator' && !isApproved) {
+      } else if ((userType == 'Organisator' || userType == 'Organizer') && !isApproved) {
         // Organizer needs approval
         NavigationService.navigateToWaitingApproval();
       } else {
@@ -190,7 +190,8 @@ class OnboardingService {
 
   // Get onboarding steps for user type
   static List<Map<String, dynamic>> getOnboardingSteps(String userType) {
-    if (userType == 'Organisator') {
+    final type = userType.trim().toLowerCase();
+    if (type == 'organisator' || type == 'organizer') {
       return _organizerSteps;
     } else {
       return _touristSteps;

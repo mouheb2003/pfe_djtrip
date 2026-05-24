@@ -117,8 +117,9 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -148,7 +149,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1E225E),
+                              color: isDark ? Colors.white : const Color(0xFF1E225E),
                               height: 1.2,
                             ),
                           ),
@@ -158,7 +159,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color: const Color(0xFF6C757D),
+                              color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                               height: 1.4,
                             ),
                           ),
@@ -179,6 +180,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             color: const Color(0xFF4B63FF),
                             isSelected: _selectedUserType == 'tourist',
                             onTap: () => _onUserTypeSelected('tourist'),
+                            isDark: isDark,
                           ),
                           
                           const SizedBox(height: 16),
@@ -192,6 +194,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             color: const Color(0xFF00B894),
                             isSelected: _selectedUserType == 'organizer',
                             onTap: () => _onUserTypeSelected('organizer'),
+                            isDark: isDark,
                           ),
                         ],
                       ),
@@ -323,7 +326,10 @@ class _UserTypeCard extends StatelessWidget {
     required this.color,
     required this.isSelected,
     required this.onTap,
+    required this.isDark,
   });
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -332,13 +338,13 @@ class _UserTypeCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
+          color: isSelected ? color : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: isSelected 
                   ? color.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.05),
+                  : Colors.black.withOpacity(isDark ? 0.2 : 0.05),
               blurRadius: isSelected ? 20 : 10,
               offset: Offset(0, isSelected ? 8 : 4),
             ),
@@ -383,7 +389,7 @@ class _UserTypeCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
-                        color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                        color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E225E)),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -404,7 +410,7 @@ class _UserTypeCard extends StatelessWidget {
                         fontSize: 13,
                         color: isSelected 
                             ? Colors.white.withOpacity(0.8)
-                            : const Color(0xFF6C757D),
+                            : (isDark ? Colors.grey[400] : const Color(0xFF6C757D)),
                         height: 1.4,
                       ),
                       maxLines: 2,

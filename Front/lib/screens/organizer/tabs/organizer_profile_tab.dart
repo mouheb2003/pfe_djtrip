@@ -661,6 +661,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     }
 
     final user = _user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final topActivities = List<ActivityModel>.from(_myActivities)
       ..sort((a, b) {
         final dateA =
@@ -672,7 +673,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
     final profileActivities = topActivities.take(9).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F1FA),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAll,
@@ -782,15 +783,16 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white,
+                                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                                 width: 3,
                               ),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
                               ],
                             ),
                             child: Hero(
@@ -822,7 +824,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8EDFF),
+                    color: isDark ? const Color(0xFF1A264F) : const Color(0xFFE8EDFF),
                     borderRadius: BorderRadius.circular(16.r),
                     border: Border.all(
                       color: AppColors.primary.withOpacity(0.3),
@@ -859,7 +861,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                     style: TextStyle(
                       fontSize: 24.sp,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1D245D),
+                      color: isDark ? const Color(0xFFE5E7EB) : Color(0xFF1D245D),
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -872,7 +874,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   margin: EdgeInsets.symmetric(horizontal: 16),
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8EDFF),
+                    color: isDark ? const Color(0xFF1A264F) : const Color(0xFFE8EDFF),
                     borderRadius: BorderRadius.circular(12.r),
                     border: Border.all(
                       color: AppColors.primary.withOpacity(0.3),
@@ -892,7 +894,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1B2458),
+                          color: isDark ? const Color(0xFFA2B4FF) : Color(0xFF1B2458),
                         ),
                       ),
                       const Spacer(),
@@ -935,7 +937,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                       style: TextStyle(
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1D245D),
+                        color: isDark ? const Color(0xFFE5E7EB) : Color(0xFF1D245D),
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -952,7 +954,7 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
                   style: TextStyle(
                     fontSize: 12.sp,
                     height: 1.35,
-                    color: Color(0xFF56608B),
+                    color: isDark ? const Color(0xFF9CA3AF) : Color(0xFF56608B),
                   ),
                 ),
               ),
@@ -1021,6 +1023,46 @@ class _OrganizerProfileTabState extends State<OrganizerProfileTab> {
 
 // ─── Shared Widgets ─────────────────────────────────────────────────────────
 
+class _InfoItem extends StatelessWidget {
+  final String label, value;
+
+  const _InfoItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(width: 3.w, height: 16.h, color: AppColors.primary),
+            SizedBox(width: 8.w),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22.sp,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 2.h),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10.sp,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.grey[400] : Color(0xFF6F7396),
+            letterSpacing: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
@@ -1078,10 +1120,11 @@ class _LanguageChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFE1FEE7), // Soft green for languages
+        color: isDark ? const Color(0xFF0F3E22) : const Color(0xFFE1FEE7), // Soft green for languages
         borderRadius: BorderRadius.circular(999.r),
         border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
       ),
@@ -1090,7 +1133,7 @@ class _LanguageChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF065F46),
+          color: isDark ? const Color(0xFF86EFAC) : Color(0xFF065F46),
         ),
       ),
     );
@@ -1104,11 +1147,11 @@ class _SpecialtyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Member colors updated to Blue as requested
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF), // Soft blue for specialties
+        color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF), // Soft blue for specialties
         borderRadius: BorderRadius.circular(999.r),
         border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.2)),
       ),
@@ -1117,7 +1160,7 @@ class _SpecialtyChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF1E40AF),
+          color: isDark ? const Color(0xFF93C5FD) : Color(0xFF1E40AF),
         ),
       ),
     );
@@ -1129,12 +1172,17 @@ class _OrganizerBioCard extends StatelessWidget {
   const _OrganizerBioCard({required this.bio});
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
       child: Text(
         bio,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12.sp, height: 1.35, color: Color(0xFF56608B)),
+        style: TextStyle(
+          fontSize: 12.sp, 
+          height: 1.35, 
+          color: isDark ? Colors.grey[300] : Color(0xFF56608B),
+        ),
       ),
     );
   }
@@ -1207,20 +1255,22 @@ class _OrganizerStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dividerColor = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD8D9EC);
     return Container(
       padding: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8E8F6),
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8E8F6),
         borderRadius: BorderRadius.circular(20.r),
       ),
       child: Row(
         children: [
           _StatCardItem(label: 'ACTIVITIES', value: activities.toString()),
-          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
+          Container(width: 1, height: 34, color: dividerColor),
           _StatCardItem(label: 'RATE', value: rate),
-          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
+          Container(width: 1, height: 34, color: dividerColor),
           _StatCardItem(label: 'POSTS', value: posts.toString()),
-          Container(width: 1, height: 34, color: const Color(0xFFD8D9EC)),
+          Container(width: 1, height: 34, color: dividerColor),
           _StatCardItem(label: 'RELATIONS', value: relations.toString()),
         ],
       ),
@@ -1234,6 +1284,7 @@ class _StatCardItem extends StatelessWidget {
   const _StatCardItem({required this.label, required this.value});
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Column(
         children: [
@@ -1252,7 +1303,7 @@ class _StatCardItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF131A4A),
+                  color: isDark ? Colors.white : Color(0xFF131A4A),
                 ),
               ),
             ],
@@ -1262,7 +1313,7 @@ class _StatCardItem extends StatelessWidget {
             style: TextStyle(
               fontSize: 9.sp,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF6F7396),
+              color: isDark ? Colors.grey[400] : Color(0xFF6F7396),
               letterSpacing: 0.5,
             ),
           ),
@@ -1275,12 +1326,13 @@ class _StatCardItem extends StatelessWidget {
 class _DefaultAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: const Color(0xFFE2E7F6),
+      color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE2E7F6),
       child: Icon(
         Icons.person,
         size: 42,
-        color: Color(0xFF8892AE),
+        color: isDark ? Colors.grey[400] : Color(0xFF8892AE),
       ),
     );
   }

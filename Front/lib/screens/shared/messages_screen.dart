@@ -184,8 +184,9 @@ class _MessagesScreenState extends State<MessagesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F4FF),
       body: SafeArea(
         child: Column(
           children: [
@@ -425,35 +426,38 @@ class _SearchFieldState extends State<_SearchField> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       height: 52,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFE4E7FF)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE4E7FF)),
       ),
       child: Row(
         children: [
           const Icon(Icons.search, color: Color(0xFF9CA3AF)),
           const SizedBox(width: 12),
           Expanded(
-            child: TextField(
-              controller: _controller,
-              onChanged: (v) {
-                widget.onChanged(v);
-                setState(() {});
-              },
-              decoration: const InputDecoration(
-                hintText: 'Search conversations...',
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
+              child: TextField(
+                controller: _controller,
+                onChanged: (v) {
+                  widget.onChanged(v);
+                  setState(() {});
+                },
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                decoration: InputDecoration(
+                  hintText: 'Search conversations...',
+                  hintStyle: TextStyle(color: isDark ? Colors.grey[500] : null),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                ),
               ),
-            ),
           ),
           if (_controller.text.isNotEmpty)
             GestureDetector(
@@ -483,6 +487,7 @@ class _TabsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -498,13 +503,13 @@ class _TabsRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: active ? const Color(0xFF4F6BFF) : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE4E7FF)),
+                  border: Border.all(color: isDark ? const Color(0xFF2E2E3E) : const Color(0xFFE4E7FF)),
                 ),
                 child: Text(
                   labels[i],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: active ? Colors.white : Colors.grey,
+                    color: active ? Colors.white : (isDark ? Colors.grey[400] : Colors.grey),
                     fontSize: 12,
                     fontWeight: active ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -526,6 +531,7 @@ class _MessageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final unread = conversation.unreadCount > 0;
     final isAdminConversation =
         conversation.partnerType.trim().toLowerCase() == 'admin' ||
@@ -545,7 +551,7 @@ class _MessageTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
       ),
       child: ListTile(
@@ -766,13 +772,14 @@ class _NewChatModalState extends State<_NewChatModal> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset + 20),
       child: Column(

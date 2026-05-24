@@ -123,8 +123,9 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F2FA),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F2FA),
       body: Stack(
         children: [
           CustomScrollView(
@@ -144,8 +145,8 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
                         itemBuilder: (ctx, i) {
                           if (_allPhotos.isEmpty) {
                             return Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image, size: 50, color: Colors.grey),
+                              color: isDark ? const Color(0xFF1E293B) : Colors.grey[300],
+                              child: Icon(Icons.image, size: 50, color: isDark ? Colors.grey[600] : Colors.grey),
                             );
                           }
                           final item = _allPhotos[i];
@@ -236,7 +237,7 @@ class _ActivityPreviewScreenState extends State<ActivityPreviewScreen> {
                       _SectionTitle('Description'),
                       Text(
                         _showFullDesc ? widget.description : (widget.description.length > 200 ? '${widget.description.substring(0, 200)}...' : widget.description),
-                        style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF4B5563)),
+                        style: TextStyle(fontSize: 15, height: 1.6, color: isDark ? Colors.grey[300] : const Color(0xFF4B5563)),
                       ),
                       if (widget.description.length > 200)
                         TextButton(
@@ -316,12 +317,13 @@ class _TopIconButton extends StatelessWidget {
   const _TopIconButton({required this.icon, required this.onTap});
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
-        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.black87, size: 20),
+        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E293B) : Colors.white, shape: BoxShape.circle),
+        child: Icon(icon, color: isDark ? Colors.white : Colors.black87, size: 20),
       ),
     );
   }
@@ -392,6 +394,7 @@ class _HeroSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final participants = capacity > 0 ? '$capacity max' : '-';
     final languagesText = languages.isEmpty ? '-' : languages.join(', ');
     final priceText = '${price.toStringAsFixed(0)} TND';
@@ -399,11 +402,11 @@ class _HeroSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F2FA),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F2FA),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.08),
+            color: isDark ? Colors.black45 : const Color(0xFF0F172A).withOpacity(0.08),
             blurRadius: 24,
             offset: const Offset(0, 14),
           ),
@@ -460,11 +463,11 @@ class _HeroSummaryCard extends StatelessWidget {
             title.isEmpty ? 'Untitled Activity' : title,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 38,
               fontWeight: FontWeight.w900,
               height: 1.02,
-              color: Color(0xFF17183D),
+              color: isDark ? Colors.white : const Color(0xFF17183D),
             ),
           ),
           const SizedBox(height: 14),
@@ -520,14 +523,15 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 12),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF1D2652),
+          color: isDark ? Colors.white : const Color(0xFF1D2652),
         ),
       ),
     );
@@ -551,6 +555,7 @@ class _TagListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -558,7 +563,7 @@ class _TagListSection extends StatelessWidget {
           emptyLabel,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -572,20 +577,20 @@ class _TagListSection extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: chipColor,
+            color: isDark ? const Color(0xFF312E81) : chipColor,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: iconColor),
+              Icon(icon, size: 16, color: isDark ? const Color(0xFFA5B4FC) : iconColor),
               const SizedBox(width: 8),
               Text(
                 item,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: iconColor,
+                  color: isDark ? const Color(0xFFA5B4FC) : iconColor,
                 ),
               ),
             ],
@@ -603,6 +608,7 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // If we have coordinates, show actual map
     if (latLng != null) {
       return Container(
@@ -612,7 +618,7 @@ class _LocationCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: isDark ? Colors.black26 : Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -694,18 +700,18 @@ class _LocationCard extends StatelessWidget {
       height: 150,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: isDark ? const Color(0xFF1E293B) : Colors.grey[200],
         borderRadius: BorderRadius.circular(20),
       ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.location_on, color: Colors.grey, size: 30),
+            Icon(Icons.location_on, color: isDark ? Colors.grey[500] : Colors.grey, size: 30),
             const SizedBox(height: 8),
             Text(
               'Meeting point: $placeLabel',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],
@@ -723,10 +729,11 @@ class _OrganizerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (loading) {
       return Container(
         height: 80,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E293B) : Colors.white, borderRadius: BorderRadius.circular(20)),
         child: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -735,9 +742,9 @@ class _OrganizerCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB)),
       ),
       child: Row(
         children: [
@@ -751,16 +758,16 @@ class _OrganizerCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
                 InkWell(
                   onTap: onViewProfile,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'Voir mon profil public',
                         style: TextStyle(
-                          color: Colors.blue,
+                          color: isDark ? const Color(0xFFA5B4FC) : Colors.blue,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -769,7 +776,7 @@ class _OrganizerCard extends StatelessWidget {
                       Icon(
                         Icons.arrow_forward_ios,
                         size: 10,
-                        color: Colors.blue[400],
+                        color: isDark ? const Color(0xFFA5B4FC) : Colors.blue[400],
                       ),
                     ],
                   ),
@@ -789,13 +796,14 @@ class _StickyBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 25, offset: Offset(0, -5))
+          BoxShadow(color: isDark ? Colors.black45 : Colors.black12, blurRadius: 25, offset: const Offset(0, -5))
         ],
       ),
       child: SafeArea(
@@ -806,7 +814,7 @@ class _StickyBottomBar extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onBack,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
+              backgroundColor: isDark ? const Color(0xFF2563EB) : const Color(0xFF3B82F6),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               elevation: 4,

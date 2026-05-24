@@ -80,15 +80,19 @@ class _PlaceSearchWidgetState extends State<PlaceSearchWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: widget.controller,
           focusNode: _focusNode,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
           decoration: InputDecoration(
             hintText: widget.hintText,
-            prefixIcon: const Icon(Icons.search),
+            hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600]),
+            prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey[400] : Colors.grey[600]),
             suffixIcon: _isSearching
                 ? const SizedBox(
                     width: 20,
@@ -101,9 +105,14 @@ class _PlaceSearchWidgetState extends State<PlaceSearchWidget> {
                 : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF333333) : Colors.grey[300]!),
             ),
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.grey[50],
           ),
           onChanged: (value) {
             if (value.length >= 2) {
@@ -121,11 +130,12 @@ class _PlaceSearchWidgetState extends State<PlaceSearchWidget> {
             margin: const EdgeInsets.only(top: 8),
             constraints: const BoxConstraints(maxHeight: 200),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? const Color(0xFF333333) : Colors.transparent),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -149,25 +159,28 @@ class _PlaceSearchWidgetState extends State<PlaceSearchWidget> {
                               return Container(
                                 width: 50,
                                 height: 50,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.place),
+                                color: isDark ? const Color(0xFF333333) : Colors.grey[300],
+                                child: Icon(Icons.place, color: isDark ? Colors.grey[500] : Colors.grey[600]),
                               );
                             },
                           ),
                         )
-                      : const SizedBox(
+                      : SizedBox(
                           width: 50,
                           height: 50,
-                          child: Icon(Icons.place),
+                          child: Icon(Icons.place, color: isDark ? Colors.grey[400] : Colors.grey[600]),
                         ),
                   title: Text(
                     place.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
                   subtitle: Text(
                     place.location ?? place.city ?? '',
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                       fontSize: 12,
                     ),
                   ),

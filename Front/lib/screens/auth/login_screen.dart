@@ -282,8 +282,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white, // Changed to pure white for consistency
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
@@ -293,9 +295,9 @@ class _LoginScreenState extends State<LoginScreen> {
               left: 10,
               child: IconButton(
                 onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.splash),
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Color(0xFF1F2937),
+                  color: isDark ? Colors.white : const Color(0xFF1F2937),
                 ),
               ),
             ),
@@ -312,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
@@ -331,21 +333,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       'Welcome Back',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF1F2937),
+                        color: isDark ? Colors.white : const Color(0xFF1F2937),
                         letterSpacing: -1,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Sign in to continue your journey',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
+                      ),
                     ),
                     const SizedBox(height: 50),
 
@@ -390,11 +395,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Remember me',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF6B7280),
+                                color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -407,7 +412,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               builder: (_) => const ForgotPasswordScreen(),
                             ),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Forgot password?',
                             style: TextStyle(
                               color: AppColors.primary,
@@ -471,16 +476,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           "Don't have an account? ",
-                          style: TextStyle(color: Color(0xFF6B7280)),
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
+                          ),
                         ),
                         GestureDetector(
                           onTap: () => Navigator.pushReplacementNamed(
                             context,
                             AppRoutes.signup,
                           ),
-                          child: Text(
+                          child: const Text(
                             "Sign Up",
                             style: TextStyle(
                               color: AppColors.primary,
@@ -509,13 +516,14 @@ class _LoginScreenState extends State<LoginScreen> {
     Widget? suffixIcon,
     TextInputType? keyboardType,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -526,14 +534,14 @@ class _LoginScreenState extends State<LoginScreen> {
         obscureText: obscureText,
         keyboardType: keyboardType,
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: isDark ? Colors.white : const Color(0xFF1F2937),
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
           suffixIcon: suffixIcon,
-          hintStyle: TextStyle(color: AppColors.textLight),
+          hintStyle: TextStyle(color: isDark ? Colors.grey[500] : AppColors.textLight),
           contentPadding: const EdgeInsets.symmetric(vertical: 18),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,

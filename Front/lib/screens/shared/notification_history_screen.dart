@@ -198,24 +198,25 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Notifications',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1A2E),
+            color: isDark ? Colors.white : const Color(0xFF1A1A2E),
           ),
         ),
         automaticallyImplyLeading: !widget.isTab,
         leading: widget.isTab
             ? null
             : IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1A1A2E)),
+                icon: Icon(Icons.arrow_back_ios, color: isDark ? Colors.white : const Color(0xFF1A1A2E)),
                 onPressed: () => Navigator.pop(context),
               ),
         actions: [
@@ -330,7 +331,7 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
                                               fontWeight: isUnread
                                                   ? FontWeight.w700
                                                   : FontWeight.w600,
-                                              color: const Color(0xFF1A1A2E),
+                                              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
                                             ),
                                           ),
                                         ),

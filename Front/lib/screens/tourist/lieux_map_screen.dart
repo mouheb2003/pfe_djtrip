@@ -592,7 +592,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                                         loadingBuilder: (context, child, loadingProgress) {
                                           if (loadingProgress == null) return child;
                                           return Container(
-                                            color: const Color(0xFFF1F5F9),
+                                            color: cs.surfaceVariant,
                                             child: const Center(
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2,
@@ -602,7 +602,7 @@ class _LieuxMapScreenState extends State<LieuxMapScreen> {
                                           );
                                         },
                                         errorBuilder: (_, __, ___) => Container(
-                                          color: const Color(0xFFF1F5F9),
+                                          color: cs.surfaceVariant,
                                           child: const Center(
                                             child: Icon(Icons.image, color: Color(0xFF94A3B8), size: 20),
                                           ),

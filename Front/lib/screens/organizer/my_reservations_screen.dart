@@ -12,16 +12,17 @@ class MyReservationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F3FE),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F3FE),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F3FE),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F3FE),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F235F)),
+          icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : const Color(0xFF1F235F)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -39,7 +40,7 @@ class MyReservationsScreen extends StatelessWidget {
                 fontSize: 20,
                 height: 1,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF1F235F),
+                color: isDark ? Colors.white : const Color(0xFF1F235F),
               ),
             ),
           ],
@@ -284,6 +285,7 @@ class _MyReservationsTabState extends State<MyReservationsTab>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_isLoading && _reservations.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
@@ -326,14 +328,15 @@ class _MyReservationsTabState extends State<MyReservationsTab>
         Container(
           margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
+              if (!isDark)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
             ],
           ),
           child: TextField(
@@ -341,7 +344,11 @@ class _MyReservationsTabState extends State<MyReservationsTab>
             onChanged: (value) {
               setState(() => _searchQuery = value);
             },
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 14, 
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white : Colors.black,
+            ),
             decoration: const InputDecoration(
               hintText: 'Search by tourist or activity...',
               hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
@@ -361,14 +368,15 @@ class _MyReservationsTabState extends State<MyReservationsTab>
           child: Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
+                if (!isDark)
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
               ],
             ),
             child: Row(
@@ -475,6 +483,7 @@ class _MyReservationsTabState extends State<MyReservationsTab>
   }
 
   Widget _buildReservationCard(InscriptionModel reservation, bool isPending) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final activityModel = reservation.activityModel;
     final activity = reservation.activite ?? {};
     final tourist = reservation.touriste ?? {};
@@ -515,14 +524,15 @@ class _MyReservationsTabState extends State<MyReservationsTab>
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
           ],
         ),
         child: Column(
@@ -639,10 +649,10 @@ class _MyReservationsTabState extends State<MyReservationsTab>
                             const SizedBox(height: 2),
                             Text(
                               touristName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1B2458),
+                                color: isDark ? Colors.white : const Color(0xFF1B2458),
                               ),
                             ),
                           ],

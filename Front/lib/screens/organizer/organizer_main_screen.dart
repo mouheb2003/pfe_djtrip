@@ -194,9 +194,10 @@ class _OrganizerMainScreenState extends State<OrganizerMainScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const navBg = Color(0xFFF2F1FA);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navBg = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF2F1FA);
     const navActive = AppColors.primary;
-    const navInactive = Color(0xFF7B82A8);
+    final navInactive = isDark ? const Color(0xFF9DA3C8) : const Color(0xFF7B82A8);
 
     return Scaffold(
       extendBody: true,

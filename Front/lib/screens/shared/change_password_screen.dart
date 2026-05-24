@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import 'password_changed_screen.dart';
@@ -56,8 +56,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: isDark ? const Color(0xFF121212) : AppColors.backgroundLight,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
@@ -105,7 +106,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textDark,
                             ),
                           ),
                         ],
@@ -114,12 +114,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 28),
 
                     // â”€â”€ Heading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                    const Text(
+                    Text(
                       'Secure your account',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
+                        color: isDark ? Colors.white : AppColors.textDark,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -170,13 +170,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                     ],
 
-                    // â”€â”€ Current Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Current Password ────────────────────────────────────────
                     const _Label('Current Password'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _currentCtrl,
                       obscureText: !_showCurrent,
                       decoration: _deco(
+                        isDark: isDark,
                         hint: 'Enter current password',
                         suffix: _eyeBtn(
                           show: _showCurrent,
@@ -190,13 +191,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // â”€â”€ New Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── New Password ────────────────────────────────────────────
                     const _Label('New Password'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _newCtrl,
                       obscureText: !_showNew,
                       decoration: _deco(
+                        isDark: isDark,
                         hint: 'Create new password',
                         suffix: _eyeBtn(
                           show: _showNew,
@@ -218,13 +220,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // â”€â”€ Confirm New Password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    // ── Confirm New Password ────────────────────────────────────
                     const _Label('Confirm New Password'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _confirmCtrl,
                       obscureText: !_showConfirm,
                       decoration: _deco(
+                        isDark: isDark,
                         hint: 'Repeat new password',
                         suffix: _eyeBtn(
                           show: _showConfirm,
@@ -249,10 +252,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             ),
           ),
 
-          // â”€â”€ Sticky bottom button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // ── Sticky bottom button ────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-            color: AppColors.backgroundLight,
+            color: isDark ? const Color(0xFF121212) : AppColors.backgroundLight,
             child: SizedBox(
               height: 56,
               width: double.infinity,
@@ -290,21 +293,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  static InputDecoration _deco({String? hint, Widget? suffix}) {
+  static InputDecoration _deco({bool isDark = false, String? hint, Widget? suffix}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 14),
       suffixIcon: suffix,
       filled: true,
-      fillColor: Colors.white,
+      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -342,12 +345,13 @@ class _Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: AppColors.textDark,
+        color: isDark ? Colors.white : AppColors.textDark,
       ),
     );
   }

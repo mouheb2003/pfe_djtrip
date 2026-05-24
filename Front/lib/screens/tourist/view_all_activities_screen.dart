@@ -225,23 +225,24 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E225E)),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF1E225E)),
           onPressed: () => Navigator.pop(context),
         ),
         title: FadeTransition(
           opacity: _fadeAnimation,
-          child: const Text(
+          child: Text(
             'All Activities',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1E225E),
+              color: isDark ? Colors.white : const Color(0xFF1E225E),
             ),
           ),
         ),
@@ -271,11 +272,12 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                   opacity: _fadeAnimation,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 2),
                         ),
@@ -284,12 +286,14 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                     child: TextField(
                       controller: _searchController,
                       onChanged: _onSearchChanged,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                       decoration: InputDecoration(
                         hintText: 'Search activities, locations...',
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF6C757D)),
+                        hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600]),
+                        prefixIcon: Icon(Icons.search, color: isDark ? Colors.grey[400] : const Color(0xFF6C757D)),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, color: Color(0xFF6C757D)),
+                                icon: Icon(Icons.clear, color: isDark ? Colors.grey[400] : const Color(0xFF6C757D)),
                                 onPressed: () {
                                   _searchController.clear();
                                   _onSearchChanged('');
@@ -318,15 +322,16 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE1E4E8)),
+                            border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE1E4E8)),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
+                              dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                               value: _selectedCategory,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6C757D)),
+                              icon: Icon(Icons.keyboard_arrow_down, color: isDark ? Colors.grey[400] : const Color(0xFF6C757D)),
                               items: _categories.map((category) {
                                 return DropdownMenuItem<String>(
                                   value: category,
@@ -335,7 +340,7 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                                     style: TextStyle(
                                       color: category == _selectedCategory
                                           ? const Color(0xFF4B63FF)
-                                          : const Color(0xFF1E225E),
+                                          : (isDark ? Colors.grey[300] : const Color(0xFF1E225E)),
                                       fontWeight: category == _selectedCategory
                                           ? FontWeight.w600
                                           : FontWeight.normal,
@@ -356,15 +361,16 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE1E4E8)),
+                            border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE1E4E8)),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
+                              dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                               value: _selectedSort,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6C757D)),
+                              icon: Icon(Icons.keyboard_arrow_down, color: isDark ? Colors.grey[400] : const Color(0xFF6C757D)),
                               items: _sortOptions.map((sort) {
                                 return DropdownMenuItem<String>(
                                   value: sort,
@@ -373,7 +379,7 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                                     style: TextStyle(
                                       color: sort == _selectedSort
                                           ? const Color(0xFF4B63FF)
-                                          : const Color(0xFF1E225E),
+                                          : (isDark ? Colors.grey[300] : const Color(0xFF1E225E)),
                                       fontWeight: sort == _selectedSort
                                           ? FontWeight.w600
                                           : FontWeight.normal,
@@ -402,10 +408,10 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                     children: [
                       Text(
                         '${_filteredActivities.length} activities found',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF6C757D),
+                          color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                         ),
                       ),
                       const Spacer(),
@@ -443,7 +449,7 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
                         ),
                       )
                     : _filteredActivities.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(isDark)
                         : _isGridView
                             ? _buildGridView()
                             : _buildListView(),
@@ -455,7 +461,7 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -463,23 +469,23 @@ class _ViewAllActivitiesScreenState extends State<ViewAllActivitiesScreen>
           Icon(
             Icons.search_off,
             size: 64,
-            color: const Color(0xFF6C757D),
+            color: isDark ? Colors.grey[600] : const Color(0xFF6C757D),
           ),
           const SizedBox(height: 16),
           Text(
             'No activities found',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1E225E),
+              color: isDark ? Colors.white : const Color(0xFF1E225E),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search or filters',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF6C757D),
+              color: isDark ? Colors.grey[500] : const Color(0xFF6C757D),
             ),
           ),
           const SizedBox(height: 24),

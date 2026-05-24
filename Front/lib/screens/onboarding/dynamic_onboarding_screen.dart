@@ -287,39 +287,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (image != null) {
         HapticFeedback.lightImpact();
         
-        // Upload to Cloudinary immediately
-        setState(() => _isUploadingProfilePhoto = true);
-        
-        try {
-          final success = await UserService.updateAvatar(File(image.path));
-          if (success && mounted) {
-            setState(() {
-              _onboardingData['avatar'] = image.path;
-              _profilePhotoUrl = image.path;
-              _isUploadingProfilePhoto = false;
-            });
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile photo uploaded successfully'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else {
-            throw Exception('Upload failed');
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() => _isUploadingProfilePhoto = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to upload profile photo: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+        setState(() {
+          _onboardingData['avatar'] = image.path;
+          _profilePhotoUrl = image.path;
+          _isUploadingProfilePhoto = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -346,39 +318,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (image != null) {
         HapticFeedback.lightImpact();
         
-        // Upload to Cloudinary immediately
-        setState(() => _isUploadingProfilePhoto = true);
-        
-        try {
-          final success = await UserService.updateAvatar(File(image.path));
-          if (success && mounted) {
-            setState(() {
-              _onboardingData['avatar'] = image.path;
-              _profilePhotoUrl = image.path;
-              _isUploadingProfilePhoto = false;
-            });
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile photo uploaded successfully'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else {
-            throw Exception('Upload failed');
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() => _isUploadingProfilePhoto = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to upload profile photo: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+        setState(() {
+          _onboardingData['avatar'] = image.path;
+          _profilePhotoUrl = image.path;
+          _isUploadingProfilePhoto = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -505,39 +449,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (image != null) {
         HapticFeedback.lightImpact();
         
-        // Upload to Cloudinary immediately
-        setState(() => _isUploadingCoverPhoto = true);
-        
-        try {
-          final success = await UserService.updateCoverPhoto(File(image.path));
-          if (success && mounted) {
-            setState(() {
-              _onboardingData['cover_photo'] = image.path;
-              _coverPhotoUrl = image.path;
-              _isUploadingCoverPhoto = false;
-            });
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Cover photo uploaded successfully'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else {
-            throw Exception('Upload failed');
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() => _isUploadingCoverPhoto = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to upload cover photo: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+        setState(() {
+          _onboardingData['cover_photo'] = image.path;
+          _coverPhotoUrl = image.path;
+          _isUploadingCoverPhoto = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -564,39 +480,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (image != null) {
         HapticFeedback.lightImpact();
         
-        // Upload to Cloudinary immediately
-        setState(() => _isUploadingCoverPhoto = true);
-        
-        try {
-          final success = await UserService.updateCoverPhoto(File(image.path));
-          if (success && mounted) {
-            setState(() {
-              _onboardingData['cover_photo'] = image.path;
-              _coverPhotoUrl = image.path;
-              _isUploadingCoverPhoto = false;
-            });
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Cover photo uploaded successfully'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else {
-            throw Exception('Upload failed');
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() => _isUploadingCoverPhoto = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to upload cover photo: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+        setState(() {
+          _onboardingData['cover_photo'] = image.path;
+          _coverPhotoUrl = image.path;
+          _isUploadingCoverPhoto = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -845,10 +733,10 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         }
         break;
       case 'profile_picture':
-        stepData = {'avatar': _onboardingData['avatar']};
+        stepData = {};
         break;
       case 'cover_photo':
-        stepData = {'cover_photo': _onboardingData['cover_photo']};
+        stepData = {};
         break;
       case 'country':
         stepData = {'pays_origine': _selectedCountry ?? ''};
@@ -888,6 +776,14 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
     setState(() => _isCompleting = true);
 
     try {
+      // 1.5. Upload images to Cloudinary if they exist locally
+      if (_onboardingData['avatar'] != null && !(_onboardingData['avatar'] as String).startsWith('http')) {
+        await UserService.updateAvatar(File(_onboardingData['avatar']));
+      }
+      if (_onboardingData['cover_photo'] != null && !(_onboardingData['cover_photo'] as String).startsWith('http')) {
+        await UserService.updateCoverPhoto(File(_onboardingData['cover_photo']));
+      }
+
       // 2. Save all steps data
       for (int i = 0; i < _steps.length; i++) {
         final stepData = await _getStepData(i);
@@ -896,6 +792,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           if (!result['success']) {
             throw Exception(result['message'] ?? 'Failed to save ${ _steps[i]['title']}');
           }
+        } else if (_steps[i]['id'] == 'profile_picture' || _steps[i]['id'] == 'cover_photo') {
+          // Increment step in backend silently for images
+          await OnboardingService.updateOnboardingStep({'updated_image_step': true});
         }
       }
 
@@ -941,9 +840,11 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8F9FF),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
         body: const Center(
           child: CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B63FF)),
@@ -953,7 +854,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -973,7 +874,6 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1E225E),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -981,7 +881,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                     'Please fill in the information below to get started with DJTrip',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      color: isDark ? Colors.grey[400] : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -1076,10 +976,10 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 ),
             ],
           ),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1E225E),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E),
           ),
         ),
         const SizedBox(height: 12),
@@ -1159,9 +1059,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           _buildStepTitle(step),
           Text(
             step['description'] ?? '',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF6C757D),
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : const Color(0xFF6C757D),
               height: 1.5,
             ),
           ),
@@ -1194,14 +1094,14 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                     }
                   });
                 },
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
                 selectedColor: const Color(0xFF4B63FF),
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E)),
                   fontWeight: FontWeight.w600,
                 ),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                  color: isSelected ? const Color(0xFF4B63FF) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8)),
                 ),
               );
             }).toList(),
@@ -1301,7 +1201,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                       borderSide: const BorderSide(color: Color(0xFF4B63FF)),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                   items: phoneCountries.map((country) {
@@ -1350,7 +1250,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                       borderSide: const BorderSide(color: Color(0xFF4B63FF)),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     errorText: _validatePhoneNumber(selectedCountry['pattern'] as String),
                   ),
@@ -1767,7 +1667,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 borderSide: const BorderSide(color: Color(0xFF4B63FF)),
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
               contentPadding: const EdgeInsets.all(16),
             ),
             items: countries.map((country) {
@@ -1858,7 +1758,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 borderSide: const BorderSide(color: Color(0xFF4B63FF)),
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
               contentPadding: const EdgeInsets.all(16),
             ),
             items: languages.map((lang) {
@@ -1969,12 +1869,12 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                     }
                   });
                 },
-                backgroundColor: isSelected ? const Color(0xFF4B63FF) : Colors.white,
+                backgroundColor: isSelected ? const Color(0xFF4B63FF) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white),
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E)),
                 ),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                  color: isSelected ? const Color(0xFF4B63FF) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8)),
                 ),
               );
             }).toList(),
@@ -2226,14 +2126,14 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                     }
                   });
                 },
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
                 selectedColor: const Color(0xFF4B63FF),
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF1E225E),
+                  color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E)),
                   fontWeight: FontWeight.w600,
                 ),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF4B63FF) : const Color(0xFFE1E4E8),
+                  color: isSelected ? const Color(0xFF4B63FF) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8)),
                 ),
               );
             }).toList(),
@@ -2270,10 +2170,10 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           const SizedBox(height: 30),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFFE1E4E8),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8),
                 width: 1,
               ),
             ),
@@ -2291,9 +2191,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.all(16),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF1E225E),
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),
@@ -2322,10 +2222,10 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           const SizedBox(height: 30),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFFE1E4E8),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8),
                 width: 1,
               ),
             ),
@@ -2343,9 +2243,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.all(16),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF1E225E),
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),
@@ -2374,10 +2274,10 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           const SizedBox(height: 30),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFFE1E4E8),
+                color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8),
                 width: 1,
               ),
             ),
@@ -2395,9 +2295,9 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.all(16),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Color(0xFF1E225E),
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E),
                 height: 1.5,
               ),
             ),

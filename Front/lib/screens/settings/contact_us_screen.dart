@@ -137,19 +137,20 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Contact Us',
           style: TextStyle(
-            color: Colors.black87,
+            color: isDark ? Colors.white : Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -162,28 +163,28 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Contact Information Cards
-            _buildContactInfo(),
+            _buildContactInfo(isDark),
             
             const SizedBox(height: 24),
             
             // Contact Form
-            _buildContactForm(),
+            _buildContactForm(isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContactInfo() {
+  Widget _buildContactInfo(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Get in Touch',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1E225E),
+            color: isDark ? Colors.white : const Color(0xFF1E225E),
           ),
         ),
         const SizedBox(height: 16),
@@ -196,6 +197,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 title: 'Email',
                 subtitle: 'support@djtrip.com',
                 onTap: _launchEmail,
+                isDark: isDark,
               ),
             ),
             const SizedBox(width: 12),
@@ -205,6 +207,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 title: 'Phone',
                 subtitle: '+1 234 567 890',
                 onTap: _launchPhone,
+                isDark: isDark,
               ),
             ),
           ],
@@ -217,6 +220,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
           title: 'Website',
           subtitle: 'www.djtrip.com/support',
           onTap: _launchWebsite,
+          isDark: isDark,
         ),
       ],
     );
@@ -227,6 +231,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    required bool isDark,
   }) {
     return InkWell(
       onTap: onTap,
@@ -234,7 +239,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -261,10 +266,10 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1E225E),
+                color: isDark ? Colors.white : const Color(0xFF1E225E),
               ),
             ),
             const SizedBox(height: 4),
@@ -272,7 +277,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
               subtitle,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: isDark ? Colors.grey[400] : Colors.grey[600],
               ),
               textAlign: TextAlign.center,
             ),
@@ -282,16 +287,16 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     );
   }
 
-  Widget _buildContactForm() {
+  Widget _buildContactForm(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Send us a Message',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1E225E),
+            color: isDark ? Colors.white : const Color(0xFF1E225E),
           ),
         ),
         const SizedBox(height: 16),
@@ -299,7 +304,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -316,9 +321,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 // Name Field
                 TextFormField(
                   controller: _nameController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: _buildInputDecoration(
                     label: 'Your Name',
                     icon: Icons.person,
+                    isDark: isDark,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -332,9 +339,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 // Email Field
                 TextFormField(
                   controller: _emailController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: _buildInputDecoration(
                     label: 'Email Address',
                     icon: Icons.email,
+                    isDark: isDark,
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
@@ -352,9 +361,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 // Subject Field
                 TextFormField(
                   controller: _subjectController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: _buildInputDecoration(
                     label: 'Subject',
                     icon: Icons.subject,
+                    isDark: isDark,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -368,9 +379,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 // Message Field
                 TextFormField(
                   controller: _messageController,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   decoration: _buildInputDecoration(
                     label: 'Message',
                     icon: Icons.message,
+                    isDark: isDark,
                   ).copyWith(
                     hintText: 'Tell us how we can help you...',
                     hintStyle: TextStyle(
@@ -435,6 +448,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
   InputDecoration _buildInputDecoration({
     required String label,
     required IconData icon,
+    required bool isDark,
   }) {
     return InputDecoration(
       labelText: label,
@@ -450,11 +464,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        borderSide: BorderSide(color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

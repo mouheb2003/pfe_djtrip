@@ -191,6 +191,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -206,7 +207,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade700,
+              color: isDark ? Colors.white70 : Colors.grey.shade700,
             ),
           ),
           const SizedBox(height: 8),
@@ -214,7 +215,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             'I can help you with activities, bookings, and more',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.grey[400] : Colors.grey.shade500,
             ),
           ),
           const SizedBox(height: 32),
@@ -272,6 +273,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _buildMessageBubble(AiChatMessage message) {
     final isUser = message.isUser;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -303,10 +305,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       ),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isUser ? AppColors.primary : Colors.white,
+                        color: isUser ? AppColors.primary : (isDark ? const Color(0xFF2D2D2D) : Colors.white),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
-                          if (!isUser)
+                          if (!isUser && !isDark)
                             BoxShadow(
                               color: Colors.black.withOpacity(0.03),
                               blurRadius: 4,
@@ -315,7 +317,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         ],
                         border: isUser
                             ? null
-                            : Border.all(color: AppColors.outline),
+                            : Border.all(color: isDark ? const Color(0xFF3D3D3D) : AppColors.outline),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +325,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           SelectableText(
                             message.content,
                             style: TextStyle(
-                              color: isUser ? Colors.white : Colors.black87,
+                              color: isUser ? Colors.white : (isDark ? Colors.white : Colors.black87),
                               fontSize: 15,
                             ),
                           ),
@@ -363,6 +365,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildSources(List<AiSource> sources, bool isUser) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
@@ -373,7 +376,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               Icon(
                 Icons.source,
                 size: 14,
-                color: Colors.grey.shade600,
+                color: isDark ? Colors.grey[400] : Colors.grey.shade600,
               ),
               const SizedBox(width: 4),
               Text(
@@ -381,7 +384,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: isUser ? Colors.white70 : Colors.grey.shade700,
+                  color: isUser ? Colors.white70 : (isDark ? Colors.grey[400] : Colors.grey.shade700),
                 ),
               ),
             ],
@@ -396,7 +399,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     width: 4,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.white70 : Colors.grey.shade600,
+                      color: isUser ? Colors.white70 : (isDark ? Colors.grey[500] : Colors.grey.shade600),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -406,7 +409,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       source.filename,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isUser ? Colors.white70 : Colors.grey.shade600,
+                        color: isUser ? Colors.white70 : (isDark ? Colors.grey[500] : Colors.grey.shade600),
                         fontStyle: FontStyle.italic,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -422,6 +425,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildTypingIndicator() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(left: 40, bottom: 12),
       child: Row(
@@ -439,9 +443,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade300),
             ),
             child: Row(
               children: List.generate(3, (index) {
@@ -465,16 +469,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent)),
         boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
+          if (!isDark)
+            BoxShadow(
+              color: Colors.grey.shade200,
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
         ],
       ),
       child: SafeArea(
@@ -483,16 +490,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: TextField(
                   controller: _messageController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                  decoration: InputDecoration(
                     hintText: 'Ask me anything...',
-                    hintStyle: TextStyle(color: Colors.grey),
+                    hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,
                     ),

@@ -69,7 +69,7 @@ class OnboardingMiddleware {
       if (!isOnboarded) {
         // User needs onboarding
         Navigator.pushReplacementNamed(context, '/onboarding');
-      } else if (userType == 'Organisator' && !isApproved) {
+      } else if ((userType.toLowerCase() == 'organisator' || userType.toLowerCase() == 'organizer') && !isApproved) {
         // Organizer needs approval
         Navigator.pushReplacementNamed(context, '/waiting_approval');
       } else {
@@ -98,15 +98,15 @@ class OnboardingMiddleware {
 
       switch (feature) {
         case 'create_activities':
-          return isOnboarded && isApproved && userType == 'Organisator';
+          return isOnboarded && isApproved && (userType.toLowerCase() == 'organisator' || userType.toLowerCase() == 'organizer');
         case 'manage_bookings':
-          return isOnboarded && isApproved && userType == 'Organisator';
+          return isOnboarded && isApproved && (userType.toLowerCase() == 'organisator' || userType.toLowerCase() == 'organizer');
         case 'view_analytics':
-          return isOnboarded && isApproved && userType == 'Organisator';
+          return isOnboarded && isApproved && (userType.toLowerCase() == 'organisator' || userType.toLowerCase() == 'organizer');
         case 'book_activities':
-          return isOnboarded && userType == 'Touriste';
+          return isOnboarded && userType.toLowerCase() == 'touriste';
         case 'write_reviews':
-          return isOnboarded && userType == 'Touriste';
+          return isOnboarded && userType.toLowerCase() == 'touriste';
         case 'view_notifications':
           return isOnboarded;
         case 'edit_profile':
@@ -140,7 +140,7 @@ class OnboardingMiddleware {
   // Check if user is organizer
   static Future<bool> isOrganizer() async {
     final userType = await getUserType();
-    return userType == 'Organisator';
+    return userType.toLowerCase() == 'organisator' || userType.toLowerCase() == 'organizer';
   }
 
   // Check if user is admin

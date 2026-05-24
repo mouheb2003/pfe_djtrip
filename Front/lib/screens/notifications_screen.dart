@@ -330,14 +330,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(NotificationModel notification) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isUnread ? const Color(0xFFF0F4FF) : Colors.white,
+        color: notification.isUnread
+            ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F4FF))
+            : (isDark ? const Color(0xFF121212) : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: notification.isUnread
             ? Border.all(color: AppColors.primary.withOpacity(0.3), width: 1)
-            : Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+            : Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey.withOpacity(0.1), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -388,7 +391,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   fontWeight: notification.isUnread
                                       ? FontWeight.bold
                                       : FontWeight.w600,
-                                  color: const Color(0xFF1E225E),
+                                  color: isDark ? Colors.white : const Color(0xFF1E225E),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -442,8 +445,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             color: notification.isUnread
-                                ? Colors.black87
-                                : const Color(0xFF6C757D),
+                                ? (isDark ? Colors.grey[300] : Colors.black87)
+                                : (isDark ? Colors.grey[500] : const Color(0xFF6C757D)),
                             height: 1.4,
                           ),
                           maxLines: 3,
@@ -513,22 +516,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
         automaticallyImplyLeading: !widget.isTab,
         leading: widget.isTab
             ? null
             : IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black87),
                 onPressed: () => Navigator.pop(context),
               ),
         title: Text(
           'Notifications ($_unreadCount)',
-          style: const TextStyle(
-            color: Colors.black87,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
@@ -558,7 +562,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Container(
             height: 60,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.03),
@@ -628,12 +632,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primary
-                            : AppColors.surface,
+                            : (isDark ? const Color(0xFF2C2C2C) : AppColors.surface),
                         borderRadius: BorderRadius.circular(25),
                         border: Border.all(
                           color: isSelected
                               ? Colors.transparent
-                              : AppColors.outline.withOpacity(0.5),
+                              : (isDark ? Colors.grey[700]! : AppColors.outline.withOpacity(0.5)),
                         ),
                         boxShadow: isSelected
                             ? [
@@ -653,7 +657,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             size: 16,
                             color: isSelected
                                 ? Colors.white
-                                : AppColors.onSurfaceVariant,
+                                : (isDark ? Colors.grey[400] : AppColors.onSurfaceVariant),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -665,7 +669,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   : FontWeight.w500,
                               color: isSelected
                                   ? Colors.white
-                                  : AppColors.onSurfaceVariant,
+                                  : (isDark ? Colors.grey[400] : AppColors.onSurfaceVariant),
                             ),
                           ),
                         ],

@@ -895,6 +895,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentTabActivities = _getFilteredActivities(
       _tabController.index == 0 ? _activities :
       _tabController.index == 1 ? _activeActivities :
@@ -1000,14 +1001,15 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
                               ],
                             ),
                             child: Stack(
@@ -1168,20 +1170,21 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
+                      color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF2E2E2E) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
+                          if (!isDark)
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
                         ],
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
@@ -1307,21 +1310,23 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
     required Color color,
     required bool isLoading,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 175,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
         ],
         border: Border.all(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(isDark ? 0.2 : 0.1),
           width: 1,
         ),
       ),
@@ -1367,10 +1372,10 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                       )
                     : Text(
                         value,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1F2937),
+                          color: isDark ? Colors.white : const Color(0xFF1F2937),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

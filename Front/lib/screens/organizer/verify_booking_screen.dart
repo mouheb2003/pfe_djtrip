@@ -172,6 +172,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   }
 
   Future<void> _showScannerOutcomeSheet(_VerificationPayload payload) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -181,9 +182,10 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
       ),
       builder: (context) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF8FAFF),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFF),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
           ),
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
           child: SafeArea(
@@ -203,6 +205,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
 
   Widget _buildScannerValidSheet(_VerificationPayload payload) {
     final booking = payload.booking;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -213,7 +216,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
             width: 42,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFDDE3F6),
+              color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFDDE3F6),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -224,20 +227,20 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
             Container(
               width: 38,
               height: 38,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFD1FAE5),
+                color: isDark ? const Color(0xFF0F3A20) : const Color(0xFFD1FAE5),
               ),
-              child: const Icon(Icons.check_rounded, color: Color(0xFF059669)),
+              child: Icon(Icons.check_rounded, color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669)),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Ticket Valid',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF1F2A44),
+                  color: isDark ? Colors.white : const Color(0xFF1F2A44),
                 ),
               ),
             ),
@@ -246,7 +249,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
         const SizedBox(height: 12),
         Text(
           payload.message,
-          style: const TextStyle(color: Color(0xFF667085), fontSize: 13),
+          style: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF667085), fontSize: 13),
         ),
         const SizedBox(height: 12),
         _detailsPanel(booking, payload.scannedCode),
@@ -295,7 +298,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
             label: const Text('Manual Entry'),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF2C67F2),
-              side: const BorderSide(color: Color(0xFFD5DDF5)),
+              side: BorderSide(color: isDark ? const Color(0xFF2F63E9) : const Color(0xFFD5DDF5)),
             ),
           ),
         ),
@@ -306,6 +309,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   Widget _buildScannerInvalidSheet(_VerificationPayload payload) {
     final booking = payload.booking;
     final title = _invalidTitle(payload.status);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -316,99 +320,99 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFDDE3F6),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Center(
-            child: Container(
-              width: 94,
-              height: 94,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFFEE2E2),
-                border: Border.all(color: const Color(0xFFFECACA), width: 2),
-              ),
-              child: const Icon(
-                Icons.close_rounded,
-                color: Color(0xFFDC2626),
-                size: 48,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFEF4444),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              payload.message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF667085),
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _detailsPanel(booking, payload.scannedCode),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _openManualEntry(prefill: payload.scannedCode);
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFDDE3F6),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _resetScanner();
-              },
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Back to Scanner'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF475467),
-                side: const BorderSide(color: Color(0xFFD5DDF5)),
+            const SizedBox(height: 18),
+            Center(
+              child: Container(
+                width: 94,
+                height: 94,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? const Color(0xFF3F1616) : const Color(0xFFFEE2E2),
+                  border: Border.all(color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA), width: 2),
+                ),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                  size: 48,
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFEF4444),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                payload.message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey[400] : const Color(0xFF667085),
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _detailsPanel(booking, payload.scannedCode),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _openManualEntry(prefill: payload.scannedCode);
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _resetScanner();
+                },
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Back to Scanner'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDark ? Colors.white70 : const Color(0xFF475467),
+                  side: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD5DDF5)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _detailsPanel(InscriptionModel? booking, String code) {
@@ -422,14 +426,15 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
         ? '#DJT-${booking.id.substring(booking.id.length - 5).toUpperCase()}'
         : code;
     final usedAt = booking?.qrUsedAt;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
+        border: Border.all(color: isDark ? const Color(0xFF3D3D3D) : const Color(0xFFE4E7EC)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,6 +454,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   }
 
   Widget _kv(String k, String v) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -457,8 +463,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
             width: 92,
             child: Text(
               k,
-              style: const TextStyle(
-                color: Color(0xFF98A2B3),
+              style: TextStyle(
+                color: isDark ? Colors.grey[400] : const Color(0xFF98A2B3),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -467,8 +473,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
           Expanded(
             child: Text(
               v,
-              style: const TextStyle(
-                color: Color(0xFF1D2939),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1D2939),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -588,8 +594,9 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   }
 
   Widget _buildScannerScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF2F4FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -597,10 +604,10 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Verify Ticket',
           style: TextStyle(
-            color: Color(0xFF1D2939),
+            color: isDark ? Colors.white : const Color(0xFF1D2939),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -690,10 +697,10 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                           margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                           decoration: BoxDecoration(
-                            color: const Color(0xE6F4F5FF),
+                            color: isDark ? const Color(0xE61E1E1E) : const Color(0xE6F4F5FF),
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.55),
+                              color: isDark ? const Color(0xFF2E2E2E) : Colors.white.withOpacity(0.55),
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -706,12 +713,12 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Event Entry',
                                 style: TextStyle(
                                   fontSize: 19,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF414672),
+                                  color: isDark ? Colors.white : const Color(0xFF414672),
                                 ),
                               ),
                               const SizedBox(height: 3),
@@ -719,8 +726,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                                 _lastResult?.booking?.activite?['titre']
                                         ?.toString() ??
                                     'Ready for ticket scan',
-                                style: const TextStyle(
-                                  color: Color(0xFF7078A4),
+                                style: TextStyle(
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF7078A4),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -778,11 +785,11 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                                   ),
                                   label: const Text('Manual Entry'),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF4F5B84),
-                                    side: const BorderSide(
-                                      color: Color(0xFFC3CAE6),
+                                    foregroundColor: isDark ? Colors.white70 : const Color(0xFF4F5B84),
+                                    side: BorderSide(
+                                      color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFC3CAE6),
                                     ),
-                                    backgroundColor: const Color(0xFFE5E8F5),
+                                    backgroundColor: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFE5E8F5),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
@@ -831,8 +838,9 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   }
 
   Widget _buildManualEntryScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F5FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F5FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -840,10 +848,10 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
           icon: const Icon(Icons.arrow_back, color: AppColors.primary),
           onPressed: _resetScanner,
         ),
-        title: const Text(
+        title: Text(
           'Verify Booking',
           style: TextStyle(
-            color: Color(0xFF1D2939),
+            color: isDark ? Colors.white : const Color(0xFF1D2939),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -858,8 +866,9 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8EDFF),
+                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE8EDFF),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                 ),
                 child: const Icon(
                   Icons.confirmation_num_rounded,
@@ -868,19 +877,19 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Enter Ticket Details',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1D2939),
+                  color: isDark ? Colors.white : const Color(0xFF1D2939),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Enter Booking ID or Ticket Code to verify manually.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF667085), height: 1.4),
+                style: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF667085), height: 1.4),
               ),
               const SizedBox(height: 20),
               Align(
@@ -899,19 +908,21 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
               TextField(
                 controller: _manualCodeController,
                 textInputAction: TextInputAction.done,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
                   hintText: '#DJT-98421 or DJTRIP_BOOKING:...',
+                  hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
+                    borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD0D5DD)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFD0D5DD)),
+                    borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD0D5DD)),
                   ),
-                  suffixIcon: const Icon(Icons.edit_outlined),
+                  suffixIcon: Icon(Icons.edit_outlined, color: isDark ? Colors.grey[400] : Colors.grey),
                 ),
               ),
               const SizedBox(height: 16),
@@ -967,13 +978,14 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                 ),
-                child: const Text(
+                child: Text(
                   'Codes are case-sensitive. Include the DJTRIP_BOOKING prefix when available.',
                   style: TextStyle(
-                    color: Color(0xFF475467),
+                    color: isDark ? Colors.grey[400] : const Color(0xFF475467),
                     fontSize: 12,
                     height: 1.35,
                   ),
@@ -989,6 +1001,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
   Widget _buildManualResultScreen({required bool success}) {
     final payload = _lastResult;
     final booking = payload?.booking;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final title = success ? 'Identity Confirmed' : 'Verification Failed';
     final subtitle = success
@@ -996,18 +1009,18 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
         : (payload?.message ?? 'Ticket code is invalid or already used.');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF344054)),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF344054)),
           onPressed: _openManualEntry,
         ),
         title: Text(
-          success ? 'VerificationSuccess' : 'Verification Result',
-          style: const TextStyle(
-            color: Color(0xFF1D2939),
+          success ? 'Verification Success' : 'Verification Result',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF1D2939),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1025,8 +1038,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: success
-                        ? const Color(0xFFD1FAE5)
-                        : const Color(0xFFFEE2E2),
+                        ? (isDark ? const Color(0xFF0F3A20) : const Color(0xFFD1FAE5))
+                        : (isDark ? const Color(0xFF3F1616) : const Color(0xFFFEE2E2)),
                   ),
                   child: Icon(
                     success ? Icons.check_rounded : Icons.close_rounded,
@@ -1042,9 +1055,7 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: success
-                      ? const Color(0xFF111827)
-                      : const Color(0xFF1F2937),
+                  color: isDark ? Colors.white : const Color(0xFF111827),
                   fontSize: 34,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1053,8 +1064,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF667085),
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : const Color(0xFF667085),
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -1115,8 +1126,8 @@ class _VerifyBookingScreenState extends State<VerifyBookingScreen> {
                   icon: const Icon(Icons.qr_code_scanner_rounded),
                   label: const Text('Back to Scanner'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF475467),
-                    side: const BorderSide(color: Color(0xFFD0D5DD)),
+                    foregroundColor: isDark ? Colors.white70 : const Color(0xFF475467),
+                    side: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFD0D5DD)),
                   ),
                 ),
               ),

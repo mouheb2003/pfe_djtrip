@@ -44,6 +44,7 @@ class _OrganizerBookingDetailScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final activityModel = _inscription.activityModel;
     final act = _inscription.activite ?? {};
     
@@ -72,15 +73,15 @@ class _OrganizerBookingDetailScreenState
     final isPending = status == 'pending';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Booking Details',
           style: TextStyle(
-            color: Colors.black,
+            color: isDark ? Colors.white : Colors.black,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -101,7 +102,7 @@ class _OrganizerBookingDetailScreenState
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -185,8 +186,9 @@ class _OrganizerBookingDetailScreenState
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.04),
@@ -206,7 +208,7 @@ class _OrganizerBookingDetailScreenState
                         aspectRatio: 16 / 9,
                         child: imageUrl.isNotEmpty
                             ? Image.network(imageUrl, fit: BoxFit.cover)
-                            : Container(color: Colors.grey[300]),
+                            : Container(color: isDark ? const Color(0xFF2D2D2D) : Colors.grey[300]),
                       ),
                     ),
                     Padding(
@@ -250,28 +252,28 @@ class _OrganizerBookingDetailScreenState
                           const SizedBox(height: 12),
                           Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.calendar_today,
                                 size: 14,
-                                color: Colors.black54,
+                                color: isDark ? Colors.grey[400] : Colors.black54,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 activityDate != null
                                     ? _formatDate(activityDate)
                                     : _formatDate(_inscription.dateDemande),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.black54,
+                                  color: isDark ? Colors.grey[400] : Colors.black54,
                                 ),
                               ),
                             ],
@@ -279,17 +281,17 @@ class _OrganizerBookingDetailScreenState
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.location_on,
                                 size: 14,
-                                color: Colors.black54,
+                                color: isDark ? Colors.grey[400] : Colors.black54,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 lieu,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.black54,
+                                  color: isDark ? Colors.grey[400] : Colors.black54,
                                 ),
                               ),
                             ],
@@ -304,20 +306,21 @@ class _OrganizerBookingDetailScreenState
             const SizedBox(height: 24),
 
             // Participants/Tourist Info
-            const Text(
+            Text(
               'Tourist Information',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.04),
@@ -330,7 +333,7 @@ class _OrganizerBookingDetailScreenState
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: Colors.grey[200],
+                    backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.grey[200],
                     backgroundImage: touristPhoto.isNotEmpty
                         ? NetworkImage(touristPhoto)
                         : null,
@@ -344,26 +347,26 @@ class _OrganizerBookingDetailScreenState
                     children: [
                       Text(
                         touristName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: Colors.black87,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.group,
                             size: 12,
-                            color: Colors.black54,
+                            color: isDark ? Colors.grey[400] : Colors.black54,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '$placeCount Person${placeCount > 1 ? 's' : ''}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.black54,
+                              color: isDark ? Colors.grey[400] : Colors.black54,
                             ),
                           ),
                         ],
@@ -376,20 +379,21 @@ class _OrganizerBookingDetailScreenState
             const SizedBox(height: 24),
 
             // Participants Count
-            const Text(
+            Text(
               'Reservation Summary',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.04),
@@ -403,15 +407,16 @@ class _OrganizerBookingDetailScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Participants',
-                        style: TextStyle(color: Colors.black54, fontSize: 14),
+                        style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54, fontSize: 14),
                       ),
                       Text(
                         '$placeCount Person${placeCount > 1 ? 's' : ''}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
                       ),
                     ],
@@ -420,15 +425,16 @@ class _OrganizerBookingDetailScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Requested Date',
-                        style: TextStyle(color: Colors.black54, fontSize: 14),
+                        style: TextStyle(color: isDark ? Colors.grey[400] : Colors.black54, fontSize: 14),
                       ),
                       Text(
                         _formatDate(_inscription.dateDemande),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black87,
                         ),
                       ),
                     ],
@@ -441,26 +447,26 @@ class _OrganizerBookingDetailScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F3F5),
+                        color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF1F3F5),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Tourist Message',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black54,
+                              color: isDark ? Colors.grey[400] : Colors.black54,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             _inscription.messageTouriste ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Colors.black87,
+                              color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
                         ],
@@ -474,27 +480,27 @@ class _OrganizerBookingDetailScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3CD),
+                        color: isDark ? const Color(0xFF3E3113) : const Color(0xFFFFF3CD),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFFEBAA)),
+                        border: Border.all(color: isDark ? const Color(0xFF6B531F) : const Color(0xFFFFEBAA)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Cancellation Reason',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF856404),
+                              color: isDark ? const Color(0xFFFDE047) : const Color(0xFF856404),
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             _inscription.cancellationReason ?? _inscription.messageOrganisateur!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF856404),
+                              color: isDark ? const Color(0xFFFDE047) : const Color(0xFF856404),
                             ),
                           ),
                         ],
@@ -552,29 +558,39 @@ class _OrganizerBookingDetailScreenState
 
   Future<String?> _showRejectionDialog() async {
     final reasonController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Reject Reservation',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Please provide a reason for rejection:',
-              style: TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[300] : Colors.black87),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
               maxLines: 3,
-              decoration: const InputDecoration(
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
                 hintText: 'Reason for rejection...',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.all(12),
+                hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF3D3D3D) : Colors.grey),
+                ),
+                contentPadding: const EdgeInsets.all(12),
               ),
             ),
           ],

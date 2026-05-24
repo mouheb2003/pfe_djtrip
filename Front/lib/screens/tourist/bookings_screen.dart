@@ -11,13 +11,14 @@ class BookingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F3FE),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F3FE),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F3FE),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF4F3FE),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F235F)),
+          icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : const Color(0xFF1F235F)),
           onPressed: () {
             if (Navigator.of(context).canPop()) {
               Navigator.pop(context);
@@ -29,10 +30,10 @@ class BookingsScreen extends StatelessWidget {
             }
           },
         ),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'YOUR JOURNEY',
               style: TextStyle(
                 fontSize: 11,
@@ -47,7 +48,7 @@ class BookingsScreen extends StatelessWidget {
                 fontSize: 20,
                 height: 1,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF1F235F),
+                color: isDark ? Colors.white : const Color(0xFF1F235F),
               ),
             ),
           ],

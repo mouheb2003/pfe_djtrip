@@ -851,13 +851,14 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF4B63FF).withOpacity(0.1)
+              ? (isDark ? const Color(0xFF4B63FF).withOpacity(0.2) : const Color(0xFF4B63FF).withOpacity(0.1))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -871,7 +872,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               icon,
               color: isSelected
                   ? const Color(0xFF4B63FF)
-                  : const Color(0xFF6B7280),
+                  : (isDark ? Colors.grey[400] : const Color(0xFF6B7280)),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -886,7 +887,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       fontWeight: FontWeight.w600,
                       color: isSelected
                           ? const Color(0xFF4B63FF)
-                          : const Color(0xFF131E32),
+                          : (isDark ? Colors.white : const Color(0xFF131E32)),
                     ),
                   ),
                   Text(
@@ -895,7 +896,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       fontSize: 12,
                       color: isSelected
                           ? const Color(0xFF4B63FF)
-                          : const Color(0xFF717BBC),
+                          : (isDark ? Colors.grey[400] : const Color(0xFF717BBC)),
                     ),
                   ),
                 ],
@@ -914,31 +915,32 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildItinerarySection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E9FF)),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E9FF)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Itinerary Items',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF131E32),
+                  color: isDark ? Colors.white : const Color(0xFF131E32),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Add each step of your journey with location and description',
-                style: TextStyle(fontSize: 12, color: Color(0xFF717BBC)),
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : const Color(0xFF717BBC)),
               ),
               const SizedBox(height: 16),
 
@@ -957,9 +959,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFF),
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFF),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E9FF)),
+                    border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E9FF)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -985,13 +987,14 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildItineraryItem(int index, String title, String item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFF),
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFF),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E9FF)),
+        border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E9FF)),
       ),
       child: Column(
         children: [
@@ -1019,10 +1022,10 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
               Expanded(
                 child: Text(
                   'Stop ${index + 1}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF131E32),
+                    color: isDark ? Colors.white : const Color(0xFF131E32),
                   ),
                 ),
               ),
@@ -1048,10 +1051,10 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF131E32),
+                      color: isDark ? Colors.white : const Color(0xFF131E32),
                     ),
                   ),
                   if (_itineraryLocations[index]['address'] != null)
@@ -1059,9 +1062,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         _itineraryLocations[index]['address'].toString(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF717BBC),
+                          color: isDark ? Colors.grey[400] : const Color(0xFF717BBC),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -1075,12 +1078,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           TextField(
             controller: TextEditingController(text: item),
             onChanged: (value) => _updateItineraryItem(index, value),
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
             decoration: InputDecoration(
               hintText: 'Describe this stop...',
-              hintStyle: const TextStyle(color: Color(0xFF717BBC)),
+              hintStyle: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF717BBC)),
+              filled: isDark,
+              fillColor: isDark ? const Color(0xFF1E293B) : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE2E9FF)),
+                borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E9FF)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1091,7 +1097,6 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 vertical: 8,
               ),
             ),
-            style: const TextStyle(fontSize: 14, color: Color(0xFF131E32)),
           ),
           const SizedBox(height: 8),
 
@@ -1107,7 +1112,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE2E9FF)),
+                      border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E9FF)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1126,8 +1131,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                               fontSize: 14,
                               color:
                                   _itineraryLocations[index]['address'] != null
-                                  ? const Color(0xFF131E32)
-                                  : const Color(0xFF717BBC),
+                                  ? (isDark ? Colors.white : const Color(0xFF131E32))
+                                  : (isDark ? Colors.grey[400] : const Color(0xFF717BBC)),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1149,8 +1154,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFF),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF9FAFF),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -1572,22 +1578,23 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   // ── Header Dashboard ───────────────────────────────────────────────────────
 
   Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF1B2452)),
+            icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : const Color(0xFF1B2452)),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-          const Text(
+          Text(
             'Edit Activity',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 16,
-              color: Color(0xFF1B2452),
+              color: isDark ? Colors.white : const Color(0xFF1B2452),
             ),
           ),
           IconButton(
@@ -1600,6 +1607,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildTopInfo() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1607,40 +1615,40 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           children: [
             _buildBadge(
               'ORGANIZER PORTAL',
-              const Color(0xFFE0E7FF),
-              const Color(0xFF3858C8),
+              isDark ? const Color(0xFF312E81) : const Color(0xFFE0E7FF),
+              isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3858C8),
             ),
             const SizedBox(width: 8),
             _buildBadge(
               'ACTIVE EXPERIENCE',
-              const Color(0xFFFCE7F3),
-              const Color(0xFFBE185D),
+              isDark ? const Color(0xFF831843) : const Color(0xFFFCE7F3),
+              isDark ? const Color(0xFFF9A8D4) : const Color(0xFFBE185D),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Edit Activity',
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w900,
-            color: Color(0xFF1B2452),
+            color: isDark ? Colors.white : const Color(0xFF1B2452),
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Update your Mediterranean experience details. All changes will be updated instantly for future bookings.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF717BBC), height: 1.5),
+          style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[400] : const Color(0xFF717BBC), height: 1.5),
         ),
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: isDark ? Colors.black26 : Colors.black.withOpacity(0.04),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -1664,7 +1672,8 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildStat(String label, String value, {bool isStatus = false}) {
-    Color valColor = const Color(0xFF1B2452);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Color valColor = isDark ? Colors.white : const Color(0xFF1B2452);
     if (isStatus) {
       final s = value.toLowerCase();
       if (s.contains('live') ||
@@ -1678,7 +1687,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           s.contains('archive')) {
         valColor = const Color(0xFF94A3B8);
       } else {
-        valColor = const Color(0xFF717BBC);
+        valColor = isDark ? Colors.grey[400]! : const Color(0xFF717BBC);
       }
     }
     return Column(
@@ -1723,21 +1732,22 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   // ── Form Components ────────────────────────────────────────────────────────
 
   Widget _buildSectionTitle(String title, String subtitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1B2452),
+            color: isDark ? Colors.white : const Color(0xFF1B2452),
           ),
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF717BBC)),
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : const Color(0xFF717BBC)),
         ),
         const SizedBox(height: 16),
       ],
@@ -1745,15 +1755,16 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildCard(List<Widget> children) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1767,14 +1778,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildLabel(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF9EACCB),
+          color: isDark ? Colors.grey[400] : const Color(0xFF9EACCB),
           letterSpacing: 0.5,
         ),
       ),
@@ -1790,16 +1802,18 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     IconData? prefixIcon,
     bool readOnly = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       controller: ctrl,
       maxLines: maxLines,
       keyboardType: keyboardType,
       readOnly: readOnly,
+      style: TextStyle(color: isDark ? Colors.white : Colors.black),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF9EACCB), fontSize: 14),
+        hintStyle: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF9EACCB), fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFFF3F3FF),
+        fillColor: isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
@@ -1809,31 +1823,35 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           vertical: 14,
         ),
         suffixIcon: suffixIcon != null
-            ? Icon(suffixIcon, size: 18, color: const Color(0xFF717BBC))
+            ? Icon(suffixIcon, size: 18, color: isDark ? Colors.grey[400] : const Color(0xFF717BBC))
             : null,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, size: 18, color: const Color(0xFF3858C8))
+            ? Icon(prefixIcon, size: 18, color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3858C8))
             : null,
       ),
     );
   }
 
   Widget _buildDropdown() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F3FF),
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF),
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _category,
           isExpanded: true,
+          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+          iconEnabledColor: isDark ? Colors.white : Colors.black54,
           items: _categories
               .map(
                 (c) => DropdownMenuItem(
                   value: c,
-                  child: Text(c, style: const TextStyle(fontSize: 14)),
+                  child: Text(c, style: TextStyle(fontSize: 14, color: isDark ? Colors.white : Colors.black)),
                 ),
               )
               .toList(),
@@ -1901,33 +1919,34 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildUploadCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: _pickImages,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F3FF),
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFFE0E7FF),
+            color: isDark ? const Color(0xFF475569) : const Color(0xFFE0E7FF),
             style: BorderStyle.solid,
             width: 1,
           ),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.add_a_photo_outlined,
-              color: Color(0xFF4F67E8),
+              color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F67E8),
               size: 24,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'UPLOAD PHOTO',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF4F67E8),
+                color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F67E8),
               ),
             ),
           ],
@@ -1953,12 +1972,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
   }
 
   Widget _buildChip(String label, bool isSel, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSel ? const Color(0xFFE0E7FF) : const Color(0xFFF3F3FF),
+          color: isSel
+              ? (isDark ? const Color(0xFF3730A3) : const Color(0xFFE0E7FF))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF)),
           borderRadius: BorderRadius.circular(30),
         ),
         child: Row(
@@ -1970,13 +1992,13 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: isSel
-                    ? const Color(0xFF3858C8)
-                    : const Color(0xFF717BBC),
+                    ? (isDark ? Colors.white : const Color(0xFF3858C8))
+                    : (isDark ? Colors.grey[300] : const Color(0xFF717BBC)),
               ),
             ),
             if (isSel) const SizedBox(width: 4),
             if (isSel)
-              const Icon(Icons.close, size: 14, color: Color(0xFF3858C8)),
+              Icon(Icons.close, size: 14, color: isDark ? Colors.white : const Color(0xFF3858C8)),
           ],
         ),
       ),
@@ -2017,6 +2039,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   Widget _buildAddableList(List<String> list, String hint, IconData icon) {
     final ctrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         ...list.map(
@@ -2024,15 +2047,15 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: const Color(0xFF3858C8)),
+                Icon(icon, size: 16, color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3858C8)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     item,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1B2452),
+                      color: isDark ? Colors.white : const Color(0xFF1B2452),
                     ),
                   ),
                 ),
@@ -2053,7 +2076,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             Icon(
               Icons.add_circle_outline,
               size: 16,
-              color: const Color(0xFF3858C8),
+              color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3858C8),
             ),
             const SizedBox(width: 4),
             TextButton(
@@ -2064,7 +2087,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                     title: const Text('Add Item'),
                     content: TextField(
                       controller: ctrl,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'e.g. Water bottle',
                       ),
                     ),
@@ -2085,12 +2108,12 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                   ),
                 );
               },
-              child: const Text(
+              child: Text(
                 'Add item',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF3858C8),
+                  color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3858C8),
                 ),
               ),
             ),
@@ -2104,6 +2127,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   Widget _buildMapPreview() {
     final latLng = _pickedLatLng;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -2112,7 +2136,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           child: Container(
             height: 180,
             width: double.infinity,
-            color: const Color(0xFFF3F3FF),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF),
             child: latLng != null
                 ? Stack(
                     children: [
@@ -2140,7 +2164,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
+                            color: isDark ? const Color(0xFF1E293B).withOpacity(0.9) : Colors.white.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -2148,18 +2172,18 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                             children: [
                               Text(
                                 '${latLng.latitude.toStringAsFixed(4)}, ${latLng.longitude.toStringAsFixed(4)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF717BBC),
+                                  color: isDark ? Colors.grey[400] : const Color(0xFF717BBC),
                                 ),
                               ),
-                              const Text(
+                              Text(
                                 'Preview',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF4F67E8),
+                                  color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F67E8),
                                 ),
                               ),
                             ],
@@ -2211,15 +2235,18 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     VoidCallback? onTap, {
     bool isDisabled = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: isDisabled ? null : onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDisabled ? const Color(0xFFF9FAFF) : const Color(0xFFF3F3FF),
+          color: isDisabled
+              ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF9FAFF))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF3F3FF)),
           borderRadius: BorderRadius.circular(16),
           border: isDisabled
-              ? Border.all(color: const Color(0xFFE2E9FF))
+              ? Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E9FF))
               : null,
         ),
         child: Row(
@@ -2232,7 +2259,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 fontWeight: FontWeight.w600,
                 color: isDisabled
                     ? const Color(0xFF9EACCB)
-                    : const Color(0xFF1B2452),
+                    : (isDark ? Colors.white : const Color(0xFF1B2452)),
               ),
             ),
             Icon(
@@ -2240,7 +2267,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                   ? Icons.lock_outline_rounded
                   : Icons.calendar_today_outlined,
               size: 18,
-              color: const Color(0xFF717BBC),
+              color: isDark ? Colors.grey[400] : const Color(0xFF717BBC),
             ),
           ],
         ),
@@ -2471,6 +2498,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   Widget _buildSaveButton() {
     final bool isSaveDisabled = _isLoading;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2478,12 +2506,12 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: SwitchListTile(
-            title: const Text(
+            title: Text(
               'Notify Booked Users',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1B2352),
+                color: isDark ? Colors.white : const Color(0xFF1B2352),
               ),
             ),
             subtitle: const Text(
@@ -2503,12 +2531,12 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: SwitchListTile(
-            title: const Text(
+            title: Text(
               'Notify Followers',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1B2352),
+                color: isDark ? Colors.white : const Color(0xFF1B2352),
               ),
             ),
             subtitle: const Text(

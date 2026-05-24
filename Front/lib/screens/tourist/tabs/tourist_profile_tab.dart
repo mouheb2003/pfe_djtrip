@@ -1484,6 +1484,7 @@ class _StatItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Row(
@@ -1498,7 +1499,7 @@ class _StatItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 22.sp,
                 fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+                color: isDark ? Colors.white : AppColors.primary,
               ),
             ),
           ],
@@ -1509,7 +1510,7 @@ class _StatItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 10.sp,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF6F7396),
+            color: isDark ? Colors.grey[400] : const Color(0xFF6F7396),
             letterSpacing: 1,
           ),
         ),
@@ -1565,6 +1566,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       onTap: onTap,
@@ -1573,8 +1575,8 @@ class _ActionRow extends StatelessWidget {
         height: 54,
         decoration: BoxDecoration(
           color: destructive
-              ? const Color(0xFFF7DFE8)
-              : const Color(0xFFE2E1FA),
+              ? (isDark ? const Color(0xFF4A1A24) : const Color(0xFFF7DFE8))
+              : (isDark ? const Color(0xFF2B2B4A) : const Color(0xFFE2E1FA)),
           borderRadius: BorderRadius.circular(17.r),
           boxShadow: [
             BoxShadow(
@@ -1591,7 +1593,7 @@ class _ActionRow extends StatelessWidget {
         style: TextStyle(
           fontSize: 14.5.sp,
           fontWeight: FontWeight.w700,
-          color: textColor ?? const Color(0xFF1D245D),
+          color: textColor ?? (isDark ? Colors.white : const Color(0xFF1D245D)),
         ),
       ),
       trailing: Icon(

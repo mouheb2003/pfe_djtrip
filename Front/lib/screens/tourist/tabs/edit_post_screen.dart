@@ -616,7 +616,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
           children: [
             Text(
               '${_existingImageUrls.length + _newImages.length} Photo(s)',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1D245D)),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1D245D)),
             ),
             TextButton.icon(
               onPressed: _addMoreImages,
@@ -683,20 +683,21 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFE),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF9FAFE),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close_rounded, color: Color(0xFF1D245D)),
+          icon: Icon(Icons.close_rounded, color: isDark ? Colors.white : const Color(0xFF1D245D)),
         ),
-        title: const Text(
+        title: Text(
           'Edit Post',
           style: TextStyle(
-            color: Color(0xFF1D245D),
+            color: isDark ? Colors.white : const Color(0xFF1D245D),
             fontWeight: FontWeight.w900,
             fontSize: 20,
             letterSpacing: -0.5,
@@ -744,7 +745,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
                     ),
                     child: CircleAvatar(
                       radius: 26,
-                      backgroundColor: const Color(0xFFF0F2FF),
+                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF0F2FF),
                       backgroundImage: _effectivePost['author_avatar'] != null
                           ? NetworkImage(_effectivePost['author_avatar'])
                           : null,
@@ -760,10 +761,10 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       children: [
                         Text(
                           _effectivePost['author_name'] ?? 'Traveler',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1D245D),
+                            color: isDark ? Colors.white : const Color(0xFF1D245D),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -847,12 +848,12 @@ class _EditPostScreenState extends State<EditPostScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'ADD TO YOUR POST',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF9E9E9E),
+                      color: isDark ? Colors.grey[400] : const Color(0xFF9E9E9E),
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -889,11 +890,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Hashtags',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1D245D),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1D245D),
           ),
         ),
         const SizedBox(height: 8),
@@ -1184,9 +1185,10 @@ class _ActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPreview = previewImageUrl != null || previewFile != null;
     final hasClear = onClear != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       borderRadius: BorderRadius.circular(16),
       child: Stack(
         children: [
@@ -1199,7 +1201,7 @@ class _ActionTile extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[200]!),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
               ),
               child: hasPreview
                   ? Stack(
@@ -1258,7 +1260,7 @@ class _ActionTile extends StatelessWidget {
                           label,
                           style: TextStyle(
                             fontWeight: hasClear ? FontWeight.w800 : FontWeight.w700,
-                            color: hasClear ? AppColors.primary : const Color(0xFF1D245D),
+                            color: hasClear ? AppColors.primary : (isDark ? Colors.white : const Color(0xFF1D245D)),
                             fontSize: 12,
                           ),
                           textAlign: TextAlign.center,
