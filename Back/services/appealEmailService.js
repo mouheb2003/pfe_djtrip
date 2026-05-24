@@ -34,16 +34,45 @@ const transporter = nodemailer.createTransport({
 // ─── Helper Functions ───────────────────────────────────────────────────────────────
 
 const sendEmail = async (options) => {
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER || `"DJTrip Support" <root@localhost>`,
+    ...options,
+  };
+
   try {
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER || `"DJTrip Support" <root@localhost>`,
-      ...options,
-    });
-    
+    const info = await transporter.sendMail(mailOptions);
     console.log("Email sent successfully:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Email sending failed:", error);
+    console.error("SMTP Email sending failed:", error.message);
+    
+    // Fallback to Resend
+    if (process.env.RESEND_API_KEY) {
+      console.log("Attempting fallback with Resend...");
+      try {
+        const { Resend } = require('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const fromAddress = process.env.RESEND_FROM || mailOptions.from;
+        
+        const { data, error: resendError } = await resend.emails.send({
+          from: fromAddress,
+          to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
+          subject: mailOptions.subject,
+          text: mailOptions.text,
+          html: mailOptions.html,
+        });
+        
+        if (resendError) {
+          throw new Error(resendError.message);
+        }
+        
+        console.log("Email sent successfully via Resend:", data.id);
+        return { success: true, messageId: data.id };
+      } catch (rsError) {
+        console.error("Resend fallback failed:", rsError.message);
+      }
+    }
+    
     return { success: false, error: error.message };
   }
 };

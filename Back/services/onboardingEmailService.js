@@ -32,6 +32,45 @@ const transporter = nodemailer.createTransport({
 });
 
 class OnboardingEmailService {
+  static async _sendMailWithFallback(mailOptions, contextMessage) {
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`${contextMessage} sent via SMTP to ${mailOptions.to}`);
+      return { success: true };
+    } catch (error) {
+      console.error(`SMTP Error sending ${contextMessage}:`, error.message);
+      
+      // Fallback to Resend
+      if (process.env.RESEND_API_KEY) {
+        console.log(`Attempting fallback with Resend for ${contextMessage}...`);
+        try {
+          const { Resend } = require('resend');
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          const fromAddress = process.env.RESEND_FROM || mailOptions.from;
+          
+          const { data, error: resendError } = await resend.emails.send({
+            from: fromAddress,
+            to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
+            subject: mailOptions.subject,
+            text: mailOptions.text,
+            html: mailOptions.html,
+          });
+          
+          if (resendError) {
+            throw new Error(resendError.message);
+          }
+          
+          console.log(`${contextMessage} sent via Resend to ${mailOptions.to}`);
+          return { success: true };
+        } catch (rsError) {
+          console.error(`Resend fallback failed for ${contextMessage}:`, rsError.message);
+        }
+      }
+      
+      return { success: false, error: error.message };
+    }
+  }
+
   // Send onboarding completed email for tourists
   static async sendOnboardingCompletedEmail(email, fullname) {
     const mailOptions = {
@@ -167,15 +206,9 @@ class OnboardingEmailService {
       `,
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`Onboarding completed email sent to ${email}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending onboarding completed email:', error);
-      return { success: false, error: error.message };
-    }
+    return await this._sendMailWithFallback(mailOptions, 'onboarding completed email');
   }
+
 
   // Send organizer submitted for approval email
   static async sendOrganizerSubmittedEmail(email, fullname) {
@@ -317,14 +350,7 @@ class OnboardingEmailService {
       `,
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`Organizer submitted email sent to ${email}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending organizer submitted email:', error);
-      return { success: false, error: error.message };
-    }
+    return await this._sendMailWithFallback(mailOptions, 'organizer submitted email');
   }
 
   // Send organizer approved email
@@ -461,14 +487,7 @@ class OnboardingEmailService {
       `,
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`Organizer approved email sent to ${email}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending organizer approved email:', error);
-      return { success: false, error: error.message };
-    }
+    return await this._sendMailWithFallback(mailOptions, 'organizer approved email');
   }
 
   // Send organizer rejected email
@@ -570,14 +589,7 @@ class OnboardingEmailService {
       `,
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`Organizer rejected email sent to ${email}`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error sending organizer rejected email:', error);
-      return { success: false, error: error.message };
-    }
+    return await this._sendMailWithFallback(mailOptions, 'organizer rejected email');
   }
 }
 
