@@ -1,10 +1,4 @@
 const nodemailer = require("nodemailer");
-const dns = require("dns");
-
-// Force IPv4 resolution to avoid ENETUNREACH on IPv6
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder("ipv4first");
-}
 
 const NODE_ENV = (process.env.NODE_ENV || "development").toLowerCase();
 const EMAIL_SERVICE = (
@@ -131,7 +125,7 @@ async function sendMailWithLogging(context, mailOptions) {
 
     return info;
   } catch (error) {
-    emailLog("error", `Failed ${context} with SMTP`, {
+    emailLog("error", `Failed ${context}`, {
       message: error.message,
       code: error.code,
       command: error.command,
@@ -139,44 +133,6 @@ async function sendMailWithLogging(context, mailOptions) {
       responseCode: error.responseCode,
       durationMs: Date.now() - startedAt,
     });
-
-    // Fallback to Resend
-    if (process.env.RESEND_API_KEY) {
-      emailLog("info", `Attempting fallback with Resend for ${context}`);
-      try {
-        const { Resend } = require('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        
-        // Resend requires a valid domain for the 'from' address
-        // If process.env.RESEND_FROM is set, we use it, otherwise we try to use the original
-        const fromAddress = process.env.RESEND_FROM || mailOptions.from;
-        
-        const { data, error: resendError } = await resend.emails.send({
-          from: fromAddress,
-          to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
-          subject: mailOptions.subject,
-          html: mailOptions.html,
-          text: mailOptions.text,
-        });
-
-        if (resendError) {
-          throw new Error(resendError.message);
-        }
-        
-        emailLog("info", `Sent ${context} via Resend`, {
-          messageId: data.id,
-          durationMs: Date.now() - startedAt,
-        });
-        
-        return { messageId: data.id };
-      } catch (rsError) {
-        emailLog("error", `Resend fallback failed for ${context}`, {
-          message: rsError.message,
-          durationMs: Date.now() - startedAt,
-        });
-      }
-    }
-
     throw error;
   }
 }
