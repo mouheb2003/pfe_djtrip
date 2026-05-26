@@ -302,16 +302,7 @@ class OnboardingService {
       throw new Error('Cannot reject an already approved organizer');
     }
 
-    organizer.is_approved = false;
-    organizer.rejection_reason = rejectionReason;
-    organizer.approved_by = adminId;
-    organizer.rejected_at = new Date();
-    // Remove submitted_for_approval to remove from pending list
-    organizer.submitted_for_approval = undefined;
-
-    await organizer.save();
-
-    // Send rejection email
+    // Send rejection email before deleting the account
     try {
       await emailService.sendOrganizerRejectedEmail(
         organizer.email,
@@ -322,14 +313,17 @@ class OnboardingService {
       console.error('Error sending rejection email:', emailError);
     }
 
+    // Delete the user from the database
+    await User.findByIdAndDelete(organizerId);
+
     return {
       success: true,
-      message: 'Organizer rejected successfully',
+      message: 'Organizer rejected and account deleted successfully',
       organizer: {
         id: organizer._id,
         fullname: organizer.fullname,
         email: organizer.email,
-        rejection_reason: organizer.rejection_reason
+        rejection_reason: rejectionReason
       }
     };
   }

@@ -546,13 +546,13 @@ class OnboardingEmailService {
               <h3 style="color: #1E225E;">What can you do?</h3>
               <ul>
                 <li>Review our organizer requirements and guidelines</li>
-                <li>Improve your profile and documentation</li>
-                <li>Wait 30 days before reapplying</li>
+                <li>Your previous account data has been removed from our system</li>
+                <li>Please <strong>create a new account</strong> from scratch with the correct information</li>
                 <li>Contact support if you have questions</li>
               </ul>
             </div>
             
-            <p style="margin-top: 30px;">You can still use DJTrip as a tourist to discover amazing experiences around the world.</p>
+            <p style="margin-top: 30px;">We look forward to seeing your new application soon.</p>
           </div>
           
           <div class="footer">
