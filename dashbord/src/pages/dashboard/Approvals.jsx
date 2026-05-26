@@ -55,7 +55,11 @@ const flattenObject = (obj, prefix = '') => {
     if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
       Object.assign(acc, flattenObject(obj[k], pre + k));
     } else {
-      acc[pre + k] = Array.isArray(obj[k]) ? JSON.stringify(obj[k]) : obj[k];
+      if (Array.isArray(obj[k])) {
+        acc[pre + k] = obj[k].map((i) => (typeof i === 'object' ? JSON.stringify(i) : i)).join(', ');
+      } else {
+        acc[pre + k] = obj[k];
+      }
     }
     return acc;
   }, {});
@@ -301,62 +305,36 @@ export default function ApprovalsPage() {
       <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Détails de l'organisateur</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={2}>
-            <Typography variant="subtitle2">
-              Nom: <Typography variant="body2" component="span">{selectedOrg?.fullname}</Typography>
-            </Typography>
-            <Typography variant="subtitle2">
-              Email: <Typography variant="body2" component="span">{selectedOrg?.email}</Typography>
-            </Typography>
-            <Typography variant="subtitle2">
-              Pays: <Typography variant="body2" component="span">{selectedOrg?.country}</Typography>
-            </Typography>
-            <Typography variant="subtitle2">
-              Téléphone: <Typography variant="body2" component="span">{selectedOrg?.phone}</Typography>
-            </Typography>
-            <Typography variant="subtitle2">
-              Langue: <Typography variant="body2" component="span">{selectedOrg?.language}</Typography>
-            </Typography>
-            {selectedOrg?.website ? (
-              <Typography variant="subtitle2">
-                Site: <Typography variant="body2" component="a" href={selectedOrg.website} target="_blank" rel="noreferrer">{selectedOrg.website}</Typography>
-              </Typography>
-            ) : null}
-            {selectedOrg?.description ? (
-              <Typography variant="subtitle2">
-                Description: <Typography variant="body2" component="span">{selectedOrg.description}</Typography>
-              </Typography>
-            ) : null}
-            {selectedOrg?.experience ? (
-              <Typography variant="subtitle2">
-                Expérience: <Typography variant="body2" component="span">{selectedOrg.experience}</Typography>
-              </Typography>
-            ) : null}
-
-            <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed', borderColor: 'divider' }}>
-              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
-                Données Brutes (Toutes les informations)
-              </Typography>
-              <Box sx={{ maxHeight: 400, overflow: 'auto', p: 1 }}>
-                <Grid container spacing={2}>
-                  {Object.entries(flattenObject(selectedOrg?.raw || {})).map(([key, value]) => (
+          <Box sx={{ maxHeight: 500, overflow: 'auto', p: 1 }}>
+            <Grid container spacing={2}>
+              {Object.entries(flattenObject(selectedOrg?.raw || {}))
+                .filter(([key, value]) => {
+                  const k = key.toLowerCase();
+                  return !k.includes('password') && !k.endsWith('._id') && k !== '_id' && k !== '__v' && value !== null && value !== '' && value !== undefined;
+                })
+                .map(([key, value]) => {
+                  const formattedLabel = key
+                    .replace(/[._]/g, ' ')
+                    .replace(/([A-Z])/g, ' $1')
+                    .trim()
+                    .replace(/^\w/, (c) => c.toUpperCase());
+                  return (
                     <Grid item xs={12} sm={6} key={key}>
                       <TextField
                         fullWidth
-                        label={key}
-                        value={String(value ?? '—')}
+                        label={formattedLabel}
+                        value={String(value)}
                         InputProps={{ readOnly: true }}
                         variant="filled"
                         size="small"
-                        multiline={String(value).length > 50}
+                        multiline={String(value).length > 40}
                         maxRows={4}
                       />
                     </Grid>
-                  ))}
-                </Grid>
-              </Box>
-            </Box>
-          </Stack>
+                  );
+                })}
+            </Grid>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDetailsOpen(false)}>Fermer</Button>
