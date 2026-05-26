@@ -248,16 +248,18 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     TextEditingController controller,
     String text,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          title: Text(
             'Select Translation Language',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1B2352),
+              color: isDark ? Colors.white : const Color(0xFF1B2352),
             ),
           ),
           content: SizedBox(
@@ -265,9 +267,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Choose the language to translate this text to:',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                  style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[400] : const Color(0xFF6B7280)),
                 ),
                 const SizedBox(height: 16),
                 ConstrainedBox(
@@ -281,11 +283,11 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                         final langCode = entry.key;
                         final langName = entry.value;
                         return ListTile(
-                          leading: Icon(
+                          leading: const Icon(
                             Icons.translate,
-                            color: const Color(0xFF4B63FF),
+                            color: Color(0xFF4B63FF),
                           ),
-                          title: Text(langName),
+                          title: Text(langName, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                           onTap: () {
                             Navigator.of(context).pop();
                             _performTranslation(
@@ -306,9 +308,9 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
+                style: TextStyle(color: isDark ? Colors.grey[400] : const Color(0xFF6B7280), fontSize: 16),
               ),
             ),
           ],
@@ -2323,9 +2325,10 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     int tempH = _customHours == 0 && _customMinutes == 0 ? 2 : _customHours;
     int tempM = _customMinutes;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(30),
@@ -2342,17 +2345,17 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: isDark ? const Color(0xFF334155) : Colors.grey[200],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Set Custom Duration',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1B2452),
+                  color: isDark ? Colors.white : const Color(0xFF1B2452),
                 ),
               ),
               const SizedBox(height: 20),

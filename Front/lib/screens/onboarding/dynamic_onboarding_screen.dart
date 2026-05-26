@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/onboarding_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/navigation_service.dart';
@@ -16,10 +19,11 @@ class DynamicOnboardingScreen extends StatefulWidget {
 }
 
 class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late PageController _pageController;
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
+  Timer? _draftTimer;
   
   int _currentStep = 0;
   List<Map<String, dynamic>> _steps = [];
@@ -50,6 +54,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     
     _pageController = PageController();
     _progressController = AnimationController(
@@ -73,10 +78,92 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
     });
     
     _loadOnboardingData();
+    _draftTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveDraft());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveDraft();
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = await AuthService.getUser();
+      final userId = user?['_id'] ?? 'draft';
+      
+      final draft = {
+        'phone': _phoneController.text,
+        'phoneCountry': _selectedPhoneCountry,
+        'country': _selectedCountry,
+        'language': _selectedLanguage,
+        'activities': _selectedActivities,
+        'languages': _selectedLanguages,
+        'interests': _selectedInterests,
+        'bio': _bioController.text,
+        'reasonToJoin': _reasonToJoinController.text,
+      };
+
+      await prefs.setString('onboarding_draft_$userId', jsonEncode(draft));
+    } catch (e) {
+      debugPrint('Error saving draft: $e');
+    }
+  }
+
+  Future<void> _loadDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = await AuthService.getUser();
+      final userId = user?['_id'] ?? 'draft';
+      
+      final draftStr = prefs.getString('onboarding_draft_$userId');
+      if (draftStr != null) {
+        final draft = jsonDecode(draftStr);
+        if (mounted) {
+          setState(() {
+            if (draft['phone'] != null) _phoneController.text = draft['phone'];
+            if (draft['phoneCountry'] != null) _selectedPhoneCountry = draft['phoneCountry'];
+            if (draft['country'] != null) _selectedCountry = draft['country'];
+            if (draft['language'] != null) _selectedLanguage = draft['language'];
+            
+            if (draft['activities'] != null) {
+              _selectedActivities = List<String>.from(draft['activities']);
+            }
+            if (draft['languages'] != null) {
+              _selectedLanguages = List<String>.from(draft['languages']);
+            }
+            if (draft['interests'] != null) {
+              _selectedInterests = List<String>.from(draft['interests']);
+            }
+            
+            if (draft['bio'] != null) _bioController.text = draft['bio'];
+            if (draft['reasonToJoin'] != null) _reasonToJoinController.text = draft['reasonToJoin'];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading draft: $e');
+    }
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final user = await AuthService.getUser();
+      final userId = user?['_id'] ?? 'draft';
+      await prefs.remove('onboarding_draft_$userId');
+    } catch (e) {
+      debugPrint('Error clearing draft: $e');
+    }
   }
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _saveDraft();
     _pageController.dispose();
     _progressController.dispose();
     _phoneController.dispose();
@@ -101,6 +188,8 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
         _steps = OnboardingService.getOnboardingSteps(userType);
         _isLoading = false;
       });
+      
+      await _loadDraft();
       
       _progressController.forward();
     } catch (e) {
@@ -817,6 +906,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       if (!mounted) return;
 
       if (result['success'] == true) {
+        await _clearDraft();
         // Refresh the current user profile from backend to update local cache
         await AuthService.refreshCurrentUser();
         

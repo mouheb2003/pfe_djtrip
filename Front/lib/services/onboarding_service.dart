@@ -191,7 +191,7 @@ class OnboardingService {
   // Get onboarding steps for user type
   static List<Map<String, dynamic>> getOnboardingSteps(String userType) {
     final type = userType.trim().toLowerCase();
-    if (type == 'organisator' || type == 'organizer') {
+    if (type == 'organisator' || type == 'organizer' || type == 'organisateur') {
       return _organizerSteps;
     } else {
       return _touristSteps;

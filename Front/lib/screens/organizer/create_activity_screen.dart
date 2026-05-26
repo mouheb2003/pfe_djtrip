@@ -1596,9 +1596,9 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.camera_alt_outlined,
-                        color: Colors.blue,
+                        color: isDark ? Colors.blue[400] : Colors.blue,
                         size: 30,
                       ),
                       const SizedBox(height: 8),
@@ -1966,7 +1966,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
             child: Container(
               height: 160,
               decoration: BoxDecoration(
-                color: const Color(0xFF131E32),
+                color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFF131E32),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Stack(
@@ -2014,10 +2014,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                               ),
                             ),
                           ),
-                          const Text(
+                          Text(
                             'PIN CHECK',
                             style: TextStyle(
-                              color: Colors.blue,
+                              color: isDark ? Colors.blue[300] : Colors.blue,
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                             ),

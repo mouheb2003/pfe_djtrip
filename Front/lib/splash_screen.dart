@@ -101,13 +101,24 @@ class _SplashScreenState extends State<SplashScreen>
 
         // 🚀 NEW: Handle onboarding flow
         if (!isOnboarded) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const UserTypeSelectionScreen(),
-            ),
-            (route) => false,
-          );
+          final actualUserType = user['userType'] as String?;
+          if (actualUserType != null && actualUserType.trim().isNotEmpty) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DynamicOnboardingScreen(),
+              ),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const UserTypeSelectionScreen(),
+              ),
+              (route) => false,
+            );
+          }
           return;
         }
 

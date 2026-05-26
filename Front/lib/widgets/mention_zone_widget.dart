@@ -114,14 +114,16 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE0E0E0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -133,9 +135,9 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
           // Header
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2A2D3E) : const Color(0xFFF8F9FA),
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
               ),
@@ -148,12 +150,12 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Mention Friends',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1D245D),
+                    color: isDark ? Colors.white : const Color(0xFF1D245D),
                   ),
                 ),
                 const Spacer(),
@@ -182,9 +184,13 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search people to mention...',
+                hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[400]),
                 prefixIcon: const Icon(Icons.person_search, color: AppColors.primary),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -196,23 +202,23 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                             _lastQuery = '';
                           });
                         },
-                        icon: const Icon(Icons.clear, color: Color(0xFF757575)),
+                        icon: Icon(Icons.clear, color: isDark ? Colors.grey[400] : const Color(0xFF757575)),
                       )
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[200]!),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: Colors.grey[200]!),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[200]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8F9FE),
+                fillColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FE),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
             ),
@@ -224,12 +230,12 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
               height: 240,
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE8EAF6)),
+                border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8EAF6)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -247,12 +253,12 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.search_off, color: Colors.grey[300], size: 40),
+                              Icon(Icons.search_off, color: isDark ? Colors.grey[700] : Colors.grey[300], size: 40),
                               const SizedBox(height: 8),
                               Text(
                                 'No users found',
                                 style: TextStyle(
-                                  color: Colors.grey[500],
+                                  color: isDark ? Colors.grey[400] : Colors.grey[500],
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -266,7 +272,7 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                           separatorBuilder: (_, __) => Divider(
                             height: 1,
                             indent: 70,
-                            color: Colors.grey[100],
+                            color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[100],
                           ),
                           itemBuilder: (context, index) {
                             final user = _searchResults[index];
@@ -281,13 +287,15 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: isAlreadySelected ? Colors.grey[200]! : AppColors.primary.withOpacity(0.1),
+                                    color: isAlreadySelected 
+                                      ? (isDark ? Colors.grey[700]! : Colors.grey[200]!) 
+                                      : AppColors.primary.withOpacity(0.1),
                                     width: 2,
                                   ),
                                 ),
                                 child: CircleAvatar(
                                   radius: 22,
-                                  backgroundColor: const Color(0xFFF0F2FF),
+                                  backgroundColor: isDark ? const Color(0xFF2A2D3E) : const Color(0xFFF0F2FF),
                                   backgroundImage: user['avatar']?.isNotEmpty == true
                                       ? NetworkImage(user['avatar'])
                                       : null,
@@ -301,7 +309,9 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
-                                  color: isAlreadySelected ? Colors.grey[400] : const Color(0xFF1D245D),
+                                  color: isAlreadySelected 
+                                    ? Colors.grey[500] 
+                                    : (isDark ? Colors.white : const Color(0xFF1D245D)),
                                 ),
                               ),
                               subtitle: Row(
@@ -309,13 +319,13 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                                   Icon(
                                     userType == 'Organisateur' ? Icons.business_center : Icons.explore,
                                     size: 12,
-                                    color: Colors.grey[500],
+                                    color: isDark ? Colors.grey[400] : Colors.grey[500],
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     userType.toString().toUpperCase(),
                                     style: TextStyle(
-                                      color: Colors.grey[500],
+                                      color: isDark ? Colors.grey[400] : Colors.grey[500],
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.5,
@@ -340,12 +350,12 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'SELECTED PEOPLE:',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF9E9E9E),
+                      color: isDark ? Colors.grey[400] : const Color(0xFF9E9E9E),
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -358,7 +368,7 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                       return Container(
                         padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
+                          color: isDark ? const Color(0xFF2A2D3E) : const Color(0xFFEEF2FF),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                         ),
@@ -367,8 +377,8 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                           children: [
                             Text(
                               displayName,
-                              style: const TextStyle(
-                                color: AppColors.primary,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.primary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -378,13 +388,13 @@ class _MentionZoneWidgetState extends State<MentionZoneWidget> {
                               onTap: () => _removeMention(userId),
                               child: Container(
                                 padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF3F435E) : Colors.white,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close,
-                                  color: AppColors.primary,
+                                  color: isDark ? Colors.white : AppColors.primary,
                                   size: 14,
                                 ),
                               ),

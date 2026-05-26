@@ -588,6 +588,12 @@ class _ExploreTabState extends State<ExploreTab> {
               blurRadius: 10,
               offset: Offset(0, 4),
             ),
+          if (isDark)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
         ],
       ),
       child: Row(
@@ -600,6 +606,7 @@ class _ExploreTabState extends State<ExploreTab> {
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF121212) : Colors.white,
                 borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : Colors.transparent),
               ),
               child: TextField(
                 controller: _searchCtrl,
@@ -610,9 +617,9 @@ class _ExploreTabState extends State<ExploreTab> {
                   color: isDark ? Colors.white : Colors.black87,
                   fontSize: 14.sp,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search destinations...',
-                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                  hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey, fontSize: 14.sp),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 15,
@@ -995,12 +1002,27 @@ class _ExploreTabState extends State<ExploreTab> {
                 borderRadius: BorderRadius.circular(22.r),
               ),
               child: Center(
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF4D4E7A)),
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item == 'Museums' ? Icons.museum :
+                      item == 'Beaches' ? Icons.beach_access :
+                      item == 'Dining' ? Icons.restaurant :
+                      item == 'History' ? Icons.history_edu :
+                      Icons.all_inclusive,
+                      size: 16,
+                      color: isSelected ? Colors.white : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF4D4E7A)),
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      item,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : (isDark ? const Color(0xFFE5E7EB) : const Color(0xFF4D4E7A)),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

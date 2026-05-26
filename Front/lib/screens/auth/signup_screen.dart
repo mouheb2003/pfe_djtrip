@@ -116,7 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
             top: MediaQuery.of(context).padding.top + 10,
             left: 10,
             child: IconButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.welcome),
+              onPressed: () => Navigator.pop(context),
               icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : const Color(0xFF1F2937)),
               padding: const EdgeInsets.all(12),
             ),

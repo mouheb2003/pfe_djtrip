@@ -258,15 +258,17 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
   void _contactSupport() {
     HapticFeedback.lightImpact();
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     // Show contact options
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: EdgeInsets.only(
           left: 24,
@@ -282,7 +284,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE1E4E8),
+                  color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE1E4E8),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -292,7 +294,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E225E),
+                  color: isDark ? Colors.white : const Color(0xFF1E225E),
                 ),
               ),
               const SizedBox(height: 20),
@@ -359,8 +361,10 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FF),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -386,7 +390,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF1E225E),
+                            color: isDark ? Colors.white : const Color(0xFF1E225E),
                             height: 1.2,
                           ),
                         ),
@@ -396,7 +400,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF6C757D),
+                            color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                             height: 1.4,
                           ),
                         ),
@@ -472,11 +476,11 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -501,7 +505,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E225E),
+                                  color: isDark ? Colors.white : const Color(0xFF1E225E),
                                 ),
                               ),
                             ],
@@ -511,7 +515,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                             'We\'re reviewing your organizer application. This process typically takes 1-3 business days.',
                             style: TextStyle(
                               fontSize: 15,
-                              color: const Color(0xFF6C757D),
+                              color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                               height: 1.5,
                             ),
                           ),
@@ -521,7 +525,7 @@ class _WaitingApprovalScreenState extends State<WaitingApprovalScreen>
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1E225E),
+                              color: isDark ? Colors.white : const Color(0xFF1E225E),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -636,6 +640,8 @@ class _StatusStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -648,7 +654,7 @@ class _StatusStep extends StatelessWidget {
                 ? const Color(0xFF00B894)
                 : isActive
                     ? const Color(0xFF4B63FF)
-                    : const Color(0xFFE1E4E8),
+                    : (isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE1E4E8)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(
@@ -663,7 +669,7 @@ class _StatusStep extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isActive ? Colors.white : const Color(0xFF6C757D),
+                      color: isActive ? Colors.white : (isDark ? Colors.grey[500] : const Color(0xFF6C757D)),
                     ),
                   ),
           ),
@@ -681,7 +687,7 @@ class _StatusStep extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1E225E),
+                  color: isDark ? Colors.white : const Color(0xFF1E225E),
                 ),
               ),
               const SizedBox(height: 4),
@@ -689,7 +695,7 @@ class _StatusStep extends StatelessWidget {
                 description,
                 style: TextStyle(
                   fontSize: 14,
-                  color: const Color(0xFF6C757D),
+                  color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                   height: 1.4,
                 ),
               ),
@@ -716,12 +722,14 @@ class _ContactOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F9FA),
+          color: isDark ? const Color(0xFF2A2D3E) : const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -746,26 +754,26 @@ class _ContactOption extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E225E),
+                      color: isDark ? Colors.white : const Color(0xFF1E225E),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF6C757D),
+                      color: isDark ? Colors.grey[400] : const Color(0xFF6C757D),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios,
-              color: Color(0xFF6C757D),
+              color: isDark ? Colors.grey[500] : const Color(0xFF6C757D),
               size: 16,
             ),
           ],

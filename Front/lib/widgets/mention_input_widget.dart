@@ -118,6 +118,8 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       children: [
         // TextField pour écrire la description avec mentions
@@ -126,28 +128,28 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
           focusNode: widget.focusNode,
           maxLines: 8,
           minLines: 5,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             height: 1.5,
-            color: Color(0xFF1D245D),
+            color: isDark ? Colors.white : const Color(0xFF1D245D),
           ),
           decoration: InputDecoration(
             hintText: "What's on your mind? Mention friends using @...",
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+            hintStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[400], fontSize: 15),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: Colors.grey[200]!),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[200]!),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: Colors.grey[200]!),
+              borderSide: BorderSide(color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[200]!),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
               borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: isDark ? const Color(0xFF121212) : Colors.white,
             contentPadding: const EdgeInsets.all(20),
           ),
         ),
@@ -157,9 +159,9 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
           Container(
             margin: const EdgeInsets.only(top: 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE8EAF6)),
+              border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE8EAF6)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.08),
@@ -174,7 +176,7 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[100], indent: 64),
+                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? const Color(0xFF2E2E2E) : Colors.grey[100], indent: 64),
                 itemBuilder: (context, index) {
                   final suggestion = _suggestions[index];
                   final fullname = suggestion['fullname'] ?? 'User';
@@ -189,7 +191,7 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
                       ),
                       child: CircleAvatar(
                         radius: 20,
-                        backgroundColor: const Color(0xFFF0F2FF),
+                        backgroundColor: isDark ? const Color(0xFF2A2D3E) : const Color(0xFFF0F2FF),
                         backgroundImage: suggestion['avatar'] != null
                             ? NetworkImage(suggestion['avatar'])
                             : null,
@@ -200,16 +202,16 @@ class _MentionInputWidgetState extends State<MentionInputWidget> {
                     ),
                     title: Text(
                       fullname,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
-                        color: Color(0xFF1D245D),
+                        color: isDark ? Colors.white : const Color(0xFF1D245D),
                       ),
                     ),
                     subtitle: Text(
                       type.toString().toUpperCase(),
                       style: TextStyle(
-                        color: Colors.grey[500],
+                        color: isDark ? Colors.grey[400] : Colors.grey[500],
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,

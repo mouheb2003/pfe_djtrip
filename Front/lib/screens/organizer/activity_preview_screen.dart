@@ -352,27 +352,28 @@ class _HeroSummaryCard extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
+    required bool isDark,
     double? width,
   }) {
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9E8F7),
+        color: isDark ? const Color(0xFF312E81) : const Color(0xFFE9E8F7),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF3049D9)),
+          Icon(icon, size: 14, color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3049D9)),
           const SizedBox(height: 6),
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               letterSpacing: 0.8,
-              color: Color(0xFF6B7280),
+              color: isDark ? Colors.grey[400] : const Color(0xFF6B7280),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -381,9 +382,9 @@ class _HeroSummaryCard extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Color(0xFF111827),
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -420,13 +421,13 @@ class _HeroSummaryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3049D9).withOpacity(0.14),
+                  color: isDark ? const Color(0xFF312E81).withOpacity(0.5) : const Color(0xFF3049D9).withOpacity(0.14),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
+                child: Text(
                   'PREVIEW',
                   style: TextStyle(
-                    color: Color(0xFF3049D9),
+                    color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3049D9),
                     fontSize: 9,
                     letterSpacing: 0.8,
                     fontWeight: FontWeight.bold,
@@ -439,15 +440,16 @@ class _HeroSummaryCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCE8FF),
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFDCE8FF),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
                     ),
                     child: Text(
                       category.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF3049D9),
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3049D9),
                         fontSize: 9,
                         letterSpacing: 0.8,
                         fontWeight: FontWeight.w700,
@@ -482,30 +484,35 @@ class _HeroSummaryCard extends StatelessWidget {
                     icon: Icons.event,
                     label: 'Date debut',
                     value: dateLabel,
+                    isDark: isDark,
                     width: itemWidth,
                   ),
                   _infoTile(
                     icon: Icons.timer,
                     label: 'Duree',
                     value: durationLabel,
+                    isDark: isDark,
                     width: itemWidth,
                   ),
                   _infoTile(
                     icon: Icons.attach_money,
                     label: 'Prix',
                     value: priceText,
+                    isDark: isDark,
                     width: itemWidth,
                   ),
                   _infoTile(
                     icon: Icons.group,
                     label: 'Capacite',
                     value: participants,
+                    isDark: isDark,
                     width: itemWidth,
                   ),
                   _infoTile(
                     icon: Icons.language,
                     label: 'Langues',
                     value: languagesText,
+                    isDark: isDark,
                     width: itemWidth,
                   ),
                 ],
