@@ -119,21 +119,4 @@ export const navData = [
       },
     ],
   },
-  /**
-   * PAYMENTS
-   */
-  {
-    items: [
-      {
-        title: 'Payments',
-        path: paths.dashboard.payments,
-        icon: ICONS.invoice,
-      },
-      {
-        title: 'Facteurs',
-        path: paths.dashboard.facteurs.root,
-        icon: ICONS.banking,
-      },
-    ],
-  },
 ];

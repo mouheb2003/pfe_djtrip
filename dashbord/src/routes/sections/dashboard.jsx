@@ -5,11 +5,9 @@ import HomePage from 'src/pages/dashboard/Home';
 import LogsPage from 'src/pages/dashboard/Logs';
 import IndexPage from 'src/pages/dashboard/Page1';
 import UsersPage from 'src/pages/dashboard/Users';
-import FacteursPage from 'src/pages/dashboard/Facteurs';
-import AddLieuPage from 'src/pages/dashboard/AddLieu';
 import AppealsPage from 'src/pages/dashboard/Appeals';
+import AddLieuPage from 'src/pages/dashboard/AddLieu';
 import MessagesPage from 'src/pages/dashboard/Messages';
-import PaymentsPage from 'src/pages/dashboard/Payments';
 import { DashboardLayout } from 'src/layouts/dashboard';
 import ApprovalsPage from 'src/pages/dashboard/Approvals';
 import ActivitiesPage from 'src/pages/dashboard/Activities';
@@ -56,10 +54,8 @@ export const dashboardRoutes = [
       { path: 'messages', element: <MessagesPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'users', element: <UsersPage /> },
-      { path: 'facteurs', element: <FacteursPage /> },
       { path: 'appeals', element: <AppealsPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
-      { path: 'payments', element: <PaymentsPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },
     ],
   },

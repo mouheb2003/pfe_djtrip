@@ -340,9 +340,11 @@ export function HomeFeedView({ sx }) {
   const [publications, setPublications] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    let isMounted = true;
+    
+    const fetchData = async (isInitial = false) => {
       try {
-        setLoading(true);
+        if (isInitial) setLoading(true);
         setError('');
 
         const [usersResult, lieuxResult, appealsResult, activitesResult, publicationsResult] = await Promise.allSettled([
@@ -352,6 +354,8 @@ export function HomeFeedView({ sx }) {
           getActivitesAdmin(),
           getPublications(),
         ]);
+
+        if (!isMounted) return;
 
         const usersData = usersResult.status === 'fulfilled' ? usersResult.value : [];
         const lieuxData = lieuxResult.status === 'fulfilled' ? lieuxResult.value : [];
@@ -365,14 +369,25 @@ export function HomeFeedView({ sx }) {
         setActivites(Array.isArray(activitesData) ? activitesData : []);
         setPublications(Array.isArray(publicationsData) ? publicationsData : []);
       } catch {
+        if (!isMounted) return;
         setError("Error loading general feed");
         toast.error('Unable to load general feed');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    fetchData();
+    fetchData(true);
+    
+    // Set up polling for real-time stats
+    const intervalId = setInterval(() => {
+      fetchData(false);
+    }, 5000); // 5 seconds polling
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   const stats = useMemo(() => {

@@ -22,6 +22,7 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
 import { varTap, varHover, transitionTap } from 'src/components/animate';
+import { toast } from 'src/components/snackbar';
 import { notificationService } from 'src/services/notificationService';
 
 import { NotificationItem } from './notification-item';
@@ -228,6 +229,8 @@ export function NotificationsDrawer({ data, sx, ...other }) {
   const [loading, setLoading] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
 
+  const [prevUnreadCount, setPrevUnreadCount] = useState(0);
+
   useEffect(() => {
     if (Array.isArray(data)) {
       setNotifications(data);
@@ -344,13 +347,25 @@ export function NotificationsDrawer({ data, sx, ...other }) {
           const normalizedType = toNormalizedType(item?.type, item?.title);
           return ALLOWED_NOTIFICATION_TYPES.includes(normalizedType) && shouldDisplayNotification(item);
         });
-        setUnreadCount(filtered.filter((item) => item?.is_read !== true).length);
+        const newUnread = filtered.filter((item) => item?.is_read !== true).length;
+        setUnreadCount((prev) => {
+          if (newUnread > prev && prev > 0) {
+            toast.info('New message, appeal or approval received!');
+          }
+          return newUnread;
+        });
         return;
       }
 
       const response = await notificationService.getUnreadCount();
-      const count = response?.unread_count ?? response?.count ?? 0;
-      setUnreadCount(Number(count) || 0);
+      const count = Number(response?.unread_count ?? response?.count ?? 0);
+      
+      setUnreadCount((prev) => {
+        if (count > prev && prev > 0) {
+          toast.info('New message, appeal or approval received!');
+        }
+        return count;
+      });
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
