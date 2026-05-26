@@ -19,6 +19,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
+import Grid from '@mui/material/Grid';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { onboardingService } from 'src/services/onboardingService';
@@ -46,6 +47,19 @@ const TABLE_HEAD = [
   { id: 'wait_days', label: "Jours d'attente" },
   { id: 'actions', label: 'Actions', align: 'right' },
 ];
+
+const flattenObject = (obj, prefix = '') => {
+  if (!obj) return {};
+  return Object.keys(obj).reduce((acc, k) => {
+    const pre = prefix.length ? prefix + '.' : '';
+    if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+      Object.assign(acc, flattenObject(obj[k], pre + k));
+    } else {
+      acc[pre + k] = Array.isArray(obj[k]) ? JSON.stringify(obj[k]) : obj[k];
+    }
+    return acc;
+  }, {});
+};
 
 function normalizeApproval(org) {
   return {
@@ -323,29 +337,24 @@ export default function ApprovalsPage() {
               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
                 Données Brutes (Toutes les informations)
               </Typography>
-              <Paper 
-                variant="outlined" 
-                sx={{ 
-                  p: 2, 
-                  bgcolor: 'background.neutral',
-                  borderRadius: 1,
-                  maxHeight: 300,
-                  overflow: 'auto'
-                }}
-              >
-                <Typography 
-                  component="pre" 
-                  variant="body2" 
-                  sx={{ 
-                    whiteSpace: 'pre-wrap', 
-                    wordBreak: 'break-word',
-                    fontFamily: 'monospace',
-                    fontSize: '0.75rem'
-                  }}
-                >
-                  {JSON.stringify(selectedOrg?.raw, null, 2)}
-                </Typography>
-              </Paper>
+              <Box sx={{ maxHeight: 400, overflow: 'auto', p: 1 }}>
+                <Grid container spacing={2}>
+                  {Object.entries(flattenObject(selectedOrg?.raw || {})).map(([key, value]) => (
+                    <Grid item xs={12} sm={6} key={key}>
+                      <TextField
+                        fullWidth
+                        label={key}
+                        value={String(value ?? '—')}
+                        InputProps={{ readOnly: true }}
+                        variant="filled"
+                        size="small"
+                        multiline={String(value).length > 50}
+                        maxRows={4}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
             </Box>
           </Stack>
         </DialogContent>
