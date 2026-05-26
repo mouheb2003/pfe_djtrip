@@ -5,6 +5,7 @@ import 'theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'screens/auth/email_verification_screen.dart';
 import 'screens/onboarding/user_type_selection_screen.dart';
+import 'screens/onboarding/dynamic_onboarding_screen.dart';
 import 'services/onboarding_service.dart';
 import 'screens/organizer/waiting_approval_screen.dart';
 
