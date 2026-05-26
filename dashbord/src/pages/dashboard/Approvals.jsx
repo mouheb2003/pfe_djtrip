@@ -74,6 +74,7 @@ function normalizeApproval(org) {
     description: org?.description || org?.onboarding_data?.description || '',
     experience: org?.experience || org?.onboarding_data?.experience || '',
     website: org?.website || org?.onboarding_data?.website || '',
+    raw: org,
   };
 }
 
@@ -317,6 +318,35 @@ export default function ApprovalsPage() {
                 Expérience: <Typography variant="body2" component="span">{selectedOrg.experience}</Typography>
               </Typography>
             ) : null}
+
+            <Box sx={{ mt: 3, pt: 2, borderTop: '1px dashed', borderColor: 'divider' }}>
+              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
+                Données Brutes (Toutes les informations)
+              </Typography>
+              <Paper 
+                variant="outlined" 
+                sx={{ 
+                  p: 2, 
+                  bgcolor: 'background.neutral',
+                  borderRadius: 1,
+                  maxHeight: 300,
+                  overflow: 'auto'
+                }}
+              >
+                <Typography 
+                  component="pre" 
+                  variant="body2" 
+                  sx={{ 
+                    whiteSpace: 'pre-wrap', 
+                    wordBreak: 'break-word',
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem'
+                  }}
+                >
+                  {JSON.stringify(selectedOrg?.raw, null, 2)}
+                </Typography>
+              </Paper>
+            </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
