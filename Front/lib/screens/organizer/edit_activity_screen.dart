@@ -43,7 +43,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
 
   late List<String> _existingPhotoUrls;
   final List<XFile> _newPhotos = [];
-  String? _aiGeneratedImageUrl;
+  List<String> _aiGeneratedImageUrls = [];
 
   bool _isLoading = false;
   bool _notifyBookedUsers = true;
@@ -545,27 +545,24 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
     _recalcEndDate();
   }
 
-  void _onAIImageGenerated(String imageUrl) {
+  void _onAIImagesSelected(List<String> imageUrls) {
     setState(() {
-      _aiGeneratedImageUrl = imageUrl;
-      _existingPhotoUrls.add(
-        imageUrl,
-      ); // Add to existing photos so it appears in gallery
-      print('🤖 AI image generated in edit screen: $imageUrl');
-      print('🤖 _existingPhotoUrls after adding: $_existingPhotoUrls');
+      _aiGeneratedImageUrls = imageUrls;
+      // Add new AI images to existing photos so they appear in gallery
+      for (final url in imageUrls) {
+        if (!_existingPhotoUrls.contains(url)) {
+          _existingPhotoUrls.add(url);
+        }
+      }
+      print('🤖 AI images selected in edit screen: ${imageUrls.length} images');
     });
   }
 
   void _onImageDeleted(String imageUrl) {
     setState(() {
       _existingPhotoUrls.remove(imageUrl);
-      // Also clear _aiGeneratedImageUrl if the deleted image matches
-      if (_aiGeneratedImageUrl == imageUrl) {
-        _aiGeneratedImageUrl = null;
-      }
+      _aiGeneratedImageUrls.remove(imageUrl);
       print('🗑️ Image deleted: $imageUrl');
-      print('🗑️ _existingPhotoUrls after delete: $_existingPhotoUrls');
-      print('🗑️ _aiGeneratedImageUrl after delete: $_aiGeneratedImageUrl');
     });
   }
 
@@ -818,7 +815,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
       dateDebut: _startDateTime ?? DateTime.now(),
       dateFin: endDateTime,
       newPhotos: _newPhotos.map((x) => File(x.path)).toList(),
-      aiGeneratedImageUrl: _aiGeneratedImageUrl,
+      aiGeneratedImageUrls: _aiGeneratedImageUrls,
       existingPhotoUrls: _existingPhotoUrls,
       languesDisponibles: _languages,
       equipementsInclus: _includedEquipment,
@@ -1317,7 +1314,7 @@ class _EditActivityScreenState extends State<EditActivityScreen> {
                     AIImageGeneratorWidget(
                       titleController: _titleCtrl,
                       descriptionController: _descCtrl,
-                      onImageGenerated: _onAIImageGenerated,
+                      onImagesSelected: _onAIImagesSelected,
                       onImageDeleted: _onImageDeleted,
                       existingImageUrls: _existingPhotoUrls,
                       category: _category,

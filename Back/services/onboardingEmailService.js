@@ -194,7 +194,7 @@ class OnboardingEmailService {
               padding: 20px;
             }
             .header {
-              background: linear-gradient(135deg, #00B894, #00A085);
+              background: linear-gradient(135deg, #4B63FF, #3A54E0);
               color: white;
               padding: 30px;
               border-radius: 12px 12px 0 0;
@@ -344,7 +344,7 @@ class OnboardingEmailService {
               padding: 20px;
             }
             .header {
-              background: linear-gradient(135deg, #00B894, #00A085);
+              background: linear-gradient(135deg, #4B63FF, #3A54E0);
               color: white;
               padding: 30px;
               border-radius: 12px 12px 0 0;
@@ -488,7 +488,7 @@ class OnboardingEmailService {
               padding: 20px;
             }
             .header {
-              background: linear-gradient(135deg, #FF4757, #E74C3C);
+              background: linear-gradient(135deg, #4B63FF, #3A54E0);
               color: white;
               padding: 30px;
               border-radius: 12px 12px 0 0;

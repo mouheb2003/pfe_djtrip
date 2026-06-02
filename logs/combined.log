@@ -6499,3 +6499,348 @@
 {"timestamp":"2026-05-22 13:14:43","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
 {"timestamp":"2026-05-22 13:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
 {"timestamp":"2026-05-22 13:15:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:17:13","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:17:20","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-05-24T11:17:20.377Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:19:49","level":"info","message":"Found 1 active tokens for user 6a12dbbb4c1680bc22bdec55","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 12:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:42:56","level":"info","message":"Adding FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:42:57","level":"info","message":"Updated existing FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 13:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:10:40","level":"info","message":"Adding FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:10:40","level":"info","message":"Updated existing FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:48:12","level":"info","message":"Adding FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:48:12","level":"info","message":"Updated existing FCM token for user 6a12dbbb4c1680bc22bdec55, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:48:55","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Organisator) s'est déconnecté de la plateforme à 2026-05-24T13:48:55.369Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:29","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Touriste) s'est connecté avec succès à la plateforme via Google à 2026-05-24T13:49:29.446Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:30","level":"info","message":"Adding FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:30","level":"info","message":"Adding FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:30","level":"info","message":"Deactivated device android_TP1A.220624.014_1779621950782 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:31","level":"info","message":"Added new FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:31","level":"info","message":"Added new FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:31","level":"error","message":"Error in addFcmToken: No matching document found for id \"6a12d4484a9f9c9a024081a3\" version 2 modifiedPaths \"fcmTokens\"","service":"djtrip-api","version":2,"modifiedPaths":["fcmTokens"],"stack":"VersionError: No matching document found for id \"6a12d4484a9f9c9a024081a3\" version 2 modifiedPaths \"fcmTokens\"\n    at generateVersionError (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:567:10)\n    at model.save (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:628:28)\n    at FcmTokenService.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\services\\fcmTokenService.js:89:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async exports.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\controllers\\user.js:2065:20)","environment":"development"}
+{"timestamp":"2026-05-24 14:49:31","level":"info","message":"Adding FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:31","level":"info","message":"Updated existing FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:32","level":"info","message":"Adding FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 14:49:32","level":"info","message":"Updated existing FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:08:13","level":"info","message":"Adding FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:08:14","level":"info","message":"Updated existing FCM token for user 6a12d4484a9f9c9a024081a3, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:08:56","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Touriste) s'est déconnecté de la plateforme à 2026-05-24T14:08:56.735Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:18","level":"info","message":"Nouvel utilisateur Amin Mj (aminmj527@gmail.com) a créé un compte via Google à 2026-05-24T14:09:18.744Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:20","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:20","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:20","level":"info","message":"Deactivated device android_TP1A.220624.014_1779621950782 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"info","message":"Added new FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"info","message":"Added new FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"error","message":"Error in addFcmToken: No matching document found for id \"6a13068d3610e092f5f5afbb\" version 0 modifiedPaths \"fcmTokens, onboarding_data\"","service":"djtrip-api","version":0,"modifiedPaths":["fcmTokens","onboarding_data"],"stack":"VersionError: No matching document found for id \"6a13068d3610e092f5f5afbb\" version 0 modifiedPaths \"fcmTokens, onboarding_data\"\n    at generateVersionError (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:567:10)\n    at model.save (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:628:28)\n    at FcmTokenService.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\services\\fcmTokenService.js:89:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async exports.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\controllers\\user.js:2065:20)","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:21","level":"info","message":"Updated existing FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:09:22","level":"info","message":"Updated existing FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:13:28","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:13:28","level":"info","message":"Updated existing FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:28:10","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:28:10","level":"info","message":"Updated existing FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 15:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 16:05:32","level":"info","message":"Adding FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-24 16:05:32","level":"info","message":"Updated existing FCM token for user 6a13068d3610e092f5f5afbb, device android_TP1A.220624.014_1779621950782","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 16:54:38","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 16:55:17","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-05-26T15:55:17.561Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:15:48","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:31:09","level":"error","message":"Error in booking reminder cron job: connection 8 to 65.62.2.54:27017 closed","service":"djtrip-api","errorLabelSet":{},"beforeHandshake":false,"connectionGeneration":18,"stack":"MongoNetworkError: connection 8 to 65.62.2.54:27017 closed\n    at Connection.onClose (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongodb\\lib\\cmap\\connection.js:134:22)\n    at TLSSocket.emit (node:events:520:35)\n    at node:net:346:12\n    at TCP.done (node:internal/tls/wrap:666:7)","environment":"development"}
+{"timestamp":"2026-05-26 17:36:09","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:38:35","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:44:09","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-26 17:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 13:53:52","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:02:01","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:04:34","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:08:47","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:15:09","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:17:36","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:21:00","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:27:49","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:28:48","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:30:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:32:14","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:32:14","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:32:49","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:33:53","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:34:31","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 14:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:04:07","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:04:24","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:04:39","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:08:33","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:16:34","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 15:45:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 16:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-05-30 16:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 12:37:51","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 12:44:44","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-06-01T11:44:44.223Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 12:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 12:45:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 13:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 13:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 13:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 13:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 13:16:53","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:12:46","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:13:09","level":"info","message":"Adding FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:13:09","level":"info","message":"Updated existing FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:26:01","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:29:53","level":"info","message":"Adding FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:29:54","level":"info","message":"Updated existing FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:45:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:45:48","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:48:23","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:49:00","level":"info","message":"Adding FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:49:01","level":"info","message":"Updated existing FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:50:46","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-01 14:52:37","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:15:40","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:30:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:33:28","level":"info","message":"Adding FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:33:28","level":"info","message":"Updated existing FCM token for user 6a15b005f6f322fef3050cb8, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:21","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Touriste) s'est déconnecté de la plateforme à 2026-06-02T11:37:21.599Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:48","level":"info","message":"Nouvel utilisateur marie.dubois (marie.dubois.voyage@gmail.com) a créé un compte via Google à 2026-06-02T11:37:48.640Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:49","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:49","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:49","level":"info","message":"Deactivated device android_TP1A.220624.014_1779810441965 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:49","level":"info","message":"Added new FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:50","level":"info","message":"Added new FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:50","level":"error","message":"Error in addFcmToken: No matching document found for id \"6a1ec08cf9e88712da710d70\" version 0 modifiedPaths \"fcmTokens, onboarding_data\"","service":"djtrip-api","version":0,"modifiedPaths":["fcmTokens","onboarding_data"],"stack":"VersionError: No matching document found for id \"6a1ec08cf9e88712da710d70\" version 0 modifiedPaths \"fcmTokens, onboarding_data\"\n    at generateVersionError (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:567:10)\n    at model.save (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\node_modules\\mongoose\\lib\\model.js:628:28)\n    at FcmTokenService.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\services\\fcmTokenService.js:89:18)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async exports.addFcmToken (C:\\Users\\ASUS\\Desktop\\pfe_djtrip-github\\Back\\controllers\\user.js:2065:20)","environment":"development"}
+{"timestamp":"2026-06-02 12:37:50","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:50","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:51","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:37:51","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 12:45:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:33:40","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:33:40","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 13:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:02:24","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:02:24","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:11:02","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:11:02","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:11:25","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:11:26","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:30:08","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:30:08","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:32:50","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est déconnecté de la plateforme à 2026-06-02T13:32:50.474Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:22","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est connecté avec succès à la plateforme via Google à 2026-06-02T13:33:22.260Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:23","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:23","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:23","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:23","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:24","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:33:24","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:35:05","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est déconnecté de la plateforme à 2026-06-02T13:35:05.115Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 14:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 15:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 15:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 15:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 15:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:05:35","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:05:51","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-06-02T19:05:51.887Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:11:35","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:12:11","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:12:38","level":"info","message":"L'utilisateur Administrator (Admin) s'est connecté avec succès à la plateforme via email à 2026-06-02T19:12:38.122Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:19:57","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:19:57","level":"info","message":"Deactivated device android_TP1A.220624.014_1779810441965 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:19:58","level":"info","message":"Added new FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:30:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:33:42","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:33:42","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 20:52:25","level":"info","message":"Found 1 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:15:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:20:30","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:30:02","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:32:55","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:33:31","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:36:26","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:36:26","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:49:07","level":"info","message":"Found 0 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:52:05","level":"info","message":"Found 0 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 21:52:09","level":"info","message":"Found 0 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:09:32","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:10:02","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:10:22","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:11:14","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:12:04","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:12:10","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:12:17","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:14:42","level":"info","message":"Booking reminder cron job started (schedule: every 15 minutes)","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:15:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:26:18","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Organisator) s'est connecté avec succès à la plateforme via Google à 2026-06-02T21:26:18.132Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:26:18","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:26:19","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:26:49","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Organisator) s'est déconnecté de la plateforme à 2026-06-02T21:26:49.078Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:16","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est connecté avec succès à la plateforme via Google à 2026-06-02T21:27:16.157Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Deactivated device android_TP1A.220624.014_1779810441965 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:17","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:18","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:19","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:19","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:33","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:37","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:39","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:46","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:48","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:27:48","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:02","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:03","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:03","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:11","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:12","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:12","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:15","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:26","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:26","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:29","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:37","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:37","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:40","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:41","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:28:41","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:06","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:08","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:09","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:20","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:20","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:20","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:20","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:41","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:41","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:29:41","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:19","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:21","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:21","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:22","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:30:22","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:43:49","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:43:49","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:45:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:45:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:51:51","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:52:45","level":"info","message":"Booking cancelled","service":"djtrip-api","bookingId":"6a1f4e9424599cf2bd9eabb6","touristId":"6a1ec08cf9e88712da710d70","environment":"development"}
+{"timestamp":"2026-06-02 22:52:46","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:52:55","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:52:56","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:53:33","level":"info","message":"Booking cancelled","service":"djtrip-api","bookingId":"6a1f50b624599cf2bd9ead51","touristId":"6a1ec08cf9e88712da710d70","environment":"development"}
+{"timestamp":"2026-06-02 22:53:33","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:53:52","level":"info","message":"Found 1 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:53:52","level":"info","message":"Found 0 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:54:22","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est déconnecté de la plateforme à 2026-06-02T21:54:22.461Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:48","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Organisator) s'est connecté avec succès à la plateforme via Google à 2026-06-02T21:56:48.686Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Deactivated device android_TP1A.220624.014_1779810441965 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Found 1 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:50","level":"info","message":"Found 1 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:51","level":"info","message":"Adding FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:51","level":"info","message":"Updated existing FCM token for user 6a1edc5df9e88712da711c80, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 22:56:51","level":"info","message":"Found 1 active tokens for user 6a1edc5df9e88712da711c80","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:00:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:00:00","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:04:34","level":"info","message":"Found 0 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:09:00","level":"info","message":"Found 0 active tokens for user 6a1ec08cf9e88712da710d70","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:07","level":"info","message":"L'utilisateur Mohamed Amine Majdoub (Organisator) s'est déconnecté de la plateforme à 2026-06-02T22:14:07.112Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:28","level":"info","message":"L'utilisateur marie.dubois (Touriste) s'est connecté avec succès à la plateforme via Google à 2026-06-02T22:14:28.709Z","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:30","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:30","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:30","level":"info","message":"Deactivated device android_TP1A.220624.014_1779810441965 for 1 other users","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:30","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:30","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:31","level":"info","message":"Adding FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:14:32","level":"info","message":"Updated existing FCM token for user 6a1ec08cf9e88712da710d70, device android_TP1A.220624.014_1779810441965","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:15:00","level":"info","message":"Starting booking reminder check...","service":"djtrip-api","environment":"development"}
+{"timestamp":"2026-06-02 23:15:01","level":"info","message":"Booking reminder check completed. Sent 0 reminders.","service":"djtrip-api","environment":"development"}

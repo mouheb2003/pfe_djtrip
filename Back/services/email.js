@@ -271,7 +271,7 @@ exports.sendVerificationEmail = async (email, code, fullname) => {
             }
             .code {
               background-color: white;
-              border: 2px solid #FF6B1A;
+              border: 2px solid #4B63FF;
               padding: 20px;
               text-align: center;
               font-size: 32px;
@@ -279,7 +279,7 @@ exports.sendVerificationEmail = async (email, code, fullname) => {
               letter-spacing: 8px;
               margin: 20px 0;
               border-radius: 8px;
-              color: #FF6B1A;
+              color: #4B63FF;
             }
             .footer {
               text-align: center;
@@ -290,7 +290,7 @@ exports.sendVerificationEmail = async (email, code, fullname) => {
             .button {
               display: inline-block;
               padding: 12px 30px;
-              background-color: #FF6B1A;
+              background-color: #4B63FF;
               color: white;
               text-decoration: none;
               border-radius: 5px;
@@ -364,7 +364,7 @@ exports.sendWelcomeEmail = async (email, fullname) => {
               padding: 20px;
             }
             .header {
-              background-color: #FF6B1A;
+              background-color: #4B63FF;
               color: white;
               padding: 30px;
               text-align: center;
@@ -438,13 +438,13 @@ exports.sendBookingConfirmationEmail = async ({
             body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
-            .header { background: linear-gradient(135deg, #0066CC, #1A7FFF); color:#fff; padding: 28px; }
+            .header { background: linear-gradient(135deg, #4B63FF, #3A54E0); color:#fff; padding: 28px; }
             .content { padding: 28px; }
             .qr { text-align:center; padding: 18px; border:1px solid #e2e8f0; border-radius:16px; background:#f8fbff; }
             .qr img { max-width:100%; height:auto; display:inline-block; }
             .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
             .meta p { margin: 6px 0; }
-            .code { font-weight:700; letter-spacing:1px; color:#0066CC; }
+            .code { font-weight:700; letter-spacing:1px; color:#4B63FF; }
           </style>
         </head>
         <body>
@@ -510,7 +510,7 @@ exports.sendBookingRejectionEmail = async ({
             body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
-            .header { background: linear-gradient(135deg, #FF6B1A, #FFA066); color:#fff; padding: 28px; }
+            .header { background: linear-gradient(135deg, #4B63FF, #3A54E0); color:#fff; padding: 28px; }
             .content { padding: 28px; }
           </style>
         </head>
@@ -573,11 +573,11 @@ exports.sendCheckInConfirmationEmail = async ({
             body { font-family: Arial, sans-serif; background:#f7f9fc; color:#1e293b; margin:0; padding:0; }
             .container { max-width: 680px; margin: 0 auto; padding: 24px; }
             .card { background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.08); }
-            .header { background: linear-gradient(135deg, #10B981, #059669); color:#fff; padding: 28px; text-align: center; }
+            .header { background: linear-gradient(135deg, #4B63FF, #3A54E0); color:#fff; padding: 28px; text-align: center; }
             .content { padding: 28px; }
             .meta { margin: 18px 0; padding: 16px; background:#f8fafc; border-radius:16px; }
             .meta p { margin: 6px 0; }
-            .code { font-weight:700; letter-spacing:1px; color:#10B981; }
+            .code { font-weight:700; letter-spacing:1px; color:#4B63FF; }
           </style>
         </head>
         <body>
@@ -641,7 +641,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
               padding: 20px;
             }
             .header {
-              background-color: #FF6B1A;
+              background-color: #4B63FF;
               color: white;
               padding: 20px;
               text-align: center;
@@ -654,7 +654,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
             }
             .code {
               background-color: white;
-              border: 2px solid #FF6B1A;
+              border: 2px solid #4B63FF;
               padding: 20px;
               text-align: center;
               font-size: 32px;
@@ -662,7 +662,7 @@ exports.sendPasswordResetEmail = async (email, code, fullname) => {
               letter-spacing: 8px;
               margin: 20px 0;
               border-radius: 8px;
-              color: #FF6B1A;
+              color: #4B63FF;
             }
             .footer {
               text-align: center;
@@ -745,7 +745,7 @@ exports.sendBanNotification = async (email, fullname, reason) => {
               padding: 20px;
             }
             .header {
-              background-color: #d32f2f;
+              background-color: #4B63FF;
               color: white;
               padding: 20px;
               text-align: center;
@@ -851,7 +851,7 @@ exports.sendAccountRestoredEmail = async (
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #1b9c53; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background-color: #4B63FF; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
             .reason-box { background-color: white; border: 1px solid #d1fae5; padding: 14px; margin: 16px 0; border-radius: 8px; }
             .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
@@ -1052,6 +1052,111 @@ exports.sendEmailWithAttachment = async ({
     return { success: true, messageId: info.messageId };
   } catch (error) {
     emailLog("error", "Error sending email with attachment", {
+      message: error.message,
+      code: error.code,
+    });
+    return { success: false, error: error.message };
+  }
+};
+
+// Send email when admin deletes content
+exports.sendAdminDeletedContentEmail = async ({
+  email,
+  fullname,
+  contentType, // 'activity' or 'publication'
+  contentTitle,
+  reason,
+}) => {
+  try {
+    const mailOptions = getBaseMailOptions({
+      to: email,
+      subject: `Your ${contentType} has been removed by an Administrator - DJTrip`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background-color: #d32f2f;
+              color: white;
+              padding: 20px;
+              text-align: center;
+              border-radius: 10px 10px 0 0;
+            }
+            .content {
+              background-color: #f9f9f9;
+              padding: 30px;
+              border-radius: 0 0 10px 10px;
+            }
+            .reason-box {
+              background-color: white;
+              border: 2px solid #d32f2f;
+              padding: 20px;
+              margin: 20px 0;
+              border-radius: 8px;
+              border-left: 4px solid #d32f2f;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 20px;
+              color: #666;
+              font-size: 12px;
+            }
+            .warning {
+              margin-top: 30px;
+              padding: 15px;
+              background-color: #fff3cd;
+              border-left: 4px solid #ffc107;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚠️ Content Removed</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${fullname},</h2>
+              <p>We are writing to inform you that your ${contentType} <strong>"${contentTitle}"</strong> has been removed by a DJTrip administrator.</p>
+              
+              <p><strong>Reason for removal:</strong></p>
+              <div class="reason-box">
+                <p style="margin: 0;">${reason}</p>
+              </div>
+              
+              <p>Please ensure that all your future content adheres to our community guidelines to avoid further action against your account.</p>
+              
+              <div class="warning">
+                <p style="margin: 0;">If you have any questions or believe this was a mistake, please contact our support team at support@djtrip.com.</p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>© 2026 DJTrip. All rights reserved.</p>
+              <p>This is an automated email, please do not reply.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hello ${fullname},\n\nWe are writing to inform you that your ${contentType} "${contentTitle}" has been removed by a DJTrip administrator.\n\nReason for removal: ${reason}\n\nPlease ensure that all your future content adheres to our community guidelines.\n\n© 2026 DJTrip. All rights reserved.`,
+    });
+
+    const info = await sendMailWithLogging("admin deleted content email", mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    emailLog("error", "Error sending admin deleted content email", {
       message: error.message,
       code: error.code,
     });

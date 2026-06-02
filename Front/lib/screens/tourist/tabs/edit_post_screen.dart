@@ -13,6 +13,9 @@ import '../../../widgets/mention_input_widget.dart';
 import '../../../widgets/mention_zone_widget.dart';
 import '../../../screens/organizer/interactive_djerba_map_screen.dart';
 import '../lieux_map_screen.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/user_provider.dart';
+import '../../../models/user_model.dart';
 
 class EditPostScreen extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -684,6 +687,20 @@ class _EditPostScreenState extends State<EditPostScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final userProvider = Provider.of<UserProvider>(context);
+    final providerUser = userProvider.user;
+    
+    UserModel? currentUser;
+    if (providerUser is Map) {
+      currentUser = UserModel.fromJson(providerUser as Map<String, dynamic>);
+    } else if (providerUser is UserModel) {
+      currentUser = providerUser;
+    }
+    
+    final authorAvatar = currentUser?.avatar ?? _effectivePost['author_avatar'];
+    final authorName = currentUser?.fullname ?? _effectivePost['author_name'];
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF9FAFE),
       appBar: AppBar(
@@ -743,15 +760,25 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.primary.withOpacity(0.1), width: 3),
                     ),
-                    child: CircleAvatar(
-                      radius: 26,
-                      backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF0F2FF),
-                      backgroundImage: _effectivePost['author_avatar'] != null
-                          ? NetworkImage(_effectivePost['author_avatar'])
-                          : null,
-                      child: _effectivePost['author_avatar'] == null
-                          ? const Icon(Icons.person, color: AppColors.primary, size: 28)
-                          : null,
+                    child: Consumer<UserProvider>(
+                      builder: (context, up, _) {
+                        final pUser = up.user;
+                        UserModel? cu;
+                        if (pUser is Map) cu = UserModel.fromJson(pUser as Map<String, dynamic>);
+                        else if (pUser is UserModel) cu = pUser;
+                        final av = cu?.avatar ?? _effectivePost['author_avatar']?.toString();
+                        final avatarUrl = (av != null && av.isNotEmpty)
+                            ? '$av${av.contains('?') ? '&' : '?'}v=${up.hashCode}'
+                            : null;
+                        return CircleAvatar(
+                          radius: 26,
+                          backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF0F2FF),
+                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl == null
+                              ? const Icon(Icons.person, color: AppColors.primary, size: 28)
+                              : null,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -760,7 +787,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _effectivePost['author_name'] ?? 'Traveler',
+                          authorName?.toString() ?? 'Traveler',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,

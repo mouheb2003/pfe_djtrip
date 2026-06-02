@@ -135,6 +135,10 @@ exports.getAllLieux = async (req, res) => {
         { name: { $regex: search, $options: "i" } },
         { short_description: { $regex: search, $options: "i" } },
         { long_description: { $regex: search, $options: "i" } },
+        { address: { $regex: search, $options: "i" } },
+        { city: { $regex: search, $options: "i" } },
+        { country: { $regex: search, $options: "i" } },
+        { type: { $regex: search, $options: "i" } },
         { tags: { $in: [new RegExp(search, "i")] } },
       ];
     }

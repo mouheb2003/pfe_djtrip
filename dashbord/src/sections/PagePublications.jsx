@@ -44,6 +44,7 @@ import {
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { useAuthContext } from 'src/auth/hooks';
 import {
   useTable,
   emptyRows,
@@ -66,6 +67,7 @@ const TABLE_HEAD = [
 function mapPost(post) {
   return {
     id: post?._id ?? post?.id,
+    author_id: post?.author_id?._id ?? post?.author_id ?? '',
     author: post?.author_id?.fullname ?? 'Unknown',
     content: String(post?.content ?? ''),
     postType: post?.post_type ?? 'post',
@@ -167,12 +169,14 @@ function applyFilter({ inputData, comparator, filters }) {
 
 export function PublicationsView({ sx }) {
   const table = useTable({ defaultOrderBy: 'createdAt' });
+  const { user } = useAuthContext();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null, reason: '' });
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
   const [detailsComments, setDetailsComments] = useState([]);
@@ -365,6 +369,11 @@ export function PublicationsView({ sx }) {
 
   const handleDelete = useCallback(
     async (row) => {
+      if (row.author_id !== user?.id && row.author_id !== user?._id && row.author_id !== user?.userId) {
+        setDeleteDialog({ open: true, row, reason: '' });
+        return;
+      }
+
       const confirmed = window.confirm('Supprimer cette publication ?');
       if (!confirmed) return;
 
@@ -376,8 +385,25 @@ export function PublicationsView({ sx }) {
         toast.error('Échec de suppression de la publication');
       }
     },
-    [loadRows]
+    [loadRows, user]
   );
+
+  const confirmDeleteWithReason = async () => {
+    const { row, reason } = deleteDialog;
+    if (!reason.trim()) {
+      toast.error('La raison est obligatoire pour supprimer la publication d\'un autre utilisateur');
+      return;
+    }
+
+    try {
+      await deletePublication(row.id, reason);
+      toast.success('Publication supprimée avec succès');
+      setDeleteDialog({ open: false, row: null, reason: '' });
+      await loadRows();
+    } catch {
+      toast.error('Échec de suppression de la publication');
+    }
+  };
 
   const openDetails = useCallback(async (row) => {
     setDetailsRow(row);
@@ -616,6 +642,32 @@ export function PublicationsView({ sx }) {
             </>
           )}
         </Card>
+
+        {/* Delete with reason dialog */}
+        <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, row: null, reason: '' })} fullWidth maxWidth="sm">
+          <DialogTitle>Raison de suppression</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Vous êtes sur le point de supprimer la publication de <strong>{deleteDialog.row?.author}</strong>. Une raison est requise et un email sera envoyé au propriétaire.
+            </Typography>
+            <TextField
+              fullWidth
+              label="Raison de suppression"
+              multiline
+              rows={3}
+              value={deleteDialog.reason}
+              onChange={(e) => setDeleteDialog((prev) => ({ ...prev, reason: e.target.value }))}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialog({ open: false, row: null, reason: '' })} color="inherit">
+              Annuler
+            </Button>
+            <Button onClick={confirmDeleteWithReason} variant="contained" color="error">
+              Supprimer
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={openDialog} onClose={closeDialog} fullWidth maxWidth="sm">
           <DialogTitle>Créer une publication</DialogTitle>

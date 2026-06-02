@@ -2078,6 +2078,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen>
         : (widget.isSupportChat ? 'DJTrip Support' : widget.partnerName);
 
     return Container(
+      padding: const EdgeInsets.only(top: 20),
       decoration: BoxDecoration(
         color: cs.surface,
         border: Border(bottom: BorderSide(color: AppColors.borderLight)),

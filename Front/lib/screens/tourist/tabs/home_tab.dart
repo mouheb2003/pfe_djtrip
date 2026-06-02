@@ -9,6 +9,7 @@ import '../../../models/activity_model.dart';
 import '../../../services/lieu_service.dart';
 import '../../../services/place_service.dart';
 import '../../../services/activity_service.dart';
+import '../../../services/recommendation_service.dart';
 import '../place_detail_screen_v2.dart';
 import '../../shared/activity_detail_screen.dart';
 import '../../shared/ai_chat_screen.dart';
@@ -54,6 +55,7 @@ class _HomeTabState extends State<HomeTab> {
   List<LieuModel> _topDestinations = [];
   List<ActivityModel> _topActivities = [];
   List<ActivityModel> _allActivities = [];
+  List<Map<String, dynamic>> _recommendations = [];
   bool _isLoading = true;
   bool _isFetching = false;
   String _searchQuery = '';
@@ -143,11 +145,15 @@ class _HomeTabState extends State<HomeTab> {
       final topActivities = upcomingActivities.take(10).toList();
       print('[DEBUG] Top activities count: ${topActivities.length}');
 
+      // Fetch AI recommendations from backend
+      final recommendations = await RecommendationService.getRecommendations();
+
       if (mounted) {
         setState(() {
           _lieux = lieux;
           _topActivities = topActivities;
-          _allActivities = activities; // Store all activities for search
+          _allActivities = activities;
+          _recommendations = recommendations;
           _isLoading = false;
         });
       }
@@ -428,6 +434,159 @@ class _HomeTabState extends State<HomeTab> {
       'price': l.prix,
       'categorie': l.categorie,
     };
+  }
+
+  Widget _buildRecommendationCard(Map<String, dynamic> item) {
+    final isActivity = item['itemType'] == 'activity';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final title = isActivity ? (item['titre'] ?? '') : (item['name'] ?? item['titre'] ?? '');
+    final type = isActivity ? (item['type_activite'] ?? item['categorie'] ?? 'Activity') : (item['type'] ?? item['categorie'] ?? 'Place');
+    final rating = (item['noteMoyenne'] ?? 0.0).toDouble();
+    final imageUrl = isActivity 
+        ? ((item['photos'] as List?)?.isNotEmpty == true ? item['photos'][0] : '')
+        : (item['main_image'] ?? item['imagePortrait'] ?? '');
+        
+    return GestureDetector(
+      onTap: () {
+        if (isActivity) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ActivityDetailScreen(activityId: item['_id'] ?? item['id']),
+            ),
+          );
+        } else {
+          // If it's a Lieu model format
+          if (item['titre'] != null && item['titre'].isNotEmpty) {
+            final lieuModel = LieuModel.fromJson(item);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PlaceDetailScreenV2(place: _toPlaceMap(lieuModel)),
+              ),
+            );
+          } else {
+            // Assume it's already PlaceMap format or simple place
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PlaceDetailScreenV2(place: item),
+              ),
+            );
+          }
+        }
+      },
+      child: Container(
+        width: 160.w,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(
+                          ApiConfig.getImageUrl(imageUrl),
+                          height: 110.h,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 110.h,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.image_not_supported),
+                          ),
+                        )
+                      : Container(
+                          height: 110.h,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image_not_supported),
+                        ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, color: Colors.amber, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          rating.toStringAsFixed(1),
+                          style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isActivity ? Colors.orange.withOpacity(0.9) : Colors.blue.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      isActivity ? 'Activity' : 'Place',
+                      style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: EdgeInsets.all(12.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    type,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildFilterButton(String text, bool isSelected) {
@@ -724,95 +883,103 @@ class _HomeTabState extends State<HomeTab> {
 
                     SizedBox(height: 32.h),
 
-                    // Recommended Places Section
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Recommended Places',
-                                style: TextStyle(
-                                  fontSize: 44.sp / 2,
-                                  fontWeight: FontWeight.w900,
-                                  color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Icon(Icons.auto_awesome, size: 12, color: const Color(0xFF167BFF)),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'Based on your interests',
-                                    style: TextStyle(
-                                      fontSize: 12.sp,
-                                      color: const Color(0xFF167BFF),
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                    // Recommended Places for You Section (interest-filtered)
+                    Builder(
+                      builder: (context) {
+                        final recPlaces = _topDestinationsList;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Recommended Places for You',
+                                        style: TextStyle(
+                                          fontSize: 44.sp / 2,
+                                          fontWeight: FontWeight.w900,
+                                          color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.auto_awesome, size: 12, color: const Color(0xFF167BFF)),
+                                          SizedBox(width: 4.w),
+                                          Text(
+                                            'Curated based on your interests',
+                                            style: TextStyle(
+                                              fontSize: 12.sp,
+                                              color: const Color(0xFF167BFF),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ViewAllPlacesScreen(),
-                              ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF167BFF),
-                          ),
-                          iconAlignment: IconAlignment.end,
-                          icon: Icon(Icons.arrow_forward, size: 18),
-                          label: Text(
-                            'View All',
-                            style: TextStyle(
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12.h),
-                    _isLoading
-                        ? SizedBox(
-                            height: 240,
-                            child: Center(child: CircularProgressIndicator()),
-                          )
-                        : _topRatedPlaces.isEmpty
-                        ? _EmptyDestinations(onRetry: _loadLieux)
-                        : SizedBox(
-                            height: 280,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _topRatedPlaces.length,
-                              separatorBuilder: (_, __) =>
-                                  SizedBox(width: 16.w),
-                              itemBuilder: (context, index) {
-                                final lieu = _topRatedPlaces[index];
-                                return _TopDestinationCard(
-                                  lieu: lieu,
-                                  onTap: () => Navigator.push(
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => PlaceDetailScreenV2(
-                                        place: _toPlaceMap(lieu),
-                                      ),
+                                      builder: (_) => const ViewAllPlacesScreen(),
                                     ),
                                   ),
-                                );
-                              },
+                                  iconAlignment: IconAlignment.end,
+                                  icon: const Icon(Icons.arrow_forward, size: 18),
+                                  label: Text(
+                                    'See all',
+                                    style: TextStyle(
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF167BFF),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                    SizedBox(height: 32.h),
+                            SizedBox(height: 16.h),
+                            _isLoading
+                                ? SizedBox(
+                                    height: 240,
+                                    child: Center(child: CircularProgressIndicator()),
+                                  )
+                                : recPlaces.isEmpty
+                                    ? _EmptyDestinations(onRetry: _loadLieux)
+                                    : SizedBox(
+                                        height: 280,
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: recPlaces.length,
+                                          separatorBuilder: (_, __) => SizedBox(width: 16.w),
+                                          itemBuilder: (context, index) {
+                                            final lieu = recPlaces[index];
+                                            return _TopDestinationCard(
+                                              lieu: lieu,
+                                              onTap: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => PlaceDetailScreenV2(
+                                                    place: _toPlaceMap(lieu),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                            SizedBox(height: 32.h),
+                          ],
+                        );
+                      },
+                    ),
+
+                    // (Places now shown in "Recommended Places for You" above)
 
                     // Recommended Activities Section
                     Row(
@@ -1074,36 +1241,53 @@ class _HomeHero extends StatelessWidget {
     return '$baseUrl/$avatar';
   }
 
-  Widget _buildProfileButton() {
-    final user = AuthService.currentUser;
-    final avatar = user?['avatar']?.toString();
-    final resolvedAvatar = _resolveAvatarUrl(avatar);
-    
-    return GestureDetector(
-      onTap: onProfileTap,
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.8), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+  Widget _buildProfileButton(BuildContext context) {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final user = userProvider.user;
+        String? avatar;
+        if (user is Map) {
+          avatar = (user as Map)['avatar']?.toString();
+        } else if (user != null) {
+          avatar = (user as dynamic).avatar;
+        }
+        if (avatar == null || avatar.isEmpty) {
+          avatar = AuthService.currentUser?['avatar']?.toString();
+        }
+
+        final resolvedAvatar = _resolveAvatarUrl(avatar);
+        // Append a cache-buster so Flutter re-fetches the image when provider notifies
+        final finalAvatar = resolvedAvatar.isNotEmpty
+            ? '$resolvedAvatar${resolvedAvatar.contains('?') ? '&' : '?'}v=${userProvider.hashCode}'
+            : '';
+
+        return GestureDetector(
+          onTap: onProfileTap,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.8), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white.withOpacity(0.2),
-          backgroundImage: resolvedAvatar.isNotEmpty
-              ? NetworkImage(resolvedAvatar)
-              : null,
-          child: resolvedAvatar.isEmpty
-              ? Icon(Icons.person, color: Colors.white, size: 20)
-              : null,
-        ),
-      ),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              backgroundImage: finalAvatar.isNotEmpty
+                  ? NetworkImage(finalAvatar)
+                  : null,
+              child: finalAvatar.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white, size: 20)
+                  : null,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1150,7 +1334,7 @@ class _HomeHero extends StatelessWidget {
                   Row(
                     children: [
                       const Spacer(),
-                      _buildProfileButton(),
+                      _buildProfileButton(context),
                     ],
                   ),
                   const Spacer(),

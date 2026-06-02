@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
+import '../services/user_service.dart';
 import 'dart:convert';
 
 /// Base state for async operations
@@ -61,13 +62,9 @@ class UserProvider extends ChangeNotifier {
   /// Refresh user data from API
   Future<void> refreshUser() async {
     try {
-      final res = await ApiClient.get('/users/profile', auth: true, cacheFirst: false);
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        final userData = body['user'] ?? body['data'] ?? body;
-        if (userData is Map<String, dynamic>) {
-          updateUser(userData);
-        }
+      final userData = await UserService.getProfile(forceRefresh: true);
+      if (userData != null) {
+        updateUser(userData);
       }
     } catch (e) {
       debugPrint('Error refreshing user: $e');

@@ -206,7 +206,7 @@ class OnboardingService {
     
     const [organizers, total] = await Promise.all([
       User.find(query)
-        .select('fullname email userType signup_method submitted_for_approval onboarding_data reasonToJoin')
+        .select('fullname email userType signup_method submitted_for_approval onboarding_data reasonToJoin avatar cover_photo')
         .sort({ submitted_for_approval: -1 })
         .skip(skip)
         .limit(limit)

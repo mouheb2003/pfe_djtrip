@@ -1649,7 +1649,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                   label,
                   style: TextStyle(
                     fontSize: 11.sp,
-                    color: Color(0xFF94A3B8),
+                    color: isDark ? Colors.white70 : const Color(0xFF94A3B8),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1658,7 +1658,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen>
                   value,
                   style: TextStyle(
                     fontSize: 14.sp,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                     fontWeight: FontWeight.w700,
                   ),
                 ),

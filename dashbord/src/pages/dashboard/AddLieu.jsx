@@ -116,6 +116,10 @@ export default function AddLieuPage() {
   const [places, setPlaces] = useState([]);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState('');
+  // API search state
+  const [apiSearch, setApiSearch] = useState('');
+  const [apiResults, setApiResults] = useState([]);
+  const [apiSearchLoading, setApiSearchLoading] = useState(false);
   const fileInputRef = useRef(null);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -284,30 +288,11 @@ export default function AddLieuPage() {
             if (url) photoUrls.push(url);
           } else if (photo?.url) {
             photoUrls.push(photo.url);
-          } else if (photo?.photo_reference || photo?.photoReference) {
-            const photoReference = photo.photo_reference ?? photo.photoReference;
-            if (GOOGLE_MAPS_API_KEY) {
-              photoUrls.push(
-                `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(photoReference)}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
-              );
-            }
           }
         } catch (e) {
           console.error('Error getting photo URL:', e);
         }
       });
-    }
-
-    if (typeof place.photo_reference === 'string' && GOOGLE_MAPS_API_KEY) {
-      photoUrls.push(
-        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(place.photo_reference)}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
-      );
-    }
-
-    if (typeof place.photoReference === 'string' && GOOGLE_MAPS_API_KEY) {
-      photoUrls.push(
-        `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${encodeURIComponent(place.photoReference)}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`,
-      );
     }
 
     if (typeof place.url === 'string' && place.url.startsWith('http')) {
@@ -584,13 +569,37 @@ export default function AddLieuPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Debounced API search
+  useEffect(() => {
+    if (!apiSearch.trim()) {
+      setApiResults([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      setApiSearchLoading(true);
+      try {
+        const response = await lieuService.getAllLieux({ search: apiSearch.trim() });
+        const list = Array.isArray(response)
+          ? response
+          : response?.lieux ?? response?.data?.lieux ?? [];
+        setApiResults(list.slice(0, 8));
+      } catch (e) {
+        console.error('API search error:', e);
+        setApiResults([]);
+      } finally {
+        setApiSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [apiSearch]);
+
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     let cancelled = false;
     let loaderPromise;
 
     const loadGoogleMapsScript = () => {
-      if (typeof window !== 'undefined' && window.google?.maps) return Promise.resolve();
+      if (typeof window !== 'undefined' && window.google?.maps?.places) return Promise.resolve();
       if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error('Missing Google Maps API key'));
 
       if (!loaderPromise) {
@@ -866,6 +875,108 @@ export default function AddLieuPage() {
                 <Typography variant="h6" sx={{ mb: 2 }}>
                   Location on Map
                 </Typography>
+
+                {/* ── API search bar ── */}
+                <Box sx={{ position: 'relative', mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="🔍 Rechercher depuis la base de données"
+                    placeholder="Tapez le nom d'un lieu existant…"
+                    value={apiSearch}
+                    onChange={(e) => setApiSearch(e.target.value)}
+                    InputProps={{
+                      endAdornment: apiSearchLoading ? (
+                        <CircularProgress size={18} />
+                      ) : null,
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderColor: 'primary.main',
+                      },
+                    }}
+                  />
+                  {apiResults.length > 0 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1300,
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        boxShadow: 4,
+                        maxHeight: 260,
+                        overflow: 'auto',
+                      }}
+                    >
+                      {apiResults.map((place) => {
+                        const coords = readPlaceCoordinates(place);
+                        return (
+                          <Box
+                            key={place._id ?? place.id}
+                            onClick={() => {
+                              if (coords) {
+                                applyPlaceSelection({
+                                  lat: coords.latitude,
+                                  lng: coords.longitude,
+                                  name: place.name ?? place.nom ?? '',
+                                  address: place.address ?? place.adresse ?? '',
+                                  city: place.city ?? place.ville ?? '',
+                                  type: normalizeLieuType(place.type ?? place.categorie ?? 'other'),
+                                  website: place.website ?? place.siteWeb ?? '',
+                                  telephone: place.telephone ?? '',
+                                  photoUrls: [
+                                    ...(place.main_image ? [place.main_image] : []),
+                                    ...(Array.isArray(place.gallery) ? place.gallery : []),
+                                  ],
+                                  openingHours: place.opening_hours ?? '',
+                                  priceRange: place.price_range ?? '',
+                                  priceLevel: place.price_level ?? null,
+                                });
+                              }
+                              setApiResults([]);
+                              setApiSearch(place.name ?? place.nom ?? '');
+                            }}
+                            sx={{
+                              px: 2,
+                              py: 1.25,
+                              cursor: 'pointer',
+                              borderBottom: '1px solid',
+                              borderColor: 'divider',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1.5,
+                              '&:hover': { bgcolor: 'action.hover' },
+                              '&:last-child': { borderBottom: 'none' },
+                            }}
+                          >
+                            {place.main_image && (
+                              <Box
+                                component="img"
+                                src={place.main_image}
+                                alt={place.name}
+                                sx={{ width: 40, height: 40, borderRadius: 0.75, objectFit: 'cover', flexShrink: 0 }}
+                              />
+                            )}
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {place.name ?? place.nom}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {[place.type ?? place.categorie, place.city ?? place.ville].filter(Boolean).join(' · ')}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Box>
+
                 <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
                   <Typography variant="caption" color="text.secondary">
                     {placesLoading ? 'Loading places...' : `${places.length} places on the map`}
@@ -879,8 +990,8 @@ export default function AddLieuPage() {
                 <TextField
                   fullWidth
                   size="small"
-                  label="Search place (Google)"
-                  placeholder="Type a place name..."
+                  label="Search place (Google Autocomplete)"
+                  placeholder="Type a place name…"
                   inputRef={searchInputRef}
                   sx={{ mb: 2 }}
                 />
@@ -925,6 +1036,7 @@ export default function AddLieuPage() {
                 </Stack>
               </Card>
             </Grid>
+
 
             {/* Form Section */}
             <Grid item xs={12} md={6}>

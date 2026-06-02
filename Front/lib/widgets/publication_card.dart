@@ -16,6 +16,7 @@ import '../providers/bookmark_provider.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 import '../screens/tourist/tabs/create_post_screen.dart';
+import '../services/auth_service.dart';
 
 class PublicationCard extends StatefulWidget {
   final PostModel post;
@@ -810,9 +811,12 @@ class _PublicationCardState extends State<PublicationCard> {
 
   void _showMoreOptions(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final currentUserId = userProvider.user is Map
+    var currentUserId = userProvider.user is Map
         ? (userProvider.user as Map)['_id']?.toString() ?? ''
         : (userProvider.user as UserModel?)?.id ?? '';
+    if (currentUserId.isEmpty && AuthService.currentUser != null) {
+      currentUserId = AuthService.currentUser?['_id']?.toString() ?? AuthService.currentUser?['id']?.toString() ?? '';
+    }
     final isMyPost = widget.post.authorId == currentUserId;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;

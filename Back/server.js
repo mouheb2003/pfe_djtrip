@@ -72,6 +72,7 @@ const notificationPreferencesRoutes = require("./routes/notificationPreferences"
 const notificationAnalyticsRoutes = require("./routes/notificationAnalytics");
 const onboardingRoutes = require("./routes/onboarding");
 const checkinLogRoutes = require("./routes/checkinLog");
+const recommendationRoutes = require("./routes/recommendation");
 
 const invoiceRoutes = require("./routes/invoice");
 const followRoutes = require("./routes/follow");
@@ -280,6 +281,7 @@ app.get("/", (req, res) => {
       activityLogs: "/api/v1/logs",
       appeals: "/api/v1/appeals",
       notifications: "/api/v1/notifications",
+      recommendations: "/api/v1/recommendations",
 
       invoices: "/api/v1/invoices",
     },
@@ -313,6 +315,7 @@ app.use("/api/v1/notifications", notificationPreferencesRoutes);
 app.use("/api/v1/notifications", notificationAnalyticsRoutes);
 app.use("/api/v1/onboarding", onboardingRoutes);
 app.use("/api/v1/checkin-logs", checkinLogRoutes);
+app.use("/api/v1/recommendations", recommendationRoutes);
 
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/follow", followRoutes);
@@ -755,18 +758,6 @@ process.on("uncaughtException", (error) => {
   console.error("❌ Uncaught Exception:", error);
 });
 
-// Graceful shutdown for notification queues
-process.on("SIGTERM", async () => {
-  console.log("🔒 SIGTERM received, closing notification queues...");
-  await closeQueues();
-  process.exit(0);
-});
-
-process.on("SIGINT", async () => {
-  console.log("🔒 SIGINT received, closing notification queues...");
-  await closeQueues();
-  process.exit(0);
-});
 
 const PORT = process.env.PORT || 3000;
 server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS || 150000);
@@ -794,6 +785,9 @@ server.listen(PORT, () => {
     env: chatbotEnv
   });
 
+  // Store globally so shutdown handlers can reach it
+  global.chatbotProcess = chatbot;
+
   chatbot.on('error', (err) => {
     console.error('[AI] Failed to start chatbot:', err.message);
   });
@@ -803,4 +797,45 @@ server.listen(PORT, () => {
       console.error(`[AI] Chatbot exited with code ${code}`);
     }
   });
+});
+
+// Cleanup child process on exit
+const cleanupChildProcesses = () => {
+  if (global.chatbotProcess && !global.chatbotProcess.killed) {
+    console.log('🛑 Shutting down AI Chatbot process...');
+    
+    // On Windows, killing the npm shell process might not kill the child node process
+    // We send kill signal to the process group if possible, or just kill the spawned process
+    try {
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', global.chatbotProcess.pid, '/f', '/t']);
+      } else {
+        process.kill(-global.chatbotProcess.pid);
+      }
+    } catch (e) {
+      global.chatbotProcess.kill('SIGTERM');
+    }
+  }
+};
+
+process.on("SIGTERM", async () => {
+  console.log("🔒 SIGTERM received, closing notification queues...");
+  cleanupChildProcesses();
+  await closeQueues();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("🔒 SIGINT received, closing notification queues...");
+  cleanupChildProcesses();
+  await closeQueues();
+  process.exit(0);
+});
+
+process.on('SIGUSR2', async () => {
+  // For nodemon restarts
+  console.log("🔒 SIGUSR2 received (nodemon restart)...");
+  cleanupChildProcesses();
+  await closeQueues();
+  process.exit(0);
 });

@@ -41,6 +41,7 @@ import {
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { useAuthContext } from 'src/auth/hooks';
 import {
   useTable,
   emptyRows,
@@ -152,12 +153,14 @@ function applyFilter({ inputData, comparator, filters }) {
 
 export function ActivitiesView({ sx }) {
   const table = useTable({ defaultOrderBy: 'date_debut' });
+  const { user } = useAuthContext();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, row: null, reason: '' });
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [detailsRow, setDetailsRow] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -447,6 +450,11 @@ export function ActivitiesView({ sx }) {
 
   const handleDelete = useCallback(
     async (row) => {
+      if (row.organisateur_id !== user?.id && row.organisateur_id !== user?._id && row.organisateur_id !== user?.userId) {
+        setDeleteDialog({ open: true, row, reason: '' });
+        return;
+      }
+      
       const confirmed = window.confirm('Supprimer cette activité ?');
       if (!confirmed) return;
 
@@ -458,8 +466,25 @@ export function ActivitiesView({ sx }) {
         toast.error('Échec de suppression de l\'activité');
       }
     },
-    [loadRows]
+    [loadRows, user]
   );
+
+  const confirmDeleteWithReason = async () => {
+    const { row, reason } = deleteDialog;
+    if (!reason.trim()) {
+      toast.error('La raison est obligatoire pour supprimer l\'activité d\'un autre utilisateur');
+      return;
+    }
+
+    try {
+      await deleteActiviteAdmin(row.id, reason);
+      toast.success('Activité supprimée avec succès');
+      setDeleteDialog({ open: false, row: null, reason: '' });
+      await loadRows();
+    } catch {
+      toast.error('Échec de suppression de l\'activité');
+    }
+  };
 
   return (
     <DashboardContent maxWidth="xl" sx={sx}>
@@ -591,6 +616,32 @@ export function ActivitiesView({ sx }) {
             </>
           )}
         </Card>
+
+        {/* Delete with reason dialog */}
+        <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, row: null, reason: '' })} fullWidth maxWidth="sm">
+          <DialogTitle>Raison de suppression</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Vous êtes sur le point de supprimer l'activité de <strong>{deleteDialog.row?.organisateur_name}</strong>. Une raison est requise et un email sera envoyé au propriétaire.
+            </Typography>
+            <TextField
+              fullWidth
+              label="Raison de suppression"
+              multiline
+              rows={3}
+              value={deleteDialog.reason}
+              onChange={(e) => setDeleteDialog((prev) => ({ ...prev, reason: e.target.value }))}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialog({ open: false, row: null, reason: '' })} color="inherit">
+              Annuler
+            </Button>
+            <Button onClick={confirmDeleteWithReason} variant="contained" color="error">
+              Supprimer
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={openDialog} onClose={closeDialog} fullWidth maxWidth="sm">
           <DialogTitle>Créer activité</DialogTitle>

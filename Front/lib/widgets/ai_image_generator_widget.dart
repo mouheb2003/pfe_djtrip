@@ -7,7 +7,7 @@ import '../theme/app_theme.dart';
 class AIImageGeneratorWidget extends StatefulWidget {
   final TextEditingController titleController;
   final TextEditingController descriptionController;
-  final Function(String imageUrl) onImageGenerated;
+  final Function(List<String> imageUrls) onImagesSelected;
   final Function(String imageUrl)? onImageDeleted;
   final List<XFile>? existingPhotos;
   final List<String>? existingImageUrls;
@@ -18,7 +18,7 @@ class AIImageGeneratorWidget extends StatefulWidget {
     super.key,
     required this.titleController,
     required this.descriptionController,
-    required this.onImageGenerated,
+    required this.onImagesSelected,
     this.onImageDeleted,
     this.existingPhotos,
     this.existingImageUrls,
@@ -35,7 +35,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
   final AIImageService _aiService = AIImageService.instance;
   bool _isGenerating = false;
   List<String> _generatedImageUrls = [];
-  int? _selectedImageIndex;
+  Set<int> _selectedIndices = {};
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -103,7 +103,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
           
           setState(() {
             _generatedImageUrls = images.cast<String>();
-            _selectedImageIndex = images.isNotEmpty ? 0 : null;
+            _selectedIndices = images.isNotEmpty ? {0} : {};
             _isGenerating = false;
             _generationMethod = result['method'] as String?;
             _promptScore = result['promptScore'] as int?;
@@ -113,7 +113,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
           });
           _animationController.forward();
           if (_generatedImageUrls.isNotEmpty) {
-            widget.onImageGenerated(_generatedImageUrls[0]);
+            widget.onImagesSelected([_generatedImageUrls[0]]);
           }
           
           // Show quality-appropriate message
@@ -151,7 +151,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
   Future<void> _regenerateImages() async {
     setState(() {
       _generatedImageUrls = [];
-      _selectedImageIndex = null;
+      _selectedIndices = {};
       _generationMethod = null;
       _promptScore = null;
       _qualityMessage = null;
@@ -165,7 +165,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
   void _removeGeneratedImages() {
     setState(() {
       _generatedImageUrls = [];
-      _selectedImageIndex = null;
+      _selectedIndices = {};
       _generationMethod = null;
       _promptScore = null;
       _qualityMessage = null;
@@ -175,19 +175,26 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
     _animationController.reset();
   }
 
-  void _selectImage(int index) {
+  void _toggleImage(int index) {
     setState(() {
-      _selectedImageIndex = index;
+      if (_selectedIndices.contains(index)) {
+        if (_selectedIndices.length > 1) {
+          _selectedIndices.remove(index); // keep at least one
+        }
+      } else {
+        _selectedIndices.add(index);
+      }
     });
-    widget.onImageGenerated(_generatedImageUrls[index]);
+    widget.onImagesSelected(_selectedIndices.map((i) => _generatedImageUrls[i]).toList());
   }
 
-  void _useSelectedImage() {
-    if (_selectedImageIndex != null && _generatedImageUrls.isNotEmpty) {
-      widget.onImageGenerated(_generatedImageUrls[_selectedImageIndex!]);
+  void _useSelectedImages() {
+    if (_selectedIndices.isNotEmpty && _generatedImageUrls.isNotEmpty) {
+      final selected = _selectedIndices.map((i) => _generatedImageUrls[i]).toList();
+      widget.onImagesSelected(selected);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Image selected successfully!'),
+        SnackBar(
+          content: Text('${selected.length} image(s) selected successfully!'),
           backgroundColor: AppColors.online,
         ),
       );
@@ -587,15 +594,15 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                       child: PageView.builder(
                         controller: _pageController,
                         onPageChanged: (index) {
-                          _selectImage(index);
+                          // just scroll, don't auto-select
                         },
                         itemCount: _generatedImageUrls.length,
                         itemBuilder: (context, index) {
-                          final isSelected = _selectedImageIndex == index;
+                          final isSelected = _selectedIndices.contains(index);
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: GestureDetector(
-                              onTap: () => _selectImage(index),
+                              onTap: () => _toggleImage(index),
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
@@ -659,6 +666,26 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                                             ),
                                           ),
                                         ),
+                                      // Show selection count badge
+                                      Positioned(
+                                        bottom: 8,
+                                        left: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            '${index + 1}/${_generatedImageUrls.length}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -669,22 +696,37 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // Image indicators
+                    // Dot indicators
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
                         _generatedImageUrls.length,
-                        (index) => Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _selectedImageIndex == index
-                                ? AppColors.primary
-                                : Colors.grey[300],
+                        (index) => GestureDetector(
+                          onTap: () => _toggleImage(index),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: _selectedIndices.contains(index) ? 12 : 8,
+                            height: _selectedIndices.contains(index) ? 12 : 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _selectedIndices.contains(index)
+                                  ? AppColors.primary
+                                  : Colors.grey[300],
+                              border: _selectedIndices.contains(index)
+                                  ? Border.all(color: AppColors.primary, width: 2)
+                                  : null,
+                            ),
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_selectedIndices.length} of ${_generatedImageUrls.length} selected — tap to toggle',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -712,9 +754,9 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: _useSelectedImage,
+                            onPressed: _useSelectedImages,
                             icon: const Icon(Icons.check, size: 18),
-                            label: const Text('Use Image'),
+                            label: Text('Use ${_selectedIndices.length > 1 ? '${_selectedIndices.length} Images' : 'Image'}'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -771,7 +813,7 @@ class _AIImageGeneratorWidgetState extends State<AIImageGeneratorWidget>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Swipe to select the best image, then click "Use Image"',
+                    'Tap images to select/deselect, then click "Use Image"',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark ? Colors.grey[300] : Colors.grey[600],
                     ),

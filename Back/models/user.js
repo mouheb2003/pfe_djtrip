@@ -74,9 +74,9 @@ const userSchema = new mongoose.Schema(
     bannedAt: Date,
     derniere_connexion: Date,
     // 🚀 NEW: Real-time presence tracking field
-    lastActiveAt: { 
-      type: Date, 
-      default: Date.now 
+    lastActiveAt: {
+      type: Date,
+      default: Date.now
     },
     notifications_email: { type: Boolean, default: true },
     notifications_sms: { type: Boolean, default: false },
@@ -156,10 +156,10 @@ const userSchema = new mongoose.Schema(
     // 🚀 NEW: Onboarding and approval fields
     is_onboarded: { type: Boolean, default: false },
     is_approved: { type: Boolean, default: true }, // Only for organizers
-    signup_method: { 
-      type: String, 
-      enum: ["google", "email", "facebook"], 
-      default: "email" 
+    signup_method: {
+      type: String,
+      enum: ["google", "email", "facebook"],
+      default: "email"
     },
     profile_completed: { type: Boolean, default: false },
     onboarding_step: { type: Number, default: 0 },

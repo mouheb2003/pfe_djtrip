@@ -56,7 +56,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
 
   // Media
   final List<XFile> _photos = [];
-  String? _aiGeneratedImageUrl;
+  List<String> _aiGeneratedImageUrls = [];
 
   // Preparation
   final List<String> _includedEquipment = [];
@@ -511,12 +511,10 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
     }
   }
 
-  void _onAIImageGenerated(String imageUrl) {
+  void _onAIImagesSelected(List<String> imageUrls) {
     setState(() {
-      _aiGeneratedImageUrl = imageUrl;
-      print('🤖 AI image generated in create screen: $imageUrl');
-      // Add AI image to photos list so it's saved with the activity
-      // Note: Since AI images are URLs, not local files, they'll be handled separately by the backend
+      _aiGeneratedImageUrls = imageUrls;
+      print('🤖 AI images selected in create screen: ${imageUrls.length} images');
     });
   }
 
@@ -1131,7 +1129,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       dateDebut: _startDateTime!,
       dateFin: endDateTime,
       photos: _photos.map((x) => File(x.path)).toList(),
-      aiGeneratedImageUrl: _aiGeneratedImageUrl,
+      aiGeneratedImageUrls: _aiGeneratedImageUrls,
       equipementsInclus: List.from(_includedEquipment),
       aApporter: List.from(_itemsToBring),
       languesDisponibles: List.from(_languages),
@@ -1488,7 +1486,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
         AIImageGeneratorWidget(
           titleController: _titleCtrl,
           descriptionController: _descCtrl,
-          onImageGenerated: _onAIImageGenerated,
+          onImagesSelected: _onAIImagesSelected,
           existingPhotos: _photos,
           category: _category,
           showDebugInfo: false, // Set to true for development/debugging
@@ -1511,54 +1509,57 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              // Display AI generated image if available
-              if (_aiGeneratedImageUrl != null)
-                Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  width: 140,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF4A65E6),
-                      width: 3,
-                    ),
-                    image: DecorationImage(
-                      image: NetworkImage(_aiGeneratedImageUrl!),
-                      fit: BoxFit.cover,
-                    ),
+              // Display AI generated images if available
+              ..._aiGeneratedImageUrls.map((imageUrl) => Container(
+                margin: const EdgeInsets.only(right: 12),
+                width: 140,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF4A65E6),
+                    width: 3,
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Container(
-                          margin: const EdgeInsets.all(6),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A65E6),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'AI',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white, size: 20),
-                          onPressed: () => setState(() => _aiGeneratedImageUrl = null),
-                        ),
-                      ),
-                    ],
+                  image: DecorationImage(
+                    image: NetworkImage(imageUrl),
+                    fit: BoxFit.cover,
                   ),
                 ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        margin: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4A65E6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'AI',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _aiGeneratedImageUrls.remove(imageUrl);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              )),
               ..._photos.map(
                 (p) => Container(
                   margin: const EdgeInsets.only(right: 12),
@@ -2710,7 +2711,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
                               startDateTime: _startDateTime,
                               endDateTime: _endDateTime,
                               photos: List.from(_photos),
-                              existingPhotos: _aiGeneratedImageUrl != null ? [_aiGeneratedImageUrl!] : const [],
+                              existingPhotos: List.from(_aiGeneratedImageUrls),
                               requirements: List.from(_includedEquipment),
                               optional: List.from(_itemsToBring),
                               pickedLatLng: _pickedLatLng,

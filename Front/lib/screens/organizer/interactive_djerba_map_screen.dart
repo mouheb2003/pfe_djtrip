@@ -5,6 +5,7 @@ import 'dart:async';
 
 import '../../models/lieu_model.dart';
 import '../../services/lieu_service.dart';
+import '../../features/maps/services/google_places_service.dart';
 
 /// Result returned when user confirms a location on the map.
 class MapPickerResult {
@@ -23,13 +24,15 @@ class MapPickerResult {
 class _SearchItem {
   final String name;
   final String subtitle;
-  final LatLng position;
+  final LatLng? position;
+  final String? placeId;
   final String source; // 'bd' or 'geo'
 
   const _SearchItem({
     required this.name,
     required this.subtitle,
-    required this.position,
+    this.position,
+    this.placeId,
     required this.source,
   });
 }
@@ -66,6 +69,7 @@ class _InteractiveDjerbaMapScreenState
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
+  final _placesService = GooglePlacesService();
 
   // All places from BD
   List<LieuModel> _bdPlaces = [];
@@ -118,27 +122,9 @@ class _InteractiveDjerbaMapScreenState
   void _updateMarkers() {
     final newMarkers = <Marker>{};
 
-    // 1) Add BD markers
-    for (final lieu in _bdPlaces) {
-      if (lieu.latitude != null && lieu.longitude != null) {
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId('bd_${lieu.id ?? lieu.titre}'),
-            position: LatLng(lieu.latitude!, lieu.longitude!),
-            infoWindow: InfoWindow(
-              title: lieu.titre,
-              snippet: lieu.sousTitre,
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-            onTap: () {
-              _onMapTapped(LatLng(lieu.latitude!, lieu.longitude!));
-            },
-          ),
-        );
-      }
-    }
+    // Removed BD markers as per user request to only show a single marker
 
-    // 2) Add picked location marker
+    // Add picked location marker
     newMarkers.add(
       Marker(
         markerId: const MarkerId('picked_location'),
@@ -314,25 +300,29 @@ class _InteractiveDjerbaMapScreenState
       }
     }
 
-    // 2) Search via geocoding API (address search)
+    // 2) Search via Google Places API
     try {
-      final locations = await locationFromAddress('$query, Djerba, Tunisia');
-      for (final loc in locations.take(5)) {
-        // Avoid duplicates near existing BD results
-        final isDuplicate = results.any((r) =>
-            (r.position.latitude - loc.latitude).abs() < 0.001 &&
-            (r.position.longitude - loc.longitude).abs() < 0.001);
+      final suggestions = await _placesService.fetchAutocompleteSuggestions(
+        query: query,
+        sessionToken: DateTime.now().millisecondsSinceEpoch.toString(),
+        latitude: _djerbaCenter.latitude,
+        longitude: _djerbaCenter.longitude,
+      );
+      
+      for (final sug in suggestions.take(5)) {
+        // Avoid duplicates near existing BD results (by name)
+        final isDuplicate = results.any((r) => r.name.toLowerCase() == sug.primaryText.toLowerCase());
         if (!isDuplicate) {
           results.add(_SearchItem(
-            name: query,
-            subtitle: 'Djerba, Tunisia',
-            position: LatLng(loc.latitude, loc.longitude),
+            name: sug.primaryText,
+            subtitle: sug.secondaryText.isNotEmpty ? sug.secondaryText : 'Djerba, Tunisia',
+            placeId: sug.placeId,
             source: 'geo',
           ));
         }
       }
     } catch (e) {
-      debugPrint('📍 MAP: Geocoding search failed for "$query": $e');
+      debugPrint('📍 MAP: Places API search failed for "$query": $e');
     }
 
     if (!mounted) return;
@@ -345,22 +335,41 @@ class _InteractiveDjerbaMapScreenState
 
   // ─── USER ACTIONS ─────────────────────────────────────────────────
 
-  void _selectSearchResult(_SearchItem item) {
+  void _selectSearchResult(_SearchItem item) async {
+    LatLng? targetPosition = item.position;
+
+    // If it's from Places API without a loaded position, fetch it
+    if (targetPosition == null && item.placeId != null) {
+      setState(() => _loading = true);
+      try {
+        final placeDetails = await _placesService.fetchPlaceDetails(placeId: item.placeId!);
+        targetPosition = placeDetails.position;
+      } catch (e) {
+        debugPrint('📍 MAP ERROR: Failed to get place details: $e');
+      }
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+
+    if (targetPosition == null) return; // Fallback if still null
+
     setState(() {
-      _pickedLatLng = item.position;
+      _pickedLatLng = targetPosition!;
       _placeName = item.name;
       _address = item.subtitle;
       _searchResults = [];
       _showResults = false;
       _searchController.clear();
+      _updateMarkers();
     });
     _searchFocusNode.unfocus();
     _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(item.position, 15),
+      CameraUpdate.newLatLngZoom(targetPosition, 15),
     );
   }
 
-  void _onMapTapped(LatLng latLng) {
+  void _onMapLongPressed(LatLng latLng) {
     setState(() {
       _pickedLatLng = latLng;
       _placeName = '';
@@ -500,7 +509,7 @@ class _InteractiveDjerbaMapScreenState
                     zoom: _defaultZoom,
                   ),
                   onMapCreated: (c) => _mapController = c,
-                  onTap: _onMapTapped,
+                  onLongPress: _onMapLongPressed,
                   markers: _markers,
                   myLocationEnabled: true,
                   myLocationButtonEnabled: false,

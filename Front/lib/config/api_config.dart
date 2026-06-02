@@ -33,7 +33,7 @@ class ApiConfig {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://192.168.68.99:3000';
+        return 'http://192.168.99.99:3000';
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.windows:
@@ -71,6 +71,7 @@ class ApiConfig {
   static String get users => '$baseUrl/users';
   static String get touristes => '$baseUrl/touristes';
   static String get organisators => '$baseUrl/organisators';
+  static String get recommendations => '$baseUrl/recommendations';
 
   // ── Timeouts ──────────────────────────────────────────────────────────────
   static const Duration connectionTimeout = Duration(seconds: 15);

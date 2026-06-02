@@ -517,6 +517,9 @@ class _RequestCard extends StatelessWidget {
   }
 
   String get _participantName {
+    if (inscription.isExternal) {
+      return inscription.externalName ?? 'External Participant';
+    }
     return (_tourist['fullname'] ?? 'Unknown').toString();
   }
 

@@ -9,6 +9,8 @@ import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/cache_manager.dart';
 import '../../utils/snackbar_utils.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -450,8 +452,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Invalidate cache to ensure fresh data on next load
       CacheManager.instance.remove('GET:/users/me');
       CacheManager.instance.removeByPattern('GET:/users/me*');
+      
+      // 🚀 NEW: Update global UserProvider state
+      if (mounted) {
+        context.read<UserProvider>().refreshUser();
+      }
+      
       SnackbarUtils.showSuccess(context, 'Profile updated successfully');
-      Navigator.pop(context);
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       // 🚀 FIX: Use post-frame callback to avoid build phase error
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -975,6 +983,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     await _loadProfile();
+    
+    // 🚀 NEW: Update global UserProvider state
+    if (mounted) {
+      context.read<UserProvider>().refreshUser();
+    }
+    
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1125,6 +1139,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     await _loadProfile();
+    
+    // 🚀 NEW: Update global UserProvider state
+    if (mounted) {
+      context.read<UserProvider>().refreshUser();
+    }
+    
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -1168,6 +1188,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _isCoverPhotoUploading = false;
         });
         await _loadProfile();
+        
+        // 🚀 NEW: Update global UserProvider state
+        if (mounted) {
+          context.read<UserProvider>().refreshUser();
+        }
+        
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1224,6 +1250,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _isAvatarUploading = false;
         });
         await _loadProfile();
+        
+        // 🚀 NEW: Update global UserProvider state
+        if (mounted) {
+          context.read<UserProvider>().refreshUser();
+        }
+        
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

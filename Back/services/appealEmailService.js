@@ -188,7 +188,7 @@ const appealDecisionTemplate = ({ user, appeal, status, admin_response }) => {
     <title>Appeal Decision - DJTrip</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: ${statusColor}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: #4B63FF; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; }
         .decision-box { background: ${isAccepted ? '#d1f2eb' : '#fadbd8'}; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }
         .admin-response { background: white; padding: 20px; border-left: 4px solid ${statusColor}; margin: 20px 0; }
@@ -230,7 +230,7 @@ const appealDecisionTemplate = ({ user, appeal, status, admin_response }) => {
         ` : `
         <h3>Current Status</h3>
         <p>Your current account status remains <strong>${user.accountStatus?.toUpperCase()}</strong>.</p>
-        <p>If you believe this decision was made in error, you may submit a new appeal after 30 days.</p>
+        <p>If you believe this decision was made in error, you may apply again directly at any time.</p>
         `}
 
         <h3>Appeal Reference</h3>

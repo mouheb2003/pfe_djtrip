@@ -307,8 +307,9 @@ class FcmNotificationService {
       payload: message.data.toString(),
     );
 
-    // Sauvegarder la push notification dans la base de données avec flag isPush
-    await _savePushNotificationToDatabase(message);
+    // The backend is responsible for saving notifications to the database.
+    // Saving it here causes duplicates and potential infinite loops.
+    // await _savePushNotificationToDatabase(message);
 
     // Callback personnalisable
     _onForegroundMessage?.call(message);

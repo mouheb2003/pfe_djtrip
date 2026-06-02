@@ -19,7 +19,7 @@ class PlacesApiException implements Exception {
 class GooglePlacesService {
   GooglePlacesService({http.Client? client, String? apiKey})
     : _client = client,
-      _apiKey = apiKey ?? 'AIzaSyCV9B0RkdbuD_F3zBnFcE-LLQeMNe4tvJI';
+      _apiKey = apiKey ?? 'AIzaSyDct2f5VYToPvW1xFBbA5yIvayTSQiRA0M';
 
   final http.Client? _client;
   final String _apiKey;

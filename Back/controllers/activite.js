@@ -57,6 +57,7 @@ exports.createActivite = async (req, res) => {
       statut,
       ai_generated_image_url,
       aiGeneratedImageUrl,
+      aiGeneratedImageUrls,
     } = req.body;
 
     // Verify the user is an organizer
@@ -134,12 +135,27 @@ exports.createActivite = async (req, res) => {
       }
     }
 
-    // Add AI-generated image URL if provided
+    // Add AI-generated image URLs if provided
     const aiImageUrl = ai_generated_image_url || aiGeneratedImageUrl;
     console.log("🤖 AI-generated image URL received:", aiImageUrl);
     if (aiImageUrl && aiImageUrl.length > 0) {
       console.log("🤖 Adding AI-generated image URL:", aiImageUrl);
       photosUrls.push(aiImageUrl);
+    }
+    
+    if (aiGeneratedImageUrls) {
+      try {
+        const urls = typeof aiGeneratedImageUrls === 'string' 
+          ? JSON.parse(aiGeneratedImageUrls) 
+          : aiGeneratedImageUrls;
+        
+        if (Array.isArray(urls) && urls.length > 0) {
+          console.log(`🤖 Adding ${urls.length} AI-generated image URLs:`, urls);
+          photosUrls.push(...urls);
+        }
+      } catch (e) {
+        console.warn("⚠️ Failed to parse aiGeneratedImageUrls:", e);
+      }
     }
 
     // Validate activity start date: must be at least 24 hours from now
@@ -491,6 +507,7 @@ exports.updateActivite = async (req, res) => {
       keepExistingPhotos, // "true" to keep existing photos and add the new ones
       ai_generated_image_url,
       aiGeneratedImageUrl,
+      aiGeneratedImageUrls,
       existing_photo_urls,
       existingPhotoUrls,
       location_type,
@@ -1106,11 +1123,41 @@ exports.updateAdminActivite = async (req, res) => {
 exports.deleteAdminActivite = async (req, res) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user?.userId || req.user?.id; // Handle different token structures
 
-    const activite = await Activite.findByIdAndDelete(id);
+    const activite = await Activite.findById(id).populate('organisateur_id');
     if (!activite) {
       return res.status(404).json({ message: "Activity not found" });
     }
+
+    const isOwnActivity = activite.organisateur_id._id.toString() === adminId?.toString();
+
+    if (!isOwnActivity) {
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({ message: "Reason is required when deleting someone else's activity" });
+      }
+
+      // Send email to the organizer
+      const email = activite.organisateur_id.email;
+      const fullname = activite.organisateur_id.fullname;
+      if (email) {
+        try {
+          await emailService.sendAdminDeletedContentEmail({
+            email,
+            fullname,
+            contentType: 'activity',
+            contentTitle: activite.titre,
+            reason,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send admin deletion email:", emailErr);
+          // Proceed with deletion even if email fails
+        }
+      }
+    }
+
+    await Activite.findByIdAndDelete(id);
 
     return res.status(200).json({
       message: "Activity deleted successfully",

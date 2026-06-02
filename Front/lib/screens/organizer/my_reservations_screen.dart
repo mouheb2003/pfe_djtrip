@@ -496,7 +496,9 @@ class _MyReservationsTabState extends State<MyReservationsTab>
       activityTitle = 'Unknown Activity';
     }
 
-    String touristName = (tourist['fullname'] ?? tourist['nom'] ?? '').toString();
+    String touristName = reservation.isExternal 
+        ? (reservation.externalName ?? 'External Participant')
+        : (tourist['fullname'] ?? tourist['nom'] ?? '').toString();
     if (touristName.isEmpty && tourist['_id'] != null) {
       touristName = 'Tourist #${tourist['_id'].toString().substring(max(0, tourist['_id'].toString().length - 5))}';
     } else if (touristName.isEmpty) {

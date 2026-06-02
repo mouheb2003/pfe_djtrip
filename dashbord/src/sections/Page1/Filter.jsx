@@ -68,7 +68,7 @@ export function InvoiceFilters({
   return (
     <>
       <Tabs
-        value={currentFilters.status}
+        value={currentFilters.categorie}
         onChange={onFilterStatus}
         sx={{
           px: 2.5,
@@ -83,7 +83,7 @@ export function InvoiceFilters({
             iconPosition="end"
             icon={
               <Label
-                variant={((tab.value === 'all' || tab.value === currentFilters.status) && 'filled') || 'soft'}
+                variant={((tab.value === 'all' || tab.value === currentFilters.categorie) && 'filled') || 'soft'}
                 color={tab.color}
               >
                 {tab.count}

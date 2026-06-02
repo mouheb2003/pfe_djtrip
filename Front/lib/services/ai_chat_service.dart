@@ -37,6 +37,9 @@ class AiChatService {
           if (conversationId != null) 'conversationId': conversationId,
           if (options != null) 'options': options,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('La réponse de l\'IA a pris trop de temps. Réessayez.'),
       );
 
       print('AI Chat Status: ${response.statusCode}');

@@ -1777,12 +1777,13 @@ class _HeroSummaryCard extends StatelessWidget {
     required String label,
     required String value,
     double? width,
+    bool isDark = false,
   }) {
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9E8F7),
+        color: isDark ? const Color(0xFF2E2E42) : const Color(0xFFE9E8F7),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1793,10 +1794,10 @@ class _HeroSummaryCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 9,
               letterSpacing: 0.8,
-              color: Color(0xFF6B7280),
+              color: isDark ? Colors.white60 : const Color(0xFF6B7280),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1805,9 +1806,9 @@ class _HeroSummaryCard extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Color(0xFF111827),
+              color: isDark ? Colors.white : const Color(0xFF111827),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1838,6 +1839,7 @@ class _HeroSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final badgeStatus = _displayStatus(activity);
     final ratingText = activity.noteMoyenne.toStringAsFixed(1);
     final activityType = activity.typeActivite.trim().isNotEmpty
@@ -1859,7 +1861,7 @@ class _HeroSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F2FA),
+        color: isDark ? const Color(0xFF1E1E30) : const Color(0xFFF3F2FA),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
@@ -1902,7 +1904,7 @@ class _HeroSummaryCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCE8FF),
+                      color: isDark ? const Color(0xFF2A3A5E) : const Color(0xFFDCE8FF),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1926,7 +1928,7 @@ class _HeroSummaryCard extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEDEBFA),
+                  color: isDark ? const Color(0xFF2E2A48) : const Color(0xFFEDEBFA),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -1936,9 +1938,9 @@ class _HeroSummaryCard extends StatelessWidget {
                     const SizedBox(width: 5),
                     Text(
                       '$ratingText $reviewsCount',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF545273),
+                        color: isDark ? Colors.white70 : const Color(0xFF545273),
                         fontSize: 10,
                       ),
                     ),
@@ -1952,11 +1954,11 @@ class _HeroSummaryCard extends StatelessWidget {
             activity.titre,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 38,
               fontWeight: FontWeight.w900,
               height: 1.02,
-              color: Color(0xFF17183D),
+              color: isDark ? Colors.white : const Color(0xFF17183D),
             ),
           ),
           const SizedBox(height: 14),
@@ -1972,24 +1974,28 @@ class _HeroSummaryCard extends StatelessWidget {
                     label: 'Date debut',
                     value: _formatStartDate(activity.dateDebut),
                     width: itemWidth,
+                    isDark: isDark,
                   ),
                   _infoTile(
                     icon: Icons.timer,
                     label: 'Duree',
                     value: activity.dureeFormatted,
                     width: itemWidth,
+                    isDark: isDark,
                   ),
                   _infoTile(
                     icon: Icons.group,
                     label: 'Capacite',
                     value: participants,
                     width: itemWidth,
+                    isDark: isDark,
                   ),
                   _infoTile(
                     icon: Icons.language,
                     label: 'Langues',
                     value: languages,
                     width: itemWidth,
+                    isDark: isDark,
                   ),
                 ],
               );
@@ -2278,14 +2284,15 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 12),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF1D2652),
+          color: isDark ? Colors.white : const Color(0xFF1D2652),
         ),
       ),
     );
@@ -2309,6 +2316,7 @@ class _TagListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cleaned = items
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
@@ -2317,8 +2325,8 @@ class _TagListSection extends StatelessWidget {
     if (cleaned.isEmpty) {
       return Text(
         emptyLabel,
-        style: const TextStyle(
-          color: Color(0xFF6B7280),
+        style: TextStyle(
+          color: isDark ? Colors.white60 : const Color(0xFF6B7280),
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -2344,8 +2352,8 @@ class _TagListSection extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     item,
-                    style: const TextStyle(
-                      color: Color(0xFF1F2A44),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF1F2A44),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2366,6 +2374,7 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final markerId = const MarkerId('meeting_point');
 
     // Build markers and polyline from itinerary coordinates
@@ -2388,7 +2397,7 @@ class _LocationCard extends StatelessWidget {
       height: 150,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: isDark ? const Color(0xFF262626) : Colors.grey[200],
         borderRadius: BorderRadius.circular(20),
       ),
       child: ClipRRect(
@@ -2425,15 +2434,15 @@ class _LocationCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
+                        color: isDark ? const Color(0xFF1A1A1A).withOpacity(0.92) : Colors.white.withOpacity(0.92),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         placeLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF1F2937),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF1F2937),
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -2459,6 +2468,8 @@ class _ItineraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     // Prefer structured itinerary steps when available, otherwise fall back to text parsing.
     final steps = itinerarySteps != null && itinerarySteps!.isNotEmpty
         ? itinerarySteps!.map((step) => _formatStructuredStep(step)).toList()
@@ -2467,9 +2478,9 @@ class _ItineraryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF262626) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E9FF)),
+        border: Border.all(color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E9FF)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2478,12 +2489,12 @@ class _ItineraryCard extends StatelessWidget {
             children: [
               Icon(Icons.route, color: const Color(0xFF4A65E6), size: 20),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Journey Itinerary',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF131E32),
+                  color: isDark ? Colors.white : const Color(0xFF131E32),
                 ),
               ),
             ],
@@ -2498,7 +2509,7 @@ class _ItineraryCard extends StatelessWidget {
 
             final location = _locationForStep(index);
 
-            return _buildItineraryStep(index + 1, step, isLast, location);
+            return _buildItineraryStep(index + 1, step, isLast, location, isDark);
           }).toList(),
         ],
       ),
@@ -2605,6 +2616,7 @@ class _ItineraryCard extends StatelessWidget {
     String stepText,
     bool isLast,
     String location,
+    bool isDark,
   ) {
     return Column(
       children: [
@@ -2670,9 +2682,9 @@ class _ItineraryCard extends StatelessWidget {
                   // Step description
                   Text(
                     _removeTimeFromText(stepText),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF131E32),
+                      color: isDark ? Colors.white : const Color(0xFF131E32),
                       height: 1.4,
                     ),
                   ),
@@ -2686,9 +2698,9 @@ class _ItineraryCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFF),
+                        color: isDark ? const Color(0xFF333333) : const Color(0xFFF8FAFF),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E9FF)),
+                        border: Border.all(color: isDark ? const Color(0xFF444444) : const Color(0xFFE2E9FF)),
                       ),
                       child: Row(
                         children: [
@@ -2778,6 +2790,7 @@ class _OrganizerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = (organizer?['fullname'] ?? 'Organizer').toString();
     final avatar = organizer?['avatar']?.toString() ?? '';
     final double ratingVal = (organizer?['noteMoyenne'] as num?)?.toDouble() ?? 0.0;
@@ -2790,9 +2803,9 @@ class _OrganizerCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF262626) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
@@ -2840,10 +2853,10 @@ class _OrganizerCard extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
-                          color: Color(0xFF1E225E),
+                          color: isDark ? Colors.white : const Color(0xFF1E225E),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -2910,10 +2923,10 @@ class _OrganizerCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
+                    color: isDark ? const Color(0xFF333333) : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.chevron_right, color: Color(0xFF4B5563), size: 18),
+                  child: Icon(Icons.chevron_right, color: isDark ? Colors.white70 : const Color(0xFF4B5563), size: 18),
                 ),
               ],
             ),
@@ -2970,12 +2983,13 @@ class _StickyBottomBar extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 20,
@@ -3000,10 +3014,10 @@ class _StickyBottomBar extends StatelessWidget {
                 ),
                 Text(
                   price,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF1B2452),
+                    color: isDark ? Colors.white : const Color(0xFF1B2452),
                   ),
                 ),
               ],
@@ -3019,11 +3033,14 @@ class _StickyBottomBar extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red,
                   side: const BorderSide(color: Colors.red),
+                  padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: Icon(deleteIcon, size: 20),
+                child: Center(
+                  child: Icon(deleteIcon, size: 20),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -3189,6 +3206,7 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final rating = (review['note'] ?? 0).toInt();
     final avatar = _reviewerAvatar();
     final isMyReview = _isMyReview();
@@ -3200,12 +3218,12 @@ class _ReviewCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF262626) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isMyReview
                 ? const Color(0xFF4B63FF)
-                : const Color(0xFFE5E7EB),
+                : (isDark ? const Color(0xFF333333) : const Color(0xFFE5E7EB)),
             width: isMyReview ? 2 : 1,
           ),
         ),
@@ -3232,10 +3250,10 @@ class _ReviewCard extends StatelessWidget {
                         children: [
                           Text(
                             _reviewerName(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: Color(0xFF1F2937),
+                              color: isDark ? Colors.white : const Color(0xFF1F2937),
                             ),
                           ),
                           if (isMyReview) ...[
@@ -3280,9 +3298,9 @@ class _ReviewCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             _reviewDate(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF6B7280),
+                              color: isDark ? Colors.white60 : const Color(0xFF6B7280),
                             ),
                           ),
                         ],
@@ -3295,9 +3313,9 @@ class _ReviewCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               _reviewText(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF4B5563),
+                color: isDark ? Colors.white70 : const Color(0xFF4B5563),
                 height: 1.4,
               ),
             ),

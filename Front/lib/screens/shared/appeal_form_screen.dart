@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/appeal_service.dart';
 import '../../../services/auth_service.dart';
@@ -31,8 +29,6 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
   
   String _selectedSubject = 'Ban Appeal';
   bool _isSubmitting = false;
-  List<File> _attachments = [];
-  final ImagePicker _imagePicker = ImagePicker();
 
   final List<String> _subjectOptions = [
     'Ban Appeal',
@@ -65,39 +61,6 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _attachments.add(File(pickedFile!.path));
-        });
-      }
-    } catch (e) {
-      print('Error picking image: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _removeAttachment(int index) {
-    setState(() {
-      _attachments.removeAt(index);
-    });
-  }
-
   Future<void> _submitAppeal() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -111,7 +74,7 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
         email: _emailController.text.trim(),
         subject: _selectedSubject,
         message: _messageController.text.trim(),
-        attachments: _attachments.map((file) => file.path).toList(),
+        attachments: [],
       );
 
       if (mounted) {
@@ -356,107 +319,6 @@ class _AppealFormScreenState extends State<AppealFormScreen> {
                         }
                         return null;
                       },
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Attachments Section
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Attachments (Optional)',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E225E),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        
-                        // Attachment Preview
-                        if (_attachments.isNotEmpty) ...[
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _attachments.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final file = entry.value;
-                              return Stack(
-                                children: [
-                                  Container(
-                                    width: 80,
-                                    height: 80,
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: const Color(0xFFE1E4E8)),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(7),
-                                      child: file.path.toLowerCase().endsWith('.jpg') ||
-                                               file.path.toLowerCase().endsWith('.jpeg') ||
-                                               file.path.toLowerCase().endsWith('.png')
-                                          ? Image.file(
-                                              File(file.path),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(Icons.broken_image, color: Colors.grey);
-                                              },
-                                            )
-                                          : const Icon(Icons.insert_drive_file, color: Colors.grey),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: -4,
-                                    right: -4,
-                                    child: GestureDetector(
-                                      onTap: () => _removeAttachment(index),
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFFF4757),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.close,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        
-                        // Add Attachment Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 45,
-                          child: OutlinedButton.icon(
-                            onPressed: _pickImage,
-                            icon: const Icon(Icons.attach_file, size: 20),
-                            label: const Text(
-                              'Add Attachment',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF4B63FF),
-                              side: const BorderSide(color: Color(0xFF4B63FF)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                     
                     const SizedBox(height: 32),

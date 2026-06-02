@@ -499,6 +499,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
@@ -507,8 +508,9 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   width: 40,
@@ -598,6 +600,7 @@ class _MyActivitiesTabState extends State<MyActivitiesTab>
                 ),
                 const SizedBox(height: 12),
               ],
+            ),
             ),
           ),
         ),
@@ -1716,6 +1719,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final photos = widget.activity.photos;
     final hasMultiplePhotos = photos.length > 1;
     final numReservations = widget.activity.nombreReservations;
@@ -1727,7 +1731,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: widget.isSelected 
               ? Border.all(color: AppColors.primary, width: 2) 
@@ -1736,7 +1740,7 @@ class _MyActivityCardState extends State<_MyActivityCard> {
             BoxShadow(
               color: widget.isSelected 
                   ? AppColors.primary.withOpacity(0.2) 
-                  : Colors.black.withOpacity(0.08),
+                  : (isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.08)),
               blurRadius: 20,
               offset: const Offset(0, 8),
               spreadRadius: -4,
@@ -1945,10 +1949,12 @@ class _MyActivityCardState extends State<_MyActivityCard> {
                   // Title
                   Text(
                     widget.activity.titre,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B2458),
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? Colors.white 
+                          : const Color(0xFF1B2458),
                       letterSpacing: -0.3,
                       height: 1.3,
                     ),

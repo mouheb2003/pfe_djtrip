@@ -26,7 +26,7 @@ class DirectionsRoute {
 class GoogleDirectionsService {
   GoogleDirectionsService({http.Client? client, String? apiKey})
     : _client = client ?? http.Client(),
-      _apiKey = apiKey ?? 'AIzaSyAKG3yUqz3-9kEdXdKdEMuTxIGN9XypUwE';
+      _apiKey = apiKey ?? 'AIzaSyDct2f5VYToPvW1xFBbA5yIvayTSQiRA0M';
 
   final http.Client _client;
   final String _apiKey;

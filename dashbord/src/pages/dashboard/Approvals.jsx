@@ -304,36 +304,101 @@ export default function ApprovalsPage() {
 
       <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Détails de l'organisateur</DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ maxHeight: 500, overflow: 'auto', p: 1 }}>
-            <Grid container spacing={2}>
-              {Object.entries(flattenObject(selectedOrg?.raw || {}))
-                .filter(([key, value]) => {
-                  const k = key.toLowerCase();
-                  return !k.includes('password') && !k.endsWith('._id') && k !== '_id' && k !== '__v' && value !== null && value !== '' && value !== undefined;
-                })
-                .map(([key, value]) => {
-                  const formattedLabel = key
-                    .replace(/[._]/g, ' ')
-                    .replace(/([A-Z])/g, ' $1')
-                    .trim()
-                    .replace(/^\w/, (c) => c.toUpperCase());
-                  return (
-                    <Grid item xs={12} sm={6} key={key}>
-                      <TextField
-                        fullWidth
-                        label={formattedLabel}
-                        value={String(value)}
-                        InputProps={{ readOnly: true }}
-                        variant="filled"
-                        size="small"
-                        multiline={String(value).length > 40}
-                        maxRows={4}
-                      />
-                    </Grid>
-                  );
-                })}
-            </Grid>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+            {/* Header Images */}
+            {(() => {
+              const coverUrl =
+                selectedOrg?.raw?.cover_photo ||
+                selectedOrg?.raw?.cover_image ||
+                selectedOrg?.raw?.onboarding_data?.cover_photo ||
+                selectedOrg?.raw?.onboarding_data?.cover_image;
+
+              const avatarUrl =
+                selectedOrg?.raw?.avatar ||
+                selectedOrg?.raw?.profile_picture ||
+                selectedOrg?.raw?.onboarding_data?.avatar ||
+                selectedOrg?.raw?.onboarding_data?.profile_picture;
+
+              return (
+                <Box sx={{ position: 'relative', mb: avatarUrl ? 6 : 2 }}>
+                  {coverUrl ? (
+                    <Box
+                      component="img"
+                      src={coverUrl}
+                      alt="Cover"
+                      sx={{ width: '100%', height: 160, objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <Box sx={{ width: '100%', height: 120, bgcolor: 'grey.200' }} />
+                  )}
+
+                  {avatarUrl && (
+                    <Box
+                      component="img"
+                      src={avatarUrl}
+                      alt="Avatar"
+                      sx={{
+                        width: 100,
+                        height: 100,
+                        objectFit: 'cover',
+                        borderRadius: '50%',
+                        border: '4px solid',
+                        borderColor: 'background.paper',
+                        position: 'absolute',
+                        bottom: -50,
+                        left: 24,
+                        bgcolor: 'background.paper',
+                        boxShadow: 1,
+                      }}
+                    />
+                  )}
+                </Box>
+              );
+            })()}
+
+            {/* Details Grid */}
+            <Box sx={{ p: 3 }}>
+              <Grid container spacing={2}>
+                {Object.entries(flattenObject(selectedOrg?.raw || {}))
+                  .filter(([key, value]) => {
+                    const k = key.toLowerCase();
+                    return (
+                      !k.includes('password') &&
+                      !k.endsWith('._id') &&
+                      k !== '_id' &&
+                      k !== '__v' &&
+                      !k.includes('avatar') &&
+                      !k.includes('cover') &&
+                      !k.includes('profile_picture') &&
+                      value !== null &&
+                      value !== '' &&
+                      value !== undefined
+                    );
+                  })
+                  .map(([key, value]) => {
+                    const formattedLabel = key
+                      .replace(/[._]/g, ' ')
+                      .replace(/([A-Z])/g, ' $1')
+                      .trim()
+                      .replace(/^\w/, (c) => c.toUpperCase());
+                    return (
+                      <Grid item xs={12} sm={6} key={key}>
+                        <TextField
+                          fullWidth
+                          label={formattedLabel}
+                          value={String(value)}
+                          InputProps={{ readOnly: true }}
+                          variant="filled"
+                          size="small"
+                          multiline={String(value).length > 40}
+                          maxRows={4}
+                        />
+                      </Grid>
+                    );
+                  })}
+              </Grid>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

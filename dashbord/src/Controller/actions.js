@@ -144,10 +144,10 @@ export async function updatePublication(id, payload) {
   return data?.post ?? data;
 }
 
-export async function deletePublication(id) {
+export async function deletePublication(id, reason) {
   if (!id) return null;
 
-  return Delete(END_POINT.postById(id));
+  return Delete(END_POINT.postById(id), { data: { reason } });
 }
 
 export async function getActivitesAdmin() {
@@ -196,10 +196,10 @@ export async function updateActiviteAdmin(id, payload) {
   return data?.activite ?? data;
 }
 
-export async function deleteActiviteAdmin(id) {
+export async function deleteActiviteAdmin(id, reason) {
   if (!id) return null;
 
-  return Delete(END_POINT.activiteById(id));
+  return Delete(END_POINT.activiteById(id), { data: { reason } });
 }
 
 export async function getMessageConversations() {

@@ -50,7 +50,21 @@ class _ScreenNetworkState extends State<ScreenNetwork>
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
   bool _isFetching = false;
-  String _currentUserId = '';
+  
+  String get _currentUserId {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    var userId = '';
+    if (userProvider.user is Map) {
+      userId = (userProvider.user as Map)['_id']?.toString() ?? '';
+    } else if (userProvider.user != null) {
+      userId = (userProvider.user as dynamic).id ?? '';
+    }
+    if (userId.isEmpty && AuthService.currentUser != null) {
+      userId = AuthService.currentUser?['_id']?.toString() ?? AuthService.currentUser?['id']?.toString() ?? '';
+    }
+    return userId.trim();
+  }
+  
   late final ScrollController _scrollController;
   late final TabController _tabController;
   bool _isScrolled = false;
@@ -399,14 +413,7 @@ class _ScreenNetworkState extends State<ScreenNetwork>
     _isFetching = true;
 
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      var userId = userProvider.user is Map
-          ? (userProvider.user as Map)['_id']?.toString() ?? ''
-          : (userProvider.user as UserModel?)?.id ?? '';
-      if (userId.isEmpty && AuthService.currentUser != null) {
-        userId = AuthService.currentUser?['_id']?.toString() ?? AuthService.currentUser?['id']?.toString() ?? '';
-      }
-      _currentUserId = userId;
+      final userId = _currentUserId;
 
       final posts = await PostService.getFeedPosts();
 

@@ -8,7 +8,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "start /B npm run chatbot:reindex && nodemon server.js",
+    "dev": "nodemon server.js",
     "chatbot:reindex": "cd ../ai-docs-chatbot && npm run reindex",
     "postinstall": "cd ../ai-docs-chatbot && npm install",
     "seed:admin": "node scripts/seed-admin.js",

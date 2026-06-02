@@ -5,6 +5,7 @@ const { triggerPublicationNotification } = require("../controllers/notification"
 const notificationEventBus = require("../services/notificationEventBus");
 const User = require("../models/user");
 const { extractMentions } = require("../controllers/mentionController");
+const emailService = require("../services/email");
 
 const basePopulate = {
   path: "author_id",
@@ -1126,12 +1127,37 @@ exports.updatePostByAdmin = async (req, res) => {
 
 exports.deletePostByAdmin = async (req, res) => {
   try {
-    const adminId = req.user.userId;
+    const adminId = req.user?.userId || req.user?.id;
     const { postId } = req.params;
-    const post = await Post.findById(postId);
+    const { reason } = req.body;
+    const post = await Post.findById(postId).populate('author_id');
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
+    }
+
+    const isOwnPost = post.author_id && post.author_id._id.toString() === adminId?.toString();
+
+    if (!isOwnPost) {
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json({ message: "Reason is required when deleting someone else's publication" });
+      }
+
+      const email = post.author_id?.email;
+      const fullname = post.author_id?.fullname;
+      if (email) {
+        try {
+          await emailService.sendAdminDeletedContentEmail({
+            email,
+            fullname,
+            contentType: 'publication',
+            contentTitle: post.content ? (post.content.substring(0, 50) + "...") : "Publication",
+            reason,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send admin deletion email:", emailErr);
+        }
+      }
     }
 
     post.is_active = false;

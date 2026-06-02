@@ -56,7 +56,9 @@ class _OrganizerBookingDetailScreenState
 
     // Tourist (not organizer)
     final tourist = _inscription.touriste ?? {};
-    final touristName = (tourist['fullname'] ?? tourist['nom'] ?? 'Tourist Name').toString();
+    final touristName = _inscription.isExternal 
+        ? (_inscription.externalName ?? 'External Participant')
+        : (tourist['fullname'] ?? tourist['nom'] ?? 'Tourist Name').toString();
     final touristPhoto = (tourist['avatar'] ?? tourist['photoProfil'] ?? '').toString();
 
     // Get activity dates properly

@@ -275,15 +275,16 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   void _showFilterModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -307,12 +308,12 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
                 padding: const EdgeInsets.all(24),
                 child: Row(
                   children: [
-                    const Text(
+                    Text(
                       'Advanced Filters',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1B2458),
+                        color: isDark ? Colors.white : const Color(0xFF1B2458),
                       ),
                     ),
                     const Spacer(),
@@ -446,15 +447,16 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
   }
 
   Widget _buildFilterSection(String title, Widget child) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1B2458),
+            color: isDark ? Colors.white : const Color(0xFF1B2458),
           ),
         ),
         const SizedBox(height: 12),
@@ -1147,7 +1149,7 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
           if (!_hasMore) return const SizedBox.shrink();
           
           return Padding(
-            padding: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.only(bottom: 100),
             child: _isLoadingMore
                 ? const Center(
                     child: Padding(
@@ -1188,24 +1190,30 @@ class _ExploreActivitiesScreenState extends State<ExploreActivitiesScreen>
         }
 
         final activity = _filteredActivities[index];
-        return _ExploreActivityCard(
-          activity: activity,
-          organizerName: _getOrganizerName(activity),
-          formattedDate: _formatDate(activity),
-          statusColor: _getStatusColor(activity.timelineStatus),
-          statusLabel: _getStatusLabel(activity.timelineStatus),
-          onTap: () {
-            HapticFeedback.selectionClick();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ActivityDetailScreen(
-                  activityId: activity.id,
-                  viewOnly: true,
+        final isLastActivity = index == _filteredActivities.length - 1;
+        final bottomSpace = isLastActivity && !_hasMore ? 100.0 : 24.0;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomSpace),
+          child: _ExploreActivityCard(
+            activity: activity,
+            organizerName: _getOrganizerName(activity),
+            formattedDate: _formatDate(activity),
+            statusColor: _getStatusColor(activity.timelineStatus),
+            statusLabel: _getStatusLabel(activity.timelineStatus),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ActivityDetailScreen(
+                    activityId: activity.id,
+                    viewOnly: true,
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );

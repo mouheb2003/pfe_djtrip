@@ -28,7 +28,7 @@ import { lieuService } from 'src/services/lieuService';
 import { LieuDetailsDialog } from './Components/LieuDetails';
 
 const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? 'AIzaSyAKG3yUqz3-9kEdXdKdEMuTxIGN9XypUwE';
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? 'AIzaSyAaoO6JWNvznoUJST9EwiMA_EGusGiWMk8';
 
 const DEFAULT_CENTER = { lat: 33.8076, lng: 10.8451 };
 
@@ -105,7 +105,7 @@ const PLACE_TYPES = [
 let googleMapsLoaderPromise;
 
 function loadGoogleMapsScript() {
-  if (typeof window !== 'undefined' && window.google?.maps) {
+  if (typeof window !== 'undefined' && window.google?.maps?.places) {
     return Promise.resolve();
   }
 
@@ -128,7 +128,7 @@ function loadGoogleMapsScript() {
       script.dataset.dashboardGoogleMaps = 'true';
       script.async = true;
       script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initDashboardLieuxMap&v=weekly`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initDashboardLieuxMap&v=weekly`;
       script.onerror = () => reject(new Error('Google Maps script failed to load'));
 
       document.head.appendChild(script);
@@ -214,14 +214,7 @@ function buildInfoWindowContent(place) {
   return wrapper;
 }
 
-function placeMatchesSearch(place, query) {
-  if (!query) return true;
-  const haystack = [place.name, place.address, place.city, place.country, place.shortDescription, place.type]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query.toLowerCase());
-}
+// Removed placeMatchesSearch since we use API
 
 export function LieuxMapExplorer() {
   const router = useRouter();
@@ -239,14 +232,8 @@ export function LieuxMapExplorer() {
   const [mapReady, setMapReady] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const filteredPlaces = useMemo(() => {
-    return places.filter((place) => {
-      if (selectedType !== 'all' && place.type !== selectedType) {
-        return false;
-      }
-      return placeMatchesSearch(place, search);
-    });
-  }, [places, search, selectedType]);
+  // We use places directly since API handles filtering
+  const filteredPlaces = places;
 
   const selected = selectedPlace && filteredPlaces.some((place) => place.id === selectedPlace.id)
     ? selectedPlace
@@ -345,12 +332,20 @@ export function LieuxMapExplorer() {
     }
   };
 
-  const loadPlaces = async () => {
+  const loadPlaces = async (searchQuery = search, typeQuery = selectedType) => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await lieuService.getAllLieux({});
+      const params = {};
+      if (typeof searchQuery === 'string' && searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+      if (typeof typeQuery === 'string' && typeQuery !== 'all') {
+        params.type = typeQuery;
+      }
+
+      const response = await lieuService.getAllLieux(params);
       const rawList = Array.isArray(response)
         ? response
         : response?.lieux ?? response?.data?.lieux ?? response?.items ?? [];
@@ -361,13 +356,9 @@ export function LieuxMapExplorer() {
         setSelectedPlace(normalized[0]);
       }
 
-      if (mapRef.current) {
-        renderMarkers(
-          normalized.filter((place) => {
-            if (selectedType !== 'all' && place.type !== selectedType) return false;
-            return placeMatchesSearch(place, search);
-          }),
-        );
+      // Always re-render markers immediately if map is already loaded
+      if (mapRef.current && window.google?.maps) {
+        renderMarkers(normalized);
       }
     } catch (err) {
       setError('Impossible de charger les lieux sur la carte du dashboard.');
@@ -420,9 +411,12 @@ export function LieuxMapExplorer() {
   }, []);
 
   useEffect(() => {
-    loadPlaces();
+    const timer = setTimeout(() => {
+      loadPlaces(search, selectedType);
+    }, 500);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [search, selectedType]);
 
   useEffect(() => {
     if (!mapReady) {
@@ -448,6 +442,7 @@ export function LieuxMapExplorer() {
     <Card sx={{ mb: 3 }}>
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={2}>
+          {/* Header */}
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={2}
@@ -459,7 +454,7 @@ export function LieuxMapExplorer() {
                 Carte des lieux
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Même logique que la carte mobile: lieux, types, sélection et détails.
+                Recherchez et explorez les lieux enregistrés directement depuis l&apos;API.
               </Typography>
             </Box>
 
@@ -467,7 +462,7 @@ export function LieuxMapExplorer() {
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
-                onClick={loadPlaces}
+                onClick={() => loadPlaces(search, selectedType)}
                 disabled={loading}
               >
                 Actualiser
@@ -481,21 +476,54 @@ export function LieuxMapExplorer() {
             </Stack>
           </Stack>
 
-          <TextField
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un lieu, une ville ou une adresse"
-            fullWidth
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
+          {/* ── Search bar ABOVE the map ── */}
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'primary.light',
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.900' : 'primary.lighter',
+              display: 'flex',
+              gap: 1.5,
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: { xs: 'stretch', sm: 'center' },
             }}
-          />
+          >
+            <TextField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') loadPlaces(e.target.value, selectedType);
+              }}
+              placeholder="Rechercher un lieu, une ville, une adresse…"
+              fullWidth
+              size="small"
+              sx={{ bgcolor: 'background.paper', borderRadius: 1 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {loading ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <SearchIcon fontSize="small" />
+                    )}
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<SearchIcon />}
+              onClick={() => loadPlaces(search, selectedType)}
+              disabled={loading}
+              sx={{ whiteSpace: 'nowrap', minWidth: 140 }}
+            >
+              Rechercher
+            </Button>
+          </Box>
 
+          {/* Type filter chips */}
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             {PLACE_TYPES.map((type) => (
               <Chip

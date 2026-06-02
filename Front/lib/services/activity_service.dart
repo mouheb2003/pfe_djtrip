@@ -382,7 +382,7 @@ class ActivityService {
     required DateTime dateDebut,
     DateTime? dateFin,
     List<File> photos = const [],
-    String? aiGeneratedImageUrl,
+    List<String>? aiGeneratedImageUrls,
     List<String> equipementsInclus = const [],
     List<String> aApporter = const [],
     List<String> languesDisponibles = const [],
@@ -454,8 +454,8 @@ class ActivityService {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
       }
 
-      if (aiGeneratedImageUrl != null && aiGeneratedImageUrl.isNotEmpty) {
-        request.fields['aiGeneratedImageUrl'] = aiGeneratedImageUrl;
+      if (aiGeneratedImageUrls != null && aiGeneratedImageUrls.isNotEmpty) {
+        request.fields['aiGeneratedImageUrls'] = jsonEncode(aiGeneratedImageUrls);
       }
 
       request.fields['notifyFollowers'] = notifyFollowers.toString();
@@ -505,7 +505,7 @@ class ActivityService {
     required DateTime dateDebut,
     DateTime? dateFin,
     List<File> newPhotos = const [],
-    String? aiGeneratedImageUrl,
+    List<String>? aiGeneratedImageUrls,
     List<String> existingPhotoUrls = const [],
     List<String> equipementsInclus = const [],
     List<String> aApporter = const [],
@@ -579,8 +579,8 @@ class ActivityService {
         request.fields['coordonnees'] = jsonEncode(coordonnees);
       }
 
-      if (aiGeneratedImageUrl != null && aiGeneratedImageUrl.isNotEmpty) {
-        request.fields['aiGeneratedImageUrl'] = aiGeneratedImageUrl;
+      if (aiGeneratedImageUrls != null && aiGeneratedImageUrls.isNotEmpty) {
+        request.fields['aiGeneratedImageUrls'] = jsonEncode(aiGeneratedImageUrls);
       }
 
       if (existingPhotoUrls.isNotEmpty) {

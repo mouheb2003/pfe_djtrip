@@ -639,7 +639,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
             {'name': 'Algeria', 'code': '+213', 'flag': '🇩🇿', 'pattern': r'^\d{9}$', 'example': '512345678'},
             {'name': 'Saudi Arabia', 'code': '+966', 'flag': '🇸🇦', 'pattern': r'^\d{9}$', 'example': '501234567'},
             {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪', 'pattern': r'^\d{9}$', 'example': '501234567'},
-            {'name': 'Israel', 'code': '+972', 'flag': '🇮🇱', 'pattern': r'^\d{9}$', 'example': '501234567'},
+
             {'name': 'Thailand', 'code': '+66', 'flag': '🇹🇭', 'pattern': r'^\d{9}$', 'example': '812345678'},
             {'name': 'Singapore', 'code': '+65', 'flag': '🇸🇬', 'pattern': r'^\d{8}$', 'example': '81234567'},
             {'name': 'Malaysia', 'code': '+60', 'flag': '🇲🇾', 'pattern': r'^\d{9,10}$', 'example': '123456789'},
@@ -795,7 +795,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
           {'name': 'Algeria', 'code': '+213', 'flag': '🇩🇿', 'pattern': r'^\d{9}$', 'example': '512345678'},
           {'name': 'Saudi Arabia', 'code': '+966', 'flag': '🇸🇦', 'pattern': r'^\d{9}$', 'example': '501234567'},
           {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪', 'pattern': r'^\d{9}$', 'example': '501234567'},
-          {'name': 'Israel', 'code': '+972', 'flag': '🇮🇱', 'pattern': r'^\d{9}$', 'example': '501234567'},
+
           {'name': 'Thailand', 'code': '+66', 'flag': '🇹🇭', 'pattern': r'^\d{9}$', 'example': '812345678'},
           {'name': 'Singapore', 'code': '+65', 'flag': '🇸🇬', 'pattern': r'^\d{8}$', 'example': '81234567'},
           {'name': 'Malaysia', 'code': '+60', 'flag': '🇲🇾', 'pattern': r'^\d{9,10}$', 'example': '123456789'},
@@ -1244,7 +1244,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Algeria', 'code': '+213', 'flag': '🇩🇿', 'pattern': r'^\d{9}$', 'example': '512345678'},
       {'name': 'Saudi Arabia', 'code': '+966', 'flag': '🇸🇦', 'pattern': r'^\d{9}$', 'example': '501234567'},
       {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪', 'pattern': r'^\d{9}$', 'example': '501234567'},
-      {'name': 'Israel', 'code': '+972', 'flag': '🇮🇱', 'pattern': r'^\d{9}$', 'example': '501234567'},
+     
       {'name': 'Thailand', 'code': '+66', 'flag': '🇹🇭', 'pattern': r'^\d{9}$', 'example': '812345678'},
       {'name': 'Singapore', 'code': '+65', 'flag': '🇸🇬', 'pattern': r'^\d{8}$', 'example': '81234567'},
       {'name': 'Malaysia', 'code': '+60', 'flag': '🇲🇾', 'pattern': r'^\d{9,10}$', 'example': '123456789'},
@@ -1417,7 +1417,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Algeria', 'code': '+213', 'flag': '🇩🇿', 'pattern': r'^\d{9}$', 'example': '512345678'},
       {'name': 'Saudi Arabia', 'code': '+966', 'flag': '🇸🇦', 'pattern': r'^\d{9}$', 'example': '501234567'},
       {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪', 'pattern': r'^\d{9}$', 'example': '501234567'},
-      {'name': 'Israel', 'code': '+972', 'flag': '🇮🇱', 'pattern': r'^\d{9}$', 'example': '501234567'},
+     
       {'name': 'Thailand', 'code': '+66', 'flag': '🇹🇭', 'pattern': r'^\d{9}$', 'example': '812345678'},
       {'name': 'Singapore', 'code': '+65', 'flag': '🇸🇬', 'pattern': r'^\d{8}$', 'example': '81234567'},
       {'name': 'Malaysia', 'code': '+60', 'flag': '🇲🇾', 'pattern': r'^\d{9,10}$', 'example': '123456789'},
@@ -1720,7 +1720,7 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
       {'name': 'Algeria', 'flag': '🇩🇿'},
       {'name': 'Saudi Arabia', 'flag': '🇸🇦'},
       {'name': 'UAE', 'flag': '🇦🇪'},
-      {'name': 'Israel', 'flag': '🇮🇱'},
+      
       {'name': 'Thailand', 'flag': '🇹🇭'},
       {'name': 'Singapore', 'flag': '🇸🇬'},
       {'name': 'Malaysia', 'flag': '🇲🇾'},
@@ -2189,45 +2189,68 @@ class _DynamicOnboardingScreenState extends State<DynamicOnboardingScreen>
             ),
           ),
           const SizedBox(height: 40),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: languages.map((lang) {
-              final isSelected = _selectedLanguages.contains(lang['name'] as String);
-              return FilterChip(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              labelText: 'Select a language',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE1E4E8)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF4B63FF)),
+              ),
+              filled: true,
+              fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
+              contentPadding: const EdgeInsets.all(16),
+            ),
+            items: languages.map((lang) {
+              return DropdownMenuItem<String>(
+                value: lang['name'] as String,
+                child: Row(
                   children: [
-                    Text(
-                      lang['flag'] as String,
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    const SizedBox(width: 6),
+                    Text(lang['flag'] as String, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
                     Text(lang['name'] as String),
                   ],
                 ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedLanguages.add(lang['name'] as String);
-                    } else {
-                      _selectedLanguages.remove(lang['name'] as String);
-                    }
-                  });
-                },
-                backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
-                selectedColor: const Color(0xFF4B63FF),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF1E225E)),
-                  fontWeight: FontWeight.w600,
-                ),
-                side: BorderSide(
-                  color: isSelected ? const Color(0xFF4B63FF) : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF333333) : const Color(0xFFE1E4E8)),
-                ),
               );
             }).toList(),
+            onChanged: (value) {
+              if (value != null && !_selectedLanguages.contains(value)) {
+                setState(() {
+                  _selectedLanguages.add(value);
+                });
+              }
+            },
           ),
+          const SizedBox(height: 20),
+          if (_selectedLanguages.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedLanguages.map((langName) {
+                final lang = languages.firstWhere((l) => l['name'] == langName, orElse: () => {'name': langName, 'flag': '🌐'});
+                return Chip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(lang['flag'] as String, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(langName),
+                    ],
+                  ),
+                  onDeleted: () {
+                    setState(() {
+                      _selectedLanguages.remove(langName);
+                    });
+                  },
+                  backgroundColor: const Color(0xFF4B63FF),
+                  labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  deleteIconColor: Colors.white,
+                );
+              }).toList(),
+            ),
           const SizedBox(height: 10),
           Text(
             'Selected: ${_selectedLanguages.length}',
