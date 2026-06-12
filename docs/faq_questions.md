@@ -116,57 +116,33 @@ Activities that are grayed out are either fully booked (sold out) or their start
 
 ---
 
-## 📌 Tourists - Booking & Payments
+## 📌 Tourists - Booking
 
 ### 27. How do I book an activity?
 **Answer:**
 Open the activity details, select your preferred date (if applicable), choose the number of spots, and tap "Book Now". Follow the prompts to confirm.
 
-### 28. What payment methods are accepted?
-**Answer:**
-We accept all major credit cards (Visa, Mastercard, AMEX), Apple Pay, and Google Pay. Some organizers also allow "Pay on Arrival".
-
-### 29. Is my payment information safe?
-**Answer:**
-Absolutely. All transactions are processed securely through Stripe. DJTrip does not store your credit card details on our servers.
-
-### 30. Can I book for a group of people?
+### 28. Can I book for a group of people?
 **Answer:**
 Yes. During the booking process, you can increase the "Number of Participants" counter, provided the activity has enough available spots.
 
-### 31. When am I charged for the booking?
-**Answer:**
-Your card is charged immediately upon confirming the booking to secure your spot. A receipt will be sent to your email.
-
-### 32. How do I get a refund?
-**Answer:**
-Refunds depend on the Organizer's specific cancellation policy. If you cancel within the allowed timeframe, the refund is processed automatically to your original payment method within 5-7 business days.
-
-### 33. Where is my ticket?
+### 29. Where is my ticket?
 **Answer:**
 Your digital ticket is stored in the "My Activities" tab. Tap on the upcoming activity to view your booking reference and QR code.
 
-### 34. Do I need to print my ticket?
+### 30. Do I need to print my ticket?
 **Answer:**
 No, DJTrip is fully digital. Simply show the digital QR code on your phone to the Organizer when you arrive at the activity location.
 
-### 35. What happens if the Organizer cancels?
+### 31. What happens if the Organizer cancels?
 **Answer:**
-If an Organizer cancels an activity, you will be notified immediately via push notification and email. A full refund will be automatically issued.
+If an Organizer cancels an activity, you will be notified immediately via push notification and email.
 
-### 36. Can I transfer my booking to someone else?
+### 32. Can I transfer my booking to someone else?
 **Answer:**
 Direct transfers are not currently supported. You must cancel your booking and have the other person book it themselves.
 
-### 37. Why was my payment declined?
-**Answer:**
-Payments can be declined for insufficient funds, expired cards, or fraud prevention by your bank. Try using a different card or contact your bank.
-
-### 38. Are there hidden fees?
-**Answer:**
-No. The price you see during checkout is the final price. All taxes and platform fees are included.
-
-### 39. Can I tip the organizer through the app?
+### 33. Can I tip the organizer through the app?
 **Answer:**
 Tipping is currently not supported inside the app. You can tip the organizer in cash after the activity if you wish.
 
@@ -174,167 +150,147 @@ Tipping is currently not supported inside the app. You can tip the organizer in 
 
 ## 📌 Organizers - Creating Activities
 
-### 40. How do I publish a new activity?
+### 34. How do I publish a new activity?
 **Answer:**
 Go to the Manage Activities tab, tap the "+" button, and follow the 5-step creation process: Details, Schedule, Pricing, Location, and Media. Tap Publish when done.
 
-### 41. What makes a good activity description?
+### 35. What makes a good activity description?
 **Answer:**
 Be clear and detailed. Include what to expect, what is included in the price, what participants should bring, and any physical requirements.
 
-### 42. How many photos can I upload?
+### 36. How many photos can I upload?
 **Answer:**
 You must upload 1 main thumbnail image and can add up to 5 additional photos in the gallery to showcase your activity.
 
-### 43. Can I set an activity to recur weekly?
+### 37. Can I set an activity to recur weekly?
 **Answer:**
 Currently, activities are created as single events. For recurring events, you can duplicate an existing past activity and change the date.
 
-### 44. How do I price my activity?
+### 38. How do I price my activity?
 **Answer:**
 You set the price during creation. Consider your costs, local market rates, and the platform fee. You can also offer it for free by setting the price to 0.
 
-### 45. Can I edit an activity after publishing?
+### 39. Can I edit an activity after publishing?
 **Answer:**
 Yes, you can edit the description, photos, and capacity. However, you cannot change the price or date if tourists have already booked spots.
 
-### 46. How do I hide an activity without deleting it?
+### 40. How do I hide an activity without deleting it?
 **Answer:**
 You can "Archive" an activity from the Manage Activities tab. It will be hidden from the Explore feed but preserved in your records.
 
-### 47. What is the maximum capacity I can set?
+### 41. What is the maximum capacity I can set?
 **Answer:**
 You can set any capacity up to 999. Ensure it reflects the actual number of people you can safely host.
 
-### 48. Do I need a permit to host activities?
+### 42. Do I need a permit to host activities?
 **Answer:**
 It is your responsibility to ensure you comply with all local laws and hold necessary permits for the activities you organize.
 
-### 49. How do I add a meeting point?
+### 43. How do I add a meeting point?
 **Answer:**
 The location you pick on the map during creation serves as the primary meeting point. You can add specific instructions in the description (e.g., "Meet by the red fountain").
 
-### 50. Can I restrict age for my activity?
+### 44. Can I restrict age for my activity?
 **Answer:**
 Yes. While creating the activity, mention any age restrictions clearly in the description so tourists are aware before booking.
 
-### 51. How do I categorize my activity?
+### 45. How do I categorize my activity?
 **Answer:**
 During creation, select the most relevant category from the dropdown (e.g., Adventure, Food, Culture). Accurate categorization helps tourists find you.
 
-### 52. Can I require a minimum number of participants?
+### 46. Can I require a minimum number of participants?
 **Answer:**
 Currently, you must host the activity even if only 1 person books, unless you cancel it. It is recommended to price your activity accordingly.
 
 ---
 
-## 📌 Organizers - Managing & Payouts
+## 📌 Organizers - Managing Activities
 
-### 53. How do I track my bookings?
+### 47. How do I track my bookings?
 **Answer:**
 The Manage Activities tab shows real-time stats. Tap any active activity to see a full list of registered participants.
 
-### 54. How do I scan participant tickets?
+### 48. How do I scan participant tickets?
 **Answer:**
 In the activity details, tap the 'Scan QR' icon in the top right. Use your camera to scan the tourist's digital ticket upon arrival.
 
-### 55. When do I get paid for my activities?
-**Answer:**
-Payouts are processed 48 hours after the successful completion of an activity. Funds are transferred to your linked bank account.
-
-### 56. What is the platform fee?
-**Answer:**
-DJTrip takes a standard commission of 10% on all paid bookings to cover payment processing and platform maintenance.
-
-### 57. How do I link my bank account?
-**Answer:**
-Go to Profile > Settings > Payout Settings. Enter your IBAN and account details. Verification may take 1-2 business days.
-
-### 58. Can I message all participants at once?
+### 49. Can I message all participants at once?
 **Answer:**
 Yes, open the activity details and tap "Message All". This creates a broadcast message sent to all registered tourists.
 
-### 59. What happens if a tourist is a no-show?
+### 50. What happens if a tourist is a no-show?
 **Answer:**
-If a tourist does not arrive and did not cancel beforehand, you still receive the payout for their booked spot.
+If a tourist does not arrive and did not cancel beforehand, they are marked as a no-show in your records.
 
-### 60. How do I handle bad weather?
+### 51. How do I handle bad weather?
 **Answer:**
-If weather forces a cancellation, immediately cancel the activity in the app so tourists are refunded. Then, use the "Message All" feature to inform them.
+If weather forces a cancellation, immediately cancel the activity in the app. Then, use the "Message All" feature to inform tourists.
 
-### 61. How do I respond to a bad review?
+### 52. How do I respond to a bad review?
 **Answer:**
 While you cannot reply directly on your public profile, you can contact the tourist via Chat to resolve the issue privately and improve future services.
 
-### 62. Can I export my booking list?
+### 53. Can I export my booking list?
 **Answer:**
 Currently, exporting is not available in the mobile app. You can view the full list within the activity details.
 
-### 63. Do I have to pay taxes on my earnings?
-**Answer:**
-Yes. You are considered an independent contractor. You are responsible for reporting your earnings to your local tax authority.
-
-### 64. How do I change my cancellation policy?
+### 54. How do I change my cancellation policy?
 **Answer:**
 Your default cancellation policy is set in Profile > Settings. It applies to all new activities you create.
-
-### 65. Can I offer discounts?
-**Answer:**
-Currently, promotional codes are not supported. To offer a discount, you must lower the price of the activity before people book.
 
 ---
 
 ## 📌 Social & Community
 
-### 66. What is the Social feed?
+### 55. What is the Social feed?
 **Answer:**
 The Social feed is where tourists and organizers share photos, experiences, and updates. It works similarly to popular social media apps.
 
-### 67. How do I post a photo?
+### 56. How do I post a photo?
 **Answer:**
 Go to the Social tab, tap the "+" button, select an image, write a caption, and hit Post. It will be visible to your followers.
 
-### 68. Can I like and comment on posts?
+### 57. Can I like and comment on posts?
 **Answer:**
 Yes. Tap the heart icon to like a post, and the speech bubble icon to leave a comment.
 
-### 69. How do I follow an Organizer?
+### 58. How do I follow an Organizer?
 **Answer:**
 Visit their public profile and tap the "Follow" button. Their posts will now appear higher in your Social feed.
 
-### 70. Can I message other tourists?
+### 59. Can I message other tourists?
 **Answer:**
 For privacy reasons, you can only directly message Organizers. Tourist-to-tourist messaging is disabled.
 
-### 71. How do I block someone on Chat?
+### 60. How do I block someone on Chat?
 **Answer:**
 Open the chat conversation, tap the three dots in the top right, and select "Block User". You will no longer receive messages from them.
 
-### 72. How do I report an inappropriate post?
+### 61. How do I report an inappropriate post?
 **Answer:**
 Tap the three dots next to any post in the Social feed and select "Report". Our admin team will review it within 24 hours.
 
-### 73. Can I delete my own posts?
+### 62. Can I delete my own posts?
 **Answer:**
 Yes. Go to your Profile, find the post in your timeline, tap the options menu, and select "Delete".
 
-### 74. Who can see my profile?
+### 63. Who can see my profile?
 **Answer:**
 Your profile is public. Other users can see your avatar, cover photo, bio, and the posts you have shared on the Social feed.
 
-### 75. How do I share my profile outside the app?
+### 64. How do I share my profile outside the app?
 **Answer:**
 Go to your Profile, tap the Share icon in the top right, and send your unique profile link to friends.
 
-### 76. Can I use hashtags in social posts?
+### 65. Can I use hashtags in social posts?
 **Answer:**
 Yes, adding hashtags makes your posts searchable by others interested in the same topics.
 
-### 77. How do I delete a comment on my post?
+### 66. How do I delete a comment on my post?
 **Answer:**
 Swipe left on the comment or long-press it, then select 'Delete'.
 
-### 78. Can I tag an organizer in a post?
+### 67. Can I tag an organizer in a post?
 **Answer:**
 Yes, type '@' followed by the organizer's username to tag them in your post caption.
 
@@ -342,55 +298,55 @@ Yes, type '@' followed by the organizer's username to tag them in your post capt
 
 ## 📌 Troubleshooting & Technical
 
-### 79. The app is crashing. What should I do?
+### 68. The app is crashing. What should I do?
 **Answer:**
 Ensure you have the latest version installed from the App Store/Play Store. Try clearing the app cache or restarting your phone.
 
-### 80. I am not receiving push notifications.
+### 69. I am not receiving push notifications.
 **Answer:**
 Check your phone's system settings to ensure DJTrip has permission to send notifications. Also, verify that notifications are enabled inside the app under Profile > Settings > Notifications.
 
-### 81. The map is not loading.
+### 70. The map is not loading.
 **Answer:**
 Check your internet connection. The map requires an active data or Wi-Fi connection to load tiles and markers.
 
-### 82. My photos won't upload.
+### 71. My photos won't upload.
 **Answer:**
 Ensure the image files are under 5MB and in standard formats (JPEG, PNG). If the upload stalls, check your network connection.
 
-### 83. I forgot my password and no longer have access to my email.
+### 72. I forgot my password and no longer have access to my email.
 **Answer:**
 You will need to contact our support team at support@djtrip.com with proof of identity to recover your account.
 
-### 84. How do I clear the app cache?
+### 73. How do I clear the app cache?
 **Answer:**
 On Android, go to Settings > Apps > DJTrip > Storage > Clear Cache. On iOS, you may need to uninstall and reinstall the app.
 
-### 85. Is the app available offline?
+### 74. Is the app available offline?
 **Answer:**
 Basic cached data (like your upcoming tickets) can be viewed offline, but you need an internet connection to browse new activities or send messages.
 
-### 86. Why is my screen frozen on the loading logo?
+### 75. Why is my screen frozen on the loading logo?
 **Answer:**
 This usually indicates a server connection issue. Force close the app, ensure you have a stable internet connection, and reopen it.
 
-### 87. How do I update the app?
+### 76. How do I update the app?
 **Answer:**
 Visit the Google Play Store or Apple App Store, search for DJTrip, and tap "Update" if a new version is available.
 
-### 88. The chat messages are delayed.
+### 77. The chat messages are delayed.
 **Answer:**
 This is likely a network issue. Pull down on the chat screen to manually refresh the conversation and fetch new messages.
 
-### 89. Why is the app draining my battery?
+### 78. Why is the app draining my battery?
 **Answer:**
 Prolonged use of the GPS for the map can drain the battery. Close the app when not in use.
 
-### 90. Is DJTrip compatible with tablets?
+### 79. Is DJTrip compatible with tablets?
 **Answer:**
 Yes, the app is optimized for both smartphones and tablets running recent versions of iOS and Android.
 
-### 91. Where is the app data stored?
+### 80. Where is the app data stored?
 **Answer:**
 Your personal data and chat history are securely stored on our encrypted cloud servers.
 
@@ -398,51 +354,43 @@ Your personal data and chat history are securely stored on our encrypted cloud s
 
 ## 📌 Admin, Verification & Appeals
 
-### 92. How long does Organizer verification take?
+### 81. How long does Organizer verification take?
 **Answer:**
 Once you submit a request for the Verified badge, the admin team typically reviews your profile and history within 3 to 5 business days.
 
-### 93. My activity was deleted by an admin. Why?
+### 82. My activity was deleted by an admin. Why?
 **Answer:**
 Admins may delete activities that violate our terms, such as illegal activities, scams, or events receiving overwhelming negative reports. You should have received an email explanation.
 
-### 94. How do I submit an Appeal?
+### 83. How do I submit an Appeal?
 **Answer:**
 If your account was suspended or an activity removed unfairly, go to the Help section and select "Submit Appeal". Provide detailed context for the admins.
 
-### 95. What happens when I report a user?
+### 84. What happens when I report a user?
 **Answer:**
 The user's profile and recent activity are sent to the admin dashboard. Admins review the report to determine if a warning or ban is necessary.
 
-### 96. Can an admin read my private chats?
+### 85. Can an admin read my private chats?
 **Answer:**
 Admins cannot read private chats unless one of the participants explicitly reports a specific message for harassment or policy violation.
 
-### 97. How do I contact the DJTrip headquarters?
+### 86. How do I contact the DJTrip headquarters?
 **Answer:**
 You can email us at contact@djtrip.com or use the "Contact Us" form in the app under Settings > Help.
 
-### 98. Do you offer a bug bounty program?
+### 87. Do you offer a bug bounty program?
 **Answer:**
 Yes! If you discover a significant security vulnerability, please report it to security@djtrip.com.
 
-### 99. How are disputes over refunds handled?
-**Answer:**
-If a tourist and organizer disagree on a refund, admins mediate the dispute based on the app's logs, GPS data, and chat history.
-
-### 100. What is the "Admin Warning" in chat?
+### 88. What is the "Admin Warning" in chat?
 **Answer:**
 If an admin needs to contact you regarding a policy violation, they will message you directly. These chats have a special "ADMIN" badge.
 
-### 101. Are my payment details visible to admins?
-**Answer:**
-No. Payment details are fully encrypted by Stripe. Admins can only see transaction IDs and booking status, not your card numbers.
-
-### 102. How do admins verify identity documents?
+### 89. How do admins verify identity documents?
 **Answer:**
 Admins use secure software to cross-reference identity documents with the provided profile information to ensure authenticity.
 
-### 103. Can I appeal a bad review?
+### 90. Can I appeal a bad review?
 **Answer:**
 Yes. If a review contains hate speech, spam, or blatant falsehoods, report it. Admins will review and remove it if it violates policy.
 
